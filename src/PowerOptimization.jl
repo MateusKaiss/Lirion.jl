@@ -1,4 +1,4 @@
-module PowerFlowSolvers
+module PowerOptimization
 
 using JuMP
 using Ipopt

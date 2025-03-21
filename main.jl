@@ -1,5 +1,5 @@
 import Pkg
 Pkg.instantiate()
 
-using PowerFlowSolvers
+using PowerOptimization
 PowerSolutions.main(ARGS)

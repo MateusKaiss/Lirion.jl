@@ -1,4 +1,4 @@
-name = "PowerFlowSolvers"
+name = "PowerOptimization"
 uuid = "39f2d509-5c07-4bae-a810-f080f7bd369c"
 authors = ["Mateus Kaiss <mateus.kaiss@ufpr.br>"]
 version = "0.1.0"
