@@ -74,9 +74,9 @@ function create_curtailment_constraints!(model, inputs)
     end
 end
 
-# ---------------------------------------------------------------------
-# Dispatching Generator Variables by Model Type
-# ---------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Dispatching Generator Variables, Expressions and Constraints by Model Type
+# ---------------------------------------------------------------------------
 function generators!(model::JuMP.Model, inputs, ::Type{DC}, ::Type{SubproblemBuild})
     create_active_generation_variables!(model, inputs)
     create_curtailment_variables!(model, inputs)
