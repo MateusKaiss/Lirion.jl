@@ -31,9 +31,9 @@ end
 function process_subproblem(args...)
     buses!(args...)
     branches!(args...)
-    # generators!(args...)
-    # batteries!(args...)
-    # active_power_balance!(args...)
+    generators!(args...)
+    batteries!(args...)
+    active_power_balance!(args...)
     # reactive_power_balance!(args...)
     # objective!(args...)
 
