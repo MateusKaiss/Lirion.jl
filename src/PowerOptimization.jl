@@ -17,6 +17,7 @@ include("build_model/bus.jl")
 include("build_model/branch.jl")
 include("build_model/generator.jl")
 include("build_model/battery.jl")
+include("build_model/active_power_balance.jl")
 include("main.jl")
 
 end
