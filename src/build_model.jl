@@ -34,8 +34,8 @@ function process_subproblem(args...)
     generators!(args...)
     batteries!(args...)
     active_power_balance!(args...)
-    # reactive_power_balance!(args...)
-    # objective!(args...)
+    reactive_power_balance!(args...)
+    objective!(args...)
 
     return nothing
 end
