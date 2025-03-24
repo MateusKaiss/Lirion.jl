@@ -4,6 +4,14 @@ struct DC <: OPFModel end
 struct AC <: OPFModel end
 struct SOCP <: OPFModel end
 
+abstract type SubproblemAction end
+
+struct SubproblemBuild <: SubproblemAction end
+struct SubproblemUpdate <: SubproblemAction end
+struct SubproblemGetResult <: SubproblemAction end
+struct SubproblemNameElementsDimensions <: SubproblemAction end
+struct SubproblemWriteResult <: SubproblemAction end
+
 function build_and_optimize_model(matpower_data, model_type)
     # problem_results = ProblemResults()
     model = JuMP.Model(Ipopt.Optimizer)
@@ -21,8 +29,8 @@ function build_and_optimize_model(matpower_data, model_type)
 end
 
 function process_subproblem(args...)
-    # buses!(args...)
-    # branches!(args...)
+    buses!(args...)
+    branches!(args...)
     # generators!(args...)
     # batteries!(args...)
     # active_power_balance!(args...)
