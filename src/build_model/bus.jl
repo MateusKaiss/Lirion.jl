@@ -54,7 +54,7 @@ end
 # ---------------------------------------------------------------------
 # Dispatching Bus Variables by Model Type
 # ---------------------------------------------------------------------
-function buses!(model::JuMP.Model, bus_data, ::Type{DC},::Type{SubproblemBuild})
+function buses!(model::JuMP.Model, bus_data, ::Type{DC}, ::Type{SubproblemBuild})
     create_voltage_angle_variables!(model, bus_data)
     return nothing
 end

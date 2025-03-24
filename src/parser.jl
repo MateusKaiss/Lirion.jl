@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------
 const _mp_data_names = ["mpc.version", "mpc.baseMVA", "mpc.bus", "mpc.gen",
     "mpc.branch", "mpc.dcline", "mpc.gencost", "mpc.dclinecost",
-    "mpc.bus_name", "mpc.storage", "mpc.switch"
+    "mpc.bus_name", "mpc.storage", "mpc.switch",
 ]
 
 const _mp_bus_columns = [
@@ -17,7 +17,7 @@ const _mp_bus_columns = [
     ("zone", Int),
     ("vmax", Float64), ("vmin", Float64),
     ("lam_p", Float64), ("lam_q", Float64),
-    ("mu_vmax", Float64), ("mu_vmin", Float64)
+    ("mu_vmax", Float64), ("mu_vmin", Float64),
 ]
 
 const _mp_bus_name_columns = [
@@ -44,7 +44,7 @@ const _mp_gen_columns = [
     ("mu_pmax", Float64), ("mu_pmin", Float64),
     ("mu_qmax", Float64), ("mu_qmin", Float64),
     ("plant_type", Float64),
-    ("curtailment_cost", Float64),    
+    ("curtailment_cost", Float64),
 ]
 
 const _mp_branch_columns = [
@@ -61,7 +61,7 @@ const _mp_branch_columns = [
     ("pf", Float64), ("qf", Float64),
     ("pt", Float64), ("qt", Float64),
     ("mu_sf", Float64), ("mu_st", Float64),
-    ("mu_angmin", Float64), ("mu_angmax", Float64)
+    ("mu_angmin", Float64), ("mu_angmax", Float64),
 ]
 
 const _mp_dcline_columns = [
@@ -78,7 +78,7 @@ const _mp_dcline_columns = [
     ("loss1", Float64),
     ("mu_pmin", Float64), ("mu_pmax", Float64),
     ("mu_qminf", Float64), ("mu_qmaxf", Float64),
-    ("mu_qmint", Float64), ("mu_qmaxt", Float64)
+    ("mu_qmint", Float64), ("mu_qmaxt", Float64),
 ]
 
 const _mp_storage_columns = [
@@ -91,22 +91,22 @@ const _mp_storage_columns = [
     ("qmin", Float64), ("qmax", Float64),
     ("r", Float64), ("x", Float64),
     ("p_loss", Float64), ("q_loss", Float64),
-    ("status", Int)
+    ("status", Int),
 ]
 
 const _mp_switch_columns = [
     ("f_bus", Int), ("t_bus", Int),
     ("psw", Float64), ("qsw", Float64), ("state", Int),
     ("thermal_rating", Float64),
-    ("status", Int)
+    ("status", Int),
 ]
 
 const _mp_gencost_columns = [
-    ("model", Int), 
-    ("startup", Float64), 
+    ("model", Int),
+    ("startup", Float64),
     ("shutdown", Float64),
-    ("ncost", Int),       
-    ("cost_coefficients", Vector{Float64})
+    ("ncost", Int),
+    ("cost_coefficients", Vector{Float64}),
 ]
 
 # ---------------------------------------------------------------------
@@ -146,7 +146,7 @@ function _parse_gencost_table(data::Array)
         push!(table["ncost"], row[4])
 
         ncost = row[4]
-        cost_coefficients = row[5:5 + ncost - 1]
+        cost_coefficients = row[5:5+ncost-1]
         push!(table["cost_coefficients"], cost_coefficients)
     end
 
@@ -154,14 +154,17 @@ function _parse_gencost_table(data::Array)
 end
 
 function _parse_matpower_string(data_string::String)
-    matlab_data, func_name, colnames = InfrastructureModels.parse_matlab_string(data_string, extended=true)
+    matlab_data, func_name, colnames =
+        InfrastructureModels.parse_matlab_string(data_string; extended = true)
 
     case = Dict{String, Any}()
 
     if func_name != nothing
         case["name"] = func_name
     else
-        @warn("No case name found in matpower file. The file seems to be missing \"function mpc = ...\"")
+        @warn(
+            "No case name found in matpower file. The file seems to be missing \"function mpc = ...\""
+        )
         case["name"] = "no_name_found"
     end
 
@@ -169,50 +172,63 @@ function _parse_matpower_string(data_string::String)
     if haskey(matlab_data, "mpc.version")
         case["source_version"] = matlab_data["mpc.version"]
     else
-        @warn("no case version found in matpower file. The file seems to be missing \"mpc.version = ...\"")
+        @warn(
+            "no case version found in matpower file. The file seems to be missing \"mpc.version = ...\""
+        )
         case["source_version"] = "0.0.0+"
     end
 
     if haskey(matlab_data, "mpc.baseMVA")
         case["baseMVA"] = matlab_data["mpc.baseMVA"]
     else
-        @warn("no baseMVA found in matpower file. The file seems to be missing \"mpc.baseMVA = ...\"")
+        @warn(
+            "no baseMVA found in matpower file. The file seems to be missing \"mpc.baseMVA = ...\""
+        )
         case["baseMVA"] = 1.0
     end
 
     if haskey(matlab_data, "mpc.bus")
         case["bus"] = _parse_table(matlab_data["mpc.bus"], _mp_bus_columns)
     else
-        @error("No bus table found in matpower file. The file seems to be missing \"mpc.bus = [...];\"")
+        @error(
+            "No bus table found in matpower file. The file seems to be missing \"mpc.bus = [...];\""
+        )
     end
 
     if haskey(matlab_data, "mpc.gen")
         case["gen"] = _parse_table(matlab_data["mpc.gen"], _mp_gen_columns)
 
         ngens = length(case["gen"]["gen_bus"])
-        if !haskey(case["gen"], "plant_type")  || isempty(case["gen"]["plant_type"])
+        if !haskey(case["gen"], "plant_type") || isempty(case["gen"]["plant_type"])
             @warn "Column 'plant_type' not found in mpc.gen. Assuming all plants are thermal ('T')."
             case["gen"]["plant_type"] = fill("T", ngens)
         end
-        if !haskey(case["gen"], "curtailment_cost") || isempty(case["gen"]["curtailment_cost"])
+        if !haskey(case["gen"], "curtailment_cost") ||
+           isempty(case["gen"]["curtailment_cost"])
             @warn "Column 'curtailment_cost' not found in mpc.gen. Assuming zero curtailment cost."
             case["gen"]["curtailment_cost"] = fill(0.0, ngens)
         end
 
     else
-        @error("No gen table found in matpower file. The file seems to be missing \"mpc.gen = [...];\"")
+        @error(
+            "No gen table found in matpower file. The file seems to be missing \"mpc.gen = [...];\""
+        )
     end
 
     if haskey(matlab_data, "mpc.gencost")
         case["gencost"] = _parse_gencost_table(matlab_data["mpc.gencost"])
     else
-        @error("No gencost table found in matpower file. The file seems to be missing \"mpc.gencost = [...];\"")
+        @error(
+            "No gencost table found in matpower file. The file seems to be missing \"mpc.gencost = [...];\""
+        )
     end
 
     if haskey(matlab_data, "mpc.branch")
         case["branch"] = _parse_table(matlab_data["mpc.branch"], _mp_branch_columns)
     else
-        @error("No branch table found in matpower file. The file seems to be missing \"mpc.branch = [...];\"")
+        @error(
+            "No branch table found in matpower file. The file seems to be missing \"mpc.branch = [...];\""
+        )
     end
 
     if haskey(matlab_data, "mpc.dcline")
@@ -231,7 +247,9 @@ function _parse_matpower_string(data_string::String)
         case["bus_name"] = _parse_table(matlab_data["mpc.bus_name"], _mp_bus_name_columns)
 
         if length(case["bus_name"]["name"]) != length(case["bus"]["bus_i"])
-            @error("Incorrect Matpower file: the number of bus names does not match the number of buses.")
+            @error(
+                "Incorrect Matpower file: the number of bus names does not match the number of buses."
+            )
         end
     end
 
