@@ -74,13 +74,22 @@ function compute_ac_branch_expressions(model, params)
     g = params.resistance ./ (params.resistance .^ 2 .+ params.reactance .^ 2)
     b = -params.reactance ./ (params.resistance .^ 2 .+ params.reactance .^ 2)
 
+    tap_position = copy(params.tap_position)
+    for i in eachindex(tap_position)
+        if isnan(tap_position[i]) || tap_position[i] == 0.0
+            tap_position[i] = 1.0
+        end
+    end
+    inv_tap = 1.0 ./ tap_position
+
     @expression(
         model,
         p_flow_branches[l = 1:params.number_of_branches],
         params.existing[l] == 1 ?
-        params.s_base * (
-            g[l] * model[:v_magnitude][params.bus_from[l]]^2 -
-            model[:v_magnitude][params.bus_from[l]] *
+        params.s_base *
+        (
+            g[l] * (inv_tap[l] * model[:v_magnitude][params.bus_from[l]])^2 -
+            inv_tap[l] * model[:v_magnitude][params.bus_from[l]] *
             model[:v_magnitude][params.bus_to[l]] *
             (
                 g[l] *
@@ -95,9 +104,10 @@ function compute_ac_branch_expressions(model, params)
         model,
         p_reverse_flow_branches[l = 1:params.number_of_branches],
         params.existing[l] == 1 ?
-        params.s_base * (
+        params.s_base *
+        (
             g[l] * model[:v_magnitude][params.bus_to[l]]^2 -
-            model[:v_magnitude][params.bus_to[l]] *
+            inv_tap[l] * model[:v_magnitude][params.bus_to[l]] *
             model[:v_magnitude][params.bus_from[l]] *
             (
                 g[l] *
@@ -112,9 +122,11 @@ function compute_ac_branch_expressions(model, params)
         model,
         q_flow_branches[l = 1:params.number_of_branches],
         params.existing[l] == 1 ?
-        params.s_base * (
-            -(b[l] + (params.b_shunt[l] / 2)) * model[:v_magnitude][params.bus_from[l]]^2 -
-            model[:v_magnitude][params.bus_from[l]] *
+        params.s_base *
+        (
+            -(b[l] + params.b_shunt[l] / 2) *
+            (inv_tap[l] * model[:v_magnitude][params.bus_from[l]])^2 -
+            inv_tap[l] * model[:v_magnitude][params.bus_from[l]] *
             model[:v_magnitude][params.bus_to[l]] *
             (
                 -b[l] *
@@ -129,9 +141,10 @@ function compute_ac_branch_expressions(model, params)
         model,
         q_reverse_flow_branches[l = 1:params.number_of_branches],
         params.existing[l] == 1 ?
-        params.s_base * (
-            -(b[l] + (params.b_shunt[l] / 2)) * model[:v_magnitude][params.bus_to[l]]^2 -
-            model[:v_magnitude][params.bus_to[l]] *
+        params.s_base *
+        (
+            -(b[l] + params.b_shunt[l] / 2) * model[:v_magnitude][params.bus_to[l]]^2 -
+            inv_tap[l] * model[:v_magnitude][params.bus_to[l]] *
             model[:v_magnitude][params.bus_from[l]] *
             (
                 -b[l] *
@@ -196,6 +209,14 @@ function compute_socp_branch_expressions(model, params)
     g = params.resistance ./ (params.resistance .^ 2 .+ params.reactance .^ 2)
     b = -params.reactance ./ (params.resistance .^ 2 .+ params.reactance .^ 2)
 
+    tap_position = copy(params.tap_position)
+    for i in eachindex(tap_position)
+        if isnan(tap_position[i]) || tap_position[i] == 0.0
+            tap_position[i] = 1.0
+        end
+    end
+    inv_tap = 1.0 ./ tap_position
+
     active_branches = findall(i -> params.existing[i] == 1, 1:params.number_of_branches)
 
     @variable(model, R[1:params.number_of_branches])
@@ -220,7 +241,8 @@ function compute_socp_branch_expressions(model, params)
         p_flow_branches[l = 1:params.number_of_branches],
         params.existing[l] == 1 ?
         params.s_base * (
-            g[l] * model[:v_magnitude_sq][params.bus_from[l]] - g[l] * R[l] - b[l] * T[l]
+            g[l] * (inv_tap[l]^2 * model[:v_magnitude_sq][params.bus_from[l]]) -
+            inv_tap[l] * (g[l] * R[l] - b[l] * T[l])
         ) : 0
     )
 
@@ -229,7 +251,8 @@ function compute_socp_branch_expressions(model, params)
         p_reverse_flow_branches[l = 1:params.number_of_branches],
         params.existing[l] == 1 ?
         params.s_base * (
-            g[l] * model[:v_magnitude_sq][params.bus_to[l]] - g[l] * R[l] + b[l] * T[l]
+            g[l] * model[:v_magnitude_sq][params.bus_to[l]] -
+            inv_tap[l] * (g[l] * R[l] + b[l] * T[l])
         ) : 0
     )
 
@@ -238,8 +261,9 @@ function compute_socp_branch_expressions(model, params)
         q_flow_branches[l = 1:params.number_of_branches],
         params.existing[l] == 1 ?
         params.s_base * (
-            -(b[l] + (params.b_shunt[l] / 2)) * model[:v_magnitude_sq][params.bus_from[l]] +
-            b[l] * R[l] - g[l] * T[l]
+            -(b[l] + (params.b_shunt[l] / 2)) *
+            (inv_tap[l]^2 * model[:v_magnitude_sq][params.bus_from[l]]) +
+            inv_tap[l] * (b[l] * R[l] - g[l] * T[l])
         ) : 0
     )
 
@@ -249,7 +273,7 @@ function compute_socp_branch_expressions(model, params)
         params.existing[l] == 1 ?
         params.s_base * (
             -(b[l] + (params.b_shunt[l] / 2)) * model[:v_magnitude_sq][params.bus_to[l]] +
-            b[l] * R[l] + g[l] * T[l]
+            inv_tap[l] * (b[l] * R[l] + g[l] * T[l])
         ) : 0
     )
 end
