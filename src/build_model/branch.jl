@@ -242,11 +242,7 @@ function compute_socp_branch_expressions(model, params)
         params.existing[l] == 1 ?
         params.s_base * (
             g[l] * (inv_tap[l]^2 * model[:v_magnitude_sq][params.bus_from[l]]) -
-<<<<<<< HEAD
             inv_tap[l] * g[l] * R[l] - inv_tap[l] * b[l] * T[l]
-=======
-            inv_tap[l] * (g[l] * R[l] - b[l] * T[l])
->>>>>>> b8e64f602fb88dbba2d680787569a455023330b3
         ) : 0
     )
 
@@ -256,11 +252,7 @@ function compute_socp_branch_expressions(model, params)
         params.existing[l] == 1 ?
         params.s_base * (
             g[l] * model[:v_magnitude_sq][params.bus_to[l]] -
-<<<<<<< HEAD
             inv_tap[l] * g[l] * R[l] + inv_tap[l] * b[l] * T[l]
-=======
-            inv_tap[l] * (g[l] * R[l] + b[l] * T[l])
->>>>>>> b8e64f602fb88dbba2d680787569a455023330b3
         ) : 0
     )
 
@@ -271,11 +263,8 @@ function compute_socp_branch_expressions(model, params)
         params.s_base * (
             -(b[l] + (params.b_shunt[l] / 2)) *
             (inv_tap[l]^2 * model[:v_magnitude_sq][params.bus_from[l]]) +
-<<<<<<< HEAD
             inv_tap[l] * b[l] * R[l] - inv_tap[l] * g[l] * T[l]
-=======
-            inv_tap[l] * (b[l] * R[l] - g[l] * T[l])
->>>>>>> b8e64f602fb88dbba2d680787569a455023330b3
+
         ) : 0
     )
 
@@ -285,11 +274,7 @@ function compute_socp_branch_expressions(model, params)
         params.existing[l] == 1 ?
         params.s_base * (
             -(b[l] + (params.b_shunt[l] / 2)) * model[:v_magnitude_sq][params.bus_to[l]] +
-<<<<<<< HEAD
             inv_tap[l] * b[l] * R[l] + inv_tap[l] * g[l] * T[l]
-=======
-            inv_tap[l] * (b[l] * R[l] + g[l] * T[l])
->>>>>>> b8e64f602fb88dbba2d680787569a455023330b3
         ) : 0
     )
 end
