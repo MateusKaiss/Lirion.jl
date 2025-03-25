@@ -8,8 +8,6 @@ function create_voltage_angle_variables!(model, bus_data)
     @variable(
         model,
         theta[b = 1:number_of_buses],
-        lower_bound = bus_data["vmin"][b],
-        upper_bound = bus_data["vmax"][b],
         start = isnan(bus_data["va"][b]) ? nothing : bus_data["va"][b]
     )
 
@@ -54,7 +52,8 @@ end
 # ---------------------------------------------------------------------
 # Dispatching Bus Variables by Model Type
 # ---------------------------------------------------------------------
-function buses!(model::JuMP.Model, bus_data, ::Type{DC}, ::Type{SubproblemBuild})
+function buses!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
+    bus_data = matpower_data["bus"]
     create_voltage_angle_variables!(model, bus_data)
     return nothing
 end
@@ -66,7 +65,8 @@ function buses!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{SubproblemB
     return nothing
 end
 
-function buses!(model::JuMP.Model, bus_data, ::Type{SOCP}, ::Type{SubproblemBuild})
+function buses!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{SubproblemBuild})
+    bus_data = matpower_data["bus"]
     create_voltage_angle_variables!(model, bus_data)
     create_socp_variables!(model, bus_data)
     return nothing
