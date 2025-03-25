@@ -1,8 +1,10 @@
 function get_objective_parameters(gen_data, battery_data, gencost_data)
     return (
         number_of_generators = length(gen_data["gen_bus"]),
-        number_of_batteries = haskey(battery_data, "storage_bus") ? length(battery_data["storage_bus"]) : 0,
-        generator_costs = haskey(gencost_data, "cost_coefficients") ? gencost_data["cost_coefficients"] : [],
+        number_of_batteries = haskey(battery_data, "storage_bus") ?
+                              length(battery_data["storage_bus"]) : 0,
+        generator_costs = haskey(gencost_data, "cost_coefficients") ?
+                          gencost_data["cost_coefficients"] : [],
         num_polynomial_coefs = haskey(gencost_data, "ncost") ? gencost_data["ncost"] : [],
         curtailment_cost = gen_data["curtailment_cost"],
         plant_type = gen_data["plant_type"],
@@ -105,7 +107,10 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{Subprob
         Min,
         model[:generation_cost] + model[:curtailment_cost] +
         model[:reactive_power_penalty] +
-        (haskey(model, :battery_reactive_injection) ? model[:battery_reactive_injection] : 0)
+        (
+            haskey(model, :battery_reactive_injection) ?
+            model[:battery_reactive_injection] : 0
+        )
     )
 end
 
@@ -127,6 +132,9 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{Subpr
         Min,
         model[:generation_cost] + model[:curtailment_cost] +
         model[:reactive_power_penalty] +
-        (haskey(model, :battery_reactive_injection) ? model[:battery_reactive_injection] : 0)
+        (
+            haskey(model, :battery_reactive_injection) ?
+            model[:battery_reactive_injection] : 0
+        )
     )
 end

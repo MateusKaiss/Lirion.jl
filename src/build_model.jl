@@ -14,7 +14,7 @@ struct SubproblemWriteResult <: SubproblemAction end
 
 function build_and_optimize_model(matpower_data, model_type)
     # problem_results = ProblemResults()
-    model = JuMP.Model(Ipopt.Optimizer)
+    model = JuMP.Model(Gurobi.Optimizer)
 
     process_subproblem(
         model,
@@ -24,6 +24,10 @@ function build_and_optimize_model(matpower_data, model_type)
     )
 
     JuMP.optimize!(model)
+
+    @show JuMP.objective_value(model)
+
+    return model
 
     return nothing
 end

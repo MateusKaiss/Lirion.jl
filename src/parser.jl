@@ -231,6 +231,21 @@ function _parse_matpower_string(data_string::String)
         )
     end
 
+    if haskey(matlab_data, "mpc.branch")
+        branch_table = _parse_table(matlab_data["mpc.branch"], _mp_branch_columns)
+
+        if haskey(branch_table, "angmin")
+            branch_table["angmin"] = [x * π / 180 for x in branch_table["angmin"]]
+        end
+        if haskey(branch_table, "angmax")
+            branch_table["angmax"] = [x * π / 180 for x in branch_table["angmax"]]
+        end
+
+        case["branch"] = branch_table
+    else
+        @error "No branch table found in matpower file."
+    end
+
     if haskey(matlab_data, "mpc.dcline")
         case["dcline"] = _parse_table(matlab_data["mpc.dcline"], _mp_dcline_columns)
     end

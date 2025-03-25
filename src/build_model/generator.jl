@@ -96,7 +96,12 @@ function generators!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{Subpro
     return nothing
 end
 
-function generators!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{SubproblemBuild})
+function generators!(
+    model::JuMP.Model,
+    matpower_data,
+    ::Type{SOCP},
+    ::Type{SubproblemBuild},
+)
     create_active_generation_variables!(model, matpower_data)
     create_reactive_generation_variables!(model, matpower_data)
     create_curtailment_variables!(model, matpower_data)

@@ -43,11 +43,11 @@ function compute_reactive_power_balance(model, matpower_data, bus_index)
     )
 end
 
-function reactive_power_balance!(model, matpower_data, ::Type{DC},::Type{SubproblemBuild})
+function reactive_power_balance!(model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
     return nothing
 end
 
-function reactive_power_balance!(model, matpower_data, ::Type{AC},::Type{SubproblemBuild})
+function reactive_power_balance!(model, matpower_data, ::Type{AC}, ::Type{SubproblemBuild})
     params = get_reactive_power_parameters(matpower_data)
 
     for b in 1:params.number_of_buses
@@ -59,7 +59,12 @@ function reactive_power_balance!(model, matpower_data, ::Type{AC},::Type{Subprob
     end
 end
 
-function reactive_power_balance!(model, matpower_data, ::Type{SOCP},::Type{SubproblemBuild})
+function reactive_power_balance!(
+    model,
+    matpower_data,
+    ::Type{SOCP},
+    ::Type{SubproblemBuild},
+)
     params = get_reactive_power_parameters(matpower_data)
 
     for b in 1:params.number_of_buses
