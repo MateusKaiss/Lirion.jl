@@ -36,8 +36,6 @@ function create_socp_variables!(model, bus_data)
     @variable(
         model,
         v_magnitude_sq[b = 1:number_of_buses],
-        lower_bound = 0.5 * bus_data["vmin"][b]^2,
-        upper_bound = 1.5 * bus_data["vmax"][b]^2
     )
 
     @constraint(
