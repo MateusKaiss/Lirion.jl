@@ -1,10 +1,12 @@
 function get_reactive_power_parameters(matpower_data)
     has_storage = haskey(matpower_data, "storage")
+    has_prosumer = haskey(matpower_data, "prosumer")
 
     return (
         number_of_buses = length(matpower_data["bus"]["bus_i"]),
         generator_bus_index = matpower_data["gen"]["gen_bus"],
         battery_bus_index = has_storage ? matpower_data["storage"]["storage_bus"] : Int[],
+        prosumer_bus_index = has_prosumer ? matpower_data["prosumer"]["bus"] : Int[],
         demand_bus_index = matpower_data["bus"]["bus_i"],
         branch_bus_from = matpower_data["branch"]["f_bus"],
         branch_bus_to = matpower_data["branch"]["t_bus"],
@@ -24,6 +26,11 @@ function compute_reactive_power_balance(model, matpower_data, bus_index)
            sum(
         model[:q_battery_injected][bat] for bat in eachindex(params.battery_bus_index)
         if params.battery_bus_index[bat] == bus_index;
+        init = 0.0,
+    ) +
+           sum(
+        model[:q_prosumer_injected][p] for p in eachindex(params.prosumer_bus_index)
+        if params.prosumer_bus_index[p] == bus_index;
         init = 0.0,
     ) -
            sum(
