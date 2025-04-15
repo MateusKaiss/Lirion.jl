@@ -5,18 +5,14 @@ function get_objective_parameters(
     prosumer_data = Dict(),
 )
     return (
-        number_of_generators = length(gen_data["gen_bus"]),
-        number_of_batteries = haskey(battery_data, "storage_bus") ?
-                              length(battery_data["storage_bus"]) : 0,
-        generator_costs = haskey(gencost_data, "cost_coefficients") ?
-                          gencost_data["cost_coefficients"] : [],
-        num_polynomial_coefs = haskey(gencost_data, "ncost") ? gencost_data["ncost"] : [],
-        curtailment_cost = gen_data["curtailment_cost"],
-        plant_type = gen_data["plant_type"],
-        number_of_prosumers = haskey(prosumer_data, "bus") ? length(prosumer_data["bus"]) :
-                              0,
-        prosumer_costs = haskey(prosumer_data, "cost_injection") ?
-                         prosumer_data["cost_injection"] : [],
+        number_of_generators = get(gen_data, "gen_bus", []) |> length,
+        number_of_batteries = get(battery_data, "storage_bus", []) |> length,
+        generator_costs = get(gencost_data, "cost_coefficients", []),
+        num_polynomial_coefs = get(gencost_data, "ncost", []),
+        curtailment_cost = get(gen_data, "curtailment_cost", []),
+        plant_type = get(gen_data, "plant_type", []),
+        number_of_prosumers = get(prosumer_data, "bus", []) |> length,
+        prosumer_costs = get(prosumer_data, "cost_injection", []),
     )
 end
 

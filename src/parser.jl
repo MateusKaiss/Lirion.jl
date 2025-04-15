@@ -109,6 +109,16 @@ const _mp_gencost_columns = [
     ("cost_coefficients", Vector{Float64}),
 ]
 
+const _mp_prosumer_columns = [
+    ("bus", Int),
+    ("generation", Float64),
+    ("demand", Float64),
+    ("q_generation", Float64),
+    ("q_demand", Float64),
+    ("cost_injection", Float64),
+    ("inverter_capacity", Float64),
+]
+
 # ---------------------------------------------------------------------
 # Matpower Parser
 # ---------------------------------------------------------------------
@@ -267,6 +277,10 @@ function _parse_matpower_string(data_string::String)
             )
         end
     end
+
+    if haskey(matlab_data, "mpc.prosumer")
+        case["prosumer"] = _parse_table(matlab_data["mpc.prosumer"], _mp_prosumer_columns)
+    end    
 
     return case
 end

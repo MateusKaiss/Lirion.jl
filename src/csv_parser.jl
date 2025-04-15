@@ -63,6 +63,15 @@ const _mp_gencost_columns = [
     ("cost_coefficients", Vector{Float64}),
 ]
 
+const _prosumer_columns = [
+    ("bus", Int),
+    ("generation", Float64),
+    ("demand", Float64),
+    ("q_generation", Float64),
+    ("q_demand", Float64),
+    ("cost_injection", Float64),
+]
+
 # ---------------------------------------------------------------------
 # Function to read any common CSV table (except gencost)
 # ---------------------------------------------------------------------
@@ -147,6 +156,10 @@ function parse_case_from_csv(dir::String)
 
     if isfile(joinpath(dir, "gencost.csv"))
         case["gencost"] = parse_gencost_table(joinpath(dir, "gencost.csv"))
+    end
+
+    if isfile(joinpath(dir, "prosumer.csv"))
+        case["prosumer"] = parse_csv_table(joinpath(dir, "prosumer.csv"), _prosumer_columns)
     end
 
     return case
