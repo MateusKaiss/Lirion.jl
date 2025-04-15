@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------
-# Colunas esperadas dos arquivos CSV (iguais ao Matpower)
+# Expected columns from CSV files (same as Matpower)
 # ---------------------------------------------------------------------
 const _mp_bus_columns = [
     ("bus_i", Int),
@@ -64,7 +64,7 @@ const _mp_gencost_columns = [
 ]
 
 # ---------------------------------------------------------------------
-# Função para ler qualquer tabela CSV comum (exceto gencost)
+# Function to read any common CSV table (except gencost)
 # ---------------------------------------------------------------------
 function parse_csv_table(path::String, columns::Vector{Tuple{String, DataType}})
     df = CSV.read(path, DataFrame)
@@ -74,7 +74,7 @@ function parse_csv_table(path::String, columns::Vector{Tuple{String, DataType}})
         if hasproperty(df, col_name)
             table[col_name] = convert(Vector{col_type}, df[!, col_name])
         else
-            @warn "Coluna '$col_name' ausente no arquivo $path. Preenchendo com valores padrão."
+            @warn "Missing column '$col_name' in file $path. Filling with default values."
             default = col_type === String ? "" : zero(col_type)
             table[col_name] = fill(default, nrow(df))
         end
@@ -84,7 +84,7 @@ function parse_csv_table(path::String, columns::Vector{Tuple{String, DataType}})
 end
 
 # ---------------------------------------------------------------------
-# Função específica para gencost.csv
+# Specific function for gencost.csv
 # ---------------------------------------------------------------------
 function parse_gencost_table(path::String)
     df = CSV.read(path, DataFrame)
@@ -111,7 +111,7 @@ function parse_gencost_table(path::String)
 end
 
 # ---------------------------------------------------------------------
-# Função principal: monta o case completo a partir da pasta com CSVs
+# Main function: assembles the complete case from the folder with CSVs
 # ---------------------------------------------------------------------
 function parse_case_from_csv(dir::String)
     case = Dict{String, Any}()
@@ -125,11 +125,11 @@ function parse_case_from_csv(dir::String)
         if nrow(base) > 0 && hasproperty(base, :baseMVA)
             case["baseMVA"] = base[!, :baseMVA][1]
         else
-            @warn "baseMVA.csv está vazio ou sem a coluna 'baseMVA'. Usando 100.0"
+            @warn "baseMVA.csv is empty or missing column 'baseMVA'. Using 100.0"
             case["baseMVA"] = 100.0
         end
     else
-        @warn "baseMVA.csv não encontrado. Usando valor padrão 100.0"
+        @warn "baseMVA.csv not found. Using default value 100.0"
         case["baseMVA"] = 100.0
     end
 
