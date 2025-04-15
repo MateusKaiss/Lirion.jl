@@ -12,6 +12,7 @@ using Xpress
 using InfrastructureModels
 
 include("parser.jl")
+include("csv_parser.jl")
 include("build_model.jl")
 include("build_model/bus.jl")
 include("build_model/branch.jl")
