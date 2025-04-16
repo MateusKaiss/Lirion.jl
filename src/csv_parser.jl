@@ -167,7 +167,8 @@ function parse_case_from_csv(dir::String)
     if isdir(profile_dir)
         for file in readdir(profile_dir)
             fullpath = joinpath(profile_dir, file)
-            case[file] = CSV.read(fullpath, DataFrame)
+            key = splitext(file)[1]
+            case[key] = CSV.read(fullpath, DataFrame)
         end
     end
 
