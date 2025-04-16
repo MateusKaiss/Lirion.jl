@@ -8,7 +8,9 @@ function main(database_path::String, model_type::Type{<:OPFModel})
     elseif isdir(database_path)
         data = parse_case_from_csv(database_path)
     else
-        error("Unrecognized input format. Please provide a .m file or a directory with .csv files.")
+        error(
+            "Unrecognized input format. Please provide a .m file or a directory with .csv files.",
+        )
     end
 
     results = build_and_optimize_model(data, model_type)

@@ -263,9 +263,7 @@ function compute_socp_branch_expressions(model, params)
         params.s_base * (
             -(b[l] + (params.b_shunt[l] / 2)) *
             (inv_tap[l]^2 * model[:v_magnitude_sq][params.bus_from[l]]) +
-            inv_tap[l] * b[l] * R[l] - inv_tap[l] * g[l] * T[l]
-
-        ) : 0
+            inv_tap[l] * b[l] * R[l] - inv_tap[l] * g[l] * T[l]) : 0
     )
 
     @expression(
