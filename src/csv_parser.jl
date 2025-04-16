@@ -163,5 +163,13 @@ function parse_case_from_csv(dir::String)
         case["prosumer"] = parse_csv_table(joinpath(dir, "prosumer.csv"), _prosumer_columns)
     end
 
+    profile_dir = joinpath(dir, "time")
+    if isdir(profile_dir)
+        for file in readdir(profile_dir)
+            fullpath = joinpath(profile_dir, file)
+            case[file] = CSV.read(fullpath, DataFrame)
+        end
+    end
+
     return case
 end
