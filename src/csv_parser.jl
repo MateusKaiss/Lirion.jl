@@ -70,6 +70,7 @@ const _prosumer_columns = [
     ("q_generation", Float64),
     ("q_demand", Float64),
     ("cost_injection", Float64),
+    ("inverter_capacity", Float64),
 ]
 
 # ---------------------------------------------------------------------
