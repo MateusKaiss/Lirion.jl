@@ -3,8 +3,8 @@
 # ---------------------------------------------------------------------
 const _mp_data_names = ["mpc.version", "mpc.baseMVA", "mpc.bus", "mpc.gen",
     "mpc.branch", "mpc.dcline", "mpc.gencost", "mpc.dclinecost",
-    "mpc.bus_name", "mpc.storage", "mpc.switch",
-]
+    "mpc.bus_name", "mpc.storage", "mpc.switch", "mpc.prosumer",
+    "mpc.bus_timeseries", "mpc.prosumer_timeseries"]
 
 const _mp_bus_columns = [
     ("bus_i", Int),
@@ -281,6 +281,25 @@ function _parse_matpower_string(data_string::String)
     if haskey(matlab_data, "mpc.prosumer")
         case["prosumer"] = _parse_table(matlab_data["mpc.prosumer"], _mp_prosumer_columns)
     end    
+
+    if haskey(matlab_data, "mpc.bus_timeseries")
+        df = DataFrame([Symbol(k) => [] for (k, _) in zip(["time", "bus", "pd", "qd"], [Int, Int, Float64, Float64])]...)
+        for row in matlab_data["mpc.bus_timeseries"]
+            push!(df, (time=row[1], bus=row[2], pd=row[3], qd=row[4]))
+        end
+        case["bus_timeseries"] = df
+    end
+
+    if haskey(matlab_data, "mpc.prosumer_timeseries")
+        df = DataFrame([Symbol(k) => [] for (k, _) in zip(["time", "bus", "generation", "demand", "q_generation", "q_demand"], [Int, Int, Float64, Float64, Float64, Float64])]...)
+        for row in matlab_data["mpc.prosumer_timeseries"]
+            push!(df, (
+                time=row[1], bus=row[2],
+                generation=row[3], demand=row[4],
+                q_generation=row[5], q_demand=row[6]))
+        end
+        case["prosumer_timeseries"] = df
+    end
 
     return case
 end
