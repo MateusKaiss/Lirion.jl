@@ -20,13 +20,12 @@ end
 function create_active_generation_variables!(model, matpower_data)
     gen_data = matpower_data["gen"]
     params = get_generator_parameters(gen_data)
+    T = get(model.ext, :time_periods, 1)
 
     @variable(
         model,
-        p_generation[
-            g = 1:params.number_of_generators;
-            params.existing[g] == 1
-        ],
+        p_generation[g = 1:params.number_of_generators, t = 1:T;
+            params.existing[g] == 1],
         lower_bound = params.pmn[g],
         upper_bound = params.pmx[g],
         start =
@@ -38,13 +37,12 @@ end
 function create_reactive_generation_variables!(model, matpower_data)
     gen_data = matpower_data["gen"]
     params = get_generator_parameters(gen_data)
+    T = get(model.ext, :time_periods, 1)
 
     @variable(
         model,
-        q_generation[
-            g = 1:params.number_of_generators;
-            params.existing[g] == 1
-        ],
+        q_generation[g = 1:params.number_of_generators, t = 1:T;
+            params.existing[g] == 1],
         lower_bound = params.qmn[g],
         upper_bound = params.qmx[g],
         start =
@@ -56,24 +54,20 @@ end
 function create_curtailment_variables!(model, matpower_data)
     gen_data = matpower_data["gen"]
     params = get_generator_parameters(gen_data)
+    T = get(model.ext, :time_periods, 1)
 
-    @variable(
-        model,
-        curtailment[g = 1:params.number_of_generators],
-        lower_bound = 0
-    )
+    @variable(model, curtailment[g = 1:params.number_of_generators, t = 1:T] >= 0)
 end
 
 function create_curtailment_constraints!(model, matpower_data)
     gen_data = matpower_data["gen"]
     params = get_generator_parameters(gen_data)
+    T = get(model.ext, :time_periods, 1)
 
     for g in 1:params.number_of_generators
         if has_curtailment(gen_data, g)
-            @constraint(
-                model,
-                model[:p_generation][g] + model[:curtailment][g] == params.pmx[g]
-            )
+            @constraint(model, [t = 1:T],
+                model[:p_generation][g, t] + model[:curtailment][g, t] == params.pmx[g])
         end
     end
 end

@@ -12,9 +12,21 @@ struct SubproblemGetResult <: SubproblemAction end
 struct SubproblemNameElementsDimensions <: SubproblemAction end
 struct SubproblemWriteResult <: SubproblemAction end
 
-function build_and_optimize_model(matpower_data, model_type)
-    # problem_results = ProblemResults()
+function build_and_optimize_model(matpower_data, model_type::Type{<:OPFModel})
+    has_time_series =
+        haskey(matpower_data, "bus_timeseries")
+
+    if has_time_series
+        return build_and_optimize_multiperiod_model(matpower_data, model_type)
+    else
+        return build_and_optimize_singleperiod_model(matpower_data, model_type)
+    end
+end
+
+function build_and_optimize_singleperiod_model(matpower_data, model_type::Type{<:OPFModel})
     model = JuMP.Model(Gurobi.Optimizer)
+    model.ext[:time_periods] = 1
+    model.ext[:times] = [1]
 
     process_subproblem(
         model,
@@ -24,12 +36,30 @@ function build_and_optimize_model(matpower_data, model_type)
     )
 
     JuMP.optimize!(model)
-
     @show JuMP.objective_value(model)
-
     return model
+end
 
-    return nothing
+function build_and_optimize_multiperiod_model(matpower_data, model_type::Type{<:OPFModel})
+    times = unique(
+        vcat(
+            haskey(matpower_data, "bus_timeseries") ?
+            matpower_data["bus_timeseries"][!, :time] : [],
+            haskey(matpower_data, "bus_timeseries.csv") ?
+            matpower_data["bus_timeseries.csv"][!, :time] : [],
+        ),
+    )
+    sort!(times)
+
+    model = JuMP.Model(Gurobi.Optimizer)
+    model.ext[:time_periods] = length(times)
+    model.ext[:times] = times
+
+    process_subproblem(model, matpower_data, model_type, SubproblemBuild)
+
+    JuMP.optimize!(model)
+    @show JuMP.objective_value(model)
+    return model
 end
 
 function process_subproblem(args...)
