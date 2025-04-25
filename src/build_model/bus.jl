@@ -33,9 +33,9 @@ function create_socp_variables!(model, bus_data)
 
     create_voltage_magnitude_variables!(model, bus_data)
 
-    @variable(model, v_magnitude_sq[b = 1:number_of_buses, t = 1:T]
-    # lower_bound = bus_data["vmin"][b]^2,
-    # upper_bound = bus_data["vmax"][b]^2,
+    @variable(model, v_magnitude_sq[b = 1:number_of_buses, t = 1:T],
+    lower_bound = bus_data["vmin"][b]^2,
+    upper_bound = bus_data["vmax"][b]^2,
     )
     @constraint(
         model,
