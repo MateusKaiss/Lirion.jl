@@ -156,7 +156,7 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{Subpr
 
     compute_generation_cost(model, gen_data, gencost_data)
     compute_curtailment_cost(model, gen_data)
-    compute_reactive_power_penalty(model, gen_data, gencost_data)
+    compute_reactive_power_penalty(model, gen_data, gencost_data)  # Comentado
     compute_prosumer_cost(model, prosumer_data)
 
     if !isempty(battery_data)
@@ -167,7 +167,7 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{Subpr
         model,
         Min,
         model[:generation_cost] + model[:curtailment_cost] +
-        model[:reactive_power_penalty] +
+        # model[:reactive_power_penalty] +  # Comentado
         (
             haskey(model, :battery_reactive_injection) ?
             model[:battery_reactive_injection] : 0.0

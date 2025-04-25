@@ -345,6 +345,13 @@ function create_socp_branch_constraints(model, params)
         ] in JuMP.RotatedSecondOrderCone()
     )
 
+    # JuMP.@constraint(model.jump,
+    #     [l = 1:number_of_branches],
+    #     [(model.jump[:v_magnitude_sq][bus_from[l]] + model.jump[:v_magnitude_sq][bus_to[l]]) / 2,
+    #         R[l],
+    #         T[l]] in JuMP.SecondOrderCone()
+    # )
+
     @constraint(
         model,
         [l in active_branches, t = 1:T],
