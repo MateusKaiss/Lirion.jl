@@ -24,7 +24,7 @@ function build_and_optimize_model(matpower_data, model_type::Type{<:OPFModel})
 end
 
 function build_and_optimize_singleperiod_model(matpower_data, model_type::Type{<:OPFModel})
-    model = JuMP.Model(Gurobi.Optimizer)
+    model = JuMP.Model(Ipopt.Optimizer)
     model.ext[:time_periods] = 1
     model.ext[:times] = [1]
 
