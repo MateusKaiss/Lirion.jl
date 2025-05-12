@@ -8,7 +8,7 @@ const reduced_list = [
     "pglib_opf_case30_ieee.m",
     "pglib_opf_case39_epri.m",
     "pglib_opf_case57_ieee.m",
-    # "pglib_opf_case60_c.m",
+    "pglib_opf_case60_c.m",
     # "pglib_opf_case73_ieee_rts.m",
     # "pglib_opf_case89_pegase.m",
     # "pglib_opf_case118_ieee.m",
@@ -56,6 +56,6 @@ function run_model_tests(
     end
 end
 
-# run_model_tests(PowerOptimization.DC, "DC"; optimizer=Gurobi.Optimizer)
+run_model_tests(PowerOptimization.DC, "DC"; optimizer=Gurobi.Optimizer)
 run_model_tests(PowerOptimization.AC, "AC"; optimizer=Ipopt.Optimizer)
 # run_model_tests(PowerOptimization.SOCP, "SOCP"; optimizer=Gurobi.Optimizer)
