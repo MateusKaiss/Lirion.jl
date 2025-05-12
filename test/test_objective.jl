@@ -1,14 +1,13 @@
-
 # Lista reduzida de casos para testes rápidos (comente ou descomente conforme desejar)
 const reduced_list = [
-    # "pglib_opf_case3_lmbd.m",
-    # "pglib_opf_case5_pjm.m",
+    "pglib_opf_case3_lmbd.m",
+    "pglib_opf_case5_pjm.m",
     "pglib_opf_case14_ieee.m",
-    # "pglib_opf_case24_ieee_rts.m",
-    # "pglib_opf_case30_as.m",
-    # "pglib_opf_case30_ieee.m",
-    # "pglib_opf_case39_epri.m",
-    # "pglib_opf_case57_ieee.m",
+    "pglib_opf_case24_ieee_rts.m",
+    "pglib_opf_case30_as.m",
+    "pglib_opf_case30_ieee.m",
+    "pglib_opf_case39_epri.m",
+    "pglib_opf_case57_ieee.m",
     # "pglib_opf_case60_c.m",
     # "pglib_opf_case73_ieee_rts.m",
     # "pglib_opf_case89_pegase.m",
@@ -21,10 +20,10 @@ function compare_with_powermodels(
     optimizer = Ipopt.Optimizer,
     tol = 1e-2,
 )
-    my_result = PowerOptimization.main(file, model_type; optimizer=optimizer)
-    @test haskey(my_result, "objective")
-    @test isfinite(my_result["objective"])
-    my_obj = my_result["objective"]
+    result_dict, _ = PowerOptimization.main(file, model_type; optimizer=optimizer)
+    @test haskey(result_dict, "objective")
+    @test isfinite(result_dict["objective"])
+    my_obj = result_dict["objective"]
 
     pm_data = PowerModels.parse_file(file)
     pm_obj = if model_type == PowerOptimization.DC

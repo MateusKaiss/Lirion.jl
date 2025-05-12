@@ -75,7 +75,7 @@ function reactive_power_balance!(model, matpower_data, ::Type{AC}, ::Type{Subpro
         reactive_balance = compute_reactive_power_balance(model, matpower_data, b, t)
         @constraint(
             model,
-            reactive_balance - params.shunt_susceptance[b] * model[:v_magnitude][b, t]^2 ==
+            reactive_balance + params.shunt_susceptance[b] * model[:v_magnitude][b, t]^2 ==
             0
         )
     end
@@ -94,7 +94,7 @@ function reactive_power_balance!(
         reactive_balance = compute_reactive_power_balance(model, matpower_data, b, t)
         @constraint(
             model,
-            reactive_balance - params.shunt_susceptance[b] * model[:v_magnitude_sq][b, t] ==
+            reactive_balance + params.shunt_susceptance[b] * model[:v_magnitude_sq][b, t] ==
             0
         )
     end
