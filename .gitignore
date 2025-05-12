@@ -49,4 +49,3 @@ test/*/*.toml
 *.out
 *.jlser
 *.xml
-*.m
