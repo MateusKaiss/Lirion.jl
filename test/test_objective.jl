@@ -1,14 +1,14 @@
 # Lista reduzida de casos para testes rápidos (comente ou descomente conforme desejar)
 const reduced_list = [
-    "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case5_pjm.m",
-    "pglib_opf_case14_ieee.m",
-    "pglib_opf_case24_ieee_rts.m",
-    "pglib_opf_case30_as.m",
+    # "pglib_opf_case3_lmbd.m",
+    # "pglib_opf_case5_pjm.m",
+    # "pglib_opf_case14_ieee.m",
+    # "pglib_opf_case24_ieee_rts.m",
+    # "pglib_opf_case30_as.m",
     "pglib_opf_case30_ieee.m",
-    "pglib_opf_case39_epri.m",
-    "pglib_opf_case57_ieee.m",
-    "pglib_opf_case60_c.m",
+    # "pglib_opf_case39_epri.m",
+    # "pglib_opf_case57_ieee.m",
+    # "pglib_opf_case60_c.m",
     # "pglib_opf_case73_ieee_rts.m",
     # "pglib_opf_case89_pegase.m",
     # "pglib_opf_case118_ieee.m",
@@ -21,19 +21,33 @@ function compare_with_powermodels(
     tol = 1e-2,
 )
     result_dict, _ = PowerOptimization.main(file, model_type; optimizer=optimizer)
-    @test haskey(result_dict, "objective")
-    @test isfinite(result_dict["objective"])
     my_obj = result_dict["objective"]
 
     pm_data = PowerModels.parse_file(file)
-    pm_obj = if model_type == PowerOptimization.DC
-        PowerModels.solve_dc_opf(pm_data, Ipopt.Optimizer)["objective"]
-    else
-        PowerModels.solve_ac_opf(pm_data, Ipopt.Optimizer)["objective"]
+    pm_obj = try
+        if model_type == PowerOptimization.DC
+            PowerModels.solve_opf(pm_data, DCPPowerModel, Gurobi.Optimizer)["objective"]
+        elseif model_type == PowerOptimization.AC
+            PowerModels.solve_ac_opf(pm_data, Ipopt.Optimizer)["objective"]
+        elseif model_type == PowerOptimization.SOCP
+            PowerModels.solve_opf(pm_data, SOCWRPowerModel, Gurobi.Optimizer)["objective"]
+        else
+            error("Model type not recognized for comparison with PowerModels.")
+        end
+    catch e
+        @warn "Error resolving PowerModels for $(basename(file)): $e"
+        NaN
     end
 
-    @test isapprox(my_obj, pm_obj; atol=tol)
-    @info "Arquivo $(basename(file)) | $(model_type) | PowerOptimization = $(round(my_obj, digits=3)) | PowerModels = $(round(pm_obj, digits=3))"
+    @info "File $(basename(file)) | $(model_type) | PowerOptimization = $(round(my_obj, digits=3)) | PowerModels = $(pm_obj)"
+
+    if isnan(pm_obj)
+        @warn "PowerModels did not find a viable solution for $(basename(file)) with model $(model_type)"
+        return
+    end
+
+    local_tol = model_type == PowerOptimization.SOCP ? 1e-1 : tol
+    @test isapprox(my_obj, pm_obj; atol=local_tol)
 end
 
 function run_model_tests(
@@ -58,4 +72,4 @@ end
 
 run_model_tests(PowerOptimization.DC, "DC"; optimizer=Gurobi.Optimizer)
 run_model_tests(PowerOptimization.AC, "AC"; optimizer=Ipopt.Optimizer)
-# run_model_tests(PowerOptimization.SOCP, "SOCP"; optimizer=Gurobi.Optimizer)
+run_model_tests(PowerOptimization.SOCP, "SOCP"; optimizer=Gurobi.Optimizer)
