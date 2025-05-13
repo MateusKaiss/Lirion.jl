@@ -56,21 +56,21 @@ function run_model_tests(
     label::String;
     optimizer = Ipopt.Optimizer,
 )
-    @testset "PowerModels vs PowerOptimization ($label) comparison" begin
-        test_dir = joinpath(@__DIR__, "matpower_cases")
-        all_files = Glob.glob("*.m", test_dir)
-        selected_files =
-            isempty(reduced_list) ? all_files :
-            filter(f -> basename(f) in reduced_list, all_files)
+    test_dir = joinpath(@__DIR__, "matpower_cases")
+    all_files = Glob.glob("*.m", test_dir)
+    selected_files =
+        isempty(reduced_list) ? all_files :
+        filter(f -> basename(f) in reduced_list, all_files)
 
-        for file in selected_files
-            @testset "$(basename(file))" begin
-                compare_with_powermodels(file, model_type; optimizer = optimizer)
-            end
+    for file in selected_files
+        @testset "$(label) - $(basename(file))" begin
+            compare_with_powermodels(file, model_type; optimizer = optimizer)
         end
     end
 end
 
-run_model_tests(PowerOptimization.DC, "DC"; optimizer = Gurobi.Optimizer)
-run_model_tests(PowerOptimization.AC, "AC"; optimizer = Ipopt.Optimizer)
-run_model_tests(PowerOptimization.SOCP, "SOCP"; optimizer = Gurobi.Optimizer)
+@testset  "PowerOptimization vs PowerModels Unified Comparison" begin
+    run_model_tests(PowerOptimization.DC, "DC"; optimizer = Gurobi.Optimizer)
+    run_model_tests(PowerOptimization.AC, "AC"; optimizer = Ipopt.Optimizer)
+    run_model_tests(PowerOptimization.SOCP, "SOCP"; optimizer = Gurobi.Optimizer)
+end
