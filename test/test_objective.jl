@@ -69,7 +69,7 @@ function run_model_tests(
     end
 end
 
-@testset  "PowerOptimization vs PowerModels Unified Comparison" begin
+@testset "PowerOptimization vs PowerModels Unified Comparison" begin
     run_model_tests(PowerOptimization.DC, "DC"; optimizer = Gurobi.Optimizer)
     run_model_tests(PowerOptimization.AC, "AC"; optimizer = Ipopt.Optimizer)
     run_model_tests(PowerOptimization.SOCP, "SOCP"; optimizer = Gurobi.Optimizer)
