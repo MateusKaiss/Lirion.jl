@@ -20,7 +20,7 @@ function compare_with_powermodels(
     optimizer = Ipopt.Optimizer,
     tol = 1e-2,
 )
-    result_dict, _ = PowerOptimization.main(file, model_type; optimizer=optimizer)
+    result_dict, _ = PowerOptimization.main(file, model_type; optimizer = optimizer)
     my_obj = result_dict["objective"]
 
     pm_data = PowerModels.parse_file(file)
@@ -47,7 +47,7 @@ function compare_with_powermodels(
     end
 
     local_tol = model_type == PowerOptimization.SOCP ? 1e-1 : tol
-    @test isapprox(my_obj, pm_obj; atol=local_tol)
+    @test isapprox(my_obj, pm_obj; atol = local_tol)
 end
 
 function run_model_tests(
@@ -64,12 +64,12 @@ function run_model_tests(
 
         for file in selected_files
             @testset "$(basename(file))" begin
-                compare_with_powermodels(file, model_type; optimizer=optimizer)
+                compare_with_powermodels(file, model_type; optimizer = optimizer)
             end
         end
     end
 end
 
-run_model_tests(PowerOptimization.DC, "DC"; optimizer=Gurobi.Optimizer)
-run_model_tests(PowerOptimization.AC, "AC"; optimizer=Ipopt.Optimizer)
-run_model_tests(PowerOptimization.SOCP, "SOCP"; optimizer=Gurobi.Optimizer)
+run_model_tests(PowerOptimization.DC, "DC"; optimizer = Gurobi.Optimizer)
+run_model_tests(PowerOptimization.AC, "AC"; optimizer = Ipopt.Optimizer)
+run_model_tests(PowerOptimization.SOCP, "SOCP"; optimizer = Gurobi.Optimizer)
