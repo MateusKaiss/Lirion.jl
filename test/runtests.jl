@@ -4,5 +4,6 @@ using PowerModels
 using Glob
 using Gurobi
 using Ipopt
+using SCS
 
 include("test_objective.jl")
