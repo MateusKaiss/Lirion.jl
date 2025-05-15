@@ -8,7 +8,6 @@ using CSV
 using Dates
 using LinearAlgebra
 using Statistics
-using Xpress
 using InfrastructureModels
 
 include("parser.jl")
