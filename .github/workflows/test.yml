@@ -11,6 +11,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -19,10 +20,25 @@ jobs:
         with:
           version: '1.9'
 
+      - name: Cache Julia deps
+        uses: actions/cache@v3
+        with:
+          path: ~/.julia/artifacts
+          key: ${{ runner.os }}-julia-artifacts-${{ hashFiles('**/Project.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-julia-artifacts-
+
       - name: Install dependencies
         run: |
-          julia --project=. -e 'using Pkg; Pkg.instantiate()'
+          julia --project=. -e '
+            using Pkg;
+            Pkg.activate(".");
+            Pkg.instantiate()
+          '
 
       - name: Run tests
         run: |
-          julia --project=. -e 'using Pkg; Pkg.test()'
+          julia --project=. -e '
+            using Pkg;
+            Pkg.test()
+          '
