@@ -14,46 +14,47 @@ const reduced_list = [
     # "pglib_opf_case118_ieee.m",
 ]
 
+function get_available_optimizer(preferred, fallback)
+    try
+        preferred()
+    catch
+        @warn "Preferred optimizer not available. Falling back to $(fallback)"
+        return fallback
+    end
+    return preferred
+end
+
 function compare_with_powermodels(
     file::String,
     model_type::Type{<:PowerOptimization.OPFModel};
     optimizer = Ipopt.Optimizer,
     tol = 1e-2,
 )
-    # PowerOptimization
     result_dict, _ = PowerOptimization.main(file, model_type; optimizer = optimizer)
     my_obj = result_dict["objective"]
 
-    # PowerModels
     pm_data = PowerModels.parse_file(file)
+    pm_optimizer = optimizer
+
     pm_obj = try
         if model_type == PowerOptimization.DC
-            pm_optimizer = try
-                Gurobi.Optimizer()
-            catch
-                @warn "Gurobi unavailable for PowerModels — falling back to Ipopt for DC"
-                Ipopt.Optimizer()
-            end
             PowerModels.solve_opf(pm_data, DCPPowerModel, pm_optimizer)["objective"]
-
         elseif model_type == PowerOptimization.AC
-            PowerModels.solve_ac_opf(pm_data, Ipopt.Optimizer)["objective"]
-
+            PowerModels.solve_ac_opf(pm_data, pm_optimizer)["objective"]
         elseif model_type == PowerOptimization.SOCP
-            PowerModels.solve_opf(pm_data, SOCWRPowerModel, Gurobi.Optimizer)["objective"]
-
+            PowerModels.solve_opf(pm_data, SOCWRPowerModel, pm_optimizer)["objective"]
         else
-            error("Model type not recognized for comparison with PowerModels.")
+            error("Model type not recognized.")
         end
     catch e
-        @warn "Error resolving PowerModels for $(basename(file)): $e"
+        @warn "Error solving PowerModels for $(basename(file)): $e"
         NaN
     end
 
     @info "File $(basename(file)) | $(model_type) | PowerOptimization = $(round(my_obj, digits=3)) | PowerModels = $(pm_obj)"
 
     if isnan(pm_obj)
-        @warn "PowerModels did not find a viable solution for $(basename(file)) with model $(model_type)"
+        @warn "PowerModels did not solve $(basename(file)) for $(model_type)"
         @test true
         return
     end
@@ -68,11 +69,7 @@ function run_model_tests(
     optimizer = Ipopt.Optimizer,
 )
     test_dir = joinpath(@__DIR__, "matpower_cases")
-    all_files = Glob.glob("*.m", test_dir)
-    selected_files =
-        isempty(reduced_list) ? all_files :
-        filter(f -> basename(f) in reduced_list, all_files)
-
+    selected_files = filter(f -> basename(f) in reduced_list, Glob.glob("*.m", test_dir))
     for file in selected_files
         @testset "$(label) - $(basename(file))" begin
             compare_with_powermodels(file, model_type; optimizer = optimizer)
@@ -81,28 +78,14 @@ function run_model_tests(
 end
 
 @testset "PowerOptimization vs PowerModels Unified Comparison" begin
-    if "Gurobi" ∈ keys(Pkg.dependencies())
-        try
-            Gurobi.Optimizer()
-            run_model_tests(PowerOptimization.DC, "DC"; optimizer = Gurobi.Optimizer)
-        catch
-            @warn "Gurobi license not found — running DC with Ipopt"
-            run_model_tests(PowerOptimization.DC, "DC"; optimizer = Ipopt.Optimizer)
-        end
-    else
-        @warn "Gurobi not in dependencies — running DC with Ipopt"
-        run_model_tests(PowerOptimization.DC, "DC"; optimizer = Ipopt.Optimizer)
-    end
+    # DC
+    dc_optimizer = get_available_optimizer(() -> Gurobi.Optimizer(), Ipopt.Optimizer)
+    run_model_tests(PowerOptimization.DC, "DC"; optimizer = dc_optimizer)
 
+    # AC
     run_model_tests(PowerOptimization.AC, "AC"; optimizer = Ipopt.Optimizer)
-    if "Gurobi" ∈ keys(Pkg.dependencies())
-        try
-            Gurobi.Optimizer()
-            run_model_tests(PowerOptimization.SOCP, "SOCP"; optimizer = Gurobi.Optimizer)
-        catch
-            @warn "Gurobi license not found — skipping SOCP"
-        end
-    else
-        @warn "Gurobi not in dependencies — skipping SOCP"
-    end
+
+    # SOCP: Gurobi → SCS
+    socp_optimizer = get_available_optimizer(() -> Gurobi.Optimizer(), SCS.Optimizer)
+    run_model_tests(PowerOptimization.SOCP, "SOCP"; optimizer = socp_optimizer)
 end
