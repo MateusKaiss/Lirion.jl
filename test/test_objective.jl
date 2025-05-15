@@ -20,17 +20,28 @@ function compare_with_powermodels(
     optimizer = Ipopt.Optimizer,
     tol = 1e-2,
 )
+    # PowerOptimization
     result_dict, _ = PowerOptimization.main(file, model_type; optimizer = optimizer)
     my_obj = result_dict["objective"]
 
+    # PowerModels
     pm_data = PowerModels.parse_file(file)
     pm_obj = try
         if model_type == PowerOptimization.DC
-            PowerModels.solve_opf(pm_data, DCPPowerModel, Gurobi.Optimizer)["objective"]
+            pm_optimizer = try
+                Gurobi.Optimizer()
+            catch
+                @warn "Gurobi unavailable for PowerModels — falling back to Ipopt for DC"
+                Ipopt.Optimizer()
+            end
+            PowerModels.solve_opf(pm_data, DCPPowerModel, pm_optimizer)["objective"]
+
         elseif model_type == PowerOptimization.AC
             PowerModels.solve_ac_opf(pm_data, Ipopt.Optimizer)["objective"]
+
         elseif model_type == PowerOptimization.SOCP
             PowerModels.solve_opf(pm_data, SOCWRPowerModel, Gurobi.Optimizer)["objective"]
+
         else
             error("Model type not recognized for comparison with PowerModels.")
         end
@@ -70,7 +81,28 @@ function run_model_tests(
 end
 
 @testset "PowerOptimization vs PowerModels Unified Comparison" begin
-    run_model_tests(PowerOptimization.DC, "DC"; optimizer = Gurobi.Optimizer)
+    if "Gurobi" ∈ keys(Pkg.dependencies())
+        try
+            Gurobi.Optimizer()
+            run_model_tests(PowerOptimization.DC, "DC"; optimizer = Gurobi.Optimizer)
+        catch
+            @warn "Gurobi license not found — running DC with Ipopt"
+            run_model_tests(PowerOptimization.DC, "DC"; optimizer = Ipopt.Optimizer)
+        end
+    else
+        @warn "Gurobi not in dependencies — running DC with Ipopt"
+        run_model_tests(PowerOptimization.DC, "DC"; optimizer = Ipopt.Optimizer)
+    end
+
     run_model_tests(PowerOptimization.AC, "AC"; optimizer = Ipopt.Optimizer)
-    run_model_tests(PowerOptimization.SOCP, "SOCP"; optimizer = Gurobi.Optimizer)
+    if "Gurobi" ∈ keys(Pkg.dependencies())
+        try
+            Gurobi.Optimizer()
+            run_model_tests(PowerOptimization.SOCP, "SOCP"; optimizer = Gurobi.Optimizer)
+        catch
+            @warn "Gurobi license not found — skipping SOCP"
+        end
+    else
+        @warn "Gurobi not in dependencies — skipping SOCP"
+    end
 end
