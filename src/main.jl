@@ -1,6 +1,8 @@
-function main(database_path::String, model_type::Type{<:OPFModel})
-    data = nothing
-
+function main(
+    database_path::String,
+    model_type::Type{<:OPFModel};
+    optimizer = Ipopt.Optimizer,
+)
     if endswith(lowercase(database_path), ".m")
         data = open(database_path) do io
             return _parse_matpower_string(read(io, String))
@@ -13,7 +15,8 @@ function main(database_path::String, model_type::Type{<:OPFModel})
         )
     end
 
-    results = build_and_optimize_model(data, model_type)
+    result_model = build_and_optimize_model(data, model_type; optimizer)
+    result_dict = build_result_dict(result_model, data)
 
-    return results
+    return result_dict, result_model
 end

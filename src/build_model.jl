@@ -12,9 +12,29 @@ struct SubproblemGetResult <: SubproblemAction end
 struct SubproblemNameElementsDimensions <: SubproblemAction end
 struct SubproblemWriteResult <: SubproblemAction end
 
-function build_and_optimize_model(matpower_data, model_type)
-    # problem_results = ProblemResults()
-    model = JuMP.Model(Gurobi.Optimizer)
+function build_and_optimize_model(
+    matpower_data,
+    model_type::Type{<:OPFModel};
+    optimizer = Ipopt.Optimizer,
+)
+    has_time_series =
+        haskey(matpower_data, "bus_timeseries")
+
+    if has_time_series
+        return build_and_optimize_multiperiod_model(matpower_data, model_type; optimizer)
+    else
+        return build_and_optimize_singleperiod_model(matpower_data, model_type; optimizer)
+    end
+end
+
+function build_and_optimize_singleperiod_model(
+    matpower_data,
+    model_type::Type{<:OPFModel};
+    optimizer = Ipopt.Optimizer,
+)
+    model = JuMP.Model(optimizer)
+    model.ext[:time_periods] = 1
+    model.ext[:times] = [1]
 
     process_subproblem(
         model,
@@ -24,12 +44,34 @@ function build_and_optimize_model(matpower_data, model_type)
     )
 
     JuMP.optimize!(model)
-
     @show JuMP.objective_value(model)
-
     return model
+end
 
-    return nothing
+function build_and_optimize_multiperiod_model(
+    matpower_data,
+    model_type::Type{<:OPFModel};
+    optimizer = Ipopt.Optimizer,
+)
+    times = unique(
+        vcat(
+            haskey(matpower_data, "bus_timeseries") ?
+            matpower_data["bus_timeseries"][!, :time] : [],
+            haskey(matpower_data, "bus_timeseries.csv") ?
+            matpower_data["bus_timeseries.csv"][!, :time] : [],
+        ),
+    )
+    sort!(times)
+
+    model = JuMP.Model(optimizer)
+    model.ext[:time_periods] = length(times)
+    model.ext[:times] = times
+
+    process_subproblem(model, matpower_data, model_type, SubproblemBuild)
+
+    JuMP.optimize!(model)
+    @show JuMP.objective_value(model)
+    return model
 end
 
 function process_subproblem(args...)
@@ -43,4 +85,105 @@ function process_subproblem(args...)
     objective!(args...)
 
     return nothing
+end
+
+function build_result_dict(model::JuMP.Model, data::Dict)
+    T = get(model.ext, :time_periods, 1)
+    result = Dict{String, Any}()
+
+    result["objective"] = objective_value(model)
+    result["bus"] = Dict(
+        "theta" => [
+            value(model[:theta][b, t]) for b in 1:length(data["bus"]["bus_i"]), t in 1:T
+        ],
+        "vm" =>
+            haskey(model, :v_magnitude) ?
+            [
+                value(model[:v_magnitude][b, t]) for
+                b in 1:length(data["bus"]["bus_i"]), t in 1:T
+            ] : nothing,
+        "vm_sq" =>
+            haskey(model, :v_magnitude_sq) ?
+            [
+                value(model[:v_magnitude_sq][b, t]) for
+                b in 1:length(data["bus"]["bus_i"]), t in 1:T
+            ] : nothing,
+    )
+
+    if haskey(model, :p_generation)
+        result["gen"] = Dict(
+            "p" => [
+                value(model[:p_generation][g, t]) for
+                g in 1:length(data["gen"]["gen_bus"]), t in 1:T
+            ],
+            "q" =>
+                haskey(model, :q_generation) ?
+                [
+                    value(model[:q_generation][g, t]) for
+                    g in 1:length(data["gen"]["gen_bus"]), t in 1:T
+                ] : nothing,
+            "curtailment" =>
+                haskey(model, :curtailment) ?
+                [
+                    value(model[:curtailment][g, t]) for
+                    g in 1:length(data["gen"]["gen_bus"]), t in 1:T
+                ] : nothing,
+        )
+    end
+
+    if haskey(model, :p_flow_branches)
+        result["branch"] = Dict(
+            "p_from" => [
+                value(model[:p_flow_branches][l, t]) for
+                l in 1:length(data["branch"]["f_bus"]), t in 1:T
+            ],
+            "p_to" => [
+                value(model[:p_reverse_flow_branches][l, t]) for
+                l in 1:length(data["branch"]["t_bus"]), t in 1:T
+            ],
+            "q_from" =>
+                haskey(model, :q_flow_branches) ?
+                [
+                    value(model[:q_flow_branches][l, t]) for
+                    l in 1:length(data["branch"]["f_bus"]), t in 1:T
+                ] : nothing,
+            "q_to" =>
+                haskey(model, :q_reverse_flow_branches) ?
+                [
+                    value(model[:q_reverse_flow_branches][l, t]) for
+                    l in 1:length(data["branch"]["t_bus"]), t in 1:T
+                ] : nothing,
+        )
+    end
+
+    if haskey(model, :storage)
+        nb = length(data["storage"]["storage_bus"])
+        result["storage"] = Dict(
+            "storage" => [value(model[:storage][b, t]) for b in 1:nb, t in 1:T],
+            "charge" => [value(model[:charge][b, t]) for b in 1:nb, t in 1:T],
+            "discharge" => [value(model[:discharge][b, t]) for b in 1:nb, t in 1:T],
+            "qcharge" => [value(model[:qcharge][b, t]) for b in 1:nb, t in 1:T],
+            "qdischarge" => [value(model[:qdischarge][b, t]) for b in 1:nb, t in 1:T],
+            "p_injected" =>
+                [value(model[:p_battery_injected][b, t]) for b in 1:nb, t in 1:T],
+            "q_injected" =>
+                [value(model[:q_battery_injected][b, t]) for b in 1:nb, t in 1:T],
+        )
+    end
+
+    if haskey(model, :p_prosumer_injected)
+        np = length(data["prosumer"]["bus"])
+        result["prosumer"] = Dict(
+            "p_injected" =>
+                [value(model[:p_prosumer_injected][p, t]) for p in 1:np, t in 1:T],
+            "q_injected" =>
+                [value(model[:q_prosumer_injected][p, t]) for p in 1:np, t in 1:T],
+            "pv_used" =>
+                [value(model[:pv_generation_used][p, t]) for p in 1:np, t in 1:T],
+            "curtailment" =>
+                [value(model[:pv_curtailment][p, t]) for p in 1:np, t in 1:T],
+        )
+    end
+
+    return result
 end
