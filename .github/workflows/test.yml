@@ -1,0 +1,42 @@
+name: Run Julia Tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Julia
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.9'
+
+      - name: Cache Julia deps
+        uses: actions/cache@v3
+        with:
+          path: ~/.julia/artifacts
+          key: ${{ runner.os }}-julia-artifacts-${{ hashFiles('**/Project.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-julia-artifacts-
+      - name: Install dependencies
+        run: |
+          julia --project=. -e '
+            using Pkg;
+            Pkg.activate(".");
+            Pkg.instantiate()
+          '
+      - name: Run tests
+        run: |
+          julia --project=. -e '
+            using Pkg;
+            Pkg.test()
+          '
