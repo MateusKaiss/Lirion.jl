@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------
-# Getting Objective Parameters
+# Getting Objective Parameters (pré-processado no início)
 # ---------------------------------------------------------------------
 function get_objective_parameters(
     gen_data,
@@ -20,9 +20,11 @@ function get_objective_parameters(
     )
 end
 
+# ---------------------------------------------------------------------
+# Cost Component Expressions
+# ---------------------------------------------------------------------
 function compute_generation_cost(model, params)
     T = get(model.ext, :time_periods, 1)
-
     @expression(model, generation_cost,
         sum(
             sum(
@@ -38,7 +40,6 @@ end
 
 function compute_curtailment_cost(model, params)
     T = get(model.ext, :time_periods, 1)
-
     @expression(model, curtailment_cost,
         sum(
             params.curtailment_cost[g] * model[:curtailment][g, t]
@@ -53,7 +54,6 @@ function compute_prosumer_cost(model, params)
         return nothing
     end
     T = get(model.ext, :time_periods, 1)
-
     @expression(model, prosumer_cost,
         sum(
             params.prosumer_costs[p] * model[:p_prosumer_injected][p, t]
@@ -64,7 +64,6 @@ end
 
 function compute_reactive_power_penalty(model, params)
     T = get(model.ext, :time_periods, 1)
-
     @expression(model, reactive_power_penalty,
         sum(
             1e-9 * sum(
@@ -83,7 +82,6 @@ function compute_battery_reactive_injection(model, params)
         return nothing
     end
     T = get(model.ext, :time_periods, 1)
-
     @expression(model, battery_reactive_injection,
         -sum(
             1e-13 * model[:q_battery_injected][b, t]
@@ -92,13 +90,11 @@ function compute_battery_reactive_injection(model, params)
     )
 end
 
+# ---------------------------------------------------------------------
+# Objective Assembly by Model Type (usando :objective_params)
+# ---------------------------------------------------------------------
 function objective!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
-    gen_data = matpower_data["gen"]
-    gencost_data = matpower_data["gencost"]
-    battery_data = get(matpower_data, "storage", Dict())
-    prosumer_data = get(matpower_data, "prosumer", Dict())
-
-    params = get_objective_parameters(gen_data, battery_data, gencost_data, prosumer_data)
+    params = matpower_data["objective_params"]
 
     compute_generation_cost(model, params)
     compute_curtailment_cost(model, params)
@@ -106,7 +102,8 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{Subprob
     compute_battery_reactive_injection(model, params)
 
     @objective(model, Min,
-        model[:generation_cost] + model[:curtailment_cost] +
+        model[:generation_cost] +
+        model[:curtailment_cost] +
         (
             haskey(model, :battery_reactive_injection) ?
             model[:battery_reactive_injection] : 0.0
@@ -116,12 +113,7 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{Subprob
 end
 
 function objective!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{SubproblemBuild})
-    gen_data = matpower_data["gen"]
-    gencost_data = matpower_data["gencost"]
-    battery_data = get(matpower_data, "storage", Dict())
-    prosumer_data = get(matpower_data, "prosumer", Dict())
-
-    params = get_objective_parameters(gen_data, battery_data, gencost_data, prosumer_data)
+    params = matpower_data["objective_params"]
 
     compute_generation_cost(model, params)
     compute_curtailment_cost(model, params)
@@ -130,7 +122,8 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{Subprob
     compute_battery_reactive_injection(model, params)
 
     @objective(model, Min,
-        model[:generation_cost] + model[:curtailment_cost] +
+        model[:generation_cost] +
+        model[:curtailment_cost] +
         model[:reactive_power_penalty] +
         (
             haskey(model, :battery_reactive_injection) ?
@@ -141,12 +134,7 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{Subprob
 end
 
 function objective!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{SubproblemBuild})
-    gen_data = matpower_data["gen"]
-    gencost_data = matpower_data["gencost"]
-    battery_data = get(matpower_data, "storage", Dict())
-    prosumer_data = get(matpower_data, "prosumer", Dict())
-
-    params = get_objective_parameters(gen_data, battery_data, gencost_data, prosumer_data)
+    params = matpower_data["objective_params"]
 
     compute_generation_cost(model, params)
     compute_curtailment_cost(model, params)
@@ -155,7 +143,9 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{Subpr
     compute_battery_reactive_injection(model, params)
 
     @objective(model, Min,
-        model[:generation_cost] + model[:curtailment_cost] +
+        model[:generation_cost] +
+        model[:curtailment_cost] +
+        model[:reactive_power_penalty] +
         (
             haskey(model, :battery_reactive_injection) ?
             model[:battery_reactive_injection] : 0.0

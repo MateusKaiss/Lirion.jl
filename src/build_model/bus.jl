@@ -53,20 +53,20 @@ end
 # Dispatching Bus Variables by Model Type
 # ---------------------------------------------------------------------
 function buses!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
-    params = get_bus_parameters(matpower_data["bus"])
+    params = matpower_data["bus_params"]
     create_voltage_angle_variables!(model, params)
     return nothing
 end
 
 function buses!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{SubproblemBuild})
-    params = get_bus_parameters(matpower_data["bus"])
+    params = matpower_data["bus_params"]
     create_voltage_angle_variables!(model, params)
     create_voltage_magnitude_variables!(model, params)
     return nothing
 end
 
 function buses!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{SubproblemBuild})
-    params = get_bus_parameters(matpower_data["bus"])
+    params = matpower_data["bus_params"]
     create_voltage_angle_variables!(model, params)
     create_socp_variables!(model, params)
     return nothing

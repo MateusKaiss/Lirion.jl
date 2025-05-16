@@ -60,7 +60,7 @@ end
 # Dispatching Generator Variables, Expressions and Constraints by Model Type
 # ---------------------------------------------------------------------------
 function generators!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
-    params = get_generator_parameters(matpower_data["gen"])
+    params = matpower_data["generator_params"]
     create_active_generation_variables!(model, params)
     create_curtailment_variables!(model, params)
     create_curtailment_constraints!(model, params)
@@ -68,7 +68,7 @@ function generators!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{Subpro
 end
 
 function generators!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{SubproblemBuild})
-    params = get_generator_parameters(matpower_data["gen"])
+    params = matpower_data["generator_params"]
     create_active_generation_variables!(model, params)
     create_reactive_generation_variables!(model, params)
     create_curtailment_variables!(model, params)
@@ -82,7 +82,7 @@ function generators!(
     ::Type{SOCP},
     ::Type{SubproblemBuild},
 )
-    params = get_generator_parameters(matpower_data["gen"])
+    params = matpower_data["generator_params"]
     create_active_generation_variables!(model, params)
     create_reactive_generation_variables!(model, params)
     create_curtailment_variables!(model, params)

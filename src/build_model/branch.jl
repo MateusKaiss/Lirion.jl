@@ -199,15 +199,8 @@ end
 function compute_socp_branch_expressions(model, params)
     T = get(model.ext, :time_periods, 1)
     active = findall(i -> params.existing[i] == 1, 1:params.number_of_branches)
-
-    # Pré-calcular condutância e susceptância
-    g = params.resistance ./ (params.resistance .^ 2 .+ params.reactance .^ 2)
-    b = -params.reactance ./ (params.resistance .^ 2 .+ params.reactance .^ 2)
-
-    # Tap ratio com fallback
     inv_tap = [1.0 / (isnan(t) || t == 0.0 ? 1.0 : t) for t in params.tap_position]
 
-    # Variáveis auxiliares para produto escalar
     @variable(model, R[l in active, t = 1:T])
     @variable(model, T_var[l in active, t = 1:T])
 
@@ -228,30 +221,31 @@ function compute_socp_branch_expressions(model, params)
 
     @expression(model, p_flow_branches[l in active, t in 1:T],
         params.s_base * (
-            g[l] * inv_tap[l]^2 * model[:v_magnitude_sq][params.bus_from[l], t] -
-            inv_tap[l] * g[l] * R[l, t] - inv_tap[l] * b[l] * T_var[l, t]
+            params.g[l] * inv_tap[l]^2 * model[:v_magnitude_sq][params.bus_from[l], t] -
+            inv_tap[l] * params.g[l] * R[l, t] - inv_tap[l] * params.b[l] * T_var[l, t]
         )
     )
 
     @expression(model, p_reverse_flow_branches[l in active, t in 1:T],
         params.s_base * (
-            g[l] * model[:v_magnitude_sq][params.bus_to[l], t] -
-            inv_tap[l] * g[l] * R[l, t] + inv_tap[l] * b[l] * T_var[l, t]
+            params.g[l] * model[:v_magnitude_sq][params.bus_to[l], t] -
+            inv_tap[l] * params.g[l] * R[l, t] + inv_tap[l] * params.b[l] * T_var[l, t]
         )
     )
 
     @expression(model, q_flow_branches[l in active, t in 1:T],
         params.s_base * (
-            -(b[l] + params.b_shunt[l] / 2) * inv_tap[l]^2 *
+            -(params.b[l] + params.b_shunt[l] / 2) * inv_tap[l]^2 *
             model[:v_magnitude_sq][params.bus_from[l], t] +
-            inv_tap[l] * b[l] * R[l, t] - inv_tap[l] * g[l] * T_var[l, t]
+            inv_tap[l] * params.b[l] * R[l, t] - inv_tap[l] * params.g[l] * T_var[l, t]
         )
     )
 
     @expression(model, q_reverse_flow_branches[l in active, t in 1:T],
         params.s_base * (
-            -(b[l] + params.b_shunt[l] / 2) * model[:v_magnitude_sq][params.bus_to[l], t] +
-            inv_tap[l] * b[l] * R[l, t] + inv_tap[l] * g[l] * T_var[l, t]
+            -(params.b[l] + params.b_shunt[l] / 2) *
+            model[:v_magnitude_sq][params.bus_to[l], t] +
+            inv_tap[l] * params.b[l] * R[l, t] + inv_tap[l] * params.g[l] * T_var[l, t]
         )
     )
 end
@@ -302,21 +296,21 @@ end
 # Dispatching Branch Variables, Expressions and Constraints by Model Type
 # ------------------------------------------------------------------------
 function branches!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
-    params = get_branch_parameters(matpower_data["branch"], matpower_data)
+    params = matpower_data["branch_params"]
     compute_dc_branch_expressions(model, params)
     create_dc_branch_constraints(model, params)
     return nothing
 end
 
 function branches!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{SubproblemBuild})
-    params = get_branch_parameters(matpower_data["branch"], matpower_data)
+    params = matpower_data["branch_params"]
     compute_ac_branch_expressions(model, params)
     create_ac_branch_constraints(model, params)
     return nothing
 end
 
 function branches!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{SubproblemBuild})
-    params = get_branch_parameters(matpower_data["branch"], matpower_data)
+    params = matpower_data["branch_params"]
     compute_socp_branch_expressions(model, params)
     create_socp_branch_constraints(model, params)
     return nothing

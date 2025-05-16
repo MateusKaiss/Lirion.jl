@@ -79,7 +79,7 @@ function compute_power_balance(model, matpower_data, params, bus_index, t)
 end
 
 function active_power_balance!(model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
-    params = get_power_balance_parameters(matpower_data)
+    params = matpower_data["power_balance_params"]
     T = get(model.ext, :time_periods, 1)
 
     @constraint(model, [b in params.bus_ids, t in 1:T],
@@ -89,7 +89,7 @@ function active_power_balance!(model, matpower_data, ::Type{DC}, ::Type{Subprobl
 end
 
 function active_power_balance!(model, matpower_data, ::Type{AC}, ::Type{SubproblemBuild})
-    params = get_power_balance_parameters(matpower_data)
+    params = matpower_data["power_balance_params"]
     T = get(model.ext, :time_periods, 1)
 
     @constraint(model, [b in params.bus_ids, t in 1:T],
@@ -99,7 +99,7 @@ function active_power_balance!(model, matpower_data, ::Type{AC}, ::Type{Subprobl
 end
 
 function active_power_balance!(model, matpower_data, ::Type{SOCP}, ::Type{SubproblemBuild})
-    params = get_power_balance_parameters(matpower_data)
+    params = matpower_data["power_balance_params"]
     T = get(model.ext, :time_periods, 1)
 
     @constraint(model, [b in params.bus_ids, t in 1:T],

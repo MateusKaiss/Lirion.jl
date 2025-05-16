@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------
-# Getting Reactive Power Balance Parameters (with preprocessed maps)
+# Getting Reactive Power Balance Parameters (pré-processado no início)
 # ---------------------------------------------------------------------
 function get_reactive_power_parameters(matpower_data)
     return (
@@ -24,6 +24,9 @@ function get_reactive_power_parameters(matpower_data)
     )
 end
 
+# ---------------------------------------------------------------------
+# Reactive Demand Utility
+# ---------------------------------------------------------------------
 function get_reactive_demand_at_time(data::Dict{String, Any}, bus_index::Int, t::Int)
     if haskey(data, "bus_timeseries")
         df = data["bus_timeseries"]
@@ -40,6 +43,9 @@ function get_reactive_demand_at_time(data::Dict{String, Any}, bus_index::Int, t:
     end
 end
 
+# ---------------------------------------------------------------------
+# Reactive Balance Expression
+# ---------------------------------------------------------------------
 function compute_reactive_power_balance(model, matpower_data, params, bus_index, t)
     q_gen = sum(
         model[:q_generation][g, t] for
@@ -72,12 +78,15 @@ function compute_reactive_power_balance(model, matpower_data, params, bus_index,
     return q_gen - q_bat + q_pros - qd - q_out - q_in
 end
 
+# ---------------------------------------------------------------------
+# Reactive Balance Constraints by Model Type
+# ---------------------------------------------------------------------
 function reactive_power_balance!(model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
     return nothing
 end
 
 function reactive_power_balance!(model, matpower_data, ::Type{AC}, ::Type{SubproblemBuild})
-    params = get_reactive_power_parameters(matpower_data)
+    params = matpower_data["reactive_balance_params"]
     T = get(model.ext, :time_periods, 1)
 
     for (idx, b) in enumerate(params.bus_ids), t in 1:T
@@ -95,7 +104,7 @@ function reactive_power_balance!(
     ::Type{SOCP},
     ::Type{SubproblemBuild},
 )
-    params = get_reactive_power_parameters(matpower_data)
+    params = matpower_data["reactive_balance_params"]
     T = get(model.ext, :time_periods, 1)
 
     for (idx, b) in enumerate(params.bus_ids), t in 1:T
