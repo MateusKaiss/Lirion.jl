@@ -27,7 +27,7 @@ function compute_generation_cost(model, params)
     T = get(model.ext, :time_periods, 1)
     @expression(model, generation_cost,
         sum(
-            sum(
+            @inbounds sum(
                 params.generator_costs[g][i] *
                 model[:p_generation][g, t]^(params.num_polynomial_coefs[g] - i)
                 for i in 1:params.num_polynomial_coefs[g]
@@ -42,7 +42,7 @@ function compute_curtailment_cost(model, params)
     T = get(model.ext, :time_periods, 1)
     @expression(model, curtailment_cost,
         sum(
-            params.curtailment_cost[g] * model[:curtailment][g, t]
+            @inbounds params.curtailment_cost[g] * model[:curtailment][g, t]
             for g in 1:params.number_of_generators, t in 1:T
             if params.plant_type[g] == "R" && params.generator_status[g] == 1
         )
@@ -56,7 +56,7 @@ function compute_prosumer_cost(model, params)
     T = get(model.ext, :time_periods, 1)
     @expression(model, prosumer_cost,
         sum(
-            params.prosumer_costs[p] * model[:p_prosumer_injected][p, t]
+            @inbounds params.prosumer_costs[p] * model[:p_prosumer_injected][p, t]
             for p in 1:params.number_of_prosumers, t in 1:T
         )
     )
@@ -66,7 +66,7 @@ function compute_reactive_power_penalty(model, params)
     T = get(model.ext, :time_periods, 1)
     @expression(model, reactive_power_penalty,
         sum(
-            1e-9 * sum(
+            1e-9 * @inbounds sum(
                 params.generator_costs[g][i] *
                 model[:q_generation][g, t]^(params.num_polynomial_coefs[g] - i)
                 for i in 1:params.num_polynomial_coefs[g]

@@ -35,9 +35,10 @@ function get_reactive_demand_at_time(data::Dict{String, Any}, bus_index::Int, t:
             init = 0.0,
         )
     else
-        return sum(
-            data["bus"]["qd"][i] for i in eachindex(data["bus"]["bus_i"])
-            if data["bus"]["bus_i"][i] == bus_index;
+        bus_list = data["bus"]["bus_i"]
+        qd_list = data["bus"]["qd"]
+        @inbounds return sum(
+            qd_list[i] for i in eachindex(bus_list) if bus_list[i] == bus_index;
             init = 0.0,
         )
     end
@@ -89,7 +90,7 @@ function reactive_power_balance!(model, matpower_data, ::Type{AC}, ::Type{Subpro
     params = matpower_data["reactive_balance_params"]
     T = get(model.ext, :time_periods, 1)
 
-    for (idx, b) in enumerate(params.bus_ids), t in 1:T
+    @inbounds for (idx, b) in enumerate(params.bus_ids), t in 1:T
         balance = compute_reactive_power_balance(model, matpower_data, params, b, t)
         @constraint(
             model,
@@ -107,7 +108,7 @@ function reactive_power_balance!(
     params = matpower_data["reactive_balance_params"]
     T = get(model.ext, :time_periods, 1)
 
-    for (idx, b) in enumerate(params.bus_ids), t in 1:T
+    @inbounds for (idx, b) in enumerate(params.bus_ids), t in 1:T
         balance = compute_reactive_power_balance(model, matpower_data, params, b, t)
         @constraint(
             model,

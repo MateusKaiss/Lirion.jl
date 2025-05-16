@@ -6,6 +6,13 @@ function get_branch_parameters(branch_data, matpower_data)
     reactance = branch_data["br_x"]
     tap_position = branch_data["tap"]
 
+    active = Int[]
+    @inbounds for i in eachindex(branch_data["f_bus"])
+        if branch_data["br_status"][i] == 1
+            push!(active, i)
+        end
+    end
+
     return (
         number_of_branches = length(branch_data["f_bus"]),
         bus_from = branch_data["f_bus"],
@@ -26,10 +33,7 @@ function get_branch_parameters(branch_data, matpower_data)
         g = resistance ./ (resistance .^ 2 .+ reactance .^ 2),
         b = -reactance ./ (resistance .^ 2 .+ reactance .^ 2),
         inv_tap = [isnan(t) || t == 0.0 ? 1.0 : 1.0 / t for t in tap_position],
-        active = filter(
-            i -> branch_data["br_status"][i] == 1,
-            eachindex(branch_data["f_bus"]),
-        ),
+        active = active,
     )
 end
 
@@ -204,7 +208,7 @@ function compute_socp_branch_expressions(model, params)
     @variable(model, R[l in active, t = 1:T])
     @variable(model, T_var[l in active, t = 1:T])
 
-    for l in active, t in 1:T
+    @inbounds for l in active, t in 1:T
         i_from = params.bus_idx_map[params.bus_from[l]]
         i_to = params.bus_idx_map[params.bus_to[l]]
 

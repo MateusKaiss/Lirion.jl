@@ -67,10 +67,10 @@ function compute_power_balance(model, matpower_data, params, bus_index, t)
             init = 0.0,
         )
     else
-        sum(
-            matpower_data["bus"]["pd"][i] for
-            i in eachindex(matpower_data["bus"]["bus_i"])
-            if matpower_data["bus"]["bus_i"][i] == bus_index;
+        bus_list = matpower_data["bus"]["bus_i"]
+        pd_list = matpower_data["bus"]["pd"]
+        @inbounds sum(
+            pd_list[i] for i in eachindex(bus_list) if bus_list[i] == bus_index;
             init = 0.0,
         )
     end
