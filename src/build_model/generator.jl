@@ -1,3 +1,6 @@
+# ---------------------------------------------------------------------------
+# Generator Parameters (precomputed once and passed to all helper functions)
+# ---------------------------------------------------------------------------
 function get_generator_parameters(gen_data)
     return (
         number_of_generators = length(gen_data["gen_bus"]),
@@ -17,8 +20,7 @@ function has_curtailment(params, g)
     return params.existing[g] && params.plant_type[g] == "R"
 end
 
-function create_active_generation_variables!(model, gen_data)
-    params = get_generator_parameters(gen_data)
+function create_active_generation_variables!(model, params)
     T = get(model.ext, :time_periods, 1)
 
     @variable(
@@ -30,8 +32,7 @@ function create_active_generation_variables!(model, gen_data)
     )
 end
 
-function create_reactive_generation_variables!(model, gen_data)
-    params = get_generator_parameters(gen_data)
+function create_reactive_generation_variables!(model, params)
     T = get(model.ext, :time_periods, 1)
 
     @variable(
@@ -43,15 +44,12 @@ function create_reactive_generation_variables!(model, gen_data)
     )
 end
 
-function create_curtailment_variables!(model, gen_data)
-    params = get_generator_parameters(gen_data)
+function create_curtailment_variables!(model, params)
     T = get(model.ext, :time_periods, 1)
-
     @variable(model, curtailment[g = 1:params.number_of_generators, t = 1:T] >= 0)
 end
 
-function create_curtailment_constraints!(model, gen_data)
-    params = get_generator_parameters(gen_data)
+function create_curtailment_constraints!(model, params)
     T = get(model.ext, :time_periods, 1)
 
     for g in 1:params.number_of_generators
@@ -67,18 +65,20 @@ end
 # ---------------------------------------------------------------------------
 function generators!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
     gen_data = matpower_data["gen"]
-    create_active_generation_variables!(model, gen_data)
-    create_curtailment_variables!(model, gen_data)
-    create_curtailment_constraints!(model, gen_data)
+    params = get_generator_parameters(gen_data)
+    create_active_generation_variables!(model, params)
+    create_curtailment_variables!(model, params)
+    create_curtailment_constraints!(model, params)
     return nothing
 end
 
 function generators!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{SubproblemBuild})
     gen_data = matpower_data["gen"]
-    create_active_generation_variables!(model, gen_data)
-    create_reactive_generation_variables!(model, gen_data)
-    create_curtailment_variables!(model, gen_data)
-    create_curtailment_constraints!(model, gen_data)
+    params = get_generator_parameters(gen_data)
+    create_active_generation_variables!(model, params)
+    create_reactive_generation_variables!(model, params)
+    create_curtailment_variables!(model, params)
+    create_curtailment_constraints!(model, params)
     return nothing
 end
 
@@ -89,9 +89,10 @@ function generators!(
     ::Type{SubproblemBuild},
 )
     gen_data = matpower_data["gen"]
-    create_active_generation_variables!(model, gen_data)
-    create_reactive_generation_variables!(model, gen_data)
-    create_curtailment_variables!(model, gen_data)
-    create_curtailment_constraints!(model, gen_data)
+    params = get_generator_parameters(gen_data)
+    create_active_generation_variables!(model, params)
+    create_reactive_generation_variables!(model, params)
+    create_curtailment_variables!(model, params)
+    create_curtailment_constraints!(model, params)
     return nothing
 end

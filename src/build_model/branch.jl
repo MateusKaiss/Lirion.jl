@@ -1,93 +1,93 @@
 # ---------------------------------------------------------------------
-# Getting Branch Parameters (multi-temporal compatible, no mudança)
+# Getting Branch Parameters (multi-temporal compatible)
 # ---------------------------------------------------------------------
 function get_branch_parameters(branch_data, matpower_data)
+    resistance = branch_data["br_r"]
+    reactance = branch_data["br_x"]
+    tap_position = branch_data["tap"]
+
     return (
-        # Informações topológicas
         number_of_branches = length(branch_data["f_bus"]),
         bus_from = branch_data["f_bus"],
         bus_to = branch_data["t_bus"],
         bus_ids = matpower_data["bus"]["bus_i"],
         bus_idx_map = matpower_data["bus_idx_map"],
-
-        # Impedâncias e tap
-        resistance = branch_data["br_r"],
-        reactance = branch_data["br_x"],
+        resistance = resistance,
+        reactance = reactance,
         b_shunt = branch_data["br_b"],
-        tap_position = branch_data["tap"],
-
-        # Limites e status
+        tap_position = tap_position,
         capacity = branch_data["rate_a"],
         min_ang = branch_data["angmin"],
         max_ang = branch_data["angmax"],
         existing = branch_data["br_status"],
-
-        # Dados do sistema base e condições iniciais
         s_base = matpower_data["baseMVA"],
         initial_voltage_magnitude = matpower_data["bus"]["vm"],
         initial_voltage_angle = matpower_data["bus"]["va"],
+        g = resistance ./ (resistance .^ 2 .+ reactance .^ 2),
+        b = -reactance ./ (resistance .^ 2 .+ reactance .^ 2),
+        inv_tap = [isnan(t) || t == 0.0 ? 1.0 : 1.0 / t for t in tap_position],
+        active = findall(
+            i -> branch_data["br_status"][i] == 1,
+            1:length(branch_data["f_bus"]),
+        ),
     )
 end
+
 function compute_dc_branch_expressions(model, params)
     T = get(model.ext, :time_periods, 1)
-    active = findall(i -> params.existing[i] == 1, 1:params.number_of_branches)
-    br_b = -params.reactance ./ (params.resistance .^ 2 .+ params.reactance .^ 2)
 
-    @expression(model, p_flow_branches[i in active, t in 1:T],
-        params.s_base * br_b[i] *
+    @expression(model, p_flow_branches[i in params.active, t in 1:T],
+        params.s_base * params.b[i] *
         (model[:theta][params.bus_from[i], t] - model[:theta][params.bus_to[i], t])
     )
 
-    @expression(model, p_reverse_flow_branches[i in active, t in 1:T],
+    @expression(model, p_reverse_flow_branches[i in params.active, t in 1:T],
         -model[:p_flow_branches][i, t]
     )
 
-    @expression(model, losses_branches[i in active, t in 1:T],
+    @expression(model, losses_branches[i in params.active, t in 1:T],
         model[:p_flow_branches][i, t]^2 * (params.resistance[i] / params.s_base)
     )
 end
 
 function create_dc_branch_constraints(model, params)
     T = get(model.ext, :time_periods, 1)
-    active = findall(i -> params.existing[i] == 1, 1:params.number_of_branches)
 
-    @constraint(model, [i in active, t in 1:T],
+    @constraint(model, [i in params.active, t in 1:T],
         -params.capacity[i] <= model[:p_flow_branches][i, t] <= params.capacity[i]
     )
 
-    @constraint(model, branch_angle_lb[i in active, t in 1:T; !isnan(params.min_ang[i])],
+    @constraint(model,
+        branch_angle_lb[i in params.active, t in 1:T; !isnan(params.min_ang[i])],
         params.min_ang[i] <=
         model[:theta][params.bus_from[i], t] - model[:theta][params.bus_to[i], t]
     )
 
-    @constraint(model, branch_angle_ub[i in active, t in 1:T; !isnan(params.max_ang[i])],
+    @constraint(model,
+        branch_angle_ub[i in params.active, t in 1:T; !isnan(params.max_ang[i])],
         model[:theta][params.bus_from[i], t] - model[:theta][params.bus_to[i], t] <=
         params.max_ang[i]
     )
 end
 
+# ---------------------------------------------------------------------
+# Creating AC Branch Variables, Expressions and Constraints
+# ---------------------------------------------------------------------
 function compute_ac_branch_expressions(model, params)
     T = get(model.ext, :time_periods, 1)
-    active = findall(i -> params.existing[i] == 1, 1:params.number_of_branches)
 
-    g = params.resistance ./ (params.resistance .^ 2 .+ params.reactance .^ 2)
-    b = -params.reactance ./ (params.resistance .^ 2 .+ params.reactance .^ 2)
-
-    # Tratar taps inválidos (0 ou NaN)
-    tap = [isnan(t) || t == 0.0 ? 1.0 : t for t in params.tap_position]
-    inv_tap = 1.0 ./ tap
-
-    @expression(model, p_flow_branches[l in active, t in 1:T],
+    @expression(model, p_flow_branches[l in params.active, t in 1:T],
         params.s_base * (
-            g[l] * (inv_tap[l] * model[:v_magnitude][params.bus_from[l], t])^2 -
-            inv_tap[l] * model[:v_magnitude][params.bus_from[l], t] *
+            params.g[l] *
+            (params.inv_tap[l] * model[:v_magnitude][params.bus_from[l], t])^2 -
+            params.inv_tap[l] * model[:v_magnitude][params.bus_from[l], t] *
             model[:v_magnitude][params.bus_to[l], t] *
             (
-                g[l] * cos(
+                params.g[l] * cos(
                     model[:theta][params.bus_from[l], t] -
                     model[:theta][params.bus_to[l], t],
                 ) +
-                b[l] * sin(
+                params.b[l] * sin(
                     model[:theta][params.bus_from[l], t] -
                     model[:theta][params.bus_to[l], t],
                 )
@@ -95,17 +95,17 @@ function compute_ac_branch_expressions(model, params)
         )
     )
 
-    @expression(model, p_reverse_flow_branches[l in active, t in 1:T],
+    @expression(model, p_reverse_flow_branches[l in params.active, t in 1:T],
         params.s_base * (
-            g[l] * model[:v_magnitude][params.bus_to[l], t]^2 -
-            inv_tap[l] * model[:v_magnitude][params.bus_to[l], t] *
+            params.g[l] * model[:v_magnitude][params.bus_to[l], t]^2 -
+            params.inv_tap[l] * model[:v_magnitude][params.bus_to[l], t] *
             model[:v_magnitude][params.bus_from[l], t] *
             (
-                g[l] * cos(
+                params.g[l] * cos(
                     model[:theta][params.bus_from[l], t] -
                     model[:theta][params.bus_to[l], t],
                 ) -
-                b[l] * sin(
+                params.b[l] * sin(
                     model[:theta][params.bus_from[l], t] -
                     model[:theta][params.bus_to[l], t],
                 )
@@ -113,18 +113,18 @@ function compute_ac_branch_expressions(model, params)
         )
     )
 
-    @expression(model, q_flow_branches[l in active, t in 1:T],
+    @expression(model, q_flow_branches[l in params.active, t in 1:T],
         params.s_base * (
-            -(b[l] + params.b_shunt[l] / 2) *
-            (inv_tap[l] * model[:v_magnitude][params.bus_from[l], t])^2 -
-            inv_tap[l] * model[:v_magnitude][params.bus_from[l], t] *
+            -(params.b[l] + params.b_shunt[l] / 2) *
+            (params.inv_tap[l] * model[:v_magnitude][params.bus_from[l], t])^2 -
+            params.inv_tap[l] * model[:v_magnitude][params.bus_from[l], t] *
             model[:v_magnitude][params.bus_to[l], t] *
             (
-                -b[l] * cos(
+                -params.b[l] * cos(
                     model[:theta][params.bus_from[l], t] -
                     model[:theta][params.bus_to[l], t],
                 ) +
-                g[l] * sin(
+                params.g[l] * sin(
                     model[:theta][params.bus_from[l], t] -
                     model[:theta][params.bus_to[l], t],
                 )
@@ -132,18 +132,18 @@ function compute_ac_branch_expressions(model, params)
         )
     )
 
-    @expression(model, q_reverse_flow_branches[l in active, t in 1:T],
+    @expression(model, q_reverse_flow_branches[l in params.active, t in 1:T],
         params.s_base * (
-            -(b[l] + params.b_shunt[l] / 2) *
+            -(params.b[l] + params.b_shunt[l] / 2) *
             model[:v_magnitude][params.bus_to[l], t]^2 -
-            inv_tap[l] * model[:v_magnitude][params.bus_to[l], t] *
+            params.inv_tap[l] * model[:v_magnitude][params.bus_to[l], t] *
             model[:v_magnitude][params.bus_from[l], t] *
             (
-                -b[l] * cos(
+                -params.b[l] * cos(
                     model[:theta][params.bus_from[l], t] -
                     model[:theta][params.bus_to[l], t],
                 ) -
-                g[l] * sin(
+                params.g[l] * sin(
                     model[:theta][params.bus_from[l], t] -
                     model[:theta][params.bus_to[l], t],
                 )
@@ -154,41 +154,39 @@ end
 
 function create_ac_branch_constraints(model, params)
     T = get(model.ext, :time_periods, 1)
-    active_branches = findall(i -> params.existing[i] == 1, 1:params.number_of_branches)
 
-    @variable(model, s_branches[l in active_branches, t = 1:T] >= 0)
-    @variable(model, s_reverse_branches[l in active_branches, t = 1:T] >= 0)
+    @variable(model, s_branches[l in params.active, t = 1:T] >= 0)
+    @variable(model, s_reverse_branches[l in params.active, t = 1:T] >= 0)
 
-    @constraint(model, [l in active_branches, t in 1:T],
+    @constraint(model, [l in params.active, t in 1:T],
         s_branches[l, t]^2 >=
         model[:p_flow_branches][l, t]^2 + model[:q_flow_branches][l, t]^2
     )
 
-    @constraint(model, [l in active_branches, t in 1:T],
+    @constraint(model, [l in params.active, t in 1:T],
         s_branches[l, t] <= params.capacity[l]
     )
 
-    @constraint(model, [l in active_branches, t in 1:T],
+    @constraint(model, [l in params.active, t in 1:T],
         s_reverse_branches[l, t]^2 >=
         model[:p_reverse_flow_branches][l, t]^2 + model[:q_reverse_flow_branches][l, t]^2
     )
 
-    @constraint(model, [l in active_branches, t in 1:T],
+    @constraint(model, [l in params.active, t in 1:T],
         s_reverse_branches[l, t] <= params.capacity[l]
     )
 
     @constraint(model,
-        branch_angle_lb[i in active_branches, t in 1:T; !isnan(params.min_ang[i])],
+        branch_angle_lb[i in params.active, t in 1:T; !isnan(params.min_ang[i])],
         params.min_ang[i] <=
         model[:theta][params.bus_from[i], t] - model[:theta][params.bus_to[i], t]
     )
 
     @constraint(model,
-        branch_angle_ub[i in active_branches, t in 1:T; !isnan(params.max_ang[i])],
+        branch_angle_ub[i in params.active, t in 1:T; !isnan(params.max_ang[i])],
         model[:theta][params.bus_from[i], t] - model[:theta][params.bus_to[i], t] <=
         params.max_ang[i]
     )
-
     return nothing
 end
 
@@ -197,15 +195,16 @@ end
 # ---------------------------------------------------------------------
 function compute_socp_branch_expressions(model, params)
     T = get(model.ext, :time_periods, 1)
+    active = findall(i -> params.existing[i] == 1, 1:params.number_of_branches)
 
+    # Pré-calcular condutância e susceptância
     g = params.resistance ./ (params.resistance .^ 2 .+ params.reactance .^ 2)
     b = -params.reactance ./ (params.resistance .^ 2 .+ params.reactance .^ 2)
 
-    tap = [isnan(t) || t == 0.0 ? 1.0 : t for t in params.tap_position]
-    inv_tap = 1.0 ./ tap
+    # Tap ratio com fallback
+    inv_tap = [1.0 / (isnan(t) || t == 0.0 ? 1.0 : t) for t in params.tap_position]
 
-    active = findall(i -> params.existing[i] == 1, 1:params.number_of_branches)
-
+    # Variáveis auxiliares para produto escalar
     @variable(model, R[l in active, t = 1:T])
     @variable(model, T_var[l in active, t = 1:T])
 
@@ -224,37 +223,33 @@ function compute_socp_branch_expressions(model, params)
         end
     end
 
-    @expression(model, p_flow_branches[l = 1:params.number_of_branches, t = 1:T],
-        params.existing[l] == 1 ?
+    @expression(model, p_flow_branches[l in active, t in 1:T],
         params.s_base * (
             g[l] * inv_tap[l]^2 * model[:v_magnitude_sq][params.bus_from[l], t] -
             inv_tap[l] * g[l] * R[l, t] - inv_tap[l] * b[l] * T_var[l, t]
-        ) : 0
+        )
     )
 
-    @expression(model, p_reverse_flow_branches[l = 1:params.number_of_branches, t = 1:T],
-        params.existing[l] == 1 ?
+    @expression(model, p_reverse_flow_branches[l in active, t in 1:T],
         params.s_base * (
             g[l] * model[:v_magnitude_sq][params.bus_to[l], t] -
             inv_tap[l] * g[l] * R[l, t] + inv_tap[l] * b[l] * T_var[l, t]
-        ) : 0
+        )
     )
 
-    @expression(model, q_flow_branches[l = 1:params.number_of_branches, t = 1:T],
-        params.existing[l] == 1 ?
+    @expression(model, q_flow_branches[l in active, t in 1:T],
         params.s_base * (
             -(b[l] + params.b_shunt[l] / 2) * inv_tap[l]^2 *
             model[:v_magnitude_sq][params.bus_from[l], t] +
             inv_tap[l] * b[l] * R[l, t] - inv_tap[l] * g[l] * T_var[l, t]
-        ) : 0
+        )
     )
 
-    @expression(model, q_reverse_flow_branches[l = 1:params.number_of_branches, t = 1:T],
-        params.existing[l] == 1 ?
+    @expression(model, q_reverse_flow_branches[l in active, t in 1:T],
         params.s_base * (
             -(b[l] + params.b_shunt[l] / 2) * model[:v_magnitude_sq][params.bus_to[l], t] +
             inv_tap[l] * b[l] * R[l, t] + inv_tap[l] * g[l] * T_var[l, t]
-        ) : 0
+        )
     )
 end
 
@@ -262,12 +257,12 @@ function create_socp_branch_constraints(model, params)
     T = get(model.ext, :time_periods, 1)
     active = findall(i -> params.existing[i] == 1, 1:params.number_of_branches)
 
-    @constraint(model, branch_angle_lb[i in active, t = 1:T; !isnan(params.min_ang[i])],
+    @constraint(model, branch_angle_lb[i in active, t in 1:T; !isnan(params.min_ang[i])],
         params.min_ang[i] <=
         model[:theta][params.bus_from[i], t] - model[:theta][params.bus_to[i], t]
     )
 
-    @constraint(model, branch_angle_ub[i in active, t = 1:T; !isnan(params.max_ang[i])],
+    @constraint(model, branch_angle_ub[i in active, t in 1:T; !isnan(params.max_ang[i])],
         model[:theta][params.bus_from[i], t] - model[:theta][params.bus_to[i], t] <=
         params.max_ang[i]
     )

@@ -20,8 +20,16 @@ function get_power_balance_parameters(matpower_data)
         bus_to_generators = get(matpower_data, "bus_to_gens", Dict{Int, Vector{Int}}()),
         bus_to_batteries = get(matpower_data, "bus_to_batteries", Dict{Int, Vector{Int}}()),
         bus_to_prosumers = get(matpower_data, "bus_to_prosumers", Dict{Int, Vector{Int}}()),
-        bus_to_branches_from = get(matpower_data, "bus_to_branches_from", Dict{Int, Vector{Int}}()),
-        bus_to_branches_to = get(matpower_data, "bus_to_branches_to", Dict{Int, Vector{Int}}()),
+        bus_to_branches_from = get(
+            matpower_data,
+            "bus_to_branches_from",
+            Dict{Int, Vector{Int}}(),
+        ),
+        bus_to_branches_to = get(
+            matpower_data,
+            "bus_to_branches_to",
+            Dict{Int, Vector{Int}}(),
+        ),
     )
 end
 
@@ -29,41 +37,41 @@ function compute_power_balance(model, matpower_data, params, bus_index, t)
     p_gen = sum(
         model[:p_generation][g, t] for
         g in get(params.bus_to_generators, bus_index, Int[]);
-        init = 0.0
+        init = 0.0,
     )
     p_bat = sum(
         model[:p_battery_injected][b, t] for
         b in get(params.bus_to_batteries, bus_index, Int[]);
-        init = 0.0
+        init = 0.0,
     )
     p_pros = sum(
         model[:p_prosumer_injected][p, t] for
         p in get(params.bus_to_prosumers, bus_index, Int[]);
-        init = 0.0
+        init = 0.0,
     )
     p_out = sum(
         model[:p_flow_branches][l, t] for
         l in get(params.bus_to_branches_from, bus_index, Int[]);
-        init = 0.0
+        init = 0.0,
     )
     p_in = sum(
         model[:p_reverse_flow_branches][l, t] for
         l in get(params.bus_to_branches_to, bus_index, Int[]);
-        init = 0.0
+        init = 0.0,
     )
 
     pd = if params.has_timeseries
         sum(
             r.pd for r in eachrow(matpower_data["bus_timeseries"])
             if r.bus == bus_index && r.time == t;
-            init = 0.0
+            init = 0.0,
         )
     else
         sum(
             matpower_data["bus"]["pd"][i] for
             i in eachindex(matpower_data["bus"]["bus_i"])
             if matpower_data["bus"]["bus_i"][i] == bus_index;
-            init = 0.0
+            init = 0.0,
         )
     end
 
