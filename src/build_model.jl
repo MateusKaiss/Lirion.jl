@@ -183,6 +183,9 @@ function build_result_dict(model::JuMP.Model, data::Dict)
     return result
 end
 
+# ---------------------------------------------------------------------
+# Adding Index Maps for Efficient Model Construction (Preprocessing)
+# ---------------------------------------------------------------------
 function add_case_index_maps!(case::Dict{String, Any})
     # ------------------------------
     # Bus index map: bus ID → index
@@ -193,13 +196,12 @@ function add_case_index_maps!(case::Dict{String, Any})
     end
 
     # --------------------------------------------------
-    # Generator bus map: generator index → bus index/id
+    # Generator bus map: generator index → bus ID
     # --------------------------------------------------
     if haskey(case, "gen")
         gen_bus = case["gen"]["gen_bus"]
         case["gen_idx_map"] = Dict(i => b for (i, b) in enumerate(gen_bus))
 
-        # Inverso: bus → list of generator indices
         bus_to_gens = Dict{Int, Vector{Int}}()
         for (i, b) in enumerate(gen_bus)
             push!(get!(bus_to_gens, b, Int[]), i)
