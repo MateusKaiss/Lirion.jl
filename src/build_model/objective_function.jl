@@ -124,7 +124,7 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{Subprob
     @objective(model, Min,
         model[:generation_cost] +
         model[:curtailment_cost] +
-        model[:reactive_power_penalty] +
+        # model[:reactive_power_penalty] +
         (
             haskey(model, :battery_reactive_injection) ?
             model[:battery_reactive_injection] : 0.0
@@ -145,7 +145,7 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{Subpr
     @objective(model, Min,
         model[:generation_cost] +
         model[:curtailment_cost] +
-        model[:reactive_power_penalty] +
+        # model[:reactive_power_penalty] +
         (
             haskey(model, :battery_reactive_injection) ?
             model[:battery_reactive_injection] : 0.0
