@@ -2,6 +2,9 @@
 # Getting Branch Parameters (multi-temporal compatible, no mudança)
 # ---------------------------------------------------------------------
 function get_branch_parameters(branch_data, matpower_data)
+    bus_ids = matpower_data["bus"]["bus_i"]
+    bus_idx_map = Dict(b => i for (i, b) in enumerate(bus_ids))
+
     return (
         number_of_branches = length(branch_data["f_bus"]),
         s_base = matpower_data["baseMVA"],
@@ -17,6 +20,8 @@ function get_branch_parameters(branch_data, matpower_data)
         tap_position = branch_data["tap"],
         initial_voltage_magnitude = matpower_data["bus"]["vm"],
         initial_voltage_angle = matpower_data["bus"]["va"],
+        bus_ids = bus_ids,
+        bus_idx_map = bus_idx_map,
     )
 end
 
@@ -256,20 +261,26 @@ function compute_socp_branch_expressions(model, params)
         end
     end
     inv_tap = 1.0 ./ tap_position
-
     active_branches = findall(i -> params.existing[i] == 1, 1:params.number_of_branches)
 
-    @variable(model, R[1:params.number_of_branches, t = 1:T])
-    @variable(model, T_var[1:params.number_of_branches, t = 1:T])  # renomeado para evitar conflito com tempo T
+    @variable(model, R[l in active_branches, t = 1:T])
+    @variable(model, T_var[l in active_branches, t = 1:T])
 
-    for t in 1:T, i in active_branches
-        V_from = params.initial_voltage_magnitude[params.bus_from[i]]
-        V_to = params.initial_voltage_magnitude[params.bus_to[i]]
-        theta_from = params.initial_voltage_angle[params.bus_from[i]]
-        theta_to = params.initial_voltage_angle[params.bus_to[i]]
+    for t in 1:T, l in active_branches
+        b_from = params.bus_from[l]
+        b_to = params.bus_to[l]
+
+        idx_from = params.bus_idx_map[b_from]
+        idx_to = params.bus_idx_map[b_to]
+
+        V_from = params.initial_voltage_magnitude[idx_from]
+        V_to = params.initial_voltage_magnitude[idx_to]
+        theta_from = params.initial_voltage_angle[idx_from]
+        theta_to = params.initial_voltage_angle[idx_to]
+
         if !any(isnan.([V_from, V_to, theta_from, theta_to]))
-            set_start_value(R[i, t], V_from * V_to * cos(theta_from - theta_to))
-            set_start_value(T_var[i, t], V_from * V_to * sin(theta_from - theta_to))
+            set_start_value(R[l, t], V_from * V_to * cos(theta_from - theta_to))
+            set_start_value(T_var[l, t], V_from * V_to * sin(theta_from - theta_to))
         end
     end
 
@@ -345,11 +356,14 @@ function create_socp_branch_constraints(model, params)
         ] in JuMP.RotatedSecondOrderCone()
     )
 
-    # JuMP.@constraint(model.jump,
-    #     [l = 1:number_of_branches],
-    #     [(model.jump[:v_magnitude_sq][bus_from[l]] + model.jump[:v_magnitude_sq][bus_to[l]]) / 2,
-    #         R[l],
-    #         T[l]] in JuMP.SecondOrderCone()
+    # @constraint(
+    #     model,
+    #     [l in active_branches, t = 1:T],
+    #     [
+    #         (model[:v_magnitude_sq][params.bus_from[l], t] + model[:v_magnitude_sq][params.bus_to[l], t]) / 2,
+    #         model[:R][l, t],
+    #         model[:T_var][l, t]
+    #     ] in JuMP.SecondOrderCone()
     # )
 
     @constraint(

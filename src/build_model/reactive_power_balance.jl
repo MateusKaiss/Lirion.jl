@@ -3,7 +3,7 @@ function get_reactive_power_parameters(matpower_data)
     has_prosumer = haskey(matpower_data, "prosumer")
 
     return (
-        number_of_buses = length(matpower_data["bus"]["bus_i"]),
+        bus_ids = matpower_data["bus"]["bus_i"],  # <- usamos o índice real aqui
         generator_bus_index = matpower_data["gen"]["gen_bus"],
         battery_bus_index = has_storage ? matpower_data["storage"]["storage_bus"] : Int[],
         prosumer_bus_index = has_prosumer ? matpower_data["prosumer"]["bus"] : Int[],
@@ -11,6 +11,7 @@ function get_reactive_power_parameters(matpower_data)
         branch_bus_from = matpower_data["branch"]["f_bus"],
         branch_bus_to = matpower_data["branch"]["t_bus"],
         shunt_susceptance = matpower_data["bus"]["bs"],
+        generator_status = matpower_data["gen"]["gen_status"],
         has_timeseries = haskey(matpower_data, "bus_timeseries"),
     )
 end
@@ -37,7 +38,7 @@ function compute_reactive_power_balance(model, matpower_data, bus_index, t)
 
     return sum(
         model[:q_generation][g, t] for g in eachindex(params.generator_bus_index)
-        if params.generator_bus_index[g] == bus_index;
+        if params.generator_bus_index[g] == bus_index && params.generator_status[g] == 1;
         init = 0.0,
     ) -
            sum(
@@ -71,12 +72,13 @@ function reactive_power_balance!(model, matpower_data, ::Type{AC}, ::Type{Subpro
     params = get_reactive_power_parameters(matpower_data)
     T = get(model.ext, :time_periods, 1)
 
-    for b in 1:params.number_of_buses, t in 1:T
+    for b in params.bus_ids, t in 1:T
+        idx = findfirst(==(b), params.bus_ids)
         reactive_balance = compute_reactive_power_balance(model, matpower_data, b, t)
         @constraint(
             model,
-            reactive_balance + params.shunt_susceptance[b] * model[:v_magnitude][b, t]^2 ==
-            0
+            reactive_balance +
+            params.shunt_susceptance[idx] * model[:v_magnitude][b, t]^2 == 0
         )
     end
 end
@@ -90,12 +92,13 @@ function reactive_power_balance!(
     params = get_reactive_power_parameters(matpower_data)
     T = get(model.ext, :time_periods, 1)
 
-    for b in 1:params.number_of_buses, t in 1:T
+    for b in params.bus_ids, t in 1:T
+        idx = findfirst(==(b), params.bus_ids)
         reactive_balance = compute_reactive_power_balance(model, matpower_data, b, t)
         @constraint(
             model,
-            reactive_balance + params.shunt_susceptance[b] * model[:v_magnitude_sq][b, t] ==
-            0
+            reactive_balance +
+            params.shunt_susceptance[idx] * model[:v_magnitude_sq][b, t] == 0
         )
     end
 end
