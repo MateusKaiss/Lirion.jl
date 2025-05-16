@@ -48,6 +48,7 @@ function create_socp_variables!(model, bus_data)
     return nothing
 end
 
+
 # ---------------------------------------------------------------------
 # Dispatching Bus Variables by Model Type
 # ---------------------------------------------------------------------
