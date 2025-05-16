@@ -11,6 +11,7 @@ function get_reactive_power_parameters(matpower_data)
         branch_bus_from = matpower_data["branch"]["f_bus"],
         branch_bus_to = matpower_data["branch"]["t_bus"],
         shunt_susceptance = matpower_data["bus"]["bs"],
+        generator_status = matpower_data["gen"]["gen_status"],
         has_timeseries = haskey(matpower_data, "bus_timeseries"),
     )
 end
@@ -37,7 +38,7 @@ function compute_reactive_power_balance(model, matpower_data, bus_index, t)
 
     return sum(
         model[:q_generation][g, t] for g in eachindex(params.generator_bus_index)
-        if params.generator_bus_index[g] == bus_index;
+        if params.generator_bus_index[g] == bus_index && params.generator_status[g] == 1;
         init = 0.0,
     ) -
            sum(

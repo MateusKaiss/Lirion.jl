@@ -41,10 +41,16 @@ function create_socp_variables!(model, bus_data)
         # lower_bound = bus_data["vmin"][b]^2,
         # upper_bound = bus_data["vmax"][b]^2,
     )
+    # @constraint(
+    #     model,
+    #     [b in bus_ids, t = 1:T],
+    #     v_magnitude_sq[b, t] == model[:v_magnitude][b, t]^2
+    # )
+
     @constraint(
         model,
         [b in bus_ids, t = 1:T],
-        v_magnitude_sq[b, t] == model[:v_magnitude][b, t]^2
+        v_magnitude_sq[b, t] ≥ model[:v_magnitude][b, t]^2
     )
 
     return nothing

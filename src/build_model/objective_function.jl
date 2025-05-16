@@ -11,6 +11,7 @@ function get_objective_parameters(
         num_polynomial_coefs = get(gencost_data, "ncost", []),
         curtailment_cost = get(gen_data, "curtailment_cost", []),
         plant_type = get(gen_data, "plant_type", []),
+        generator_status = get(gen_data, "gen_status", []),
         number_of_prosumers = get(prosumer_data, "bus", []) |> length,
         prosumer_costs = get(prosumer_data, "cost_injection", []),
     )
@@ -30,6 +31,7 @@ function compute_generation_cost(model, gen_data, gencost_data)
                 for i in 1:params.num_polynomial_coefs[g]
             )
             for g in 1:params.number_of_generators, t in 1:T
+            if params.generator_status[g] == 1
         )
     )
 end
@@ -44,7 +46,7 @@ function compute_curtailment_cost(model, gen_data)
         sum(
             params.curtailment_cost[g] * model[:curtailment][g, t]
             for g in 1:params.number_of_generators, t in 1:T
-            if params.plant_type[g] == "R"
+            if params.plant_type[g] == "R" && params.generator_status[g] == 1
         )
     )
 end
@@ -80,7 +82,7 @@ function compute_reactive_power_penalty(model, gen_data, gencost_data)
                 for i in 1:length(params.generator_costs[g])
             )
             for g in 1:params.number_of_generators, t in 1:T
-            if params.plant_type[g] == "T"
+            if params.plant_type[g] == "T" && params.generator_status[g] == 1
         )
     )
 end
@@ -156,7 +158,7 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{Subpr
 
     compute_generation_cost(model, gen_data, gencost_data)
     compute_curtailment_cost(model, gen_data)
-    compute_reactive_power_penalty(model, gen_data, gencost_data)  # Comentado
+    compute_reactive_power_penalty(model, gen_data, gencost_data)
     compute_prosumer_cost(model, prosumer_data)
 
     if !isempty(battery_data)
@@ -167,7 +169,7 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{Subpr
         model,
         Min,
         model[:generation_cost] + model[:curtailment_cost] +
-        # model[:reactive_power_penalty] +  # Comentado
+        model[:reactive_power_penalty] +
         (
             haskey(model, :battery_reactive_injection) ?
             model[:battery_reactive_injection] : 0.0
