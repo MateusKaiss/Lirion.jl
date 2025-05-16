@@ -26,13 +26,16 @@ function get_branch_parameters(branch_data, matpower_data)
         g = resistance ./ (resistance .^ 2 .+ reactance .^ 2),
         b = -reactance ./ (resistance .^ 2 .+ reactance .^ 2),
         inv_tap = [isnan(t) || t == 0.0 ? 1.0 : 1.0 / t for t in tap_position],
-        active = findall(
+        active = filter(
             i -> branch_data["br_status"][i] == 1,
-            1:length(branch_data["f_bus"]),
+            eachindex(branch_data["f_bus"]),
         ),
     )
 end
 
+# ---------------------------------------------------------------------
+# DC Branch Modeling
+# ---------------------------------------------------------------------
 function compute_dc_branch_expressions(model, params)
     T = get(model.ext, :time_periods, 1)
 
@@ -71,7 +74,7 @@ function create_dc_branch_constraints(model, params)
 end
 
 # ---------------------------------------------------------------------
-# Creating AC Branch Variables, Expressions and Constraints
+# AC Branch Modeling
 # ---------------------------------------------------------------------
 function compute_ac_branch_expressions(model, params)
     T = get(model.ext, :time_periods, 1)
@@ -299,24 +302,21 @@ end
 # Dispatching Branch Variables, Expressions and Constraints by Model Type
 # ------------------------------------------------------------------------
 function branches!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
-    branch_data = matpower_data["branch"]
-    params = get_branch_parameters(branch_data, matpower_data)
+    params = get_branch_parameters(matpower_data["branch"], matpower_data)
     compute_dc_branch_expressions(model, params)
     create_dc_branch_constraints(model, params)
     return nothing
 end
 
 function branches!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{SubproblemBuild})
-    branch_data = matpower_data["branch"]
-    params = get_branch_parameters(branch_data, matpower_data)
+    params = get_branch_parameters(matpower_data["branch"], matpower_data)
     compute_ac_branch_expressions(model, params)
     create_ac_branch_constraints(model, params)
     return nothing
 end
 
 function branches!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{SubproblemBuild})
-    branch_data = matpower_data["branch"]
-    params = get_branch_parameters(branch_data, matpower_data)
+    params = get_branch_parameters(matpower_data["branch"], matpower_data)
     compute_socp_branch_expressions(model, params)
     create_socp_branch_constraints(model, params)
     return nothing

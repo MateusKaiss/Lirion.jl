@@ -6,19 +6,12 @@ function get_bus_parameters(bus_data)
     reference_bus_idx = findfirst(==(3), bus_data["bus_type"])
     reference_bus = bus_ids[reference_bus_idx]
 
-    vmin = Dict(bus_ids[i] => bus_data["vmin"][i] for i in eachindex(bus_ids))
-    vmax = Dict(bus_ids[i] => bus_data["vmax"][i] for i in eachindex(bus_ids))
-    vstart = Dict(
-        bus_ids[i] => isnan(bus_data["vm"][i]) ? nothing : bus_data["vm"][i]
-        for i in eachindex(bus_ids)
-    )
-
     return (
         bus_ids = bus_ids,
         reference_bus = reference_bus,
-        vmin = vmin,
-        vmax = vmax,
-        vstart = vstart,
+        vmin = Dict(bus_ids[i] => bus_data["vmin"][i] for i in eachindex(bus_ids)),
+        vmax = Dict(bus_ids[i] => bus_data["vmax"][i] for i in eachindex(bus_ids)),
+        vstart = Dict(bus_ids[i] => bus_data["vm"][i] for i in eachindex(bus_ids)),
     )
 end
 
@@ -28,19 +21,18 @@ end
 function create_voltage_angle_variables!(model, params)
     T = get(model.ext, :time_periods, 1)
     @variable(model, theta[b in params.bus_ids, t = 1:T], start = 0.0)
-    @constraint(model, theta_ref[t = 1:T], theta[params.reference_bus, t] == 0)
+    @constraint(model, theta_ref[t in 1:T], theta[params.reference_bus, t] == 0)
     return nothing
 end
 
 function create_voltage_magnitude_variables!(model, params)
     T = get(model.ext, :time_periods, 1)
-
     @variable(
         model,
         v_magnitude[b in params.bus_ids, t = 1:T],
         lower_bound = params.vmin[b],
         upper_bound = params.vmax[b],
-        start = params.vstart[b]
+        start = isnan(params.vstart[b]) ? nothing : params.vstart[b]
     )
     return nothing
 end

@@ -22,7 +22,6 @@ end
 
 function create_active_generation_variables!(model, params)
     T = get(model.ext, :time_periods, 1)
-
     @variable(
         model,
         p_generation[g = 1:params.number_of_generators, t = 1:T; params.existing[g]],
@@ -34,7 +33,6 @@ end
 
 function create_reactive_generation_variables!(model, params)
     T = get(model.ext, :time_periods, 1)
-
     @variable(
         model,
         q_generation[g = 1:params.number_of_generators, t = 1:T; params.existing[g]],
@@ -51,21 +49,18 @@ end
 
 function create_curtailment_constraints!(model, params)
     T = get(model.ext, :time_periods, 1)
+    curtailable = filter(g -> has_curtailment(params, g), 1:params.number_of_generators)
 
-    for g in 1:params.number_of_generators
-        if has_curtailment(params, g)
-            @constraint(model, [t = 1:T],
-                model[:p_generation][g, t] + model[:curtailment][g, t] == params.pmx[g])
-        end
-    end
+    @constraint(model, [g in curtailable, t in 1:T],
+        model[:p_generation][g, t] + model[:curtailment][g, t] == params.pmx[g]
+    )
 end
 
 # ---------------------------------------------------------------------------
 # Dispatching Generator Variables, Expressions and Constraints by Model Type
 # ---------------------------------------------------------------------------
 function generators!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
-    gen_data = matpower_data["gen"]
-    params = get_generator_parameters(gen_data)
+    params = get_generator_parameters(matpower_data["gen"])
     create_active_generation_variables!(model, params)
     create_curtailment_variables!(model, params)
     create_curtailment_constraints!(model, params)
@@ -73,8 +68,7 @@ function generators!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{Subpro
 end
 
 function generators!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{SubproblemBuild})
-    gen_data = matpower_data["gen"]
-    params = get_generator_parameters(gen_data)
+    params = get_generator_parameters(matpower_data["gen"])
     create_active_generation_variables!(model, params)
     create_reactive_generation_variables!(model, params)
     create_curtailment_variables!(model, params)
@@ -88,8 +82,7 @@ function generators!(
     ::Type{SOCP},
     ::Type{SubproblemBuild},
 )
-    gen_data = matpower_data["gen"]
-    params = get_generator_parameters(gen_data)
+    params = get_generator_parameters(matpower_data["gen"])
     create_active_generation_variables!(model, params)
     create_reactive_generation_variables!(model, params)
     create_curtailment_variables!(model, params)
