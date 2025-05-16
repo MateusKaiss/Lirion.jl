@@ -79,11 +79,11 @@ end
 
 @testset "PowerOptimization vs PowerModels Unified Comparison" begin
     # DC
-    # dc_optimizer = get_available_optimizer(() -> Gurobi.Optimizer(), Ipopt.Optimizer)
-    # run_model_tests(PowerOptimization.DC, "DC"; optimizer = dc_optimizer)
+    dc_optimizer = get_available_optimizer(() -> Gurobi.Optimizer(), Ipopt.Optimizer)
+    run_model_tests(PowerOptimization.DC, "DC"; optimizer = dc_optimizer)
 
     # AC
-    # run_model_tests(PowerOptimization.AC, "AC"; optimizer = Ipopt.Optimizer)
+    run_model_tests(PowerOptimization.AC, "AC"; optimizer = Ipopt.Optimizer)
 
     # SOCP — only run if Gurobi is available
     try
