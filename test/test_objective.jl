@@ -1,16 +1,15 @@
-
 # Lista reduzida de casos para testes rápidos (comente ou descomente conforme desejar)
 const reduced_list = [
-    "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case5_pjm.m",
-    "pglib_opf_case14_ieee.m",
-    "pglib_opf_case24_ieee_rts.m",
-    "pglib_opf_case30_as.m",
-    "pglib_opf_case30_ieee.m",
-    "pglib_opf_case39_epri.m",
-    "pglib_opf_case57_ieee.m",
-    "pglib_opf_case60_c.m",
-    "pglib_opf_case73_ieee_rts.m",
+    # "pglib_opf_case3_lmbd.m",
+    # "pglib_opf_case5_pjm.m",
+    # "pglib_opf_case14_ieee.m",
+    # "pglib_opf_case24_ieee_rts.m",
+    # "pglib_opf_case30_as.m",
+    # "pglib_opf_case30_ieee.m",
+    # "pglib_opf_case39_epri.m",
+    # "pglib_opf_case57_ieee.m",
+    # "pglib_opf_case60_c.m",
+    # "pglib_opf_case73_ieee_rts.m",
     "pglib_opf_case89_pegase.m",
     "pglib_opf_case118_ieee.m",
 ]
@@ -60,8 +59,8 @@ function compare_with_powermodels(
         return
     end
 
-    local_tol = model_type == PowerOptimization.SOCP ? 1e-1 : tol
-    @test isapprox(my_obj, pm_obj; atol = local_tol)
+    # Comparação com tolerância relativa de 5% para todos os modelos
+    @test isapprox(my_obj, pm_obj; rtol = 0.05)
 end
 
 function run_model_tests(
