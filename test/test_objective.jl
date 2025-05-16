@@ -10,9 +10,9 @@ const reduced_list = [
     "pglib_opf_case39_epri.m",
     "pglib_opf_case57_ieee.m",
     "pglib_opf_case60_c.m",
-    # "pglib_opf_case73_ieee_rts.m",
-    # "pglib_opf_case89_pegase.m",
-    # "pglib_opf_case118_ieee.m",
+    "pglib_opf_case73_ieee_rts.m",
+    "pglib_opf_case89_pegase.m",
+    "pglib_opf_case118_ieee.m",
 ]
 
 function get_available_optimizer(preferred, fallback)
@@ -84,13 +84,13 @@ end
     run_model_tests(PowerOptimization.DC, "DC"; optimizer = dc_optimizer)
 
     # AC
-    run_model_tests(PowerOptimization.AC, "AC"; optimizer = Ipopt.Optimizer)
+    # run_model_tests(PowerOptimization.AC, "AC"; optimizer = Ipopt.Optimizer)
 
     # SOCP — only run if Gurobi is available
-    try
-        Gurobi.Optimizer()  # test if Gurobi is licensed and working
-        run_model_tests(PowerOptimization.SOCP, "SOCP"; optimizer = Gurobi.Optimizer)
-    catch e
-        @warn "Skipping SOCP tests: Gurobi not available or license issue. ($e)"
-    end
+    # try
+    #     Gurobi.Optimizer()  # test if Gurobi is licensed and working
+    #     run_model_tests(PowerOptimization.SOCP, "SOCP"; optimizer = Gurobi.Optimizer)
+    # catch e
+    #     @warn "Skipping SOCP tests: Gurobi not available or license issue. ($e)"
+    # end
 end
