@@ -2,46 +2,48 @@
 # Creating Bus Variables
 # ---------------------------------------------------------------------
 function create_voltage_angle_variables!(model, bus_data)
-    number_of_buses = length(bus_data["bus_i"])
-    reference_bus_index = findfirst(b -> b == 3, bus_data["bus_type"])
+    bus_ids = bus_data["bus_i"]
+    reference_bus = bus_ids[findfirst(b -> b == 3, bus_data["bus_type"])]  # ou outro critério de barra de referência
     T = get(model.ext, :time_periods, 1)
 
-    @variable(model, theta[b = 1:number_of_buses, t = 1:T], start = 0.0)
-    @constraint(model, [t = 1:T], theta[reference_bus_index, t] == 0)
+    @variable(model, theta[b in bus_ids, t = 1:T], start = 0.0)
+    @constraint(model, [t = 1:T], theta[reference_bus, t] == 0)
 
     return nothing
 end
 
 function create_voltage_magnitude_variables!(model, bus_data)
-    number_of_buses = length(bus_data["bus_i"])
+    bus_ids = bus_data["bus_i"]
     T = get(model.ext, :time_periods, 1)
 
     @variable(
         model,
-        v_magnitude[b = 1:number_of_buses, t = 1:T],
-        lower_bound = bus_data["vmin"][b],
-        upper_bound = bus_data["vmax"][b],
-        start = isnan(bus_data["vm"][b]) ? nothing : bus_data["vm"][b]
+        v_magnitude[b in bus_ids, t = 1:T],
+        lower_bound = bus_data["vmin"][findfirst(==(b), bus_data["bus_i"])],
+        upper_bound = bus_data["vmax"][findfirst(==(b), bus_data["bus_i"])],
+        start =
+            isnan(bus_data["vm"][findfirst(==(b), bus_data["bus_i"])]) ? nothing :
+            bus_data["vm"][findfirst(==(b), bus_data["bus_i"])]
     )
 
     return nothing
 end
 
 function create_socp_variables!(model, bus_data)
-    number_of_buses = length(bus_data["bus_i"])
+    bus_ids = bus_data["bus_i"]
     T = get(model.ext, :time_periods, 1)
 
     create_voltage_magnitude_variables!(model, bus_data)
 
     @variable(
         model,
-        v_magnitude_sq[b = 1:number_of_buses, t = 1:T],
+        v_magnitude_sq[b in bus_ids, t = 1:T],
         # lower_bound = bus_data["vmin"][b]^2,
         # upper_bound = bus_data["vmax"][b]^2,
     )
     @constraint(
         model,
-        [b = 1:number_of_buses, t = 1:T],
+        [b in bus_ids, t = 1:T],
         v_magnitude_sq[b, t] == model[:v_magnitude][b, t]^2
     )
 
