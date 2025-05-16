@@ -1,12 +1,12 @@
+# ---------------------------------------------------------------------
+# Getting Power Balance Parameters (multi-temporal compatible)
+# ---------------------------------------------------------------------
 function get_power_balance_parameters(matpower_data)
-    has_storage = haskey(matpower_data, "storage")
-    has_prosumer = haskey(matpower_data, "prosumer")
-
     return (
-        bus_ids = matpower_data["bus"]["bus_i"],  # <- adicionamos aqui
+        bus_ids = matpower_data["bus"]["bus_i"],
         generator_bus_index = matpower_data["gen"]["gen_bus"],
-        battery_bus_index = has_storage ? matpower_data["storage"]["bus"] : Int[],
-        prosumer_bus_index = has_prosumer ? matpower_data["prosumer"]["bus"] : Int[],
+        battery_bus_index = get(matpower_data, "storage", Dict("bus" => Int[]))["bus"],
+        prosumer_bus_index = get(matpower_data, "prosumer", Dict("bus" => Int[]))["bus"],
         demand_bus_index = matpower_data["bus"]["bus_i"],
         branch_bus_from = matpower_data["branch"]["f_bus"],
         branch_bus_to = matpower_data["branch"]["t_bus"],
@@ -25,8 +25,8 @@ function get_bus_demand_at_time(data::Dict{String, Any}, bus_index::Int, t::Int)
         )
     else
         return sum(
-            data["bus"]["pd"][d] for
-            d in eachindex(data["bus"]["bus_i"]) if data["bus"]["bus_i"][d] == bus_index;
+            data["bus"]["pd"][i] for i in eachindex(data["bus"]["bus_i"])
+            if data["bus"]["bus_i"][i] == bus_index;
             init = 0.0,
         )
     end
@@ -41,9 +41,9 @@ function compute_power_balance(model, matpower_data, bus_index, t)
                init = 0.0,
            ) +
            sum(
-               model[:p_battery_injected][bat, t] for
-               bat in eachindex(params.battery_bus_index)
-               if params.battery_bus_index[bat] == bus_index;
+               model[:p_battery_injected][b, t] for
+               b in eachindex(params.battery_bus_index)
+               if params.battery_bus_index[b] == bus_index;
                init = 0.0,
            ) +
            sum(
@@ -69,8 +69,7 @@ function active_power_balance!(model, matpower_data, ::Type{DC}, ::Type{Subprobl
     params = get_power_balance_parameters(matpower_data)
     T = get(model.ext, :time_periods, 1)
 
-    for b in params.bus_ids, t in 1:T
-        idx = findfirst(==(b), params.bus_ids)
+    for (idx, b) in enumerate(params.bus_ids), t in 1:T
         power_balance = compute_power_balance(model, matpower_data, b, t)
         @constraint(model, power_balance + params.shunt_conductance[idx] == 0)
     end
@@ -80,8 +79,7 @@ function active_power_balance!(model, matpower_data, ::Type{AC}, ::Type{Subprobl
     params = get_power_balance_parameters(matpower_data)
     T = get(model.ext, :time_periods, 1)
 
-    for b in params.bus_ids, t in 1:T
-        idx = findfirst(==(b), params.bus_ids)
+    for (idx, b) in enumerate(params.bus_ids), t in 1:T
         power_balance = compute_power_balance(model, matpower_data, b, t)
         @constraint(
             model,
@@ -95,8 +93,7 @@ function active_power_balance!(model, matpower_data, ::Type{SOCP}, ::Type{Subpro
     params = get_power_balance_parameters(matpower_data)
     T = get(model.ext, :time_periods, 1)
 
-    for b in params.bus_ids, t in 1:T
-        idx = findfirst(==(b), params.bus_ids)
+    for (idx, b) in enumerate(params.bus_ids), t in 1:T
         power_balance = compute_power_balance(model, matpower_data, b, t)
         @constraint(
             model,

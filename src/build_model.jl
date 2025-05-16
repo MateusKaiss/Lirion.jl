@@ -182,3 +182,72 @@ function build_result_dict(model::JuMP.Model, data::Dict)
 
     return result
 end
+
+function add_case_index_maps!(case::Dict{String, Any})
+    # ------------------------------
+    # Bus index map: bus ID → index
+    # ------------------------------
+    if haskey(case, "bus")
+        bus_ids = case["bus"]["bus_i"]
+        case["bus_idx_map"] = Dict(b => i for (i, b) in enumerate(bus_ids))
+    end
+
+    # --------------------------------------------------
+    # Generator bus map: generator index → bus index/id
+    # --------------------------------------------------
+    if haskey(case, "gen")
+        gen_bus = case["gen"]["gen_bus"]
+        case["gen_idx_map"] = Dict(i => b for (i, b) in enumerate(gen_bus))
+
+        # Inverso: bus → list of generator indices
+        bus_to_gens = Dict{Int, Vector{Int}}()
+        for (i, b) in enumerate(gen_bus)
+            push!(get!(bus_to_gens, b, Int[]), i)
+        end
+        case["bus_to_gens"] = bus_to_gens
+    end
+
+    # --------------------------------------
+    # Branch maps: bus → branches (from/to)
+    # --------------------------------------
+    if haskey(case, "branch")
+        f_bus = case["branch"]["f_bus"]
+        t_bus = case["branch"]["t_bus"]
+
+        bus_to_branches_from = Dict{Int, Vector{Int}}()
+        bus_to_branches_to = Dict{Int, Vector{Int}}()
+
+        for (i, f) in enumerate(f_bus)
+            push!(get!(bus_to_branches_from, f, Int[]), i)
+        end
+        for (i, t) in enumerate(t_bus)
+            push!(get!(bus_to_branches_to, t, Int[]), i)
+        end
+
+        case["bus_to_branches_from"] = bus_to_branches_from
+        case["bus_to_branches_to"] = bus_to_branches_to
+    end
+
+    # ---------------------------------------------------
+    # Prosumers and storage maps (if available)
+    # ---------------------------------------------------
+    if haskey(case, "prosumer")
+        prosumer_bus = case["prosumer"]["bus"]
+        bus_to_prosumers = Dict{Int, Vector{Int}}()
+        for (i, b) in enumerate(prosumer_bus)
+            push!(get!(bus_to_prosumers, b, Int[]), i)
+        end
+        case["bus_to_prosumers"] = bus_to_prosumers
+    end
+
+    if haskey(case, "storage")
+        storage_bus = case["storage"]["storage_bus"]
+        bus_to_batteries = Dict{Int, Vector{Int}}()
+        for (i, b) in enumerate(storage_bus)
+            push!(get!(bus_to_batteries, b, Int[]), i)
+        end
+        case["bus_to_batteries"] = bus_to_batteries
+    end
+
+    return case
+end

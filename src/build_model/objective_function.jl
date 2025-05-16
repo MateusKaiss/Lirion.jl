@@ -1,3 +1,6 @@
+# ---------------------------------------------------------------------
+# Getting Objective Parameters
+# ---------------------------------------------------------------------
 function get_objective_parameters(
     gen_data,
     battery_data,
@@ -21,9 +24,7 @@ function compute_generation_cost(model, gen_data, gencost_data)
     params = get_objective_parameters(gen_data, Dict(), gencost_data)
     T = get(model.ext, :time_periods, 1)
 
-    @expression(
-        model,
-        generation_cost,
+    @expression(model, generation_cost,
         sum(
             sum(
                 params.generator_costs[g][i] *
@@ -40,9 +41,7 @@ function compute_curtailment_cost(model, gen_data)
     params = get_objective_parameters(gen_data, Dict(), Dict())
     T = get(model.ext, :time_periods, 1)
 
-    @expression(
-        model,
-        curtailment_cost,
+    @expression(model, curtailment_cost,
         sum(
             params.curtailment_cost[g] * model[:curtailment][g, t]
             for g in 1:params.number_of_generators, t in 1:T
@@ -58,9 +57,7 @@ function compute_prosumer_cost(model, prosumer_data)
     end
     T = get(model.ext, :time_periods, 1)
 
-    @expression(
-        model,
-        prosumer_cost,
+    @expression(model, prosumer_cost,
         sum(
             params.prosumer_costs[p] * model[:p_prosumer_injected][p, t]
             for p in 1:params.number_of_prosumers, t in 1:T
@@ -72,14 +69,12 @@ function compute_reactive_power_penalty(model, gen_data, gencost_data)
     params = get_objective_parameters(gen_data, Dict(), gencost_data)
     T = get(model.ext, :time_periods, 1)
 
-    @expression(
-        model,
-        reactive_power_penalty,
+    @expression(model, reactive_power_penalty,
         sum(
             1e-9 * sum(
                 params.generator_costs[g][i] *
                 model[:q_generation][g, t]^(params.num_polynomial_coefs[g] - i)
-                for i in 1:length(params.generator_costs[g])
+                for i in 1:params.num_polynomial_coefs[g]
             )
             for g in 1:params.number_of_generators, t in 1:T
             if params.plant_type[g] == "T" && params.generator_status[g] == 1
@@ -94,9 +89,7 @@ function compute_battery_reactive_injection(model, battery_data)
     end
     T = get(model.ext, :time_periods, 1)
 
-    @expression(
-        model,
-        battery_reactive_injection,
+    @expression(model, battery_reactive_injection,
         -sum(
             1e-13 * model[:q_battery_injected][b, t]
             for b in 1:params.number_of_batteries, t in 1:T
@@ -107,17 +100,19 @@ end
 function objective!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
     gen_data = matpower_data["gen"]
     gencost_data = matpower_data["gencost"]
-    battery_data = haskey(matpower_data, "storage") ? matpower_data["storage"] : Dict()
-    prosumer_data = haskey(matpower_data, "prosumer") ? matpower_data["prosumer"] : Dict()
+    battery_data = get(matpower_data, "storage", Dict())
+    prosumer_data = get(matpower_data, "prosumer", Dict())
 
     compute_generation_cost(model, gen_data, gencost_data)
     compute_curtailment_cost(model, gen_data)
     compute_prosumer_cost(model, prosumer_data)
 
-    @objective(
-        model,
-        Min,
+    @objective(model, Min,
         model[:generation_cost] + model[:curtailment_cost] +
+        (
+            haskey(model, :battery_reactive_injection) ?
+            model[:battery_reactive_injection] : 0.0
+        ) +
         (haskey(model, :prosumer_cost) ? model[:prosumer_cost] : 0.0)
     )
 end
@@ -125,8 +120,8 @@ end
 function objective!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{SubproblemBuild})
     gen_data = matpower_data["gen"]
     gencost_data = matpower_data["gencost"]
-    battery_data = haskey(matpower_data, "storage") ? matpower_data["storage"] : Dict()
-    prosumer_data = haskey(matpower_data, "prosumer") ? matpower_data["prosumer"] : Dict()
+    battery_data = get(matpower_data, "storage", Dict())
+    prosumer_data = get(matpower_data, "prosumer", Dict())
 
     compute_generation_cost(model, gen_data, gencost_data)
     compute_curtailment_cost(model, gen_data)
@@ -137,11 +132,8 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{Subprob
         compute_battery_reactive_injection(model, battery_data)
     end
 
-    @objective(
-        model,
-        Min,
+    @objective(model, Min,
         model[:generation_cost] + model[:curtailment_cost] +
-        model[:reactive_power_penalty] +
         (
             haskey(model, :battery_reactive_injection) ?
             model[:battery_reactive_injection] : 0.0
@@ -153,8 +145,8 @@ end
 function objective!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{SubproblemBuild})
     gen_data = matpower_data["gen"]
     gencost_data = matpower_data["gencost"]
-    battery_data = haskey(matpower_data, "storage") ? matpower_data["storage"] : Dict()
-    prosumer_data = haskey(matpower_data, "prosumer") ? matpower_data["prosumer"] : Dict()
+    battery_data = get(matpower_data, "storage", Dict())
+    prosumer_data = get(matpower_data, "prosumer", Dict())
 
     compute_generation_cost(model, gen_data, gencost_data)
     compute_curtailment_cost(model, gen_data)
@@ -165,11 +157,8 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{Subpr
         compute_battery_reactive_injection(model, battery_data)
     end
 
-    @objective(
-        model,
-        Min,
+    @objective(model, Min,
         model[:generation_cost] + model[:curtailment_cost] +
-        # model[:reactive_power_penalty] +  # Comentado
         (
             haskey(model, :battery_reactive_injection) ?
             model[:battery_reactive_injection] : 0.0
