@@ -92,66 +92,61 @@ function build_result_dict(model::JuMP.Model, data::Dict)
     result = Dict{String, Any}()
 
     result["objective"] = objective_value(model)
+    bus_ids = data["bus"]["bus_i"]
     result["bus"] = Dict(
         "theta" => [
-            value(model[:theta][b, t]) for b in 1:length(data["bus"]["bus_i"]), t in 1:T
+            value(model[:theta][b, t]) for b in bus_ids, t in 1:T
         ],
         "vm" =>
             haskey(model, :v_magnitude) ?
             [
-                value(model[:v_magnitude][b, t]) for
-                b in 1:length(data["bus"]["bus_i"]), t in 1:T
+                value(model[:v_magnitude][b, t]) for b in bus_ids, t in 1:T
             ] : nothing,
         "vm_sq" =>
             haskey(model, :v_magnitude_sq) ?
             [
-                value(model[:v_magnitude_sq][b, t]) for
-                b in 1:length(data["bus"]["bus_i"]), t in 1:T
+                value(model[:v_magnitude_sq][b, t]) for b in bus_ids, t in 1:T
             ] : nothing,
     )
 
     if haskey(model, :p_generation)
+        gen_ids = 1:length(data["gen"]["gen_bus"])
         result["gen"] = Dict(
             "p" => [
-                value(model[:p_generation][g, t]) for
-                g in 1:length(data["gen"]["gen_bus"]), t in 1:T
+                value(model[:p_generation][g, t]) for g in gen_ids, t in 1:T
             ],
             "q" =>
                 haskey(model, :q_generation) ?
                 [
-                    value(model[:q_generation][g, t]) for
-                    g in 1:length(data["gen"]["gen_bus"]), t in 1:T
+                    value(model[:q_generation][g, t]) for g in gen_ids, t in 1:T
                 ] : nothing,
             "curtailment" =>
                 haskey(model, :curtailment) ?
                 [
-                    value(model[:curtailment][g, t]) for
-                    g in 1:length(data["gen"]["gen_bus"]), t in 1:T
+                    value(model[:curtailment][g, t]) for g in gen_ids, t in 1:T
                 ] : nothing,
         )
     end
 
     if haskey(model, :p_flow_branches)
+        branch_ids = 1:length(data["branch"]["f_bus"])
         result["branch"] = Dict(
             "p_from" => [
-                value(model[:p_flow_branches][l, t]) for
-                l in 1:length(data["branch"]["f_bus"]), t in 1:T
+                value(model[:p_flow_branches][l, t]) for l in branch_ids, t in 1:T
             ],
             "p_to" => [
-                value(model[:p_reverse_flow_branches][l, t]) for
-                l in 1:length(data["branch"]["t_bus"]), t in 1:T
+                value(model[:p_reverse_flow_branches][l, t]) for l in branch_ids, t in 1:T
             ],
             "q_from" =>
                 haskey(model, :q_flow_branches) ?
                 [
-                    value(model[:q_flow_branches][l, t]) for
-                    l in 1:length(data["branch"]["f_bus"]), t in 1:T
+                    value(model[:q_flow_branches][l, t]) for l in branch_ids, t in 1:T
                 ] : nothing,
             "q_to" =>
                 haskey(model, :q_reverse_flow_branches) ?
                 [
-                    value(model[:q_reverse_flow_branches][l, t]) for
-                    l in 1:length(data["branch"]["t_bus"]), t in 1:T
+                    value(model[:q_reverse_flow_branches][l, t]) for l in branch_ids,
+                    t in 1:T
                 ] : nothing,
         )
     end
