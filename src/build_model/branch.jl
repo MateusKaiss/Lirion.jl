@@ -6,6 +6,12 @@ function get_branch_parameters(branch_data, matpower_data)
     reactance = branch_data["br_x"]
     tap_position = branch_data["tap"]
 
+    inv_tap = similar(tap_position)
+    @inbounds for i in eachindex(tap_position)
+        t = tap_position[i]
+        inv_tap[i] = ifelse(isnan(t) || t == 0.0, 1.0, 1.0 / t)
+    end
+
     active = Int[]
     @inbounds for i in eachindex(branch_data["f_bus"])
         if branch_data["br_status"][i] == 1
@@ -32,7 +38,7 @@ function get_branch_parameters(branch_data, matpower_data)
         initial_voltage_angle = matpower_data["bus"]["va"],
         g = resistance ./ (resistance .^ 2 .+ reactance .^ 2),
         b = -reactance ./ (resistance .^ 2 .+ reactance .^ 2),
-        inv_tap = [isnan(t) || t == 0.0 ? 1.0 : 1.0 / t for t in tap_position],
+        inv_tap = inv_tap,
         active = active,
     )
 end

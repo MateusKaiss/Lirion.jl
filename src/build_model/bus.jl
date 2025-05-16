@@ -5,13 +5,22 @@ function get_bus_parameters(bus_data)
     bus_ids = bus_data["bus_i"]
     reference_bus_idx = findfirst(==(3), bus_data["bus_type"])
     reference_bus = bus_ids[reference_bus_idx]
+    vmin = Dict{Int, Float64}()
+    vmax = Dict{Int, Float64}()
+    vstart = Dict{Int, Union{Nothing, Float64}}()
+    @inbounds for i in eachindex(bus_ids)
+        b = bus_ids[i]
+        vmin[b] = bus_data["vmin"][i]
+        vmax[b] = bus_data["vmax"][i]
+        vstart[b] = isnan(bus_data["vm"][i]) ? nothing : bus_data["vm"][i]
+    end
 
     return (
         bus_ids = bus_ids,
         reference_bus = reference_bus,
-        vmin = Dict(bus_ids[i] => bus_data["vmin"][i] for i in eachindex(bus_ids)),
-        vmax = Dict(bus_ids[i] => bus_data["vmax"][i] for i in eachindex(bus_ids)),
-        vstart = Dict(bus_ids[i] => bus_data["vm"][i] for i in eachindex(bus_ids)),
+        vmin = vmin,
+        vmax = vmax,
+        vstart = vstart,
     )
 end
 
@@ -32,7 +41,7 @@ function create_voltage_magnitude_variables!(model, params)
         v_magnitude[b in params.bus_ids, t = 1:T],
         lower_bound = params.vmin[b],
         upper_bound = params.vmax[b],
-        start = isnan(params.vstart[b]) ? nothing : params.vstart[b]
+        start = params.vstart[b]
     )
     return nothing
 end
