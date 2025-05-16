@@ -21,7 +21,7 @@ function get_branch_parameters(branch_data, matpower_data)
         initial_voltage_magnitude = matpower_data["bus"]["vm"],
         initial_voltage_angle = matpower_data["bus"]["va"],
         bus_ids = bus_ids,
-        bus_idx_map = bus_idx_map
+        bus_idx_map = bus_idx_map,
     )
 end
 
@@ -271,12 +271,12 @@ function compute_socp_branch_expressions(model, params)
         b_to = params.bus_to[l]
 
         idx_from = params.bus_idx_map[b_from]
-        idx_to   = params.bus_idx_map[b_to]
+        idx_to = params.bus_idx_map[b_to]
 
         V_from = params.initial_voltage_magnitude[idx_from]
-        V_to   = params.initial_voltage_magnitude[idx_to]
+        V_to = params.initial_voltage_magnitude[idx_to]
         theta_from = params.initial_voltage_angle[idx_from]
-        theta_to   = params.initial_voltage_angle[idx_to]
+        theta_to = params.initial_voltage_angle[idx_to]
 
         if !any(isnan.([V_from, V_to, theta_from, theta_to]))
             set_start_value(R[l, t], V_from * V_to * cos(theta_from - theta_to))
