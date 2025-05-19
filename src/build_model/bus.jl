@@ -116,24 +116,6 @@ function select_cone_scale(params)
     delta = vmax / vmin
 
     if delta < 1.11
-        base_scale = 1.0 / max(vmin^2, 1e-4)
-        correction = 1.0 + 0.5 * log(delta)^2
-        raw_scale = base_scale * correction
-        return clamp(raw_scale, 25.0, 150.0)
-    else
-        return 100.0
-    end
-end
-
-function select_cone_scale(params)
-    vmin_vals = collect(values(params.vmin))
-    vmax_vals = collect(values(params.vmax))
-
-    vmin = clamp(minimum(vmin_vals), 0.80, 1.05)
-    vmax = clamp(maximum(vmax_vals), 0.90, 1.15)
-    delta = vmax / vmin
-
-    if delta < 1.11
         return 30
     elseif delta < 1.13
         return 20
