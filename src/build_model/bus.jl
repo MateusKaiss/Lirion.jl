@@ -139,7 +139,7 @@ function select_cone_scale(params)
         return 20
     elseif delta < 1.16
         return 100
-    else 
+    else
         return 70
     end
 end
