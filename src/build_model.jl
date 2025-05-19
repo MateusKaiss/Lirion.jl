@@ -105,7 +105,9 @@ function build_result_dict(model::JuMP.Model, data::Dict)
     )
 
     if haskey(model, :p_generation)
-        gen_ids = 1:length(data["gen"]["gen_bus"])
+        gen_status = data["gen"]["gen_status"]
+        gen_ids = [g for g in 1:length(gen_status) if gen_status[g] == 1]
+
         result["gen"] = Dict(
             "p" => [value(model[:p_generation][g, t]) for g in gen_ids, t in 1:T],
             "q" =>

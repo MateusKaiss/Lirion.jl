@@ -35,8 +35,9 @@ end
 
 function compute_power_balance(model, matpower_data, params, bus_index, t)
     p_gen = sum(
-        model[:p_generation][g, t] for
-        g in get(params.bus_to_generators, bus_index, Int[]);
+        model[:p_generation][g, t]
+        for g in get(params.bus_to_generators, bus_index, Int[])
+        if params.existing[g] == 1;
         init = 0.0,
     )
     p_bat = sum(

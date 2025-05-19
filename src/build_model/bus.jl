@@ -50,7 +50,7 @@ function create_socp_variables!(model, params)
     T = get(model.ext, :time_periods, 1)
 
     create_voltage_magnitude_variables!(model, params)
-    
+
     @variable(model,
         v_magnitude_sq[b in params.bus_ids, t in 1:T],
         lower_bound = params.vmin[b]^2,
@@ -61,10 +61,15 @@ function create_socp_variables!(model, params)
     scale = select_cone_scale(params)
 
     @constraint(model, voltage_sq_def[b in params.bus_ids, t in 1:T],
-        [sqrt(scale), model[:v_magnitude][b, t] * sqrt(scale), model[:v_magnitude_sq][b, t] * sqrt(scale)]
-        in JuMP.RotatedSecondOrderCone()
+        [
+            sqrt(scale),
+            model[:v_magnitude][b, t] * sqrt(scale),
+            model[:v_magnitude_sq][b, t] * sqrt(scale),
+        ]
+        in
+        JuMP.RotatedSecondOrderCone()
     )
-    
+
     # Alternativas (não usadas, mas deixadas para referência):
     # Igualdade exata (costuma deixar o modelo mais lento e menos estável)
     # @constraint(model, voltage_sq_def[b in params.bus_ids, t in 1:T],
@@ -132,7 +137,9 @@ function select_cone_scale(params)
         return 30
     elseif delta < 1.13
         return 20
-    else
-        return 100.0
+    elseif delta < 1.16
+        return 100
+    else 
+        return 70
     end
 end
