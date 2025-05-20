@@ -17,8 +17,8 @@ function build_and_optimize_model(
     model_type::Type{<:OPFModel};
     optimizer = Ipopt.Optimizer,
 )
+    convert_to_pu!(matpower_data)
     has_time_series = haskey(matpower_data, "bus_timeseries")
-
     if has_time_series
         return build_and_optimize_multiperiod_model(matpower_data, model_type; optimizer)
     else
@@ -170,7 +170,7 @@ function build_result_dict(model::JuMP.Model, data::Dict)
                 [value(model[:pv_curtailment][p, t]) for p in 1:np, t in 1:T],
         )
     end
-
+    
     return result
 end
 
@@ -236,8 +236,31 @@ function add_case_index_maps!(case::Dict{String, Any})
         case["gen"],
         get(case, "storage", Dict()),
         case["gencost"],
-        get(case, "prosumer", Dict()),
+        get(case, "prosumer", Dict())
     )
 
+    case["objective_params"] = merge(
+        case["objective_params"],
+        (; sbase = case["baseMVA"])
+    )
+
+
+    return case
+end
+
+function convert_to_pu!(case::Dict{String, Any})
+    Sbase = case["baseMVA"]
+
+    for field in ["pd", "qd", "gs", "bs"]
+        case["bus"][field] ./= Sbase
+    end
+
+    for field in ["pg", "qg", "pmax", "pmin", "qmax", "qmin"]
+        case["gen"][field] ./= Sbase
+    end
+
+    for field in ["rate_a", "rate_b", "rate_c"]
+        case["branch"][field] ./= Sbase
+    end
     return case
 end

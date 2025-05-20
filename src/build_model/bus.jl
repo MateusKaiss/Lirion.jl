@@ -115,13 +115,11 @@ function select_cone_scale(params)
     vmax = clamp(maximum(vmax_vals), 0.90, 1.15)
     delta = vmax / vmin
 
-    if delta < 1.11
-        return 30
-    elseif delta < 1.13
+    if delta < 1.13
         return 20
     elseif delta < 1.16
-        return 100
-    else
         return 70
+    else
+        return 100
     end
 end

@@ -50,7 +50,7 @@ function compute_dc_branch_expressions(model, params)
     T = get(model.ext, :time_periods, 1)
 
     @expression(model, p_flow_branches[i in params.active, t in 1:T],
-        params.s_base * params.b[i] *
+        params.b[i] *
         (model[:theta][params.bus_from[i], t] - model[:theta][params.bus_to[i], t])
     )
 
@@ -59,7 +59,7 @@ function compute_dc_branch_expressions(model, params)
     )
 
     @expression(model, losses_branches[i in params.active, t in 1:T],
-        model[:p_flow_branches][i, t]^2 * (params.resistance[i] / params.s_base)
+        model[:p_flow_branches][i, t]^2 * (params.resistance[i])
     )
 end
 
@@ -90,7 +90,7 @@ function compute_ac_branch_expressions(model, params)
     T = get(model.ext, :time_periods, 1)
 
     @expression(model, p_flow_branches[l in params.active, t in 1:T],
-        params.s_base * (
+         (
             params.g[l] *
             (params.inv_tap[l] * model[:v_magnitude][params.bus_from[l], t])^2 -
             params.inv_tap[l] * model[:v_magnitude][params.bus_from[l], t] *
@@ -109,7 +109,7 @@ function compute_ac_branch_expressions(model, params)
     )
 
     @expression(model, p_reverse_flow_branches[l in params.active, t in 1:T],
-        params.s_base * (
+         (
             params.g[l] * model[:v_magnitude][params.bus_to[l], t]^2 -
             params.inv_tap[l] * model[:v_magnitude][params.bus_to[l], t] *
             model[:v_magnitude][params.bus_from[l], t] *
@@ -127,7 +127,7 @@ function compute_ac_branch_expressions(model, params)
     )
 
     @expression(model, q_flow_branches[l in params.active, t in 1:T],
-        params.s_base * (
+         (
             -(params.b[l] + params.b_shunt[l] / 2) *
             (params.inv_tap[l] * model[:v_magnitude][params.bus_from[l], t])^2 -
             params.inv_tap[l] * model[:v_magnitude][params.bus_from[l], t] *
@@ -146,7 +146,7 @@ function compute_ac_branch_expressions(model, params)
     )
 
     @expression(model, q_reverse_flow_branches[l in params.active, t in 1:T],
-        params.s_base * (
+         (
             -(params.b[l] + params.b_shunt[l] / 2) *
             model[:v_magnitude][params.bus_to[l], t]^2 -
             params.inv_tap[l] * model[:v_magnitude][params.bus_to[l], t] *
@@ -230,21 +230,21 @@ function compute_socp_branch_expressions(model, params)
     end
 
     @expression(model, p_flow_branches[l in active, t in 1:T],
-        params.s_base * (
+         (
             params.g[l] * inv_tap[l]^2 * model[:v_magnitude_sq][params.bus_from[l], t] -
             inv_tap[l] * params.g[l] * R[l, t] - inv_tap[l] * params.b[l] * T_var[l, t]
         )
     )
 
     @expression(model, p_reverse_flow_branches[l in active, t in 1:T],
-        params.s_base * (
+         (
             params.g[l] * model[:v_magnitude_sq][params.bus_to[l], t] -
             inv_tap[l] * params.g[l] * R[l, t] + inv_tap[l] * params.b[l] * T_var[l, t]
         )
     )
 
     @expression(model, q_flow_branches[l in active, t in 1:T],
-        params.s_base * (
+         (
             -(params.b[l] + params.b_shunt[l] / 2) * inv_tap[l]^2 *
             model[:v_magnitude_sq][params.bus_from[l], t] +
             inv_tap[l] * params.b[l] * R[l, t] - inv_tap[l] * params.g[l] * T_var[l, t]
@@ -252,7 +252,7 @@ function compute_socp_branch_expressions(model, params)
     )
 
     @expression(model, q_reverse_flow_branches[l in active, t in 1:T],
-        params.s_base * (
+         (
             -(params.b[l] + params.b_shunt[l] / 2) *
             model[:v_magnitude_sq][params.bus_to[l], t] +
             inv_tap[l] * params.b[l] * R[l, t] + inv_tap[l] * params.g[l] * T_var[l, t]

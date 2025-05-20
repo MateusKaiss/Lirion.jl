@@ -5,7 +5,7 @@ function get_objective_parameters(
     gen_data,
     battery_data,
     gencost_data,
-    prosumer_data = Dict(),
+    prosumer_data = Dict()
 )
     return (
         number_of_generators = get(gen_data, "gen_bus", []) |> length,
@@ -31,7 +31,7 @@ function compute_generation_cost(model, params)
         sum(
             sum(
                 params.generator_costs[g][i] *
-                model[:p_generation][g, t]^(params.num_polynomial_coefs[g] - i)
+                (params.sbase*model[:p_generation][g, t])^(params.num_polynomial_coefs[g] - i)
                 for i in 1:params.num_polynomial_coefs[g]
             )
             for g in active_generators, t in 1:T
