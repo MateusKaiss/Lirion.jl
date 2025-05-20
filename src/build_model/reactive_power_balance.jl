@@ -8,6 +8,7 @@ function get_reactive_power_parameters(matpower_data)
         generator_status = matpower_data["gen"]["gen_status"],
         has_timeseries = haskey(matpower_data, "bus_timeseries"),
         bus_idx_map = matpower_data["bus_idx_map"],
+        branch_status = matpower_data["branch"]["br_status"],
         bus_to_generators = get(matpower_data, "bus_to_gens", Dict{Int, Vector{Int}}()),
         bus_to_batteries = get(matpower_data, "bus_to_batteries", Dict{Int, Vector{Int}}()),
         bus_to_prosumers = get(matpower_data, "bus_to_prosumers", Dict{Int, Vector{Int}}()),
@@ -66,12 +67,14 @@ function compute_reactive_power_balance(model, matpower_data, params, bus_index,
     )
     q_out = sum(
         model[:q_flow_branches][l, t] for
-        l in get(params.bus_to_branches_from, bus_index, Int[]);
+        l in get(params.bus_to_branches_from, bus_index, Int[])
+        if params.branch_status[l] == 1;
         init = 0.0,
     )
     q_in = sum(
         model[:q_reverse_flow_branches][l, t] for
-        l in get(params.bus_to_branches_to, bus_index, Int[]);
+        l in get(params.bus_to_branches_to, bus_index, Int[])
+        if params.branch_status[l] == 1;
         init = 0.0,
     )
     qd = get_reactive_demand_at_time(matpower_data, bus_index, t)

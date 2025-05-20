@@ -121,7 +121,8 @@ function build_result_dict(model::JuMP.Model, data::Dict)
     end
 
     if haskey(model, :p_flow_branches)
-        branch_ids = 1:length(data["branch"]["f_bus"])
+        branch_status = data["branch"]["br_status"]
+        branch_ids = [g for g in 1:length(branch_status) if branch_status[g] == 1]
         result["branch"] = Dict(
             "p_from" =>
                 [value(model[:p_flow_branches][l, t]) for l in branch_ids, t in 1:T],
