@@ -14,9 +14,10 @@ function main(
             "Unrecognized input format. Please provide a .m file or a directory with .csv files.",
         )
     end
+    add_case_index_maps!(data)
 
     result_model = build_and_optimize_model(data, model_type; optimizer)
     result_dict = build_result_dict(result_model, data)
 
-    return result_dict, result_model
+    return result_dict, result_model, data
 end

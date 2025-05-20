@@ -17,8 +17,7 @@ function build_and_optimize_model(
     model_type::Type{<:OPFModel};
     optimizer = Ipopt.Optimizer,
 )
-    has_time_series =
-        haskey(matpower_data, "bus_timeseries")
+    has_time_series = haskey(matpower_data, "bus_timeseries")
 
     if has_time_series
         return build_and_optimize_multiperiod_model(matpower_data, model_type; optimizer)
@@ -99,49 +98,41 @@ function build_result_dict(model::JuMP.Model, data::Dict)
         ],
         "vm" =>
             haskey(model, :v_magnitude) ?
-            [
-                value(model[:v_magnitude][b, t]) for b in bus_ids, t in 1:T
-            ] : nothing,
+            [value(model[:v_magnitude][b, t]) for b in bus_ids, t in 1:T] : nothing,
         "vm_sq" =>
             haskey(model, :v_magnitude_sq) ?
-            [
-                value(model[:v_magnitude_sq][b, t]) for b in bus_ids, t in 1:T
-            ] : nothing,
+            [value(model[:v_magnitude_sq][b, t]) for b in bus_ids, t in 1:T] : nothing,
     )
 
     if haskey(model, :p_generation)
-        gen_ids = 1:length(data["gen"]["gen_bus"])
+        gen_status = data["gen"]["gen_status"]
+        gen_ids = [g for g in 1:length(gen_status) if gen_status[g] == 1]
+
         result["gen"] = Dict(
-            "p" => [
-                value(model[:p_generation][g, t]) for g in gen_ids, t in 1:T
-            ],
+            "p" => [value(model[:p_generation][g, t]) for g in gen_ids, t in 1:T],
             "q" =>
                 haskey(model, :q_generation) ?
-                [
-                    value(model[:q_generation][g, t]) for g in gen_ids, t in 1:T
-                ] : nothing,
+                [value(model[:q_generation][g, t]) for g in gen_ids, t in 1:T] :
+                nothing,
             "curtailment" =>
                 haskey(model, :curtailment) ?
-                [
-                    value(model[:curtailment][g, t]) for g in gen_ids, t in 1:T
-                ] : nothing,
+                [value(model[:curtailment][g, t]) for g in gen_ids, t in 1:T] : nothing,
         )
     end
 
     if haskey(model, :p_flow_branches)
-        branch_ids = 1:length(data["branch"]["f_bus"])
+        branch_status = data["branch"]["br_status"]
+        branch_ids = [g for g in 1:length(branch_status) if branch_status[g] == 1]
         result["branch"] = Dict(
-            "p_from" => [
-                value(model[:p_flow_branches][l, t]) for l in branch_ids, t in 1:T
-            ],
+            "p_from" =>
+                [value(model[:p_flow_branches][l, t]) for l in branch_ids, t in 1:T],
             "p_to" => [
                 value(model[:p_reverse_flow_branches][l, t]) for l in branch_ids, t in 1:T
             ],
             "q_from" =>
                 haskey(model, :q_flow_branches) ?
-                [
-                    value(model[:q_flow_branches][l, t]) for l in branch_ids, t in 1:T
-                ] : nothing,
+                [value(model[:q_flow_branches][l, t]) for l in branch_ids, t in 1:T] :
+                nothing,
             "q_to" =>
                 haskey(model, :q_reverse_flow_branches) ?
                 [
@@ -181,4 +172,72 @@ function build_result_dict(model::JuMP.Model, data::Dict)
     end
 
     return result
+end
+
+function add_case_index_maps!(case::Dict{String, Any})
+    if haskey(case, "bus")
+        bus_ids = case["bus"]["bus_i"]
+        case["bus_idx_map"] = Dict(b => i for (i, b) in enumerate(bus_ids))
+    end
+
+    if haskey(case, "gen")
+        gen_bus = case["gen"]["gen_bus"]
+        case["gen_idx_map"] = Dict(i => b for (i, b) in enumerate(gen_bus))
+
+        bus_to_gens = Dict{Int, Vector{Int}}()
+        for (i, b) in enumerate(gen_bus)
+            push!(get!(bus_to_gens, b, Int[]), i)
+        end
+        case["bus_to_gens"] = bus_to_gens
+    end
+
+    if haskey(case, "branch")
+        f_bus = case["branch"]["f_bus"]
+        t_bus = case["branch"]["t_bus"]
+
+        bus_to_branches_from = Dict{Int, Vector{Int}}()
+        bus_to_branches_to = Dict{Int, Vector{Int}}()
+
+        for (i, f) in enumerate(f_bus)
+            push!(get!(bus_to_branches_from, f, Int[]), i)
+        end
+        for (i, t) in enumerate(t_bus)
+            push!(get!(bus_to_branches_to, t, Int[]), i)
+        end
+
+        case["bus_to_branches_from"] = bus_to_branches_from
+        case["bus_to_branches_to"] = bus_to_branches_to
+    end
+
+    if haskey(case, "prosumer")
+        prosumer_bus = case["prosumer"]["bus"]
+        bus_to_prosumers = Dict{Int, Vector{Int}}()
+        for (i, b) in enumerate(prosumer_bus)
+            push!(get!(bus_to_prosumers, b, Int[]), i)
+        end
+        case["bus_to_prosumers"] = bus_to_prosumers
+    end
+
+    if haskey(case, "storage")
+        storage_bus = case["storage"]["storage_bus"]
+        bus_to_batteries = Dict{Int, Vector{Int}}()
+        for (i, b) in enumerate(storage_bus)
+            push!(get!(bus_to_batteries, b, Int[]), i)
+        end
+        case["bus_to_batteries"] = bus_to_batteries
+    end
+
+    case["bus_params"] = get_bus_parameters(case["bus"])
+    case["branch_params"] = get_branch_parameters(case["branch"], case)
+    case["generator_params"] = get_generator_parameters(case["gen"])
+    case["power_balance_params"] = get_power_balance_parameters(case)
+    case["reactive_balance_params"] = get_reactive_power_parameters(case)
+    case["objective_params"] = get_objective_parameters(
+        case["gen"],
+        get(case, "storage", Dict()),
+        case["gencost"],
+        get(case, "prosumer", Dict()),
+    )
+
+    return case
 end

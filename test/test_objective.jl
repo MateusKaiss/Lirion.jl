@@ -12,6 +12,12 @@ const reduced_list = [
     "pglib_opf_case73_ieee_rts.m",
     # "pglib_opf_case89_pegase.m", - deixar comentado
     "pglib_opf_case118_ieee.m",
+    # "pglib_opf_case162_ieee_dtc.m", - deixar comentado
+    "pglib_opf_case179_goc.m",
+    "pglib_opf_case197_snem.m",
+    "pglib_opf_case200_activ.m",
+    # "pglib_opf_case240_pserc.m", - deixar comentado
+    "pglib_opf_case300_ieee.m",
 ]
 
 function get_available_optimizer(preferred, fallback)
