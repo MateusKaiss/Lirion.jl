@@ -14,9 +14,17 @@ function main(
             "Unrecognized input format. Please provide a .m file or a directory with .csv files.",
         )
     end
+
+    # Pré-processamento
     add_case_index_maps!(data)
 
-    result_model = build_and_optimize_model(data, model_type; optimizer)
+    # Escolha da função de otimização
+    result_model = if model_type == SOCP
+        try_with_fallback_scale(data, model_type; optimizer = optimizer)
+    else
+        build_and_optimize_model(data, model_type; optimizer = optimizer)
+    end
+
     result_dict = build_result_dict(result_model, data)
 
     return result_dict, result_model, data

@@ -58,7 +58,8 @@ function create_socp_variables!(model, params)
         start = 1.001
     )
 
-    scale = select_cone_scale(params)
+    scale = get(model.ext, :selected_scale, nothing)
+    scale = isnothing(scale) ? select_cone_scale(params) : scale
 
     @constraint(model, voltage_sq_def[b in params.bus_ids, t in 1:T],
         [
@@ -115,7 +116,10 @@ function select_cone_scale(params)
     vmax = clamp(maximum(vmax_vals), 0.90, 1.15)
     delta = vmax / vmin
 
-    if delta < 1.13
+    nb = length(params.vmin)
+    if nb > 1000 && delta > 1.17
+        return 100
+    elseif delta < 1.13
         return 20
     elseif delta < 1.16
         return 70
