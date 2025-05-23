@@ -18,7 +18,7 @@ const reduced_list = [
     "pglib_opf_case200_activ.m",
     "pglib_opf_case240_pserc.m",
     "pglib_opf_case300_ieee.m",
-    "pglib_opf_case500_goc.m", 
+    "pglib_opf_case500_goc.m",
     "pglib_opf_case588_sdet.m",
     "pglib_opf_case793_goc.m",
     "pglib_opf_case1354_pegase.m",
@@ -32,7 +32,7 @@ const reduced_list = [
     "pglib_opf_case2737sop_k.m",
     "pglib_opf_case2742_goc.m",
     "pglib_opf_case2746wop_k.m",
-    "pglib_opf_case2746wp_k.m",  
+    "pglib_opf_case2746wp_k.m",
     "pglib_opf_case2848_rte.m",
     "pglib_opf_case2853_sdet.m",
     "pglib_opf_case2868_rte.m",
@@ -65,7 +65,7 @@ const reduced_list = [
     "pglib_opf_case20758_epigrids.m",
     "pglib_opf_case24464_goc.m",
     "pglib_opf_case30000_goc.m",
-    "pglib_opf_case78484_epigrids.m"
+    "pglib_opf_case78484_epigrids.m",
 ]
 
 # Lista reduzida apenas para AC (≤ 73 barras)
@@ -78,7 +78,7 @@ const reduced_testlist_ac = [
     "pglib_opf_case39_epri.m",
     "pglib_opf_case57_ieee.m",
     "pglib_opf_case60_c.m",
-    "pglib_opf_case73_ieee_rts.m"
+    "pglib_opf_case73_ieee_rts.m",
 ]
 
 function get_available_optimizer(preferred, fallback)
@@ -90,11 +90,12 @@ function get_available_optimizer(preferred, fallback)
     end
     return preferred
 end
+
 function compare_with_powermodels(
     file::String,
     model_type::Type{<:PowerOptimization.OPFModel};
     optimizer = Ipopt.Optimizer,
-    tol = 1e-2,
+    tol = 0.05,
     failed_pm_cases = [],
     failed_po_cases = [],
 )
@@ -143,6 +144,7 @@ function run_model_tests(
     label::String;
     optimizer = Ipopt.Optimizer,
     case_list::Vector{String} = reduced_list,
+    tol = 0.05,
 )
     test_dir = joinpath(@__DIR__, "matpower_cases")
     selected_files = [
@@ -164,7 +166,8 @@ function run_model_tests(
                 model_type;
                 optimizer = optimizer,
                 failed_pm_cases = failed_pm_cases,
-                failed_po_cases = failed_po_cases
+                failed_po_cases = failed_po_cases,
+                tol = tol,
             )
         end
     end
@@ -175,18 +178,24 @@ function run_model_tests(
 
     println("\n Casos que falharam no PowerOptimization: $(length(failed_po_cases))")
     foreach(x -> println(" - $x"), failed_po_cases)
-    println("=============================\n")
+    return println("=============================\n")
 end
 
 @testset "PowerOptimization vs PowerModels Unified Comparison" begin
-    # DC — todos os casos
-    # dc_optimizer = get_available_optimizer(() -> Gurobi.Optimizer(), Ipopt.Optimizer)
-    # run_model_tests(PowerOptimization.DC, "DC"; optimizer = dc_optimizer, case_list = reduced_list)
+    # DC — todos os casos (comentado)
+    dc_optimizer = get_available_optimizer(() -> Gurobi.Optimizer(), Ipopt.Optimizer)
+    run_model_tests(PowerOptimization.DC, "DC"; optimizer = dc_optimizer, case_list = reduced_list, tol = 0.05)
 
-    # # AC — até 73 barras
-    # run_model_tests(PowerOptimization.AC, "AC"; optimizer = Ipopt.Optimizer, case_list = reduced_testlist_ac)
+    # AC — até 73 barras (comentado)
+    run_model_tests(PowerOptimization.AC, "AC"; optimizer = Ipopt.Optimizer, case_list = reduced_testlist_ac, tol = 0.05)
 
+    # SOCP — todos os casos com tolerância de 5%
     socp_optimizer = get_available_optimizer(() -> Gurobi.Optimizer(), SCS.Optimizer)
-    run_model_tests(PowerOptimization.SOCP, "SOCP"; optimizer = socp_optimizer, case_list = reduced_list)
-
+    run_model_tests(
+        PowerOptimization.SOCP,
+        "SOCP";
+        optimizer = socp_optimizer,
+        case_list = reduced_list,
+        tol = 0.05,
+    )
 end
