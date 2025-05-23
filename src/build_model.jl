@@ -36,7 +36,6 @@ function build_and_optimize_singleperiod_model(
     model.ext[:times] = [1]
     model.ext[:selected_scale] = get(matpower_data, "selected_scale", nothing)
 
-
     process_subproblem(
         model,
         matpower_data,
@@ -177,7 +176,7 @@ function build_result_dict(model::JuMP.Model, data::Dict)
                 [value(model[:pv_curtailment][p, t]) for p in 1:np, t in 1:T],
         )
     end
-    
+
     return result
 end
 
@@ -243,14 +242,13 @@ function add_case_index_maps!(case::Dict{String, Any})
         case["gen"],
         get(case, "storage", Dict()),
         case["gencost"],
-        get(case, "prosumer", Dict())
+        get(case, "prosumer", Dict()),
     )
 
     case["objective_params"] = merge(
         case["objective_params"],
-        (; sbase = case["baseMVA"])
+        (; sbase = case["baseMVA"]),
     )
-
 
     return case
 end
@@ -317,7 +315,8 @@ function try_with_fallback_scale(
         @warn "Modelo ainda falhou com scale=300 (status: $status). Tentando scale=500 (última tentativa)..."
         matpower_data_extreme_attempt = deepcopy(matpower_data)
         matpower_data_extreme_attempt["selected_scale"] = 500
-        model = build_and_optimize_model(matpower_data_extreme_attempt, model_type; optimizer)
+        model =
+            build_and_optimize_model(matpower_data_extreme_attempt, model_type; optimizer)
     end
 
     return model
