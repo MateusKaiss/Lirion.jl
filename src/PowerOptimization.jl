@@ -9,6 +9,7 @@ using Dates
 using LinearAlgebra
 using Statistics
 using InfrastructureModels
+using Logging
 
 include("parser.jl")
 include("csv_parser.jl")

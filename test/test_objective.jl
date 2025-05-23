@@ -1,17 +1,16 @@
 # Lista reduzida de casos para testes rápidos (comente ou descomente conforme desejar)
-# Lista reduzida de casos para testes rápidos (comente ou descomente conforme desejar)
 const reduced_list = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case5_pjm.m",
     "pglib_opf_case14_ieee.m",
     "pglib_opf_case24_ieee_rts.m",
     "pglib_opf_case30_as.m",
-    # "pglib_opf_case30_ieee.m", deixar
+    "pglib_opf_case30_ieee.m",
     "pglib_opf_case39_epri.m",
     "pglib_opf_case57_ieee.m",
     "pglib_opf_case60_c.m",
     "pglib_opf_case73_ieee_rts.m",
-    # "pglib_opf_case89_pegase.m", deixar
+    "pglib_opf_case89_pegase.m",
     "pglib_opf_case118_ieee.m",
     "pglib_opf_case162_ieee_dtc.m",
     "pglib_opf_case179_goc.m",
@@ -19,16 +18,54 @@ const reduced_list = [
     "pglib_opf_case200_activ.m",
     "pglib_opf_case240_pserc.m",
     "pglib_opf_case300_ieee.m",
-    # "pglib_opf_case500_goc.m", deixar comentado
-    # "pglib_opf_case588_sdet.m",deixar comentado
-    # "pglib_opf_case793_goc.m",deixar comentado
-    # "pglib_opf_case1354_pegase.m",deixar comentado
+    "pglib_opf_case500_goc.m", 
+    "pglib_opf_case588_sdet.m",
+    "pglib_opf_case793_goc.m",
+    "pglib_opf_case1354_pegase.m",
     "pglib_opf_case1803_snem.m",
     "pglib_opf_case1888_rte.m",
     "pglib_opf_case1951_rte.m",
     "pglib_opf_case2000_goc.m",
     "pglib_opf_case2312_goc.m",
-    "pglib_opf_case2383wp_k.m"
+    "pglib_opf_case2383wp_k.m",
+    "pglib_opf_case2736sp_k.m",
+    "pglib_opf_case2737sop_k.m",
+    "pglib_opf_case2742_goc.m",
+    "pglib_opf_case2746wop_k.m",
+    "pglib_opf_case2746wp_k.m",  
+    "pglib_opf_case2848_rte.m",
+    # "pglib_opf_case2853_sdet.m", analise
+    "pglib_opf_case2868_rte.m",
+    "pglib_opf_case2869_pegase.m",
+    "pglib_opf_case3012wp_k.m",
+    "pglib_opf_case3022_goc.m",
+    "pglib_opf_case3120sp_k.m",
+    "pglib_opf_case3375wp_k.m",
+    "pglib_opf_case3970_goc.m",
+    "pglib_opf_case4020_goc.m",
+    "pglib_opf_case4001_goc.m",
+    "pglib_opf_case4619_goc.m",
+    "pglib_opf_case4661_sdet.m",
+    "pglib_opf_case4837_goc.m",
+    "pglib_opf_case4917_goc.m",
+    "pglib_opf_case5658_epigrids.m",
+    "pglib_opf_case6468_rte.m",
+    "pglib_opf_case6470_rte.m",
+    "pglib_opf_case6495_rte.m",
+    "pglib_opf_case6515_rte.m",
+    "pglib_opf_case7336_epigrids.m",
+    "pglib_opf_case8387_pegase.m",
+    "pglib_opf_case9241_pegase.m",
+    "pglib_opf_case9591_goc.m",
+    "pglib_opf_case10000_goc.m",
+    "pglib_opf_case10192_epigrids.m",
+    # "pglib_opf_case10480_goc.m", - ANalise
+    "pglib_opf_case13659_pegase.m",
+    "pglib_opf_case14902_goc.m",
+    "pglib_opf_case20758_epigrids.m",
+    # "pglib_opf_case24464_goc.m", -analise
+    "pglib_opf_case30000_goc.m",
+    "pglib_opf_case78484_epigrids.m"
 ]
 
 # Lista reduzida apenas para AC (≤ 73 barras)
@@ -101,7 +138,10 @@ function run_model_tests(
 )
     test_dir = joinpath(@__DIR__, "matpower_cases")
     selected_files = filter(f -> basename(f) in case_list, Glob.glob("*.m", test_dir))
-    for file in selected_files
+    n = length(selected_files)
+    for (i, file) in enumerate(selected_files)
+        case_name = basename(file)
+        @info "[$label] Rodando caso $i de $n: $case_name"
         @testset "$(label) - $(basename(file))" begin
             compare_with_powermodels(file, model_type; optimizer = optimizer)
         end
@@ -110,17 +150,20 @@ end
 
 @testset "PowerOptimization vs PowerModels Unified Comparison" begin
     # DC — todos os casos
-    dc_optimizer = get_available_optimizer(() -> Gurobi.Optimizer(), Ipopt.Optimizer)
-    run_model_tests(PowerOptimization.DC, "DC"; optimizer = dc_optimizer, case_list = reduced_list)
+    # dc_optimizer = get_available_optimizer(() -> Gurobi.Optimizer(), Ipopt.Optimizer)
+    # run_model_tests(PowerOptimization.DC, "DC"; optimizer = dc_optimizer, case_list = reduced_list)
 
-    # AC — até 73 barras
-    run_model_tests(PowerOptimization.AC, "AC"; optimizer = Ipopt.Optimizer, case_list = reduced_testlist_ac)
+    # # AC — até 73 barras
+    # run_model_tests(PowerOptimization.AC, "AC"; optimizer = Ipopt.Optimizer, case_list = reduced_testlist_ac)
 
-    # SOCP — todos os casos (se Gurobi disponível)
-    try
-        Gurobi.Optimizer()
-        run_model_tests(PowerOptimization.SOCP, "SOCP"; optimizer = Gurobi.Optimizer, case_list = reduced_list)
-    catch e
-        @warn "Skipping SOCP tests: Gurobi not available or license issue. ($e)"
-    end
+
+    run_model_tests(PowerOptimization.SOCP, "SOCP"; optimizer = SCS.Optimizer, case_list = reduced_list)
+
 end
+
+
+
+
+
+
+

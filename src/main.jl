@@ -3,27 +3,24 @@ function main(
     model_type::Type{<:OPFModel};
     optimizer = Ipopt.Optimizer,
 )
-    if endswith(lowercase(database_path), ".m")
-        data = open(database_path) do io
-            return _parse_matpower_string(read(io, String))
+    # Etapa 1: Carregamento dos dados
+    data = if endswith(lowercase(database_path), ".m")
+        open(database_path) do io
+            parse_matpower_string_silent(read(io, String))
         end
     elseif isdir(database_path)
-        data = parse_case_from_csv(database_path)
+        parse_case_from_csv_silent(database_path)
     else
-        error(
-            "Unrecognized input format. Please provide a .m file or a directory with .csv files.",
-        )
+        error("Unrecognized input format. Provide a .m file or a directory with .csv files.")
     end
 
-    # Pré-processamento
+    # Etapa 2: Pré-processamento
     add_case_index_maps!(data)
 
-    # Escolha da função de otimização
-    result_model = if model_type == SOCP
-        try_with_fallback_scale(data, model_type; optimizer = optimizer)
-    else
+    # Etapa 3: Construção e otimização
+    result_model = model_type == SOCP ?
+        try_with_fallback_scale(data, model_type; optimizer = optimizer) :
         build_and_optimize_model(data, model_type; optimizer = optimizer)
-    end
 
     result_dict = build_result_dict(result_model, data)
 

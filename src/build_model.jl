@@ -296,7 +296,7 @@ function try_with_fallback_scale(
 
     # Terceira tentativa com scale = 1
     if status ∉ (MOI.OPTIMAL, MOI.LOCALLY_SOLVED)
-        @warn "Modelo ainda falhou com scale=150 (status: $status). Tentando scale=1 (fallback extremo)..."
+        @warn "Modelo ainda falhou com scale=150 (status: $status). Tentando scale=1..."
         matpower_data_final_attempt = deepcopy(matpower_data)
         matpower_data_final_attempt["selected_scale"] = 1
         model = build_and_optimize_model(matpower_data_final_attempt, model_type; optimizer)
@@ -305,12 +305,38 @@ function try_with_fallback_scale(
 
     # Quarta tentativa com scale = 300
     if status ∉ (MOI.OPTIMAL, MOI.LOCALLY_SOLVED)
-        @warn "Modelo ainda falhou com scale=1 (status: $status). Tentando scale=300 (última tentativa)..."
+        @warn "Modelo ainda falhou com scale=1 (status: $status). Tentando scale=300..."
         matpower_data_last_attempt = deepcopy(matpower_data)
         matpower_data_last_attempt["selected_scale"] = 300
         model = build_and_optimize_model(matpower_data_last_attempt, model_type; optimizer)
         status = JuMP.termination_status(model)
     end
 
+    # Quinta tentativa com scale = 500
+    if status ∉ (MOI.OPTIMAL, MOI.LOCALLY_SOLVED)
+        @warn "Modelo ainda falhou com scale=300 (status: $status). Tentando scale=500 (última tentativa)..."
+        matpower_data_extreme_attempt = deepcopy(matpower_data)
+        matpower_data_extreme_attempt["selected_scale"] = 500
+        model = build_and_optimize_model(matpower_data_extreme_attempt, model_type; optimizer)
+    end
+
     return model
+end
+
+function parse_case_from_csv_silent(dir::String)
+    # Silencia logs dentro desta função
+    original_logger = current_logger()
+    logger = NullLogger()
+    global_logger(logger)
+    result = parse_case_from_csv(dir)
+    global_logger(original_logger)
+    return result
+end
+
+function parse_matpower_string_silent(data_string::String)
+    original_logger = current_logger()
+    global_logger(NullLogger())
+    case = _parse_matpower_string(data_string)
+    global_logger(original_logger)
+    return case
 end
