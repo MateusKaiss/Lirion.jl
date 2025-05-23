@@ -137,7 +137,11 @@ function run_model_tests(
     case_list::Vector{String} = reduced_list,
 )
     test_dir = joinpath(@__DIR__, "matpower_cases")
-    selected_files = filter(f -> basename(f) in case_list, Glob.glob("*.m", test_dir))
+    selected_files = [
+        joinpath(test_dir, fname)
+        for fname in case_list
+        if isfile(joinpath(test_dir, fname))
+    ]
     n = length(selected_files)
     for (i, file) in enumerate(selected_files)
         case_name = basename(file)
