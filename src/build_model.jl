@@ -17,8 +17,8 @@ function build_and_optimize_model(
     model_type::Type{<:OPFModel};
     optimizer = Ipopt.Optimizer,
 )
+    convert_to_pu!(matpower_data)
     has_time_series = haskey(matpower_data, "bus_timeseries")
-
     if has_time_series
         return build_and_optimize_multiperiod_model(matpower_data, model_type; optimizer)
     else
@@ -34,6 +34,7 @@ function build_and_optimize_singleperiod_model(
     model = JuMP.Model(optimizer)
     model.ext[:time_periods] = 1
     model.ext[:times] = [1]
+    model.ext[:selected_scale] = get(matpower_data, "selected_scale", nothing)
 
     process_subproblem(
         model,
@@ -43,7 +44,12 @@ function build_and_optimize_singleperiod_model(
     )
 
     JuMP.optimize!(model)
-    @show JuMP.objective_value(model)
+    termination_status = JuMP.termination_status(model)
+    if termination_status == MOI.OPTIMAL || termination_status == MOI.LOCALLY_SOLVED
+        @show JuMP.objective_value(model)
+    else
+        @warn "Modelo não resolveu com sucesso. Status: $termination_status"
+    end
     return model
 end
 
@@ -239,5 +245,97 @@ function add_case_index_maps!(case::Dict{String, Any})
         get(case, "prosumer", Dict()),
     )
 
+    case["objective_params"] = merge(
+        case["objective_params"],
+        (; sbase = case["baseMVA"]),
+    )
+
+    return case
+end
+
+function convert_to_pu!(case::Dict{String, Any})
+    Sbase = case["baseMVA"]
+
+    for field in ["pd", "qd", "gs", "bs"]
+        case["bus"][field] ./= Sbase
+    end
+
+    for field in ["pg", "qg", "pmax", "pmin", "qmax", "qmin"]
+        case["gen"][field] ./= Sbase
+    end
+
+    for field in ["rate_a", "rate_b", "rate_c"]
+        case["branch"][field] ./= Sbase
+    end
+    return case
+end
+
+function try_with_fallback_scale(
+    matpower_data::Dict,
+    model_type::Type{<:OPFModel};
+    optimizer = Ipopt.Optimizer,
+)
+    scale = select_cone_scale(matpower_data["bus_params"])
+
+    # Primeira tentativa
+    matpower_data_attempt = deepcopy(matpower_data)
+    matpower_data_attempt["selected_scale"] = scale
+    model = build_and_optimize_model(matpower_data_attempt, model_type; optimizer)
+    status = JuMP.termination_status(model)
+
+    # Segunda tentativa com scale = 150
+    if status ∉ (MOI.OPTIMAL, MOI.LOCALLY_SOLVED)
+        @warn "Modelo com scale=$scale falhou (status: $status). Tentando scale=150..."
+        matpower_data_fallback = deepcopy(matpower_data)
+        matpower_data_fallback["selected_scale"] = 150
+        model = build_and_optimize_model(matpower_data_fallback, model_type; optimizer)
+        status = JuMP.termination_status(model)
+    end
+
+    # Terceira tentativa com scale = 1
+    if status ∉ (MOI.OPTIMAL, MOI.LOCALLY_SOLVED)
+        @warn "Modelo ainda falhou com scale=150 (status: $status). Tentando scale=1..."
+        matpower_data_final_attempt = deepcopy(matpower_data)
+        matpower_data_final_attempt["selected_scale"] = 1
+        model = build_and_optimize_model(matpower_data_final_attempt, model_type; optimizer)
+        status = JuMP.termination_status(model)
+    end
+
+    # Quarta tentativa com scale = 300
+    if status ∉ (MOI.OPTIMAL, MOI.LOCALLY_SOLVED)
+        @warn "Modelo ainda falhou com scale=1 (status: $status). Tentando scale=300..."
+        matpower_data_last_attempt = deepcopy(matpower_data)
+        matpower_data_last_attempt["selected_scale"] = 300
+        model = build_and_optimize_model(matpower_data_last_attempt, model_type; optimizer)
+        status = JuMP.termination_status(model)
+    end
+
+    # Quinta tentativa com scale = 500
+    if status ∉ (MOI.OPTIMAL, MOI.LOCALLY_SOLVED)
+        @warn "Modelo ainda falhou com scale=300 (status: $status). Tentando scale=500 (última tentativa)..."
+        matpower_data_extreme_attempt = deepcopy(matpower_data)
+        matpower_data_extreme_attempt["selected_scale"] = 500
+        model =
+            build_and_optimize_model(matpower_data_extreme_attempt, model_type; optimizer)
+    end
+
+    return model
+end
+
+function parse_case_from_csv_silent(dir::String)
+    # Silencia logs dentro desta função
+    original_logger = current_logger()
+    logger = NullLogger()
+    global_logger(logger)
+    result = parse_case_from_csv(dir)
+    global_logger(original_logger)
+    return result
+end
+
+function parse_matpower_string_silent(data_string::String)
+    original_logger = current_logger()
+    global_logger(NullLogger())
+    case = _parse_matpower_string(data_string)
+    global_logger(original_logger)
     return case
 end

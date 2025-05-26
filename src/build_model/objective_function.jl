@@ -31,7 +31,9 @@ function compute_generation_cost(model, params)
         sum(
             sum(
                 params.generator_costs[g][i] *
-                model[:p_generation][g, t]^(params.num_polynomial_coefs[g] - i)
+                (
+                    params.sbase * model[:p_generation][g, t]
+                )^(params.num_polynomial_coefs[g] - i)
                 for i in 1:params.num_polynomial_coefs[g]
             )
             for g in active_generators, t in 1:T
