@@ -9,7 +9,7 @@ function get_power_balance_parameters(matpower_data)
         bus_ids = bus_ids,
         bus_idx_map = bus_idx_map,
         generator_bus_index = matpower_data["gen"]["gen_bus"],
-        battery_bus_index = get(matpower_data, "storage", Dict("bus" => Int[]))["bus"],
+        battery_bus_index = get(get(matpower_data, "storage", Dict{String, Any}()), "storage_bus", Int[]),
         prosumer_bus_index = get(matpower_data, "prosumer", Dict("bus" => Int[]))["bus"],
         demand_bus_index = bus_ids,
         branch_bus_from = matpower_data["branch"]["f_bus"],
@@ -46,6 +46,7 @@ function compute_power_balance(model, matpower_data, params, bus_index, t)
         b in get(params.bus_to_batteries, bus_index, Int[]);
         init = 0.0,
     )
+
     p_pros = sum(
         model[:p_prosumer_injected][p, t] for
         p in get(params.bus_to_prosumers, bus_index, Int[]);
@@ -79,7 +80,7 @@ function compute_power_balance(model, matpower_data, params, bus_index, t)
         )
     end
 
-    return p_gen + p_bat + p_pros - pd - p_out - p_in
+    return p_gen + p_bat - p_pros - pd - p_out - p_in
 end
 
 function active_power_balance!(model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})

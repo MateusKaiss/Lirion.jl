@@ -54,7 +54,8 @@ end
 
 function create_curtailment_variables!(model, params)
     T = get(model.ext, :time_periods, 1)
-    @variable(model, curtailment[g = 1:params.number_of_generators, t = 1:T] >= 0)
+    curtailable = filter(g -> has_curtailment(params, g), 1:params.number_of_generators)
+    @variable(model, curtailment[g in curtailable, t in 1:T] >= 0)
 end
 
 function create_curtailment_constraints!(model, params)

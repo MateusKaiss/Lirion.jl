@@ -108,18 +108,19 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{Subprob
     params = matpower_data["objective_params"]
 
     compute_generation_cost(model, params)
-    compute_curtailment_cost(model, params)
-    compute_prosumer_cost(model, params)
+    # compute_curtailment_cost(model, params)
+    # compute_prosumer_cost(model, params)
     compute_battery_reactive_injection(model, params)
 
     @objective(model, Min,
-        model[:generation_cost] +
-        model[:curtailment_cost] +
-        (
-            haskey(model, :battery_reactive_injection) ?
-            model[:battery_reactive_injection] : 0.0
-        ) +
-        (haskey(model, :prosumer_cost) ? model[:prosumer_cost] : 0.0)
+        model[:generation_cost] 
+        # +
+        # # model[:curtailment_cost] +
+        # (
+        #     haskey(model, :battery_reactive_injection) ?
+        #     model[:battery_reactive_injection] : 0.0
+        # ) +
+        # (haskey(model, :prosumer_cost) ? model[:prosumer_cost] : 0.0)
     )
 end
 
@@ -135,7 +136,7 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{Subprob
     @objective(model, Min,
         model[:generation_cost] +
         model[:curtailment_cost] +
-        # model[:reactive_power_penalty] +
+        model[:reactive_power_penalty] +
         (
             haskey(model, :battery_reactive_injection) ?
             model[:battery_reactive_injection] : 0.0

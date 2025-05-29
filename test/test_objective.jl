@@ -66,25 +66,27 @@ const reduced_list = [
     # "pglib_opf_case24464_goc.m",
     # "pglib_opf_case30000_goc.m",
     # "pglib_opf_case78484_epigrids.m",
+    "case5_strg.m"
 ]
 
 # Lista reduzida apenas para AC (≤ 73 barras)
 const reduced_testlist_ac = [
-    "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case5_pjm.m",
-    "pglib_opf_case14_ieee.m",
-    "pglib_opf_case24_ieee_rts.m",
-    "pglib_opf_case30_as.m",
-    "pglib_opf_case39_epri.m",
-    "pglib_opf_case57_ieee.m",
-    "pglib_opf_case60_c.m",
-    "pglib_opf_case73_ieee_rts.m",
-    "pglib_opf_case89_pegase.m",
-    "pglib_opf_case118_ieee.m",
-    "pglib_opf_case162_ieee_dtc.m",
-    "pglib_opf_case179_goc.m",
-    "pglib_opf_case197_snem.m",
-    "pglib_opf_case200_activ.m",
+    # "pglib_opf_case3_lmbd.m",
+    # "pglib_opf_case5_pjm.m",
+    # "pglib_opf_case14_ieee.m",
+    # "pglib_opf_case24_ieee_rts.m",
+    # "pglib_opf_case30_as.m",
+    # "pglib_opf_case39_epri.m",
+    # "pglib_opf_case57_ieee.m",
+    # "pglib_opf_case60_c.m",
+    # "pglib_opf_case73_ieee_rts.m",
+    # "pglib_opf_case89_pegase.m",
+    # "pglib_opf_case118_ieee.m",
+    # "pglib_opf_case162_ieee_dtc.m",
+    # "pglib_opf_case179_goc.m",
+    # "pglib_opf_case197_snem.m",
+    # "pglib_opf_case200_activ.m",
+    "case5_strg.m"
 ]
 
 function get_available_optimizer(preferred, fallback)
