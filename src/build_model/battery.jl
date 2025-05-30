@@ -125,81 +125,92 @@ function create_socp_battery_constraints!(model, battery_data)
     @variable(model, p_aux[b = 1:params.number_of_batteries, t = 1:T] >= 0)
     @variable(model, q_aux[b = 1:params.number_of_batteries, t = 1:T] >= 0)
     @variable(model, z_b[b = 1:params.number_of_batteries, t = 1:T], Bin)
+    @variable(model, z_q[b = 1:params.number_of_batteries, t = 1:T], Bin)
 
+    @variable(model, qcharge_abs[b = 1:params.number_of_batteries, t = 1:T] >= 0)
+    @variable(model, qdischarge_abs[b = 1:params.number_of_batteries, t = 1:T] >= 0)
+
+    # Cone térmico
     @constraint(
         model,
         [b = 1:params.number_of_batteries, t = 1:T],
         [params.thermal_limit[b], p_aux[b, t], q_aux[b, t]] in JuMP.SecondOrderCone()
     )
 
-    # Substituindo abs com restrições lineares
-    @constraint(
-        model,
-        [b = 1:params.number_of_batteries, t = 1:T],
+    # Valor absoluto de p_battery_injected
+    @constraint(model, [b = 1:params.number_of_batteries, t = 1:T],
         p_aux[b, t] >= model[:p_battery_injected][b, t]
     )
-    @constraint(
-        model,
-        [b = 1:params.number_of_batteries, t = 1:T],
+    @constraint(model, [b = 1:params.number_of_batteries, t = 1:T],
         p_aux[b, t] >= -model[:p_battery_injected][b, t]
     )
 
-    @constraint(
-        model,
-        [b = 1:params.number_of_batteries, t = 1:T],
+    # Valor absoluto de q_battery_injected
+    @constraint(model, [b = 1:params.number_of_batteries, t = 1:T],
         q_aux[b, t] >= model[:q_battery_injected][b, t]
     )
-    @constraint(
-        model,
-        [b = 1:params.number_of_batteries, t = 1:T],
+    @constraint(model, [b = 1:params.number_of_batteries, t = 1:T],
         q_aux[b, t] >= -model[:q_battery_injected][b, t]
     )
 
-    @constraint(
-        model,
-        [b = 1:params.number_of_batteries, t = 1:T],
+    # Exclusividade entre charge e discharge
+    @constraint(model, [b = 1:params.number_of_batteries, t = 1:T],
         model[:charge][b, t] <= z_b[b, t] * params.charge_ramp[b]
     )
-
-    @constraint(
-        model,
-        [b = 1:params.number_of_batteries, t = 1:T],
+    @constraint(model, [b = 1:params.number_of_batteries, t = 1:T],
         model[:discharge][b, t] <= (1 - z_b[b, t]) * params.discharge_ramp[b]
     )
 
-    @constraint(
-        model,
-        [b = 1:params.number_of_batteries],
+    # Exclusividade entre qcharge e qdischarge
+    @constraint(model, [b = 1:params.number_of_batteries, t = 1:T],
+        qcharge_abs[b, t] >= model[:qcharge][b, t]
+    )
+    @constraint(model, [b = 1:params.number_of_batteries, t = 1:T],
+        qcharge_abs[b, t] >= -model[:qcharge][b, t]
+    )
+    @constraint(model, [b = 1:params.number_of_batteries, t = 1:T],
+        qdischarge_abs[b, t] >= model[:qdischarge][b, t]
+    )
+    @constraint(model, [b = 1:params.number_of_batteries, t = 1:T],
+        qdischarge_abs[b, t] >= -model[:qdischarge][b, t]
+    )
+
+    @constraint(model, [b = 1:params.number_of_batteries, t = 1:T],
+        qcharge_abs[b, t] <= z_q[b, t] * params.qmax[b]
+    )
+    @constraint(model, [b = 1:params.number_of_batteries, t = 1:T],
+        qdischarge_abs[b, t] <= (1 - z_q[b, t]) * params.qmax[b]
+    )
+
+    # Dinâmica do armazenamento
+    @constraint(model, [b = 1:params.number_of_batteries],
         model[:storage][b, 1] ==
         params.initial_storage[b] +
         model[:charge][b, 1] * params.charge_efficiency[b] -
         model[:discharge][b, 1] / params.discharge_efficiency[b]
     )
 
-    @constraint(
-        model,
-        [b = 1:params.number_of_batteries, t = 2:T],
+    @constraint(model, [b = 1:params.number_of_batteries, t = 2:T],
         model[:storage][b, t] ==
-        model[:storage][b, t-1] +
+        model[:storage][b, t - 1] +
         model[:charge][b, t] * params.charge_efficiency[b] -
         model[:discharge][b, t] / params.discharge_efficiency[b]
     )
 
-    @constraint(
-        model,
-        [b = 1:params.number_of_batteries, t = 1:T],
-        model[:p_battery_injected][b, t] == model[:discharge][b, t] - model[:charge][b, t]
+    # Potência injetada nas barras
+    @constraint(model, [b = 1:params.number_of_batteries, t = 1:T],
+        model[:p_battery_injected][b, t] ==
+        model[:discharge][b, t] - model[:charge][b, t]
     )
 
-    @constraint(
-        model,
-        [b = 1:params.number_of_batteries, t = 1:T],
+    @constraint(model, [b = 1:params.number_of_batteries, t = 1:T],
         model[:q_battery_injected][b, t] ==
         model[:qdischarge][b, t] - model[:qcharge][b, t]
     )
 
     return nothing
 end
+
 # ------------------------------------------------------------------------
 # Dispatching Battery Variables,Expressions and Constraints by Model Type
 # ------------------------------------------------------------------------
