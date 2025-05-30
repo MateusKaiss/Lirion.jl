@@ -122,15 +122,14 @@ function build_result_dict(model::JuMP.Model, data::Dict)
                 nothing,
             "curtailment" =>
                 haskey(model, :curtailment) ?
-                [ try
-                    value(model[:curtailment][g, t])
-                catch
-                    0.0
-                end
-                for g in gen_ids, t in 1:T
-                ] : nothing,
-
-             )
+                [
+                    try
+                        value(model[:curtailment][g, t])
+                    catch
+                        0.0
+                    end
+                    for g in gen_ids, t in 1:T
+                ] : nothing,)
     end
 
     if haskey(model, :p_flow_branches)
@@ -282,8 +281,9 @@ function convert_to_pu!(case::Dict{String, Any})
     #     end
     # end
     if haskey(case, "storage")
-        for field in ["ps", "qs", "energy", "energy_rating", "charge_rating", "discharge_rating",
-                    "thermal_rating", "qmin", "qmax", "q_loss", "p_loss"]
+        for field in
+            ["ps", "qs", "energy", "energy_rating", "charge_rating", "discharge_rating",
+            "thermal_rating", "qmin", "qmax", "q_loss", "p_loss"]
             case["storage"][field] ./= Sbase
         end
     end

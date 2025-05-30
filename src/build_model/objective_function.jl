@@ -113,7 +113,7 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{Subprob
     compute_battery_reactive_injection(model, params)
 
     @objective(model, Min,
-        model[:generation_cost] 
+        model[:generation_cost]
         # +
         # # model[:curtailment_cost] +
         # (

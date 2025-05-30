@@ -5,7 +5,7 @@ function get_battery_parameters(battery_data)
         max_storage = battery_data["energy_rating"],
         charge_ramp = battery_data["charge_rating"],
         discharge_ramp = battery_data["discharge_rating"],
-        initial_storage = battery_data["energy"],    
+        initial_storage = battery_data["energy"],
         qmin = battery_data["qmin"],
         qmax = battery_data["qmax"],
         thermal_limit = battery_data["thermal_rating"],
@@ -101,18 +101,18 @@ function create_ac_dc_battery_constraints!(model, battery_data)
         model,
         [b = 1:params.number_of_batteries],
         model[:storage][b, 1] ==
-            params.initial_storage[b] +
-            model[:charge][b, 1] * params.charge_efficiency[b] -
-            model[:discharge][b, 1] / params.discharge_efficiency[b]
+        params.initial_storage[b] +
+        model[:charge][b, 1] * params.charge_efficiency[b] -
+        model[:discharge][b, 1] / params.discharge_efficiency[b]
     )
 
     @constraint(
         model,
         [b = 1:params.number_of_batteries, t = 2:T],
         model[:storage][b, t] ==
-            model[:storage][b, t-1] +
-            model[:charge][b, t] * params.charge_efficiency[b] -
-            model[:discharge][b, t] / params.discharge_efficiency[b]
+        model[:storage][b, t-1] +
+        model[:charge][b, t] * params.charge_efficiency[b] -
+        model[:discharge][b, t] / params.discharge_efficiency[b]
     )
 
     return nothing
@@ -167,23 +167,22 @@ function create_socp_battery_constraints!(model, battery_data)
         model[:discharge][b, t] <= (1 - z_b[b, t]) * params.discharge_ramp[b]
     )
 
-
     @constraint(
         model,
         [b = 1:params.number_of_batteries],
         model[:storage][b, 1] ==
-            params.initial_storage[b] +
-            model[:charge][b, 1] * params.charge_efficiency[b] -
-            model[:discharge][b, 1] / params.discharge_efficiency[b]
+        params.initial_storage[b] +
+        model[:charge][b, 1] * params.charge_efficiency[b] -
+        model[:discharge][b, 1] / params.discharge_efficiency[b]
     )
 
     @constraint(
         model,
         [b = 1:params.number_of_batteries, t = 2:T],
         model[:storage][b, t] ==
-            model[:storage][b, t-1] +
-            model[:charge][b, t] * params.charge_efficiency[b] -
-            model[:discharge][b, t] / params.discharge_efficiency[b]
+        model[:storage][b, t-1] +
+        model[:charge][b, t] * params.charge_efficiency[b] -
+        model[:discharge][b, t] / params.discharge_efficiency[b]
     )
 
     @constraint(

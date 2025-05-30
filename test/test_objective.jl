@@ -66,7 +66,7 @@ const reduced_list = [
     # "pglib_opf_case24464_goc.m",
     # "pglib_opf_case30000_goc.m",
     # "pglib_opf_case78484_epigrids.m",
-    "case5_strg.m"
+    "case5_strg.m",
 ]
 
 # Lista reduzida apenas para AC (≤ 73 barras)
@@ -86,7 +86,7 @@ const reduced_testlist_ac = [
     # "pglib_opf_case179_goc.m",
     # "pglib_opf_case197_snem.m",
     # "pglib_opf_case200_activ.m",
-    "case5_strg.m"
+    "case5_strg.m",
 ]
 
 function get_available_optimizer(preferred, fallback)
@@ -195,7 +195,13 @@ end
     # run_model_tests(PowerOptimization.DC, "DC"; optimizer = dc_optimizer, case_list = reduced_list, tol = 0.05)
 
     # AC — até 73 barras (comentado)
-    run_model_tests(PowerOptimization.AC, "AC"; optimizer = Ipopt.Optimizer, case_list = reduced_testlist_ac, tol = 0.05)
+    run_model_tests(
+        PowerOptimization.AC,
+        "AC";
+        optimizer = Ipopt.Optimizer,
+        case_list = reduced_testlist_ac,
+        tol = 0.05,
+    )
 
     # SOCP — todos os casos com tolerância de 5%
     # socp_optimizer = get_available_optimizer(() -> Gurobi.Optimizer(), SCS.Optimizer)
