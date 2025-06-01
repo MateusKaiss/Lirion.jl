@@ -63,12 +63,56 @@ function create_battery_variables!(model, battery_data)
         upper_bound = params.qmax[b],
         start = 0.0,
     )
+    
+    return nothing
+end
+
+
+function create_dc_battery_constraints!(model, battery_data)
+    params = get_battery_parameters(battery_data)
+    T = get(model.ext, :time_periods, 1)
+
+    # Exclusividade entre carga e descarga
+    @constraint(model,
+        [b = 1:params.number_of_batteries, t = 1:T],
+        model[:charge][b, t] * model[:discharge][b, t] == 0
+    )
+
+    # Limite térmico (cone quadrático)
+    @constraint(model,
+        [b = 1:params.number_of_batteries, t = 1:T],
+        model[:p_battery_injected][b, t]^2 + model[:q_battery_injected][b, t]^2 <=
+        params.thermal_limit[b]^2
+    )
+
+    # Dinâmica do armazenamento (t = 1)
+    @constraint(model,
+        [b = 1:params.number_of_batteries],
+        model[:storage][b, 1] ==
+        params.initial_storage[b] +
+        model[:charge][b, 1] * params.charge_efficiency[b] -
+        model[:discharge][b, 1] / params.discharge_efficiency[b]
+    )
+
+    # Dinâmica do armazenamento (t > 1)
+    @constraint(model,
+        [b = 1:params.number_of_batteries, t = 2:T],
+        model[:storage][b, t] ==
+        model[:storage][b, t - 1] +
+        model[:charge][b, t] * params.charge_efficiency[b] -
+        model[:discharge][b, t] / params.discharge_efficiency[b]
+    )
+
+    # Potência ativa com perdas (AC model)
+    @constraint(model, [b = 1:params.number_of_batteries, t = 1:T],
+        model[:p_battery_injected][b, t] + model[:discharge][b, t] - model[:charge][b, t] == params.p_loss[b]
+    )
 
 
     return nothing
 end
 
-function create_ac_dc_battery_constraints!(model, battery_data)
+function create_ac_battery_constraints!(model, battery_data)
     params = get_battery_parameters(battery_data)
     T = get(model.ext, :time_periods, 1)
 
@@ -226,7 +270,7 @@ function batteries!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{Subprob
     if haskey(matpower_data, "storage") && !isempty(matpower_data["storage"])
         battery_data = matpower_data["storage"]
         create_battery_variables!(model, battery_data)
-        create_ac_dc_battery_constraints!(model, battery_data)
+        create_dc_battery_constraints!(model, battery_data)
     else
         @warn "No battery information found in file (DC). Skipping storage modeling."
     end
@@ -237,7 +281,7 @@ function batteries!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{Subprob
     if haskey(matpower_data, "storage") && !isempty(matpower_data["storage"])
         battery_data = matpower_data["storage"]
         create_battery_variables!(model, battery_data)
-        create_ac_dc_battery_constraints!(model, battery_data)
+        create_ac_battery_constraints!(model, battery_data)
     else
         @warn "No battery information found in file (AC). Skipping storage modeling."
     end
