@@ -160,8 +160,8 @@ function build_result_dict(model::JuMP.Model, data::Dict)
             "storage" => [value(model[:storage][b, t]) for b in 1:nb, t in 1:T],
             "charge" => [value(model[:charge][b, t]) for b in 1:nb, t in 1:T],
             "discharge" => [value(model[:discharge][b, t]) for b in 1:nb, t in 1:T],
-            "qcharge" => [value(model[:qcharge][b, t]) for b in 1:nb, t in 1:T],
-            "qdischarge" => [value(model[:qdischarge][b, t]) for b in 1:nb, t in 1:T],
+            "qsc" => [value(model[:qsc][b, t]) for b in 1:nb, t in 1:T],
+            # "qdischarge" => [value(model[:qdischarge][b, t]) for b in 1:nb, t in 1:T],
             "p_injected" =>
                 [value(model[:p_battery_injected][b, t]) for b in 1:nb, t in 1:T],
             "q_injected" =>

@@ -84,7 +84,7 @@ function compute_power_balance(model, matpower_data, params, bus_index, t)
         )
     end
 
-    return p_gen + p_bat - p_pros - pd - p_out - p_in
+    return p_gen - p_bat - p_pros - pd - p_out - p_in
 end
 
 function active_power_balance!(model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})

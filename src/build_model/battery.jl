@@ -11,6 +11,11 @@ function get_battery_parameters(battery_data)
         thermal_limit = battery_data["thermal_rating"],
         charge_efficiency = battery_data["charge_efficiency"],
         discharge_efficiency = battery_data["discharge_efficiency"],
+        r = battery_data["r"],
+        x = battery_data["x"],
+        p_loss = battery_data["p_loss"],
+        q_loss = battery_data["q_loss"],
+        bus = battery_data["storage_bus"],
     )
 end
 
@@ -22,35 +27,43 @@ function create_battery_variables!(model, battery_data)
         model,
         storage[b = 1:params.number_of_batteries, t = 1:T],
         lower_bound = 0,
-        # upper_bound = params.max_storage[b]
+        upper_bound = params.max_storage[b],
+        start = params.initial_storage[b],
     )
 
-    @variable(
-        model,
+    @variable(model,
         charge[b = 1:params.number_of_batteries, t = 1:T],
         lower_bound = 0,
-        upper_bound = params.charge_ramp[b]
+        upper_bound = params.charge_ramp[b],
+        start = 1,
     )
-    @variable(
-        model,
-        qcharge[b = 1:params.number_of_batteries, t = 1:T],
-        lower_bound = params.qmin[b],
-        upper_bound = params.qmax[b]
-    )
-    @variable(
-        model,
+
+    @variable(model,
         discharge[b = 1:params.number_of_batteries, t = 1:T],
         lower_bound = 0,
-        upper_bound = params.discharge_ramp[b]
+        upper_bound = params.discharge_ramp[b],
+        start = 1
     )
-    @variable(
-        model,
-        qdischarge[b = 1:params.number_of_batteries, t = 1:T],
+
+    @variable(model, p_battery_injected[b = 1:params.number_of_batteries, t = 1:T],
+    lower_bound = -params.thermal_limit[b],
+    upper_bound = params.thermal_limit[b],
+    start = 0.0)
+
+    @variable(model,
+        q_battery_injected[b = 1:params.number_of_batteries, t = 1:T],
         lower_bound = params.qmin[b],
-        upper_bound = params.qmax[b]
+        upper_bound = params.qmax[b],
+        start = 0.0,
     )
-    @variable(model, p_battery_injected[b = 1:params.number_of_batteries, t = 1:T])
-    @variable(model, q_battery_injected[b = 1:params.number_of_batteries, t = 1:T])
+
+    @variable(model,
+        qsc[b = 1:params.number_of_batteries, t = 1:T],
+        lower_bound = params.qmin[b],
+        upper_bound = params.qmax[b],
+        start = 0.0,
+    )
+
 
     return nothing
 end
@@ -59,46 +72,21 @@ function create_ac_dc_battery_constraints!(model, battery_data)
     params = get_battery_parameters(battery_data)
     T = get(model.ext, :time_periods, 1)
 
-    @constraint(
-        model,
-        [b = 1:params.number_of_batteries, t = 1:T],
-        model[:charge][b, t]^2 + model[:qcharge][b, t]^2 <= params.thermal_limit[b]^2
-    )
-    @constraint(
-        model,
-        [b = 1:params.number_of_batteries, t = 1:T],
-        model[:discharge][b, t]^2 + model[:qdischarge][b, t]^2 <= params.thermal_limit[b]^2
-    )
-    @constraint(
-        model,
+    # Exclusividade entre carga e descarga
+    @constraint(model,
         [b = 1:params.number_of_batteries, t = 1:T],
         model[:charge][b, t] * model[:discharge][b, t] == 0
     )
-    @constraint(
-        model,
-        [b = 1:params.number_of_batteries, t = 1:T],
-        model[:qcharge][b, t] * model[:qdischarge][b, t] == 0
-    )
-    @constraint(
-        model,
-        [b = 1:params.number_of_batteries, t = 1:T],
-        model[:p_battery_injected][b, t] == model[:discharge][b, t] - model[:charge][b, t]
-    )
-    @constraint(
-        model,
-        [b = 1:params.number_of_batteries, t = 1:T],
-        model[:q_battery_injected][b, t] ==
-        model[:qdischarge][b, t] - model[:qcharge][b, t]
-    )
-    @constraint(
-        model,
+
+    # Limite térmico (cone quadrático)
+    @constraint(model,
         [b = 1:params.number_of_batteries, t = 1:T],
         model[:p_battery_injected][b, t]^2 + model[:q_battery_injected][b, t]^2 <=
         params.thermal_limit[b]^2
     )
 
-    @constraint(
-        model,
+    # Dinâmica do armazenamento (t = 1)
+    @constraint(model,
         [b = 1:params.number_of_batteries],
         model[:storage][b, 1] ==
         params.initial_storage[b] +
@@ -106,13 +94,33 @@ function create_ac_dc_battery_constraints!(model, battery_data)
         model[:discharge][b, 1] / params.discharge_efficiency[b]
     )
 
-    @constraint(
-        model,
+    # Dinâmica do armazenamento (t > 1)
+    @constraint(model,
         [b = 1:params.number_of_batteries, t = 2:T],
         model[:storage][b, t] ==
-        model[:storage][b, t-1] +
+        model[:storage][b, t - 1] +
         model[:charge][b, t] * params.charge_efficiency[b] -
         model[:discharge][b, t] / params.discharge_efficiency[b]
+    )
+
+    # Potência ativa com perdas (AC model)
+    @constraint(model,
+        [b = 1:params.number_of_batteries, t = 1:T],
+        model[:p_battery_injected][b, t] + model[:discharge][b, t] - model[:charge][b, t] ==
+         params.p_loss[b] +
+        params.r[b] * (
+            model[:p_battery_injected][b, t]^2 + model[:q_battery_injected][b, t]^2
+        ) / model[:v_magnitude][params.bus[b], t]^2
+    )
+
+    # Potência reativa com perdas (AC model)
+    @constraint(model,
+        [b = 1:params.number_of_batteries, t = 1:T],
+        model[:q_battery_injected][b, t] ==
+        model[:qsc][b, t] + params.q_loss[b] +
+        params.x[b] * (
+            model[:p_battery_injected][b, t]^2 + model[:q_battery_injected][b, t]^2
+        ) / model[:v_magnitude][params.bus[b], t]^2
     )
 
     return nothing

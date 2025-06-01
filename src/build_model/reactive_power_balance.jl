@@ -79,7 +79,7 @@ function compute_reactive_power_balance(model, matpower_data, params, bus_index,
     )
     qd = get_reactive_demand_at_time(matpower_data, bus_index, t)
 
-    return q_gen + q_bat + q_pros - qd - q_out - q_in
+    return q_gen - q_bat + q_pros - qd - q_out - q_in
 end
 
 # ---------------------------------------------------------------------
