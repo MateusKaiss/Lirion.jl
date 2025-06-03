@@ -92,7 +92,7 @@ function active_power_balance!(model, matpower_data, ::Type{DC}, ::Type{Subprobl
     T = get(model.ext, :time_periods, 1)
 
     @constraint(model, [b in params.bus_ids, t in 1:T],
-        compute_power_balance(model, matpower_data, params, b, t) +
+        compute_power_balance(model, matpower_data, params, b, t) -
         params.shunt_conductance[params.bus_idx_map[b]] == 0
     )
 end
@@ -102,7 +102,7 @@ function active_power_balance!(model, matpower_data, ::Type{AC}, ::Type{Subprobl
     T = get(model.ext, :time_periods, 1)
 
     @constraint(model, [b in params.bus_ids, t in 1:T],
-        compute_power_balance(model, matpower_data, params, b, t) +
+        compute_power_balance(model, matpower_data, params, b, t) -
         params.shunt_conductance[params.bus_idx_map[b]] * model[:v_magnitude][b, t]^2 == 0
     )
 end
@@ -112,7 +112,7 @@ function active_power_balance!(model, matpower_data, ::Type{SOCP}, ::Type{Subpro
     T = get(model.ext, :time_periods, 1)
 
     @constraint(model, [b in params.bus_ids, t in 1:T],
-        compute_power_balance(model, matpower_data, params, b, t) +
+        compute_power_balance(model, matpower_data, params, b, t) -
         params.shunt_conductance[params.bus_idx_map[b]] * model[:v_magnitude_sq][b, t] == 0
     )
 end
