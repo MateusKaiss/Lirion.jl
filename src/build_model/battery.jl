@@ -46,9 +46,9 @@ function create_battery_variables!(model, battery_data)
     )
 
     @variable(model, p_battery_injected[b = 1:params.number_of_batteries, t = 1:T],
-    lower_bound = -params.thermal_limit[b],
-    upper_bound = params.thermal_limit[b],
-    start = 0.0)
+        lower_bound = -params.thermal_limit[b],
+        upper_bound = params.thermal_limit[b],
+        start = 0.0)
 
     @variable(model,
         q_battery_injected[b = 1:params.number_of_batteries, t = 1:T],
@@ -63,7 +63,7 @@ function create_battery_variables!(model, battery_data)
         upper_bound = params.qmax[b],
         start = 0.0,
     )
-    
+
     return nothing
 end
 
@@ -97,16 +97,16 @@ function create_dc_battery_constraints!(model, battery_data)
     @constraint(model,
         [b = 1:params.number_of_batteries, t = 2:T],
         model[:storage][b, t] ==
-        model[:storage][b, t - 1] +
+        model[:storage][b, t-1] +
         model[:charge][b, t] * params.charge_efficiency[b] -
         model[:discharge][b, t] / params.discharge_efficiency[b]
     )
 
     # Potência ativa com perdas (AC model)
     @constraint(model, [b = 1:params.number_of_batteries, t = 1:T],
-        model[:p_battery_injected][b, t] + model[:discharge][b, t] - model[:charge][b, t] == params.p_loss[b]
+        model[:p_battery_injected][b, t] + model[:discharge][b, t] - model[:charge][b, t] ==
+        params.p_loss[b]
     )
-
 
     return nothing
 end
@@ -141,7 +141,7 @@ function create_ac_battery_constraints!(model, battery_data)
     @constraint(model,
         [b = 1:params.number_of_batteries, t = 2:T],
         model[:storage][b, t] ==
-        model[:storage][b, t - 1] +
+        model[:storage][b, t-1] +
         model[:charge][b, t] * params.charge_efficiency[b] -
         model[:discharge][b, t] / params.discharge_efficiency[b]
     )
@@ -150,7 +150,7 @@ function create_ac_battery_constraints!(model, battery_data)
     @constraint(model,
         [b = 1:params.number_of_batteries, t = 1:T],
         model[:p_battery_injected][b, t] + model[:discharge][b, t] - model[:charge][b, t] ==
-         params.p_loss[b] +
+        params.p_loss[b] +
         params.r[b] * (
             model[:p_battery_injected][b, t]^2 + model[:q_battery_injected][b, t]^2
         ) / model[:v_magnitude][params.bus[b], t]^2
@@ -178,10 +178,10 @@ function create_socp_battery_constraints!(model, battery_data)
 
     # Variável de corrente ao quadrado (ccms)
     @variable(model, ccms[b = 1:params.number_of_batteries, t = 1:T], lower_bound = 0,
-    start= 0
+        start = 0
     )
 
-        # Limite superior para ccms baseado no thermal_limit e vmin
+    # Limite superior para ccms baseado no thermal_limit e vmin
     for b in 1:params.number_of_batteries
         for t in 1:T
             vmin = get(model.ext, :vmin, 0.9)
@@ -189,7 +189,6 @@ function create_socp_battery_constraints!(model, battery_data)
             set_upper_bound(ccms[b, t], ub)
         end
     end
-
 
     # Exclusividade entre carga e descarga
     @constraint(model, [b = 1:params.number_of_batteries, t = 1:T],
@@ -209,7 +208,7 @@ function create_socp_battery_constraints!(model, battery_data)
 
     @constraint(model, [b = 1:params.number_of_batteries, t = 2:T],
         model[:storage][b, t] ==
-        model[:storage][b, t - 1] +
+        model[:storage][b, t-1] +
         model[:charge][b, t] * params.charge_efficiency[b] -
         model[:discharge][b, t] / params.discharge_efficiency[b]
     )

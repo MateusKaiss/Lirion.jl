@@ -129,7 +129,7 @@ function build_result_dict(model::JuMP.Model, data::Dict)
                         0.0
                     end
                     for g in gen_ids, t in 1:T
-                ] : nothing,)
+                ] : nothing)
     end
 
     if haskey(model, :p_flow_branches)

@@ -4,12 +4,27 @@
 function get_branch_parameters(branch_data, matpower_data)
     resistance = branch_data["br_r"]
     reactance = branch_data["br_x"]
-    tap_position = branch_data["tap"]
+    tap_position_raw = branch_data["tap"]
+    tap_angle_raw = branch_data["shift"]
 
-    inv_tap = similar(tap_position)
-    @inbounds for i in eachindex(tap_position)
-        t = tap_position[i]
-        inv_tap[i] = ifelse(isnan(t) || t == 0.0, 1.0, 1.0 / t)
+    n = length(tap_position_raw)
+    tap_position = ones(Float64, n)
+    tap_angle = zeros(Float64, n)
+    inv_tap = ones(Float64, n)
+
+    @inbounds for i in 1:n
+        t = tap_position_raw[i]
+        a = tap_angle_raw[i]
+
+        if isnan(t) || t == 0.0
+            tap_position[i] = 1.0
+            tap_angle[i] = 0.0
+            inv_tap[i] = 1.0
+        else
+            tap_position[i] = t
+            tap_angle[i] = deg2rad(a)
+            inv_tap[i] = 1.0 / t
+        end
     end
 
     active = Int[]
@@ -29,6 +44,8 @@ function get_branch_parameters(branch_data, matpower_data)
         reactance = reactance,
         b_shunt = branch_data["br_b"],
         tap_position = tap_position,
+        tap_angle = tap_angle,
+        inv_tap = inv_tap,
         capacity = branch_data["rate_a"],
         min_ang = branch_data["angmin"],
         max_ang = branch_data["angmax"],
@@ -38,7 +55,6 @@ function get_branch_parameters(branch_data, matpower_data)
         initial_voltage_angle = matpower_data["bus"]["va"],
         g = resistance ./ (resistance .^ 2 .+ reactance .^ 2),
         b = -reactance ./ (resistance .^ 2 .+ reactance .^ 2),
-        inv_tap = inv_tap,
         active = active,
     )
 end
@@ -98,11 +114,11 @@ function compute_ac_branch_expressions(model, params)
             (
                 params.g[l] * cos(
                     model[:theta][params.bus_from[l], t] -
-                    model[:theta][params.bus_to[l], t],
+                    model[:theta][params.bus_to[l], t]- params.tap_angle[l]
                 ) +
                 params.b[l] * sin(
                     model[:theta][params.bus_from[l], t] -
-                    model[:theta][params.bus_to[l], t],
+                    model[:theta][params.bus_to[l], t] - params.tap_angle[l]
                 )
             )
         )
@@ -116,11 +132,11 @@ function compute_ac_branch_expressions(model, params)
             (
                 params.g[l] * cos(
                     model[:theta][params.bus_from[l], t] -
-                    model[:theta][params.bus_to[l], t],
+                    model[:theta][params.bus_to[l], t]- params.tap_angle[l]
                 ) -
                 params.b[l] * sin(
                     model[:theta][params.bus_from[l], t] -
-                    model[:theta][params.bus_to[l], t],
+                    model[:theta][params.bus_to[l], t]- params.tap_angle[l]
                 )
             )
         )
@@ -135,11 +151,11 @@ function compute_ac_branch_expressions(model, params)
             (
                 -params.b[l] * cos(
                     model[:theta][params.bus_from[l], t] -
-                    model[:theta][params.bus_to[l], t],
+                    model[:theta][params.bus_to[l], t]- params.tap_angle[l]
                 ) +
                 params.g[l] * sin(
                     model[:theta][params.bus_from[l], t] -
-                    model[:theta][params.bus_to[l], t],
+                    model[:theta][params.bus_to[l], t]- params.tap_angle[l]
                 )
             )
         )
@@ -154,11 +170,11 @@ function compute_ac_branch_expressions(model, params)
             (
                 -params.b[l] * cos(
                     model[:theta][params.bus_from[l], t] -
-                    model[:theta][params.bus_to[l], t],
+                    model[:theta][params.bus_to[l], t]- params.tap_angle[l]
                 ) -
                 params.g[l] * sin(
                     model[:theta][params.bus_from[l], t] -
-                    model[:theta][params.bus_to[l], t],
+                    model[:theta][params.bus_to[l], t]- params.tap_angle[l]
                 )
             )
         )
