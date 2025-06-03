@@ -126,7 +126,7 @@ end
 
 function objective!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{SubproblemBuild})
     params = matpower_data["objective_params"]
-
+    
     compute_generation_cost(model, params)
 
     @objective(model, Min,

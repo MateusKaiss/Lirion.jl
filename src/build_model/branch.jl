@@ -251,7 +251,6 @@ function compute_socp_branch_expressions(model, params)
     shift = params.tap_angle
     tr = tap .* cos.(shift)
     ti = tap .* sin.(shift)
-    tm2 = tap .^ 2
 
     @expression(model, p_flow_branches[l in active, t in 1:T],
         (
