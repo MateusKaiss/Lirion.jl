@@ -114,11 +114,11 @@ function compute_ac_branch_expressions(model, params)
             (
                 params.g[l] * cos(
                     model[:theta][params.bus_from[l], t] -
-                    model[:theta][params.bus_to[l], t]- params.tap_angle[l]
+                    model[:theta][params.bus_to[l], t] - params.tap_angle[l],
                 ) +
                 params.b[l] * sin(
                     model[:theta][params.bus_from[l], t] -
-                    model[:theta][params.bus_to[l], t] - params.tap_angle[l]
+                    model[:theta][params.bus_to[l], t] - params.tap_angle[l],
                 )
             )
         )
@@ -132,11 +132,11 @@ function compute_ac_branch_expressions(model, params)
             (
                 params.g[l] * cos(
                     model[:theta][params.bus_from[l], t] -
-                    model[:theta][params.bus_to[l], t]- params.tap_angle[l]
+                    model[:theta][params.bus_to[l], t] - params.tap_angle[l],
                 ) -
                 params.b[l] * sin(
                     model[:theta][params.bus_from[l], t] -
-                    model[:theta][params.bus_to[l], t]- params.tap_angle[l]
+                    model[:theta][params.bus_to[l], t] - params.tap_angle[l],
                 )
             )
         )
@@ -151,11 +151,11 @@ function compute_ac_branch_expressions(model, params)
             (
                 -params.b[l] * cos(
                     model[:theta][params.bus_from[l], t] -
-                    model[:theta][params.bus_to[l], t]- params.tap_angle[l]
+                    model[:theta][params.bus_to[l], t] - params.tap_angle[l],
                 ) +
                 params.g[l] * sin(
                     model[:theta][params.bus_from[l], t] -
-                    model[:theta][params.bus_to[l], t]- params.tap_angle[l]
+                    model[:theta][params.bus_to[l], t] - params.tap_angle[l],
                 )
             )
         )
@@ -170,11 +170,11 @@ function compute_ac_branch_expressions(model, params)
             (
                 -params.b[l] * cos(
                     model[:theta][params.bus_from[l], t] -
-                    model[:theta][params.bus_to[l], t]- params.tap_angle[l]
+                    model[:theta][params.bus_to[l], t] - params.tap_angle[l],
                 ) -
                 params.g[l] * sin(
                     model[:theta][params.bus_from[l], t] -
-                    model[:theta][params.bus_to[l], t]- params.tap_angle[l]
+                    model[:theta][params.bus_to[l], t] - params.tap_angle[l],
                 )
             )
         )
@@ -240,38 +240,50 @@ function compute_socp_branch_expressions(model, params)
         Va_to = params.initial_voltage_angle[i_to]
 
         if !any(isnan.([Vm_from, Vm_to, Va_from, Va_to]))
-            set_start_value(R[l, t], Vm_from * Vm_to * cos(Va_from - Va_to))
-            set_start_value(T_var[l, t], Vm_from * Vm_to * sin(Va_from - Va_to))
+            shift = params.tap_angle
+            set_start_value(R[l, t], Vm_from * Vm_to * cos(Va_from - Va_to - shift[l]))
+            set_start_value(T_var[l, t], Vm_from * Vm_to * sin(Va_from - Va_to - shift[l]))
         end
     end
 
+    # Calcula tr, ti e tm
+    tap = params.tap_position
+    shift = params.tap_angle
+    tr = tap .* cos.(shift)
+    ti = tap .* sin.(shift)
+    tm2 = tap .^ 2
+
     @expression(model, p_flow_branches[l in active, t in 1:T],
         (
-            params.g[l] * inv_tap[l]^2 * model[:v_magnitude_sq][params.bus_from[l], t] -
-            inv_tap[l] * params.g[l] * R[l, t] - inv_tap[l] * params.b[l] * T_var[l, t]
+            params.g[l] * inv_tap[l]^2 * model[:v_magnitude_sq][params.bus_from[l], t] +
+            (-params.g[l] * tr[l] + params.b[l] * ti[l]) * inv_tap[l]^2 * R[l, t] +
+            (-params.b[l] * tr[l] - params.g[l] * ti[l]) * inv_tap[l]^2 * T_var[l, t]
         )
     )
 
     @expression(model, p_reverse_flow_branches[l in active, t in 1:T],
         (
-            params.g[l] * model[:v_magnitude_sq][params.bus_to[l], t] -
-            inv_tap[l] * params.g[l] * R[l, t] + inv_tap[l] * params.b[l] * T_var[l, t]
+            params.g[l] * model[:v_magnitude_sq][params.bus_to[l], t] +
+            (-params.g[l] * tr[l] - params.b[l] * ti[l]) * inv_tap[l]^2 * R[l, t] +
+            (-params.b[l] * tr[l] + params.g[l] * ti[l]) * inv_tap[l]^2 * -T_var[l, t]
         )
     )
 
     @expression(model, q_flow_branches[l in active, t in 1:T],
         (
             -(params.b[l] + params.b_shunt[l] / 2) * inv_tap[l]^2 *
-            model[:v_magnitude_sq][params.bus_from[l], t] +
-            inv_tap[l] * params.b[l] * R[l, t] - inv_tap[l] * params.g[l] * T_var[l, t]
+            model[:v_magnitude_sq][params.bus_from[l], t] -
+            (-params.b[l] * tr[l] - params.g[l] * ti[l]) * inv_tap[l]^2 * R[l, t] +
+            (-params.g[l] * tr[l] + params.b[l] * ti[l]) * inv_tap[l]^2 * T_var[l, t]
         )
     )
 
     @expression(model, q_reverse_flow_branches[l in active, t in 1:T],
         (
             -(params.b[l] + params.b_shunt[l] / 2) *
-            model[:v_magnitude_sq][params.bus_to[l], t] +
-            inv_tap[l] * params.b[l] * R[l, t] + inv_tap[l] * params.g[l] * T_var[l, t]
+            model[:v_magnitude_sq][params.bus_to[l], t] -
+            (-params.b[l] * tr[l] + params.g[l] * ti[l]) * inv_tap[l]^2 * R[l, t] +
+            (-params.g[l] * tr[l] - params.b[l] * ti[l]) * inv_tap[l]^2 * -T_var[l, t]
         )
     )
 end
