@@ -161,7 +161,9 @@ function build_result_dict(model::JuMP.Model, data::Dict)
             "charge" => [value(model[:charge][b, t]) for b in 1:nb, t in 1:T],
             "discharge" => [value(model[:discharge][b, t]) for b in 1:nb, t in 1:T],
             "qsc" => [value(model[:qsc][b, t]) for b in 1:nb, t in 1:T],
-            "ccms" => haskey(model, :ccms) ? [value(model[:ccms][b, t]) for b in 1:nb, t in 1:T] : nothing,
+            "ccms" =>
+                haskey(model, :ccms) ?
+                [value(model[:ccms][b, t]) for b in 1:nb, t in 1:T] : nothing,
             "p_injected" =>
                 [value(model[:p_battery_injected][b, t]) for b in 1:nb, t in 1:T],
             "q_injected" =>

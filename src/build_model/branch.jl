@@ -246,7 +246,6 @@ function compute_socp_branch_expressions(model, params)
         end
     end
 
-    # Calcula tr, ti e tm
     tap = params.tap_position
     shift = params.tap_angle
     tr = tap .* cos.(shift)

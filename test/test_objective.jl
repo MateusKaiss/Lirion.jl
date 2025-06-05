@@ -66,27 +66,33 @@ const reduced_list = [
     # "pglib_opf_case24464_goc.m",
     # "pglib_opf_case30000_goc.m",
     # "pglib_opf_case78484_epigrids.m",
-    "case5_strg.m",
 ]
 
 # Lista reduzida apenas para AC (≤ 73 barras)
 const reduced_testlist_ac = [
-    # "pglib_opf_case3_lmbd.m",
-    # "pglib_opf_case5_pjm.m",
-    # "pglib_opf_case14_ieee.m",
-    # "pglib_opf_case24_ieee_rts.m",
-    # "pglib_opf_case30_as.m",
-    # "pglib_opf_case39_epri.m",
-    # "pglib_opf_case57_ieee.m",
-    # "pglib_opf_case60_c.m",
-    # "pglib_opf_case73_ieee_rts.m",
-    # "pglib_opf_case89_pegase.m",
-    # "pglib_opf_case118_ieee.m",
-    # "pglib_opf_case162_ieee_dtc.m",
-    # "pglib_opf_case179_goc.m",
-    # "pglib_opf_case197_snem.m",
-    # "pglib_opf_case200_activ.m",
-    "case5_strg.m",
+# "pglib_opf_case3_lmbd.m",
+# "pglib_opf_case5_pjm.m",
+# "pglib_opf_case14_ieee.m",
+# "pglib_opf_case24_ieee_rts.m",
+# "pglib_opf_case30_as.m",
+# "pglib_opf_case39_epri.m",
+# "pglib_opf_case57_ieee.m",
+# "pglib_opf_case60_c.m",
+# "pglib_opf_case73_ieee_rts.m",
+# "pglib_opf_case89_pegase.m",
+# "pglib_opf_case118_ieee.m",
+# "pglib_opf_case162_ieee_dtc.m",
+# "pglib_opf_case179_goc.m",
+# "pglib_opf_case197_snem.m",
+# "pglib_opf_case200_activ.m",
+]
+
+const battery_cases = [
+    "case5_bus_2_bat.m",
+    "case14_bus_4_bat.m",
+    "case57_bus_6_bat.m",
+    "case118_bus_10_bat.m",
+    "case200active_bus_20_bat.m",
 ]
 
 function get_available_optimizer(preferred, fallback)
@@ -109,7 +115,7 @@ function compare_with_powermodels(
 )
     case_name = basename(file)
 
-    # PowerOptimization
+    # --- PowerOptimization ---
     my_obj = try
         result_dict, _ = PowerOptimization.main(file, model_type; optimizer = optimizer)
         result_dict["objective"]
@@ -119,7 +125,7 @@ function compare_with_powermodels(
         return
     end
 
-    # PowerModels
+    # --- PowerModels ---
     pm_obj = try
         pm_data = PowerModels.parse_file(file)
         if model_type == PowerOptimization.DC
@@ -132,7 +138,7 @@ function compare_with_powermodels(
             error("Model type not recognized.")
         end
     catch e
-        @warn "PowerModels threw an error on $case_name: $e"
+        @warn "PowerModels failed on $case_name: $e"
         push!(failed_pm_cases, case_name)
         return
     end
