@@ -70,21 +70,21 @@ const reduced_list = [
 
 # Lista reduzida apenas para AC (≤ 73 barras)
 const reduced_testlist_ac = [
-"pglib_opf_case3_lmbd.m",
-"pglib_opf_case5_pjm.m",
-"pglib_opf_case14_ieee.m",
-"pglib_opf_case24_ieee_rts.m",
-"pglib_opf_case30_as.m",
-"pglib_opf_case39_epri.m",
-"pglib_opf_case57_ieee.m",
-"pglib_opf_case60_c.m",
-"pglib_opf_case73_ieee_rts.m",
-"pglib_opf_case89_pegase.m",
-"pglib_opf_case118_ieee.m",
-"pglib_opf_case162_ieee_dtc.m",
-"pglib_opf_case179_goc.m",
-"pglib_opf_case197_snem.m",
-"pglib_opf_case200_activ.m",
+    "pglib_opf_case3_lmbd.m",
+    "pglib_opf_case5_pjm.m",
+    "pglib_opf_case14_ieee.m",
+    "pglib_opf_case24_ieee_rts.m",
+    "pglib_opf_case30_as.m",
+    "pglib_opf_case39_epri.m",
+    "pglib_opf_case57_ieee.m",
+    "pglib_opf_case60_c.m",
+    "pglib_opf_case73_ieee_rts.m",
+    "pglib_opf_case89_pegase.m",
+    "pglib_opf_case118_ieee.m",
+    "pglib_opf_case162_ieee_dtc.m",
+    "pglib_opf_case179_goc.m",
+    "pglib_opf_case197_snem.m",
+    "pglib_opf_case200_activ.m",
 ]
 
 const battery_cases = [
@@ -211,7 +211,13 @@ end
 @testset "PowerOptimization vs PowerModels Unified Comparison" begin
     # DC — todos os casos (comentado)
     dc_optimizer = get_available_optimizer(() -> Gurobi.Optimizer(), Ipopt.Optimizer)
-    run_model_tests(PowerOptimization.DC, "DC"; optimizer = dc_optimizer, case_list = reduced_list, tol = 0.05)
+    run_model_tests(
+        PowerOptimization.DC,
+        "DC";
+        optimizer = dc_optimizer,
+        case_list = reduced_list,
+        tol = 0.05,
+    )
 
     # AC — até 73 barras (comentado)
     run_model_tests(
