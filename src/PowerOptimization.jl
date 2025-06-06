@@ -10,7 +10,12 @@ using LinearAlgebra
 using Statistics
 using InfrastructureModels
 using Logging
+using ArgParse
+using MathOptInterface
+const MOI = MathOptInterface
 
+include("types.jl")
+include("args.jl")
 include("parser.jl")
 include("csv_parser.jl")
 include("build_model.jl")
