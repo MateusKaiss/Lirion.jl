@@ -1,3 +1,15 @@
+function load_input_data(path::String)
+    if endswith(lowercase(path), ".m")
+        return open(path) do io
+            parse_matpower_string_silent(read(io, String))
+        end
+    elseif isdir(path)
+        return parse_case_from_csv_silent(path)
+    else
+        error("Unrecognized input format. Use .m or folder with .csv files.")
+    end
+end
+
 function preprocess_case_data!(data)
     add_case_index_maps!(data)
     convert_to_pu!(data)
