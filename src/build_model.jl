@@ -3,6 +3,7 @@ function build_and_optimize_model(
     model_type::Type{<:OPFModel};
     optimizer = Ipopt.Optimizer,
 )
+    optimizer === nothing && (optimizer = Ipopt.Optimizer)
     convert_to_pu!(matpower_data)
     has_time_series = haskey(matpower_data, "bus_timeseries")
     if has_time_series
