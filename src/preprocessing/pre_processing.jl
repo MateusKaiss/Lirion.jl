@@ -10,7 +10,7 @@ function load_input_data(path::String)
     end
 end
 
-function preprocess_case_data!(data)
+function preprocess_case_data!(data::Dict{String, Any})
     add_case_index_maps!(data)
     return convert_to_pu!(data)
 end
@@ -32,6 +32,14 @@ function parse_matpower_string_silent(data_string::String)
     return case
 end
 
+function map_items_by_bus(bus_vec::Vector{Any})
+    mapping = Dict{Int, Vector{Int}}()
+    for (i, b) in enumerate(bus_vec)
+        push!(get!(mapping, b, Int[]), i)
+    end
+    return mapping
+end
+
 function add_case_index_maps!(case::Dict{String, Any})
     if haskey(case, "bus")
         bus_ids = case["bus"]["bus_i"]
@@ -41,48 +49,22 @@ function add_case_index_maps!(case::Dict{String, Any})
     if haskey(case, "gen")
         gen_bus = case["gen"]["gen_bus"]
         case["gen_idx_map"] = Dict(i => b for (i, b) in enumerate(gen_bus))
-
-        bus_to_gens = Dict{Int, Vector{Int}}()
-        for (i, b) in enumerate(gen_bus)
-            push!(get!(bus_to_gens, b, Int[]), i)
-        end
-        case["bus_to_gens"] = bus_to_gens
+        case["bus_to_gens"] = map_items_by_bus(gen_bus)
     end
 
     if haskey(case, "branch")
         f_bus = case["branch"]["f_bus"]
         t_bus = case["branch"]["t_bus"]
-
-        bus_to_branches_from = Dict{Int, Vector{Int}}()
-        bus_to_branches_to = Dict{Int, Vector{Int}}()
-
-        for (i, f) in enumerate(f_bus)
-            push!(get!(bus_to_branches_from, f, Int[]), i)
-        end
-        for (i, t) in enumerate(t_bus)
-            push!(get!(bus_to_branches_to, t, Int[]), i)
-        end
-
-        case["bus_to_branches_from"] = bus_to_branches_from
-        case["bus_to_branches_to"] = bus_to_branches_to
+        case["bus_to_branches_from"] = map_items_by_bus(f_bus)
+        case["bus_to_branches_to"] = map_items_by_bus(t_bus)
     end
 
     if haskey(case, "prosumer")
-        prosumer_bus = case["prosumer"]["bus"]
-        bus_to_prosumers = Dict{Int, Vector{Int}}()
-        for (i, b) in enumerate(prosumer_bus)
-            push!(get!(bus_to_prosumers, b, Int[]), i)
-        end
-        case["bus_to_prosumers"] = bus_to_prosumers
+        case["bus_to_prosumers"] = map_items_by_bus(case["prosumer"]["bus"])
     end
 
     if haskey(case, "storage")
-        storage_bus = case["storage"]["storage_bus"]
-        bus_to_batteries = Dict{Int, Vector{Int}}()
-        for (i, b) in enumerate(storage_bus)
-            push!(get!(bus_to_batteries, b, Int[]), i)
-        end
-        case["bus_to_batteries"] = bus_to_batteries
+        case["bus_to_batteries"] = map_items_by_bus(case["storage"]["storage_bus"])
     end
 
     case["bus_params"] = get_bus_parameters(case["bus"])
@@ -90,15 +72,13 @@ function add_case_index_maps!(case::Dict{String, Any})
     case["generator_params"] = get_generator_parameters(case["gen"])
     case["power_balance_params"] = get_power_balance_parameters(case)
     case["reactive_balance_params"] = get_reactive_power_parameters(case)
-    case["objective_params"] = get_objective_parameters(
-        case["gen"],
-        get(case, "storage", Dict()),
-        case["gencost"],
-        get(case, "prosumer", Dict()),
-    )
-
     case["objective_params"] = merge(
-        case["objective_params"],
+        get_objective_parameters(
+            case["gen"],
+            get(case, "storage", Dict()),
+            case["gencost"],
+            get(case, "prosumer", Dict()),
+        ),
         (; sbase = case["baseMVA"]),
     )
 
