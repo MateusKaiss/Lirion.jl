@@ -41,9 +41,9 @@ function get_bus_parameters(bus_data)
     )
 end
 
-# ---------------------------------------------------------------------
+# ------------------------------------------------------------
 # Getting Branch Parameters
-# ---------------------------------------------------------------------
+# ------------------------------------------------------------
 function get_branch_parameters(branch_data, matpower_data)
     resistance = branch_data["br_r"]
     reactance = branch_data["br_x"]
@@ -79,6 +79,10 @@ function get_branch_parameters(branch_data, matpower_data)
 
     bus_ids = matpower_data["bus"]["bus_i"]
 
+    den = resistance .^ 2 .+ reactance .^ 2
+    g = resistance ./ den
+    b = -reactance ./ den
+
     return (
         number_of_branches = length(branch_data["f_bus"]),
         bus_from = branch_data["f_bus"],
@@ -98,8 +102,8 @@ function get_branch_parameters(branch_data, matpower_data)
         s_base = matpower_data["baseMVA"],
         initial_voltage_magnitude = matpower_data["bus"]["vm"],
         initial_voltage_angle = matpower_data["bus"]["va"],
-        g = resistance ./ (resistance .^ 2 .+ reactance .^ 2),
-        b = -reactance ./ (resistance .^ 2 .+ reactance .^ 2),
+        g = g,
+        b = b,
         active = active,
     )
 end
