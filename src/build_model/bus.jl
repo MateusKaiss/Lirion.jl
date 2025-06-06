@@ -45,13 +45,13 @@ function create_socp_variables!(model, params)
         JuMP.RotatedSecondOrderCone()
     )
 
-    # Alternativas (não usadas, mas deixadas para referência):
-    # Igualdade exata (costuma deixar o modelo mais lento e menos estável)
+    # Alternatives (not used, but kept for reference):
+    # Strict equality (usually slower and less numerically stable)
     # @constraint(model, voltage_sq_def[b in params.bus_ids, t in 1:T],
     #     v_magnitude_sq[b, t] == model[:v_magnitude][b, t]^2
     # )
 
-    # Desigualdade relaxada (mais rápida, mas fisicamente imprecisa)
+    # Relaxed inequality (faster but physically inaccurate)
     # @constraint(model, voltage_sq_def[b in params.bus_ids, t in 1:T],
     #     v_magnitude_sq[b, t] >= model[:v_magnitude][b, t]^2
     # )

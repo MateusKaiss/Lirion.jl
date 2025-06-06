@@ -47,6 +47,9 @@ function compute_power_balance(model, matpower_data, params, bus_index, t)
     return p_gen - p_bat - p_pros - pd - p_out - p_in
 end
 
+# ---------------------------------------------------------------------
+# Dispatching Active Power Balance Variables by Model Type
+# ---------------------------------------------------------------------
 function active_power_balance!(model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
     params = matpower_data["power_balance_params"]
     T = get(model.ext, :time_periods, 1)
