@@ -1,30 +1,4 @@
 # ---------------------------------------------------------------------
-# Getting Bus Parameters (preprocessed)
-# ---------------------------------------------------------------------
-function get_bus_parameters(bus_data)
-    bus_ids = bus_data["bus_i"]
-    reference_bus_idx = findfirst(==(3), bus_data["bus_type"])
-    reference_bus = bus_ids[reference_bus_idx]
-    vmin = Dict{Int, Float64}()
-    vmax = Dict{Int, Float64}()
-    vstart = Dict{Int, Union{Nothing, Float64}}()
-    @inbounds for i in eachindex(bus_ids)
-        b = bus_ids[i]
-        vmin[b] = bus_data["vmin"][i]
-        vmax[b] = bus_data["vmax"][i]
-        vstart[b] = isnan(bus_data["vm"][i]) ? nothing : bus_data["vm"][i]
-    end
-
-    return (
-        bus_ids = bus_ids,
-        reference_bus = reference_bus,
-        vmin = vmin,
-        vmax = vmax,
-        vstart = vstart,
-    )
-end
-
-# ---------------------------------------------------------------------
 # Creating Bus Variables (Vectorized and Optimized)
 # ---------------------------------------------------------------------
 function create_voltage_angle_variables!(model, params)

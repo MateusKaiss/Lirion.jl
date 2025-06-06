@@ -1,29 +1,3 @@
-# ---------------------------------------------------------------------------
-# Generator Parameters (precomputed once and passed to all helper functions)
-# ---------------------------------------------------------------------------
-function get_generator_parameters(gen_data)
-    number_of_generators = length(gen_data["gen_bus"])
-    start_pg = Dict{Int, Union{Nothing, Float64}}()
-    start_qg = Dict{Int, Union{Nothing, Float64}}()
-    for g in 1:number_of_generators
-        start_pg[g] = isnan(gen_data["pg"][g]) ? nothing : gen_data["pg"][g]
-        start_qg[g] = isnan(gen_data["qg"][g]) ? nothing : gen_data["qg"][g]
-    end
-
-    return (
-        number_of_generators = number_of_generators,
-        existing = gen_data["gen_status"] .== 1,
-        pmn = gen_data["pmin"],
-        pmx = gen_data["pmax"],
-        qmn = gen_data["qmin"],
-        qmx = gen_data["qmax"],
-        initial_pg = start_pg,
-        initial_qg = start_qg,
-        plant_type = gen_data["plant_type"],
-        curtailment_cost = gen_data["curtailment_cost"],
-    )
-end
-
 function has_curtailment(params, g)
     return params.existing[g] && params.plant_type[g] == "R"
 end

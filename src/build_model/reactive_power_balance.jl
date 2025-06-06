@@ -1,31 +1,4 @@
 # ---------------------------------------------------------------------
-# Getting Reactive Power Balance Parameters (pré-processado no início)
-# ---------------------------------------------------------------------
-function get_reactive_power_parameters(matpower_data)
-    return (
-        bus_ids = matpower_data["bus"]["bus_i"],
-        shunt_susceptance = matpower_data["bus"]["bs"],
-        generator_status = matpower_data["gen"]["gen_status"],
-        has_timeseries = haskey(matpower_data, "bus_timeseries"),
-        bus_idx_map = matpower_data["bus_idx_map"],
-        branch_status = matpower_data["branch"]["br_status"],
-        bus_to_generators = get(matpower_data, "bus_to_gens", Dict{Int, Vector{Int}}()),
-        bus_to_batteries = get(matpower_data, "bus_to_batteries", Dict{Int, Vector{Int}}()),
-        bus_to_prosumers = get(matpower_data, "bus_to_prosumers", Dict{Int, Vector{Int}}()),
-        bus_to_branches_from = get(
-            matpower_data,
-            "bus_to_branches_from",
-            Dict{Int, Vector{Int}}(),
-        ),
-        bus_to_branches_to = get(
-            matpower_data,
-            "bus_to_branches_to",
-            Dict{Int, Vector{Int}}(),
-        ),
-    )
-end
-
-# ---------------------------------------------------------------------
 # Reactive Demand Utility
 # ---------------------------------------------------------------------
 function get_reactive_demand_at_time(data::Dict{String, Any}, bus_index::Int, t::Int)

@@ -1,26 +1,4 @@
 # ---------------------------------------------------------------------
-# Getting Objective Parameters (pré-processado no início)
-# ---------------------------------------------------------------------
-function get_objective_parameters(
-    gen_data,
-    battery_data,
-    gencost_data,
-    prosumer_data = Dict(),
-)
-    return (
-        number_of_generators = get(gen_data, "gen_bus", []) |> length,
-        number_of_batteries = get(battery_data, "storage_bus", []) |> length,
-        generator_costs = get(gencost_data, "cost_coefficients", []),
-        num_polynomial_coefs = get(gencost_data, "ncost", []),
-        curtailment_cost = get(gen_data, "curtailment_cost", []),
-        plant_type = get(gen_data, "plant_type", []),
-        generator_status = get(gen_data, "gen_status", []),
-        number_of_prosumers = get(prosumer_data, "bus", []) |> length,
-        prosumer_costs = get(prosumer_data, "cost_injection", []),
-    )
-end
-
-# ---------------------------------------------------------------------
 # Cost Component Expressions
 # ---------------------------------------------------------------------
 function compute_generation_cost(model, params)
