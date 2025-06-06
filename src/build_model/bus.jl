@@ -81,23 +81,3 @@ function buses!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{Subproble
     create_socp_variables!(model, params)
     return nothing
 end
-
-function select_cone_scale(params)
-    vmin_vals = collect(values(params.vmin))
-    vmax_vals = collect(values(params.vmax))
-
-    vmin = clamp(minimum(vmin_vals), 0.80, 1.05)
-    vmax = clamp(maximum(vmax_vals), 0.90, 1.15)
-    delta = vmax / vmin
-
-    nb = length(params.vmin)
-    if nb > 1000 && delta > 1.17
-        return 100
-    elseif delta < 1.13
-        return 20
-    elseif delta < 1.16
-        return 70
-    else
-        return 100
-    end
-end

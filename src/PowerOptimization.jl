@@ -22,6 +22,7 @@ include("parsing/csv_parser.jl")
 include("preprocessing/pre_processing.jl")
 include("preprocessing/parameter_extractors.jl")
 
+include("build_model/helpers.jl")
 include("build_model/build_model.jl")
 include("build_model/bus.jl")
 include("build_model/branch.jl")

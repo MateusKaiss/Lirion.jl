@@ -20,53 +20,66 @@ function build_and_optimize_model(
     end
 end
 
+"""
+Attempts to solve the model using a sequence of scaling factors
+to improve numerical stability for conic models (e.g., SOCP).
+
+This function tries up to 5 different scale values:
+  1. A default scale selected by `select_cone_scale`
+  2. A fallback value of 150
+  3. A minimal scale of 1
+  4. A larger fallback of 300
+  5. A final extreme attempt with scale = 500
+
+Each attempt uses a deepcopy of the original input data to avoid side effects
+from previous runs. Returns the model from the last successful attempt
+(or the final attempt if all fail).
+"""
 function try_with_fallback_scale(
     matpower_data::Dict,
     model_type::Type{<:OPFModel};
     optimizer = Ipopt.Optimizer,
 )
+    # First attempt using the scale selected from bus data
     scale = select_cone_scale(matpower_data["bus_params"])
-
-    # Primeira tentativa
     matpower_data_attempt = deepcopy(matpower_data)
     matpower_data_attempt["selected_scale"] = scale
     model = build_and_optimize_model(matpower_data_attempt, model_type; optimizer)
     status = JuMP.termination_status(model)
 
-    # Segunda tentativa com scale = 150
+    # Second attempt with scale = 150
     if status ∉ (MOI.OPTIMAL, MOI.LOCALLY_SOLVED)
-        @warn "Modelo com scale=$scale falhou (status: $status). Tentando scale=150..."
+        @warn "Model with scale=$scale failed (status: $status). Trying scale=150..."
         matpower_data_fallback = deepcopy(matpower_data)
         matpower_data_fallback["selected_scale"] = 150
         model = build_and_optimize_model(matpower_data_fallback, model_type; optimizer)
         status = JuMP.termination_status(model)
     end
 
-    # Terceira tentativa com scale = 1
+    # Third attempt with scale = 1
     if status ∉ (MOI.OPTIMAL, MOI.LOCALLY_SOLVED)
-        @warn "Modelo ainda falhou com scale=150 (status: $status). Tentando scale=1..."
+        @warn "Model still failed with scale=150 (status: $status). Trying scale=1..."
         matpower_data_final_attempt = deepcopy(matpower_data)
         matpower_data_final_attempt["selected_scale"] = 1
         model = build_and_optimize_model(matpower_data_final_attempt, model_type; optimizer)
         status = JuMP.termination_status(model)
     end
 
-    # Quarta tentativa com scale = 300
+    # Fourth attempt with scale = 300
     if status ∉ (MOI.OPTIMAL, MOI.LOCALLY_SOLVED)
-        @warn "Modelo ainda falhou com scale=1 (status: $status). Tentando scale=300..."
+        @warn "Model still failed with scale=1 (status: $status). Trying scale=300..."
         matpower_data_last_attempt = deepcopy(matpower_data)
         matpower_data_last_attempt["selected_scale"] = 300
         model = build_and_optimize_model(matpower_data_last_attempt, model_type; optimizer)
         status = JuMP.termination_status(model)
     end
 
-    # Quinta tentativa com scale = 500
+    # Fifth and final attempt with scale = 500
     if status ∉ (MOI.OPTIMAL, MOI.LOCALLY_SOLVED)
-        @warn "Modelo ainda falhou com scale=300 (status: $status). Tentando scale=500 (última tentativa)..."
+        @warn "Model still failed with scale=300 (status: $status). Trying scale=500 (final attempt)..."
         matpower_data_extreme_attempt = deepcopy(matpower_data)
         matpower_data_extreme_attempt["selected_scale"] = 500
-        model =
-            build_and_optimize_model(matpower_data_extreme_attempt, model_type; optimizer)
+        model = build_and_optimize_model(matpower_data_extreme_attempt, model_type; optimizer)
     end
 
     return model
