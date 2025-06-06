@@ -186,6 +186,11 @@ function run_model_tests(
     case_list::Vector{String},
     tol = 0.05,
 )
+    if isempty(case_list)
+        @info "Empty case list for $label. No tests will be run."
+        return true
+    end
+
     test_dir = joinpath(@__DIR__, "matpower_cases")
     selected_files = [
         joinpath(test_dir, fname)
@@ -207,6 +212,8 @@ function run_model_tests(
             )
         end
     end
+
+    return true
 end
 
 @testset "PowerOptimization vs PowerModels Unified Comparison" begin
