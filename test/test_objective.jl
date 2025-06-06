@@ -1,31 +1,31 @@
-# Lista reduzida de casos para testes rápidos (comente ou descomente conforme desejar)
+# Short list of cases for rapid testing (comment or uncomment as you wish)
 const reduced_list = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case5_pjm.m",
     "pglib_opf_case14_ieee.m",
     "pglib_opf_case24_ieee_rts.m",
     "pglib_opf_case30_as.m",
-    "pglib_opf_case30_ieee.m",
-    "pglib_opf_case39_epri.m",
-    "pglib_opf_case57_ieee.m",
-    "pglib_opf_case60_c.m",
-    "pglib_opf_case73_ieee_rts.m",
-    "pglib_opf_case89_pegase.m",
-    "pglib_opf_case118_ieee.m",
-    "pglib_opf_case162_ieee_dtc.m",
-    "pglib_opf_case179_goc.m",
-    "pglib_opf_case197_snem.m",
-    "pglib_opf_case200_activ.m",
-    "pglib_opf_case240_pserc.m",
-    "pglib_opf_case300_ieee.m",
-    "pglib_opf_case500_goc.m",
-    "pglib_opf_case588_sdet.m",
-    "pglib_opf_case793_goc.m",
-    "pglib_opf_case1354_pegase.m",
-    "pglib_opf_case1803_snem.m",
-    "pglib_opf_case1888_rte.m",
-    "pglib_opf_case1951_rte.m",
-    "pglib_opf_case2000_goc.m",
+    # "pglib_opf_case30_ieee.m",
+    # "pglib_opf_case39_epri.m",
+    # "pglib_opf_case57_ieee.m",
+    # "pglib_opf_case60_c.m",
+    # "pglib_opf_case73_ieee_rts.m",
+    # "pglib_opf_case89_pegase.m",
+    # "pglib_opf_case118_ieee.m",
+    # "pglib_opf_case162_ieee_dtc.m",
+    # "pglib_opf_case179_goc.m",
+    # "pglib_opf_case197_snem.m",
+    # "pglib_opf_case200_activ.m",
+    # "pglib_opf_case240_pserc.m",
+    # "pglib_opf_case300_ieee.m",
+    # "pglib_opf_case500_goc.m",
+    # "pglib_opf_case588_sdet.m",
+    # "pglib_opf_case793_goc.m",
+    # "pglib_opf_case1354_pegase.m",
+    # "pglib_opf_case1803_snem.m",
+    # "pglib_opf_case1888_rte.m",
+    # "pglib_opf_case1951_rte.m",
+    # "pglib_opf_case2000_goc.m",
     # "pglib_opf_case2312_goc.m",
     # "pglib_opf_case2383wp_k.m",
     # "pglib_opf_case2736sp_k.m",
@@ -68,7 +68,7 @@ const reduced_list = [
     # "pglib_opf_case78484_epigrids.m",
 ]
 
-# Lista reduzida apenas para AC (≤ 73 barras)
+# Reduced list for AC only
 const reduced_testlist_ac = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case5_pjm.m",
@@ -87,6 +87,7 @@ const reduced_testlist_ac = [
     "pglib_opf_case200_activ.m",
 ]
 
+# Cases with batteries
 const battery_cases = [
     "case5_bus_2_bat.m",
     "case14_bus_4_bat.m",
@@ -252,11 +253,11 @@ end
     )
 end
 
-println("\n===== RESUMO GLOBAL DE FALHAS POR MODELO =====")
+println("\n===== GLOBAL SUMMARY OF FAILURES BY MODEL =====")
 for (label, failures) in GLOBAL_FAILED_CASES
     println("\n[$label]")
     for (source, cases) in failures
-        println("  $source falhou em $(length(cases)) caso(s):")
+        println("  $source error in $(length(cases)) case(s):")
         for c in cases
             println("    - $c")
         end
