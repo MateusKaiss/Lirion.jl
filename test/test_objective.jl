@@ -117,7 +117,12 @@ function compare_with_powermodels(
 
     # --- PowerOptimization ---
     my_obj = try
-        result_dict, _ = PowerOptimization.main(file, model_type; optimizer = optimizer)
+        args = [
+            file,
+            "--model", lowercase(string(model_type.name.name)),
+            "--optimizer", string(optimizer)
+        ]
+        result_dict, _ = PowerOptimization.main(args)
         result_dict["objective"]
     catch e
         @warn "PowerOptimization failed on $case_name: $e"
@@ -125,10 +130,9 @@ function compare_with_powermodels(
         return
     end
 
-    # --- PowerModels ---
+    # --- PowerModels (sem alteração)
     pm_obj = try
         pm_data = PowerModels.parse_file(file)
-        # Se for caso com storage, usar _solve_opf_strg
         if haskey(pm_data, "storage") && !isempty(pm_data["storage"])
             if model_type == PowerOptimization.DC
                 PowerModels._solve_opf_strg(pm_data, DCPPowerModel, optimizer)["objective"]
