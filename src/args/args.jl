@@ -82,7 +82,7 @@ struct Args
 
         model_key = lowercase(strip(parsed["model"]))
         model_type = get(model_map, model_key) do
-            error("Invalid model: $model_key")
+            return error("Invalid model: $model_key")
         end
 
         optimizer = nothing
@@ -102,7 +102,7 @@ struct Args
             model_type,
             optimizer,
             get(parsed, "plot-outputs", false),
-            get(parsed, "write-lp", false)
+            get(parsed, "write-lp", false),
         )
     end
 end

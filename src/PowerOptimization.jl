@@ -17,12 +17,10 @@ const MOI = MathOptInterface
 include("types.jl")
 include("args/args.jl")
 
-
 include("parsing/parser.jl")
 include("parsing/csv_parser.jl")
 include("preprocessing/pre_processing.jl")
 include("preprocessing/parameter_extractors.jl")
-
 
 include("build_model/build_model.jl")
 include("build_model/bus.jl")
