@@ -50,7 +50,7 @@ struct Args
     function Args(raw_args::Vector{String})
         s = ArgParseSettings()
 
-        @add_arg_table s begin
+        @add_arg_table! s begin
             "path"
             help = "Path to MATPOWER .m or CSV folder"
 
