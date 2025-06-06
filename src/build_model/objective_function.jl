@@ -34,57 +34,11 @@ function compute_curtailment_cost(model, params)
     )
 end
 
-function compute_prosumer_cost(model, params)
-    if params.number_of_prosumers == 0
-        return nothing
-    end
-    T = get(model.ext, :time_periods, 1)
-    @expression(model, prosumer_cost,
-        sum(
-            @inbounds params.prosumer_costs[p] * model[:p_prosumer_injected][p, t]
-            for p in 1:params.number_of_prosumers, t in 1:T
-        )
-    )
-end
-
-function compute_reactive_power_penalty(model, params)
-    T = get(model.ext, :time_periods, 1)
-    thermal_generators = findall(
-        g -> params.plant_type[g] == "T" && params.generator_status[g] == 1,
-        1:params.number_of_generators,
-    )
-
-    @expression(model, reactive_power_penalty,
-        sum(
-            1e-9 * sum(
-                params.generator_costs[g][i] *
-                model[:q_generation][g, t]^(params.num_polynomial_coefs[g] - i)
-                for i in 1:params.num_polynomial_coefs[g]
-            )
-            for g in thermal_generators, t in 1:T
-        )
-    )
-end
-
-function compute_battery_reactive_injection(model, params)
-    if params.number_of_batteries == 0
-        return nothing
-    end
-    T = get(model.ext, :time_periods, 1)
-    @expression(model, battery_reactive_injection,
-        -sum(
-            1e-13 * model[:q_battery_injected][b, t]
-            for b in 1:params.number_of_batteries, t in 1:T
-        )
-    )
-end
-
 # ---------------------------------------------------------------------
 # Objective Assembly by Model Type (usando :objective_params)
 # ---------------------------------------------------------------------
 function objective!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
     params = matpower_data["objective_params"]
-
     compute_generation_cost(model, params)
 
     @objective(model, Min,
@@ -94,7 +48,6 @@ end
 
 function objective!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{SubproblemBuild})
     params = matpower_data["objective_params"]
-
     compute_generation_cost(model, params)
 
     @objective(model, Min,
