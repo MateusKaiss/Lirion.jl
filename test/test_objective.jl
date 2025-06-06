@@ -183,7 +183,7 @@ function run_model_tests(
     model_type::Type{<:PowerOptimization.OPFModel},
     label::String;
     optimizer = Ipopt.Optimizer,
-    case_list::Vector{String},
+    case_list::Vector{Any},
     tol = 0.05,
 )
     if isempty(case_list)
