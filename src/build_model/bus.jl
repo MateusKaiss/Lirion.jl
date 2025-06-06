@@ -55,7 +55,7 @@ function create_socp_variables!(model, params)
         v_magnitude_sq[b in params.bus_ids, t in 1:T],
         lower_bound = params.vmin[b]^2,
         upper_bound = params.vmax[b]^2,
-        start = 1.001
+        start = params.vstart[b]^2
     )
 
     scale = get(model.ext, :selected_scale, nothing)

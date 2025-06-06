@@ -87,6 +87,14 @@ const reduced_testlist_ac = [
     "pglib_opf_case200_activ.m",
 ]
 
+const battery_cases = [
+    "case5_bus_2_bat.m",
+    "case14_bus_4_bat.m",
+    "case57_bus_6_bat.m",
+    "case118_bus_10_bat.m",
+    "case200active_bus_20_bat.m",
+]
+
 function get_available_optimizer(preferred, fallback)
     try
         preferred()
@@ -107,7 +115,7 @@ function compare_with_powermodels(
 )
     case_name = basename(file)
 
-    # PowerOptimization
+    # --- PowerOptimization ---
     my_obj = try
         result_dict, _ = PowerOptimization.main(file, model_type; optimizer = optimizer)
         result_dict["objective"]
@@ -117,20 +125,33 @@ function compare_with_powermodels(
         return
     end
 
-    # PowerModels
+    # --- PowerModels ---
     pm_obj = try
         pm_data = PowerModels.parse_file(file)
-        if model_type == PowerOptimization.DC
-            PowerModels.solve_opf(pm_data, DCPPowerModel, optimizer)["objective"]
-        elseif model_type == PowerOptimization.AC
-            PowerModels.solve_ac_opf(pm_data, optimizer)["objective"]
-        elseif model_type == PowerOptimization.SOCP
-            PowerModels.solve_opf(pm_data, SOCWRPowerModel, optimizer)["objective"]
+        # Se for caso com storage, usar _solve_opf_strg
+        if haskey(pm_data, "storage") && !isempty(pm_data["storage"])
+            if model_type == PowerOptimization.DC
+                PowerModels._solve_opf_strg(pm_data, DCPPowerModel, optimizer)["objective"]
+            elseif model_type == PowerOptimization.AC
+                PowerModels._solve_opf_strg(pm_data, ACPPowerModel, optimizer)["objective"]
+            elseif model_type == PowerOptimization.SOCP
+                PowerModels._solve_opf_strg(pm_data, SOCWRPowerModel, optimizer)["objective"]
+            else
+                error("Model type not recognized.")
+            end
         else
-            error("Model type not recognized.")
+            if model_type == PowerOptimization.DC
+                PowerModels.solve_opf(pm_data, DCPPowerModel, optimizer)["objective"]
+            elseif model_type == PowerOptimization.AC
+                PowerModels.solve_ac_opf(pm_data, optimizer)["objective"]
+            elseif model_type == PowerOptimization.SOCP
+                PowerModels.solve_opf(pm_data, SOCWRPowerModel, optimizer)["objective"]
+            else
+                error("Model type not recognized.")
+            end
         end
     catch e
-        @warn "PowerModels threw an error on $case_name: $e"
+        @warn "PowerModels failed on $case_name: $e"
         push!(failed_pm_cases, case_name)
         return
     end
@@ -189,19 +210,56 @@ end
 
 @testset "PowerOptimization vs PowerModels Unified Comparison" begin
     # DC — todos os casos (comentado)
-    # dc_optimizer = get_available_optimizer(() -> Gurobi.Optimizer(), Ipopt.Optimizer)
-    # run_model_tests(PowerOptimization.DC, "DC"; optimizer = dc_optimizer, case_list = reduced_list, tol = 0.05)
+    dc_optimizer = get_available_optimizer(() -> Gurobi.Optimizer(), Ipopt.Optimizer)
+    run_model_tests(
+        PowerOptimization.DC,
+        "DC";
+        optimizer = dc_optimizer,
+        case_list = reduced_list,
+        tol = 0.05,
+    )
 
     # AC — até 73 barras (comentado)
-    run_model_tests(PowerOptimization.AC, "AC"; optimizer = Ipopt.Optimizer, case_list = reduced_testlist_ac, tol = 0.05)
+    run_model_tests(
+        PowerOptimization.AC,
+        "AC";
+        optimizer = Ipopt.Optimizer,
+        case_list = reduced_testlist_ac,
+        tol = 0.05,
+    )
 
     # SOCP — todos os casos com tolerância de 5%
-    # socp_optimizer = get_available_optimizer(() -> Gurobi.Optimizer(), SCS.Optimizer)
-    # run_model_tests(
-    #     PowerOptimization.SOCP,
-    #     "SOCP";
-    #     optimizer = socp_optimizer,
-    #     case_list = reduced_list,
-    #     tol = 0.05,
-    # )
+    socp_optimizer = get_available_optimizer(() -> Gurobi.Optimizer(), SCS.Optimizer)
+    run_model_tests(
+        PowerOptimization.SOCP,
+        "SOCP";
+        optimizer = socp_optimizer,
+        case_list = reduced_list,
+        tol = 0.05,
+    )
+
+    # Batteries
+    run_model_tests(
+        PowerOptimization.DC,
+        "DC com baterias";
+        optimizer = dc_optimizer,
+        case_list = battery_cases,
+        tol = 0.05,
+    )
+
+    run_model_tests(
+        PowerOptimization.AC,
+        "AC com baterias";
+        optimizer = Ipopt.Optimizer,
+        case_list = battery_cases,
+        tol = 0.05,
+    )
+
+    run_model_tests(
+        PowerOptimization.SOCP,
+        "SOCP com baterias";
+        optimizer = socp_optimizer,
+        case_list = battery_cases,
+        tol = 0.05,
+    )
 end

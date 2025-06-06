@@ -122,8 +122,14 @@ function build_result_dict(model::JuMP.Model, data::Dict)
                 nothing,
             "curtailment" =>
                 haskey(model, :curtailment) ?
-                [value(model[:curtailment][g, t]) for g in gen_ids, t in 1:T] : nothing,
-        )
+                [
+                    try
+                        value(model[:curtailment][g, t])
+                    catch
+                        0.0
+                    end
+                    for g in gen_ids, t in 1:T
+                ] : nothing)
     end
 
     if haskey(model, :p_flow_branches)
@@ -154,8 +160,10 @@ function build_result_dict(model::JuMP.Model, data::Dict)
             "storage" => [value(model[:storage][b, t]) for b in 1:nb, t in 1:T],
             "charge" => [value(model[:charge][b, t]) for b in 1:nb, t in 1:T],
             "discharge" => [value(model[:discharge][b, t]) for b in 1:nb, t in 1:T],
-            "qcharge" => [value(model[:qcharge][b, t]) for b in 1:nb, t in 1:T],
-            "qdischarge" => [value(model[:qdischarge][b, t]) for b in 1:nb, t in 1:T],
+            "qsc" => [value(model[:qsc][b, t]) for b in 1:nb, t in 1:T],
+            "ccms" =>
+                haskey(model, :ccms) ?
+                [value(model[:ccms][b, t]) for b in 1:nb, t in 1:T] : nothing,
             "p_injected" =>
                 [value(model[:p_battery_injected][b, t]) for b in 1:nb, t in 1:T],
             "q_injected" =>
@@ -267,6 +275,21 @@ function convert_to_pu!(case::Dict{String, Any})
     for field in ["rate_a", "rate_b", "rate_c"]
         case["branch"][field] ./= Sbase
     end
+
+    # if haskey(case, "storage")
+    #     for field in ["ps", "qs", "energy", "energy_rating", "charge_rating", "discharge_rating",
+    #                 "thermal_rating", "qmin", "qmax", "q_loss", "p_loss"]
+    #         case["storage"][field] ./= Sbase
+    #     end
+    # end
+    if haskey(case, "storage")
+        for field in
+            ["ps", "qs", "energy", "energy_rating", "charge_rating", "discharge_rating",
+            "thermal_rating", "qmin", "qmax", "q_loss", "p_loss"]
+            case["storage"][field] ./= Sbase
+        end
+    end
+
     return case
 end
 
