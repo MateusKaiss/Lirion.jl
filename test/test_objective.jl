@@ -209,7 +209,7 @@ function run_model_tests(
 end
 
 @testset "PowerOptimization vs PowerModels Unified Comparison" begin
-    dc_optimizer = get_available_optimizer(() -> Gurobi.Optimizer, Ipopt.Optimizer)
+    dc_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer)
     run_model_tests(
         PowerOptimization.DC,
         "DC";
