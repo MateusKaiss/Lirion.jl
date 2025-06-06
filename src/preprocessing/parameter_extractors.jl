@@ -1,66 +1,48 @@
+# ===============================================================
+# Parameter Extractors for PowerOptimization.jl
+# All functions to preprocess and extract model-ready parameters
+# ===============================================================
+
 # ---------------------------------------------------------------------
-# Getting Power Balance Parameters (multi-temporal compatible)
+# Helpers
 # ---------------------------------------------------------------------
-function get_power_balance_parameters(matpower_data)
-    bus_ids = matpower_data["bus"]["bus_i"]
-    bus_idx_map = Dict(b => i for (i, b) in enumerate(bus_ids))
+
+"Gets a field from a dictionary with a fallback default"
+getfieldsafe(data::Dict, field::String, default = missing) = get(data, field, default)
+
+"Creates a bus index map from bus IDs"
+function get_bus_index_map(bus_ids::AbstractVector)
+    return Dict(b => i for (i, b) in enumerate(bus_ids))
+end
+
+# ---------------------------------------------------------------------
+# Getting Bus Parameters
+# ---------------------------------------------------------------------
+function get_bus_parameters(bus_data)
+    bus_ids = bus_data["bus_i"]
+    reference_bus_idx = findfirst(==(3), bus_data["bus_type"])
+    reference_bus = bus_ids[reference_bus_idx]
+    vmin = Dict{Int, Float64}()
+    vmax = Dict{Int, Float64}()
+    vstart = Dict{Int, Union{Nothing, Float64}}()
+    @inbounds for i in eachindex(bus_ids)
+        b = bus_ids[i]
+        vmin[b] = bus_data["vmin"][i]
+        vmax[b] = bus_data["vmax"][i]
+        vstart[b] = isnan(bus_data["vm"][i]) ? nothing : bus_data["vm"][i]
+    end
 
     return (
         bus_ids = bus_ids,
-        bus_idx_map = bus_idx_map,
-        generator_bus_index = matpower_data["gen"]["gen_bus"],
-        battery_bus_index = get(
-            get(matpower_data, "storage", Dict{String, Any}()),
-            "storage_bus",
-            Int[],
-        ),
-        prosumer_bus_index = get(matpower_data, "prosumer", Dict("bus" => Int[]))["bus"],
-        demand_bus_index = bus_ids,
-        branch_bus_from = matpower_data["branch"]["f_bus"],
-        branch_bus_to = matpower_data["branch"]["t_bus"],
-        shunt_conductance = matpower_data["bus"]["gs"],
-        existing = matpower_data["gen"]["gen_status"],
-        branch_status = matpower_data["branch"]["br_status"],
-        has_timeseries = haskey(matpower_data, "bus_timeseries"),
-        bus_to_generators = get(matpower_data, "bus_to_gens", Dict{Int, Vector{Int}}()),
-        bus_to_batteries = get(matpower_data, "bus_to_batteries", Dict{Int, Vector{Int}}()),
-        bus_to_prosumers = get(matpower_data, "bus_to_prosumers", Dict{Int, Vector{Int}}()),
-        bus_to_branches_from = get(
-            matpower_data,
-            "bus_to_branches_from",
-            Dict{Int, Vector{Int}}(),
-        ),
-        bus_to_branches_to = get(
-            matpower_data,
-            "bus_to_branches_to",
-            Dict{Int, Vector{Int}}(),
-        ),
-    )
-end
-
-function get_battery_parameters(battery_data)
-    return (
-        number_of_batteries = length(battery_data["storage_bus"]),
-        min_storage = battery_data["energy"],
-        max_storage = battery_data["energy_rating"],
-        charge_ramp = battery_data["charge_rating"],
-        discharge_ramp = battery_data["discharge_rating"],
-        initial_storage = battery_data["energy"],
-        qmin = battery_data["qmin"],
-        qmax = battery_data["qmax"],
-        thermal_limit = battery_data["thermal_rating"],
-        charge_efficiency = battery_data["charge_efficiency"],
-        discharge_efficiency = battery_data["discharge_efficiency"],
-        r = battery_data["r"],
-        x = battery_data["x"],
-        p_loss = battery_data["p_loss"],
-        q_loss = battery_data["q_loss"],
-        bus = battery_data["storage_bus"],
+        reference_bus = reference_bus,
+        vmin = vmin,
+        vmax = vmax,
+        vstart = vstart,
     )
 end
 
 # ---------------------------------------------------------------------
-# Getting Branch Parameters (multi-temporal compatible)
+# Getting Branch Parameters
 # ---------------------------------------------------------------------
 function get_branch_parameters(branch_data, matpower_data)
     resistance = branch_data["br_r"]
@@ -95,12 +77,14 @@ function get_branch_parameters(branch_data, matpower_data)
         end
     end
 
+    bus_ids = matpower_data["bus"]["bus_i"]
+
     return (
         number_of_branches = length(branch_data["f_bus"]),
         bus_from = branch_data["f_bus"],
         bus_to = branch_data["t_bus"],
-        bus_ids = matpower_data["bus"]["bus_i"],
-        bus_idx_map = matpower_data["bus_idx_map"],
+        bus_ids = bus_ids,
+        bus_idx_map = get_bus_index_map(bus_ids),
         resistance = resistance,
         reactance = reactance,
         b_shunt = branch_data["br_b"],
@@ -120,34 +104,8 @@ function get_branch_parameters(branch_data, matpower_data)
     )
 end
 
-# ---------------------------------------------------------------------
-# Getting Bus Parameters (preprocessed)
-# ---------------------------------------------------------------------
-function get_bus_parameters(bus_data)
-    bus_ids = bus_data["bus_i"]
-    reference_bus_idx = findfirst(==(3), bus_data["bus_type"])
-    reference_bus = bus_ids[reference_bus_idx]
-    vmin = Dict{Int, Float64}()
-    vmax = Dict{Int, Float64}()
-    vstart = Dict{Int, Union{Nothing, Float64}}()
-    @inbounds for i in eachindex(bus_ids)
-        b = bus_ids[i]
-        vmin[b] = bus_data["vmin"][i]
-        vmax[b] = bus_data["vmax"][i]
-        vstart[b] = isnan(bus_data["vm"][i]) ? nothing : bus_data["vm"][i]
-    end
-
-    return (
-        bus_ids = bus_ids,
-        reference_bus = reference_bus,
-        vmin = vmin,
-        vmax = vmax,
-        vstart = vstart,
-    )
-end
-
 # ---------------------------------------------------------------------------
-# Generator Parameters (precomputed once and passed to all helper functions)
+# Generator Parameters
 # ---------------------------------------------------------------------------
 function get_generator_parameters(gen_data)
     number_of_generators = length(gen_data["gen_bus"])
@@ -173,55 +131,32 @@ function get_generator_parameters(gen_data)
 end
 
 # ---------------------------------------------------------------------
-# Getting Objective Parameters (pré-processado no início)
+# Battery Parameters
 # ---------------------------------------------------------------------
-function get_objective_parameters(
-    gen_data,
-    battery_data,
-    gencost_data,
-    prosumer_data = Dict(),
-)
+function get_battery_parameters(battery_data)
     return (
-        number_of_generators = get(gen_data, "gen_bus", []) |> length,
-        number_of_batteries = get(battery_data, "storage_bus", []) |> length,
-        generator_costs = get(gencost_data, "cost_coefficients", []),
-        num_polynomial_coefs = get(gencost_data, "ncost", []),
-        curtailment_cost = get(gen_data, "curtailment_cost", []),
-        plant_type = get(gen_data, "plant_type", []),
-        generator_status = get(gen_data, "gen_status", []),
-        number_of_prosumers = get(prosumer_data, "bus", []) |> length,
-        prosumer_costs = get(prosumer_data, "cost_injection", []),
+        number_of_batteries = length(battery_data["storage_bus"]),
+        min_storage = battery_data["energy"],
+        max_storage = battery_data["energy_rating"],
+        charge_ramp = battery_data["charge_rating"],
+        discharge_ramp = battery_data["discharge_rating"],
+        initial_storage = battery_data["energy"],
+        qmin = battery_data["qmin"],
+        qmax = battery_data["qmax"],
+        thermal_limit = battery_data["thermal_rating"],
+        charge_efficiency = battery_data["charge_efficiency"],
+        discharge_efficiency = battery_data["discharge_efficiency"],
+        r = battery_data["r"],
+        x = battery_data["x"],
+        p_loss = battery_data["p_loss"],
+        q_loss = battery_data["q_loss"],
+        bus = battery_data["storage_bus"],
     )
 end
 
-
 # ---------------------------------------------------------------------
-# Getting Reactive Power Balance Parameters (pré-processado no início)
+# Prosumer Parameters
 # ---------------------------------------------------------------------
-function get_reactive_power_parameters(matpower_data)
-    return (
-        bus_ids = matpower_data["bus"]["bus_i"],
-        shunt_susceptance = matpower_data["bus"]["bs"],
-        generator_status = matpower_data["gen"]["gen_status"],
-        has_timeseries = haskey(matpower_data, "bus_timeseries"),
-        bus_idx_map = matpower_data["bus_idx_map"],
-        branch_status = matpower_data["branch"]["br_status"],
-        bus_to_generators = get(matpower_data, "bus_to_gens", Dict{Int, Vector{Int}}()),
-        bus_to_batteries = get(matpower_data, "bus_to_batteries", Dict{Int, Vector{Int}}()),
-        bus_to_prosumers = get(matpower_data, "bus_to_prosumers", Dict{Int, Vector{Int}}()),
-        bus_to_branches_from = get(
-            matpower_data,
-            "bus_to_branches_from",
-            Dict{Int, Vector{Int}}(),
-        ),
-        bus_to_branches_to = get(
-            matpower_data,
-            "bus_to_branches_to",
-            Dict{Int, Vector{Int}}(),
-        ),
-    )
-end
-
 function get_prosumer_parameters(data)
     return (
         number_of_prosumers = length(data["bus"]),
@@ -232,5 +167,120 @@ function get_prosumer_parameters(data)
         q_demand = data["q_demand"],
         cost_injection = data["cost_injection"],
         inverter_capacity = data["inverter_capacity"],
+    )
+end
+
+# ---------------------------------------------------------------------
+# Objective Parameters
+# ---------------------------------------------------------------------
+function get_objective_parameters(
+    gen_data,
+    battery_data,
+    gencost_data,
+    prosumer_data = Dict(),
+)
+    return (
+        number_of_generators = getfieldsafe(gen_data, "gen_bus", []) |> length,
+        number_of_batteries = getfieldsafe(battery_data, "storage_bus", []) |> length,
+        generator_costs = getfieldsafe(gencost_data, "cost_coefficients", []),
+        num_polynomial_coefs = getfieldsafe(gencost_data, "ncost", []),
+        curtailment_cost = getfieldsafe(gen_data, "curtailment_cost", []),
+        plant_type = getfieldsafe(gen_data, "plant_type", []),
+        generator_status = getfieldsafe(gen_data, "gen_status", []),
+        number_of_prosumers = getfieldsafe(prosumer_data, "bus", []) |> length,
+        prosumer_costs = getfieldsafe(prosumer_data, "cost_injection", []),
+    )
+end
+
+# ---------------------------------------------------------------------
+# Power Balance Parameters (multi-temporal compatible)
+# ---------------------------------------------------------------------
+function get_power_balance_parameters(matpower_data)
+    bus_ids = matpower_data["bus"]["bus_i"]
+    return (
+        bus_ids = bus_ids,
+        bus_idx_map = get_bus_index_map(bus_ids),
+        generator_bus_index = matpower_data["gen"]["gen_bus"],
+        battery_bus_index = getfieldsafe(
+            getfieldsafe(matpower_data, "storage", Dict()),
+            "storage_bus",
+            Int[],
+        ),
+        prosumer_bus_index = getfieldsafe(
+            getfieldsafe(matpower_data, "prosumer", Dict()),
+            "bus",
+            Int[],
+        ),
+        demand_bus_index = bus_ids,
+        branch_bus_from = matpower_data["branch"]["f_bus"],
+        branch_bus_to = matpower_data["branch"]["t_bus"],
+        shunt_conductance = matpower_data["bus"]["gs"],
+        existing = matpower_data["gen"]["gen_status"],
+        branch_status = matpower_data["branch"]["br_status"],
+        has_timeseries = haskey(matpower_data, "bus_timeseries"),
+        bus_to_generators = getfieldsafe(
+            matpower_data,
+            "bus_to_gens",
+            Dict{Int, Vector{Int}}(),
+        ),
+        bus_to_batteries = getfieldsafe(
+            matpower_data,
+            "bus_to_batteries",
+            Dict{Int, Vector{Int}}(),
+        ),
+        bus_to_prosumers = getfieldsafe(
+            matpower_data,
+            "bus_to_prosumers",
+            Dict{Int, Vector{Int}}(),
+        ),
+        bus_to_branches_from = getfieldsafe(
+            matpower_data,
+            "bus_to_branches_from",
+            Dict{Int, Vector{Int}}(),
+        ),
+        bus_to_branches_to = getfieldsafe(
+            matpower_data,
+            "bus_to_branches_to",
+            Dict{Int, Vector{Int}}(),
+        ),
+    )
+end
+
+# ---------------------------------------------------------------------
+# Reactive Power Balance Parameters
+# ---------------------------------------------------------------------
+function get_reactive_power_parameters(matpower_data)
+    return (
+        bus_ids = matpower_data["bus"]["bus_i"],
+        shunt_susceptance = matpower_data["bus"]["bs"],
+        generator_status = matpower_data["gen"]["gen_status"],
+        has_timeseries = haskey(matpower_data, "bus_timeseries"),
+        bus_idx_map = matpower_data["bus_idx_map"],
+        branch_status = matpower_data["branch"]["br_status"],
+        bus_to_generators = getfieldsafe(
+            matpower_data,
+            "bus_to_gens",
+            Dict{Int, Vector{Int}}(),
+        ),
+        bus_to_batteries = getfieldsafe(
+            matpower_data,
+            "bus_to_batteries",
+            Dict{Int, Vector{Int}}(),
+        ),
+        bus_to_prosumers = getfieldsafe(
+            matpower_data,
+            "bus_to_prosumers",
+            Dict{Int, Vector{Int}}(),
+        ),
+        bus_to_branches_from = getfieldsafe(
+            matpower_data,
+            "bus_to_branches_from",
+            Dict{Int, Vector{Int}}(),
+        ),
+        bus_to_branches_to = getfieldsafe(
+            matpower_data,
+            "bus_to_branches_to",
+            Dict{Int, Vector{Int}}(),
+        ),
     )
 end
