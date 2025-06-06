@@ -17,7 +17,8 @@ function main(ARGS)
 
     add_case_index_maps!(data)
 
-    result_model = args.model_type == SOCP ?
+    result_model =
+        args.model_type == SOCP ?
         try_with_fallback_scale(data, args.model_type; optimizer = args.optimizer) :
         build_and_optimize_model(data, args.model_type; optimizer = args.optimizer)
 
