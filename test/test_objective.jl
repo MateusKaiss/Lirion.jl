@@ -104,14 +104,22 @@ function get_available_optimizer(preferred, fallback)
     end
     return preferred
 end
+const GLOBAL_FAILED_CASES = Dict{String, Dict{String, Vector{String}}}()
+
+function track_failure(label::String, origin::String, case_name::String)
+    if !haskey(GLOBAL_FAILED_CASES, label)
+        GLOBAL_FAILED_CASES[label] =
+            Dict("PowerModels" => String[], "PowerOptimization" => String[])
+    end
+    return push!(GLOBAL_FAILED_CASES[label][origin], case_name)
+end
 
 function compare_with_powermodels(
     file::String,
     model_type::Type{<:PowerOptimization.OPFModel};
+    label,
     optimizer = Ipopt.Optimizer,
     tol = 0.05,
-    failed_pm_cases = [],
-    failed_po_cases = [],
 )
     case_name = basename(file)
 
@@ -120,17 +128,17 @@ function compare_with_powermodels(
         args = [
             file,
             "--model", lowercase(string(model_type.name.name)),
-            "--optimizer", string(optimizer)
+            "--optimizer", string(optimizer),
         ]
         result_dict, _ = PowerOptimization.main(args)
         result_dict["objective"]
     catch e
         @warn "PowerOptimization failed on $case_name: $e"
-        push!(failed_po_cases, case_name)
+        track_failure(label, "PowerOptimization", case_name)
         return
     end
 
-    # --- PowerModels (sem alteração)
+    # --- PowerModels ---
     pm_obj = try
         pm_data = PowerModels.parse_file(file)
         if haskey(pm_data, "storage") && !isempty(pm_data["storage"])
@@ -156,13 +164,13 @@ function compare_with_powermodels(
         end
     catch e
         @warn "PowerModels failed on $case_name: $e"
-        push!(failed_pm_cases, case_name)
+        track_failure(label, "PowerModels", case_name)
         return
     end
 
     if isnan(pm_obj)
         @warn "PowerModels returned NaN for $case_name"
-        push!(failed_pm_cases, case_name)
+        track_failure(label, "PowerModels", case_name)
         return
     end
 
@@ -174,7 +182,7 @@ function run_model_tests(
     model_type::Type{<:PowerOptimization.OPFModel},
     label::String;
     optimizer = Ipopt.Optimizer,
-    case_list::Vector{String} = reduced_list,
+    case_list::Vector{String},
     tol = 0.05,
 )
     test_dir = joinpath(@__DIR__, "matpower_cases")
@@ -184,9 +192,6 @@ function run_model_tests(
         if isfile(joinpath(test_dir, fname))
     ]
 
-    failed_po_cases = String[]
-    failed_pm_cases = String[]
-
     n = length(selected_files)
     for (i, file) in enumerate(selected_files)
         case_name = basename(file)
@@ -195,75 +200,66 @@ function run_model_tests(
             compare_with_powermodels(
                 file,
                 model_type;
+                label = label,
                 optimizer = optimizer,
-                failed_pm_cases = failed_pm_cases,
-                failed_po_cases = failed_po_cases,
                 tol = tol,
             )
         end
     end
-
-    println("\n===== RESUMO DE FALHAS =====")
-    println(" Casos que falharam no PowerModels: $(length(failed_pm_cases))")
-    foreach(x -> println(" - $x"), failed_pm_cases)
-
-    println("\n Casos que falharam no PowerOptimization: $(length(failed_po_cases))")
-    foreach(x -> println(" - $x"), failed_po_cases)
-    return println("=============================\n")
 end
 
 @testset "PowerOptimization vs PowerModels Unified Comparison" begin
-    # DC — todos os casos (comentado)
-    dc_optimizer = get_available_optimizer(() -> Gurobi.Optimizer(), Ipopt.Optimizer)
+    dc_optimizer = get_available_optimizer(() -> Gurobi.Optimizer, Ipopt.Optimizer)
     run_model_tests(
         PowerOptimization.DC,
         "DC";
         optimizer = dc_optimizer,
         case_list = reduced_list,
-        tol = 0.05,
     )
 
-    # AC — até 73 barras (comentado)
     run_model_tests(
         PowerOptimization.AC,
         "AC";
         optimizer = Ipopt.Optimizer,
         case_list = reduced_testlist_ac,
-        tol = 0.05,
     )
 
-    # SOCP — todos os casos com tolerância de 5%
-    socp_optimizer = get_available_optimizer(() -> Gurobi.Optimizer(), SCS.Optimizer)
+    socp_optimizer = get_available_optimizer(Gurobi.Optimizer, SCS.Optimizer)
     run_model_tests(
         PowerOptimization.SOCP,
         "SOCP";
         optimizer = socp_optimizer,
         case_list = reduced_list,
-        tol = 0.05,
     )
 
-    # Batteries
     run_model_tests(
         PowerOptimization.DC,
         "DC com baterias";
         optimizer = dc_optimizer,
         case_list = battery_cases,
-        tol = 0.05,
     )
-
     run_model_tests(
         PowerOptimization.AC,
         "AC com baterias";
         optimizer = Ipopt.Optimizer,
         case_list = battery_cases,
-        tol = 0.05,
     )
-
     run_model_tests(
         PowerOptimization.SOCP,
         "SOCP com baterias";
         optimizer = socp_optimizer,
         case_list = battery_cases,
-        tol = 0.05,
     )
 end
+
+println("\n===== RESUMO GLOBAL DE FALHAS POR MODELO =====")
+for (label, failures) in GLOBAL_FAILED_CASES
+    println("\n[$label]")
+    for (source, cases) in failures
+        println("  $source falhou em $(length(cases)) caso(s):")
+        for c in cases
+            println("    - $c")
+        end
+    end
+end
+println("==============================================\n")

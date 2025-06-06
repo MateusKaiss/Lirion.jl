@@ -45,34 +45,66 @@ end
 struct Args
     database_path::String
     model_type::Type{<:OPFModel}
-    optimizer
+    optimizer::Any
     plot_outputs::Bool
     write_lp::Bool
 
     function Args(raw_args::Vector{String})
-        parsed_args = parse_commandline(raw_args)
+        s = ArgParseSettings()
 
-        model = lowercase(strip(parsed_args["model"]))
-        model_type = model == "dc"   ? PowerOptimization.DC :
-                     model == "ac"   ? PowerOptimization.AC :
-                     model == "socp" ? PowerOptimization.SOCP :
-                     error("Invalid model: $model")
+        @add_arg_table s begin
+            "path"
+            help = "Path to MATPOWER .m or CSV folder"
 
-        optimizer_name = strip(parsed_args["optimizer"])
-        optimizer_expr = Meta.parse(optimizer_name)
+            "--model"
+            help = "Model to use (dc, ac, socp)"
+            arg_type = String
+            required = true
 
-        optimizer = try
-            Base.eval(Main, optimizer_expr)
-        catch
-            error("Failed to evaluate optimizer: $optimizer_name. Make sure it's loaded in Main.")
+            "--optimizer"
+            help = "Optimizer (e.g., Ipopt.Optimizer, Gurobi.Optimizer)"
+            arg_type = String
+
+            "--plot-outputs"
+            help = "Generate plots"
+            action = :store_true
+
+            "--write-lp"
+            help = "Write LP file"
+            action = :store_true
+        end
+
+        parsed = parse_args(raw_args, s)
+
+        model_map = Dict(
+            "dc" => DC,
+            "ac" => AC,
+            "socp" => SOCP,
+        )
+
+        model_key = lowercase(strip(parsed["model"]))
+        model_type = get(model_map, model_key) do
+            error("Invalid model: $model_key")
+        end
+
+        optimizer = nothing
+        if haskey(parsed, "optimizer")
+            try
+                optimizer = eval(Meta.parse(parsed["optimizer"]))
+            catch
+                @warn "Invalid optimizer: $(parsed["optimizer"]). Defaulting to Ipopt."
+                optimizer = Ipopt.Optimizer
+            end
+        else
+            optimizer = Ipopt.Optimizer
         end
 
         return new(
-            parsed_args["path"],
+            abspath(parsed["path"]),
             model_type,
             optimizer,
-            get(parsed_args, "plot-outputs", false),
-            get(parsed_args, "write-lp", false),
+            get(parsed, "plot-outputs", false),
+            get(parsed, "write-lp", false)
         )
     end
 end
