@@ -158,7 +158,7 @@ function compare_with_powermodels(
             elseif model_type == PowerOptimization.AC
                 PowerModels.solve_ac_opf(pm_data, optimizer)["objective"]
             elseif model_type == PowerOptimization.SOCP
-                PowerModels.solve_opf(pm_data, SOCWRPowerModel, optimizer)["objective"]
+                PowerModels.solve_opf(pm_data, SOCWRConicPowerModel, optimizer)["objective"]
             else
                 error("Model type not recognized.")
             end
