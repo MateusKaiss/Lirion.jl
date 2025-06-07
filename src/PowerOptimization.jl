@@ -11,9 +11,7 @@ using Statistics
 using InfrastructureModels
 using Logging
 using ArgParse
-using MathOptInterface
 using SCS
-const MOI = MathOptInterface
 
 include("types.jl")
 include("args/args.jl")
