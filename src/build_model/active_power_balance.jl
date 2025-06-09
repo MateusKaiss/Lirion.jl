@@ -1,43 +1,3 @@
-# ---------------------------------------------------------------------
-# Getting Power Balance Parameters (multi-temporal compatible)
-# ---------------------------------------------------------------------
-function get_power_balance_parameters(matpower_data)
-    bus_ids = matpower_data["bus"]["bus_i"]
-    bus_idx_map = Dict(b => i for (i, b) in enumerate(bus_ids))
-
-    return (
-        bus_ids = bus_ids,
-        bus_idx_map = bus_idx_map,
-        generator_bus_index = matpower_data["gen"]["gen_bus"],
-        battery_bus_index = get(
-            get(matpower_data, "storage", Dict{String, Any}()),
-            "storage_bus",
-            Int[],
-        ),
-        prosumer_bus_index = get(matpower_data, "prosumer", Dict("bus" => Int[]))["bus"],
-        demand_bus_index = bus_ids,
-        branch_bus_from = matpower_data["branch"]["f_bus"],
-        branch_bus_to = matpower_data["branch"]["t_bus"],
-        shunt_conductance = matpower_data["bus"]["gs"],
-        existing = matpower_data["gen"]["gen_status"],
-        branch_status = matpower_data["branch"]["br_status"],
-        has_timeseries = haskey(matpower_data, "bus_timeseries"),
-        bus_to_generators = get(matpower_data, "bus_to_gens", Dict{Int, Vector{Int}}()),
-        bus_to_batteries = get(matpower_data, "bus_to_batteries", Dict{Int, Vector{Int}}()),
-        bus_to_prosumers = get(matpower_data, "bus_to_prosumers", Dict{Int, Vector{Int}}()),
-        bus_to_branches_from = get(
-            matpower_data,
-            "bus_to_branches_from",
-            Dict{Int, Vector{Int}}(),
-        ),
-        bus_to_branches_to = get(
-            matpower_data,
-            "bus_to_branches_to",
-            Dict{Int, Vector{Int}}(),
-        ),
-    )
-end
-
 function compute_power_balance(model, matpower_data, params, bus_index, t)
     p_gen = sum(
         model[:p_generation][g, t]
@@ -87,6 +47,9 @@ function compute_power_balance(model, matpower_data, params, bus_index, t)
     return p_gen - p_bat - p_pros - pd - p_out - p_in
 end
 
+# ---------------------------------------------------------------------
+# Dispatching Active Power Balance Variables by Model Type
+# ---------------------------------------------------------------------
 function active_power_balance!(model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
     params = matpower_data["power_balance_params"]
     T = get(model.ext, :time_periods, 1)

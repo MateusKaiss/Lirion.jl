@@ -1,29 +1,24 @@
-function main(
-    database_path::String,
-    model_type::Type{<:OPFModel};
-    optimizer = Ipopt.Optimizer,
-)
-    # Etapa 1: Carregamento dos dados
-    data = if endswith(lowercase(database_path), ".m")
-        open(database_path) do io
-            return parse_matpower_string_silent(read(io, String))
-        end
-    elseif isdir(database_path)
-        parse_case_from_csv_silent(database_path)
-    else
-        error("Unrecognized input format. Provide a .m file or a directory with .csv files.")
-    end
+function main(ARGS)
+    args = Args(ARGS)
 
-    # Etapa 2: Pré-processamento
-    add_case_index_maps!(data)
+    @info "Case: $(args.database_path)"
+    @info "Model: $(args.model_type)"
+    @info "Optimizer: $(args.optimizer)"
 
-    # Etapa 3: Construção e otimização
-    result_model =
-        model_type == SOCP ?
-        try_with_fallback_scale(data, model_type; optimizer = optimizer) :
-        build_and_optimize_model(data, model_type; optimizer = optimizer)
+    # --- Load and preprocess input data ---
+    data = load_input_data(args.database_path)
+    preprocess_case_data!(data)
 
+    # --- Build and solve the optimization model ---
+    result_model = build_model(data, args.model_type; optimizer = args.optimizer)
+
+    # --- Post-process and organize results ---
     result_dict = build_result_dict(result_model, data)
 
     return result_dict, result_model, data
+end
+
+function julia_main()::Cint
+    main(ARGS)
+    return 0
 end

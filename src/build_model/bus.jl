@@ -1,30 +1,4 @@
 # ---------------------------------------------------------------------
-# Getting Bus Parameters (preprocessed)
-# ---------------------------------------------------------------------
-function get_bus_parameters(bus_data)
-    bus_ids = bus_data["bus_i"]
-    reference_bus_idx = findfirst(==(3), bus_data["bus_type"])
-    reference_bus = bus_ids[reference_bus_idx]
-    vmin = Dict{Int, Float64}()
-    vmax = Dict{Int, Float64}()
-    vstart = Dict{Int, Union{Nothing, Float64}}()
-    @inbounds for i in eachindex(bus_ids)
-        b = bus_ids[i]
-        vmin[b] = bus_data["vmin"][i]
-        vmax[b] = bus_data["vmax"][i]
-        vstart[b] = isnan(bus_data["vm"][i]) ? nothing : bus_data["vm"][i]
-    end
-
-    return (
-        bus_ids = bus_ids,
-        reference_bus = reference_bus,
-        vmin = vmin,
-        vmax = vmax,
-        vstart = vstart,
-    )
-end
-
-# ---------------------------------------------------------------------
 # Creating Bus Variables (Vectorized and Optimized)
 # ---------------------------------------------------------------------
 function create_voltage_angle_variables!(model, params)
@@ -71,13 +45,13 @@ function create_socp_variables!(model, params)
         JuMP.RotatedSecondOrderCone()
     )
 
-    # Alternativas (não usadas, mas deixadas para referência):
-    # Igualdade exata (costuma deixar o modelo mais lento e menos estável)
+    # Alternatives (not used, but kept for reference):
+    # Strict equality (usually slower and less numerically stable)
     # @constraint(model, voltage_sq_def[b in params.bus_ids, t in 1:T],
     #     v_magnitude_sq[b, t] == model[:v_magnitude][b, t]^2
     # )
 
-    # Desigualdade relaxada (mais rápida, mas fisicamente imprecisa)
+    # Relaxed inequality (faster but physically inaccurate)
     # @constraint(model, voltage_sq_def[b in params.bus_ids, t in 1:T],
     #     v_magnitude_sq[b, t] >= model[:v_magnitude][b, t]^2
     # )
@@ -106,24 +80,4 @@ function buses!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{Subproble
     create_voltage_angle_variables!(model, params)
     create_socp_variables!(model, params)
     return nothing
-end
-
-function select_cone_scale(params)
-    vmin_vals = collect(values(params.vmin))
-    vmax_vals = collect(values(params.vmax))
-
-    vmin = clamp(minimum(vmin_vals), 0.80, 1.05)
-    vmax = clamp(maximum(vmax_vals), 0.90, 1.15)
-    delta = vmax / vmin
-
-    nb = length(params.vmin)
-    if nb > 1000 && delta > 1.17
-        return 100
-    elseif delta < 1.13
-        return 20
-    elseif delta < 1.16
-        return 70
-    else
-        return 100
-    end
 end

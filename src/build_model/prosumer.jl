@@ -1,16 +1,3 @@
-function get_prosumer_parameters(data)
-    return (
-        number_of_prosumers = length(data["bus"]),
-        bus_index = data["bus"],
-        generation = data["generation"],
-        demand = data["demand"],
-        q_generation = data["q_generation"],
-        q_demand = data["q_demand"],
-        cost_injection = data["cost_injection"],
-        inverter_capacity = data["inverter_capacity"],
-    )
-end
-
 function create_prosumer_variables!(model::JuMP.Model, params)
     T = get(model.ext, :time_periods, 1)
 
