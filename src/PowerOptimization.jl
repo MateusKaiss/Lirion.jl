@@ -14,6 +14,9 @@ using ArgParse
 using SCS
 
 include("types.jl")
+include("distributed/distributed_opf.jl")
+using .DistributedOPF
+
 include("args/args.jl")
 
 include("parsing/parser.jl")
@@ -35,4 +38,5 @@ include("build_model/build_model.jl")
 include("build_results/build_results.jl")
 
 include("main.jl")
-end
+
+end 

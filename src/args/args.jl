@@ -42,7 +42,7 @@ end
 
 struct Args
     database_path::String
-    model_type::Type{<:OPFModel}
+    model_type::Union{Type{<:OPFModel}, DistributedOPFModel}
     optimizer::Any
     plot_outputs::Bool
     write_lp::Bool
@@ -78,6 +78,9 @@ struct Args
             "dc" => DC,
             "ac" => AC,
             "socp" => SOCP,
+            "distributed-admm-dc" => DistributedOPFModel(DC, :admm, 10, 1.0),
+            "distributed-admm-ac" => DistributedOPFModel(AC, :admm, 10, 1.0),
+            "distributed-admm-socp" => DistributedOPFModel(SOCP, :admm, 10, 1.0),
         )
 
         model_key = lowercase(strip(parsed["model"]))

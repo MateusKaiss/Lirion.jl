@@ -9,6 +9,12 @@ function main(ARGS)
     data = load_input_data(args.database_path)
     preprocess_case_data!(data)
 
+    if args.model_type isa DistributedOPFModel
+        runner = get_method_runner(args.model_type)
+        result = runner(args.model_type, args.database_path)
+        return result
+    end
+
     # --- Build and solve the optimization model ---
     result_model = build_model(data, args.model_type; optimizer = args.optimizer)
 
