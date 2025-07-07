@@ -12,7 +12,8 @@ end
 
 function preprocess_case_data!(data::Dict{String, Any})
     add_case_index_maps!(data)
-    return convert_to_pu!(data)
+    convert_to_pu!(data)
+    return nothing
 end
 
 function parse_case_from_csv_silent(dir::String)
@@ -32,7 +33,7 @@ function parse_matpower_string_silent(data_string::String)
     return case
 end
 
-function map_items_by_bus(bus_vec::Vector{Any})
+function map_items_by_bus(bus_vec::Vector{T}) where T
     mapping = Dict{Int, Vector{Int}}()
     for (i, b) in enumerate(bus_vec)
         push!(get!(mapping, b, Int[]), i)
@@ -57,6 +58,14 @@ function add_case_index_maps!(case::Dict{String, Any})
         t_bus = case["branch"]["t_bus"]
         case["bus_to_branches_from"] = map_items_by_bus(f_bus)
         case["bus_to_branches_to"] = map_items_by_bus(t_bus)
+        f_bus = case["branch"]["f_bus"]
+        t_bus = case["branch"]["t_bus"]
+        bus_to_neighbors = Dict{Int, Vector{Int}}()
+        for (f, t) in zip(f_bus, t_bus)
+            push!(get!(bus_to_neighbors, f, Int[]), t)
+            push!(get!(bus_to_neighbors, t, Int[]), f)
+        end
+        case["bus_to_neighbors"] = bus_to_neighbors
     end
 
     if haskey(case, "prosumer")
@@ -78,6 +87,7 @@ function add_case_index_maps!(case::Dict{String, Any})
             get(case, "storage", Dict()),
             case["gencost"],
             get(case, "prosumer", Dict()),
+            get(case, "gencost_timeseries", nothing),
         ),
         (; sbase = case["baseMVA"]),
     )
