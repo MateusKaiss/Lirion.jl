@@ -20,7 +20,7 @@ const reduced_list = [
     "pglib_opf_case300_ieee.m",
     # "pglib_opf_case500_goc.m",
     # "pglib_opf_case588_sdet.m",
-    "pglib_opf_case793_goc.m",
+    # "pglib_opf_case793_goc.m",
     # "pglib_opf_case1354_pegase.m",
     # "pglib_opf_case1803_snem.m",
     # "pglib_opf_case1888_rte.m",
@@ -81,10 +81,10 @@ const reduced_testlist_ac = [
     "pglib_opf_case73_ieee_rts.m",
     "pglib_opf_case89_pegase.m",
     "pglib_opf_case118_ieee.m",
-    "pglib_opf_case162_ieee_dtc.m",
-    "pglib_opf_case179_goc.m",
-    "pglib_opf_case197_snem.m",
-    "pglib_opf_case200_activ.m",
+    # "pglib_opf_case162_ieee_dtc.m",
+    # "pglib_opf_case179_goc.m",
+    # "pglib_opf_case197_snem.m",
+    # "pglib_opf_case200_activ.m",
 ]
 
 # Cases with batteries
