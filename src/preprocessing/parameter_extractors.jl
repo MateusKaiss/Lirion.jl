@@ -162,16 +162,52 @@ end
 # Prosumer Parameters
 # ---------------------------------------------------------------------
 function get_prosumer_parameters(data)
-    return (
-        number_of_prosumers = length(data["bus"]),
-        bus_index = data["bus"],
-        generation = data["generation"],
-        demand = data["demand"],
-        q_generation = data["q_generation"],
-        q_demand = data["q_demand"],
-        cost_injection = data["cost_injection"],
-        inverter_capacity = data["inverter_capacity"],
-    )
+    if haskey(data, "prosumer_timeseries")
+        ts = data["prosumer_timeseries"]
+        return (
+            is_timeseries = true,
+            number_of_prosumers = length(unique(ts["bus"])),
+            time = ts["time"],
+            bus_index = ts["bus"],
+            generation = ts["generation"],
+            demand = ts["demand"],
+            q_generation = ts["q_generation"],
+            q_demand = ts["q_demand"],
+            cost_injection = haskey(data, "prosumer") ? data["prosumer"]["cost_injection"] : fill(0.0, length(unique(ts["bus"]))),
+            inverter_capacity = haskey(data, "prosumer") ? data["prosumer"]["inverter_capacity"] : fill(Inf, length(unique(ts["bus"]))),
+        )
+    else
+        s = data["prosumer"]
+        if haskey(data, "bus_timeseries")
+            times = unique(data["bus_timeseries"]["time"])
+            ntimes = length(times)
+            nb = length(s["bus"])
+            return (
+                is_timeseries = true,
+                number_of_prosumers = nb,
+                time = repeat(times, inner=nb),
+                bus_index = repeat(s["bus"], outer=ntimes),
+                generation = repeat(s["generation"], outer=ntimes),
+                demand = repeat(s["demand"], outer=ntimes),
+                q_generation = repeat(s["q_generation"], outer=ntimes),
+                q_demand = repeat(s["q_demand"], outer=ntimes),
+                cost_injection = repeat(s["cost_injection"], outer=ntimes),
+                inverter_capacity = repeat(s["inverter_capacity"], outer=ntimes),
+            )
+        else
+            return (
+                is_timeseries = false,
+                number_of_prosumers = length(s["bus"]),
+                bus_index = s["bus"],
+                generation = s["generation"],
+                demand = s["demand"],
+                q_generation = s["q_generation"],
+                q_demand = s["q_demand"],
+                cost_injection = s["cost_injection"],
+                inverter_capacity = s["inverter_capacity"],
+            )
+        end
+    end
 end
 
 # ---------------------------------------------------------------------
@@ -182,17 +218,46 @@ function get_objective_parameters(
     battery_data,
     gencost_data,
     prosumer_data = Dict(),
+    gencost_timeseries = nothing,
 )
+    has_timeseries = gencost_timeseries !== nothing
+
+    if has_timeseries
+        generator_costs = Dict{Int, Dict{Int, Vector{Float64}}}()
+        gen_ids = gencost_timeseries["gen_id"]
+        times = gencost_timeseries["time"]
+        cost_coeffs = gencost_timeseries["cost_coefficients"]
+
+        for i in eachindex(gen_ids)
+            t = times[i]
+            g = gen_ids[i]
+            c = cost_coeffs[i]
+
+            if !haskey(generator_costs, t)
+                generator_costs[t] = Dict{Int, Vector{Float64}}()
+            end
+
+            generator_costs[t][g] = c
+        end
+    else
+        generator_costs = Dict{Int, Dict{Int, Vector{Float64}}}()
+        generator_costs[1] = Dict{Int, Vector{Float64}}()
+        for (g, coefs) in enumerate(getfieldsafe(gencost_data, "cost_coefficients", []))
+            generator_costs[1][g] = coefs
+        end
+    end
+
     return (
         number_of_generators = getfieldsafe(gen_data, "gen_bus", []) |> length,
         number_of_batteries = getfieldsafe(battery_data, "storage_bus", []) |> length,
-        generator_costs = getfieldsafe(gencost_data, "cost_coefficients", []),
+        generator_costs = generator_costs,
         num_polynomial_coefs = getfieldsafe(gencost_data, "ncost", []),
         curtailment_cost = getfieldsafe(gen_data, "curtailment_cost", []),
         plant_type = getfieldsafe(gen_data, "plant_type", []),
         generator_status = getfieldsafe(gen_data, "gen_status", []),
         number_of_prosumers = getfieldsafe(prosumer_data, "bus", []) |> length,
         prosumer_costs = getfieldsafe(prosumer_data, "cost_injection", []),
+        has_timeseries = has_timeseries,
     )
 end
 
