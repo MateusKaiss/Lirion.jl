@@ -30,9 +30,11 @@ function compute_power_balance(model, matpower_data, params, bus_index, t)
     )
 
     pd = if params.has_timeseries
+        ts = matpower_data["bus_timeseries"]
         sum(
-            r.pd for r in eachrow(matpower_data["bus_timeseries"])
-            if r.bus == bus_index && r.time == t;
+            ts["pd"][i]
+            for i in eachindex(ts["bus"])
+            if ts["bus"][i] == bus_index && ts["time"][i] == t;
             init = 0.0,
         )
     else

@@ -1,24 +1,4 @@
 # ---------------------------------------------------------------------
-# Reactive Demand Utility
-# ---------------------------------------------------------------------
-function get_reactive_demand_at_time(data::Dict{String, Any}, bus_index::Int, t::Int)
-    if haskey(data, "bus_timeseries")
-        df = data["bus_timeseries"]
-        return sum(
-            row.qd for row in eachrow(df) if row.bus == bus_index && row.time == t;
-            init = 0.0,
-        )
-    else
-        bus_list = data["bus"]["bus_i"]
-        qd_list = data["bus"]["qd"]
-        @inbounds return sum(
-            qd_list[i] for i in eachindex(bus_list) if bus_list[i] == bus_index;
-            init = 0.0,
-        )
-    end
-end
-
-# ---------------------------------------------------------------------
 # Reactive Balance Expression
 # ---------------------------------------------------------------------
 function compute_reactive_power_balance(model, matpower_data, params, bus_index, t)
@@ -50,7 +30,24 @@ function compute_reactive_power_balance(model, matpower_data, params, bus_index,
         if params.branch_status[l] == 1;
         init = 0.0,
     )
-    qd = get_reactive_demand_at_time(matpower_data, bus_index, t)
+
+    qd = if params.has_timeseries
+        ts = matpower_data["bus_timeseries"]
+        sum(
+            ts["qd"][i]
+            for i in eachindex(ts["bus"])
+            if ts["bus"][i] == bus_index && ts["time"][i] == t;
+            init = 0.0,
+        )
+    else
+        bus_list = matpower_data["bus"]["bus_i"]
+        qd_list = matpower_data["bus"]["qd"]
+        @inbounds sum(
+            qd_list[i] for i in eachindex(bus_list) if bus_list[i] == bus_index;
+            init = 0.0,
+        )
+    end
+
 
     return q_gen - q_bat + q_pros - qd - q_out - q_in
 end
