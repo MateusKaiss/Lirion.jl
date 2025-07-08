@@ -20,6 +20,86 @@ function get_model_times(data)
     return all_times
 end
 
+function ensure_prosumer_timeseries!(data::Dict{String, Any}, T::Int)
+    ts = get(data, "prosumer_timeseries", Dict("time" => Int[]))
+    if !isempty(ts["time"]) || T == 1 || !haskey(data, "prosumer")
+        return
+    end
+
+    @info "Criando prosumer_timeseries com base na tabela estática prosumer."
+
+    s = data["prosumer"]
+    nb = length(s["bus"])
+
+    data["prosumer_timeseries"] = Dict(
+        "time" => ones(Int, nb),
+        "bus" => copy(s["bus"]),
+        "p_pv" => copy(s["generation"]),
+        "p_load" => copy(s["demand"]),
+        "p_curtail" => fill(0.0, nb),
+    )
+end
+
+function ensure_gencost_timeseries!(data::Dict{String, Any}, T::Int)
+    if haskey(data, "gencost_timeseries") && !isempty(data["gencost_timeseries"]["time"])
+        return
+    end
+    if T == 1 || !haskey(data, "gencost")
+        return
+    end
+
+    @info "Criando gencost_timeseries com base na tabela gencost fixa."
+
+    gencost = data["gencost"]
+    ng = length(gencost["cost_coefficients"])
+    ts = Dict{String, Vector}()
+
+    ts["time"] = Int[]
+    ts["gen_id"] = Int[]
+    ts["model"] = Int[]
+    ts["startup"] = Float64[]
+    ts["shutdown"] = Float64[]
+    ts["ncost"] = Int[]
+    ts["cost_coefficients"] = Vector{Vector{Float64}}()
+    ts["tou"] = Float64[]
+    ts["feed_in_tariff"] = Float64[]
+
+    for g in 1:ng
+        push!(ts["time"], 1)
+        push!(ts["gen_id"], g)
+        push!(ts["model"], gencost["model"][g])
+        push!(ts["startup"], gencost["startup"][g])
+        push!(ts["shutdown"], gencost["shutdown"][g])
+        push!(ts["ncost"], gencost["ncost"][g])
+        push!(ts["cost_coefficients"], copy(gencost["cost_coefficients"][g]))
+        push!(ts["tou"], 1.0)
+        push!(ts["feed_in_tariff"], 0.0)
+    end
+
+    data["gencost_timeseries"] = ts
+end
+
+function ensure_bus_timeseries!(data::Dict{String, Any}, T::Int)
+    ts = get(data, "bus_timeseries", Dict("time" => Int[]))
+    if !isempty(ts["time"]) || T == 1 || !haskey(data, "bus")
+        return
+    end
+
+    @info "Criando bus_timeseries com base na tabela estática bus."
+
+    b = data["bus"]
+    nb = length(b["bus_i"])
+
+    data["bus_timeseries"] = Dict(
+        "time" => ones(Int, nb),
+        "bus" => copy(b["bus_i"]),
+        "pd" => copy(b["pd"]),
+        "qd" => copy(b["qd"]),
+        "gs" => copy(b["gs"]),
+        "bs" => copy(b["bs"]),
+    )
+end
+
 function extend_bus_timeseries!(data::Dict{String, Any}, T::Int)
     if !haskey(data, "bus_timeseries")
         return
@@ -37,9 +117,8 @@ function extend_bus_timeseries!(data::Dict{String, Any}, T::Int)
 
     @warn "bus_timeseries tem dados apenas até t=$last_time. Repetindo valores para t=$(last_time+1):$T automaticamente."
 
-    # Identifica os índices da última linha por bus
     for bus in bus_ids
-        indices = [i for (i, (g, t)) in enumerate(zip(gens, times)) if g == gen && t == last_time]
+        indices = [i for (i, (b, t)) in enumerate(zip(buses, times)) if b == bus && t == last_time]
         if isempty(indices)
             continue
         end
@@ -48,7 +127,7 @@ function extend_bus_timeseries!(data::Dict{String, Any}, T::Int)
             for key in keys(ts)
                 push!(ts[key], ts[key][idx])  # copia o valor da linha
             end
-            ts["time"][end] = t
+            ts["time"][end] = t  # atualiza o tempo
         end
     end
 end
@@ -90,7 +169,6 @@ function extend_gencost_timeseries!(data::Dict{String, Any}, T::Int)
         return
     end
 
-    # Caso 2: já existe gencost_timeseries → extender se necessário
     ts = data["gencost_timeseries"]
     times = ts["time"]
     gens = ts["gen_id"]

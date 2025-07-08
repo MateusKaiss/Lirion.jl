@@ -15,8 +15,13 @@ end
 function preprocess_case_data!(data::Dict{String, Any})
     T_all = get_model_times(data)
     T = isempty(T_all) ? 1 : maximum(T_all)
+    data["T"] = T
 
     check_time_alignment(data)
+
+    ensure_bus_timeseries!(data, T)
+    ensure_gencost_timeseries!(data, T)
+    ensure_prosumer_timeseries!(data, T)
 
     extend_bus_timeseries!(data, T)
     extend_gencost_timeseries!(data, T)
@@ -91,6 +96,7 @@ function add_case_index_maps!(case::Dict{String, Any})
     case["reactive_balance_params"] = get_reactive_power_parameters(case)
     case["objective_params"] = merge(
         get_objective_parameters(
+            case,
             case["gen"],
             get(case, "storage", Dict()),
             case["gencost"],

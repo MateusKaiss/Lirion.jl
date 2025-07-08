@@ -116,7 +116,7 @@ function build_and_optimize_multiperiod_model(
     matpower_data,
     model_type::Type{<:OPFModel};
     optimizer = Ipopt.Optimizer,
-    times::Vector{Any},
+    times::AbstractVector,
 )
     model = JuMP.Model(optimizer)
     model.ext[:time_periods] = length(times)
