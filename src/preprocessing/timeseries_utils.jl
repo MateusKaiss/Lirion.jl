@@ -1,0 +1,171 @@
+function get_model_times(data)
+    time_vecs = []
+
+    if haskey(data, "bus_timeseries")
+        push!(time_vecs, data["bus_timeseries"]["time"])
+    end
+    if haskey(data, "prosumer_timeseries")
+        push!(time_vecs, data["prosumer_timeseries"]["time"])
+    end
+    if haskey(data, "gencost_timeseries")
+        push!(time_vecs, data["gencost_timeseries"]["time"])
+    end
+
+    if isempty(time_vecs)
+        return Int[]
+    end
+
+    all_times = unique(vcat(time_vecs...))
+    sort!(all_times)
+    return all_times
+end
+
+function extend_bus_timeseries!(data::Dict{String, Any}, T::Int)
+    if !haskey(data, "bus_timeseries")
+        return
+    end
+
+    ts = data["bus_timeseries"]
+    times = ts["time"]
+    buses = ts["bus"]
+    last_time = maximum(times)
+    bus_ids = unique(buses)
+
+    if last_time >= T
+        return
+    end
+
+    @warn "bus_timeseries tem dados apenas até t=$last_time. Repetindo valores para t=$(last_time+1):$T automaticamente."
+
+    # Identifica os índices da última linha por bus
+    for bus in bus_ids
+        indices = [i for (i, (g, t)) in enumerate(zip(gens, times)) if g == gen && t == last_time]
+        if isempty(indices)
+            continue
+        end
+        idx = indices[1]
+        for t in (last_time + 1):T
+            for key in keys(ts)
+                push!(ts[key], ts[key][idx])  # copia o valor da linha
+            end
+            ts["time"][end] = t
+        end
+    end
+end
+
+function extend_gencost_timeseries!(data::Dict{String, Any}, T::Int)
+    # Caso 1: não existe gencost_timeseries
+    if !haskey(data, "gencost_timeseries")
+        @info "gencost_timeseries não encontrado. Criando com base em gencost fixo."
+
+        gencost = data["gencost"]
+        ng = length(gencost["cost_coefficients"])
+        ts = Dict{String, Vector}()
+
+        ts["time"] = Int[]
+        ts["gen_id"] = Int[]
+        ts["model"] = Int[]
+        ts["startup"] = Float64[]
+        ts["shutdown"] = Float64[]
+        ts["ncost"] = Int[]
+        ts["cost_coefficients"] = Vector{Vector{Float64}}()
+        ts["tou"] = Float64[]
+        ts["feed_in_tariff"] = Float64[]
+
+        for t in 1:T
+            for g in 1:ng
+                push!(ts["time"], t)
+                push!(ts["gen_id"], g)
+                push!(ts["model"], gencost["model"][g])
+                push!(ts["startup"], gencost["startup"][g])
+                push!(ts["shutdown"], gencost["shutdown"][g])
+                push!(ts["ncost"], gencost["ncost"][g])
+                push!(ts["cost_coefficients"], gencost["cost_coefficients"][g])
+                push!(ts["tou"], 1.0)
+                push!(ts["feed_in_tariff"], 0.0)
+            end
+        end
+
+        data["gencost_timeseries"] = ts
+        return
+    end
+
+    # Caso 2: já existe gencost_timeseries → extender se necessário
+    ts = data["gencost_timeseries"]
+    times = ts["time"]
+    gens = ts["gen_id"]
+    last_time = maximum(times)
+    gen_ids = unique(gens)
+
+    if last_time >= T
+        return
+    end
+
+    @warn "gencost_timeseries tem dados apenas até t=$last_time. Repetindo valores para t=$(last_time+1):$T automaticamente."
+
+    for gen in gen_ids
+        indices = [i for (i, (g, t)) in enumerate(zip(gens, times)) if g == gen && t == last_time]
+        if isempty(indices)
+            continue
+        end
+        idx = indices[1]
+        for t in (last_time + 1):T
+            for key in keys(ts)
+                push!(ts[key], ts[key][idx])
+            end
+            ts["time"][end] = t
+        end
+    end
+end
+
+
+function extend_prosumer_timeseries!(data::Dict{String, Any}, T::Int)
+    if !haskey(data, "prosumer_timeseries")
+        return
+    end
+
+    ts = data["prosumer_timeseries"]
+    times = ts["time"]
+    prosumers = ts["bus"]
+    last_time = maximum(times)
+    prosumer_ids = unique(prosumers)
+
+    if last_time >= T
+        return
+    end
+
+    @warn "prosumer_timeseries tem dados apenas até t=$last_time. Repetindo valores para t=$(last_time+1):$T automaticamente."
+
+    for p in prosumer_ids
+        indices = [i for (i, (pid, t)) in enumerate(zip(prosumers, times)) if pid == p && t == last_time]
+        if isempty(indices)
+            continue
+        end
+        idx = indices[1]
+        for t in (last_time + 1):T
+            for key in keys(ts)
+                push!(ts[key], ts[key][idx])
+            end
+            ts["time"][end] = t
+        end
+    end
+end
+
+function check_time_alignment(data)
+    time_sets = Dict()
+
+    for key in ("bus_timeseries", "prosumer_timeseries", "gencost_timeseries")
+        if haskey(data, key)
+            time_sets[key] = Set(data[key]["time"])
+        end
+    end
+
+    if length(time_sets) > 1
+        ref_key, ref_times = first(time_sets)
+        for (key, ts) in time_sets
+            if ts != ref_times
+                @warn "Tabela $key possui tempos diferentes das demais. Tempos serão unificados via união total. ($key: $(sort(collect(ts))) vs $ref_key: $(sort(collect(ref_times))))"
+            end
+        end
+    end
+end
