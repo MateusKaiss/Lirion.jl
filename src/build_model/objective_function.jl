@@ -7,9 +7,8 @@ function compute_generation_cost(model, params)
             begin
                 coefs = params.generator_costs[t][g]
                 sum(
-                    coefs[i] *
-                    (params.sbase * model[:p_generation][g, t])^(length(coefs) - i)
-                    for i in 1:length(coefs)
+                    coefs[i] * (params.sbase * model[:p_generation][g, t])^(length(coefs) - i)
+                    for i in eachindex(coefs)
                 )
             end
             for t in 1:T, g in active_generators
