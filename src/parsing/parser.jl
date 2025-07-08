@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------
 const _mp_data_names = ["mpc.version", "mpc.baseMVA", "mpc.bus", "mpc.gen",
     "mpc.branch", "mpc.dcline", "mpc.gencost", "mpc.dclinecost",
-    "mpc.bus_name", "mpc.storage", "mpc.switch", "mpc.prosumer","mpc.consumer",
+    "mpc.bus_name", "mpc.storage", "mpc.switch", "mpc.prosumer", "mpc.consumer",
     "mpc.bus_timeseries", "mpc.prosumer_timeseries"]
 
 const _mp_bus_columns = [

@@ -64,7 +64,6 @@ function ensure_consumer_timeseries!(data::Dict{String, Any}, T::Int)
     return
 end
 
-
 function ensure_gencost_timeseries!(data::Dict{String, Any}, T::Int)
     if haskey(data, "gencost_timeseries") && !isempty(data["gencost_timeseries"]["time"])
         return
@@ -278,7 +277,8 @@ function extend_consumer_timeseries!(data::Dict{String, Any}, T::Int)
 
     for c in consumer_ids
         indices = [
-            i for (i, (cid, t)) in enumerate(zip(consumers, times)) if cid == c && t == last_time
+            i for (i, (cid, t)) in enumerate(zip(consumers, times)) if
+            cid == c && t == last_time
         ]
         if isempty(indices)
             continue

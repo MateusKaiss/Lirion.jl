@@ -6,7 +6,7 @@ const _mp_data_names_csv = [
     "mpc.branch", "mpc.dcline", "mpc.gencost", "mpc.dclinecost",
     "mpc.bus_name", "mpc.storage", "mpc.switch", "mpc.prosumer",
     "mpc.bus_timeseries", "mpc.prosumer_timeseries",
-    "mpc.consumer"
+    "mpc.consumer",
 ]
 
 const _mp_bus_columns_csv = [
