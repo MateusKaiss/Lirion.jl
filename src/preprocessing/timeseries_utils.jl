@@ -31,7 +31,7 @@ function ensure_prosumer_timeseries!(data::Dict{String, Any}, T::Int)
     s = data["prosumer"]
     nb = length(s["bus"])
 
-    data["prosumer_timeseries"] = Dict(
+    return data["prosumer_timeseries"] = Dict(
         "time" => ones(Int, nb),
         "bus" => copy(s["bus"]),
         "p_pv" => copy(s["generation"]),
@@ -76,7 +76,7 @@ function ensure_gencost_timeseries!(data::Dict{String, Any}, T::Int)
         push!(ts["feed_in_tariff"], 0.0)
     end
 
-    data["gencost_timeseries"] = ts
+    return data["gencost_timeseries"] = ts
 end
 
 function ensure_bus_timeseries!(data::Dict{String, Any}, T::Int)
@@ -90,7 +90,7 @@ function ensure_bus_timeseries!(data::Dict{String, Any}, T::Int)
     b = data["bus"]
     nb = length(b["bus_i"])
 
-    data["bus_timeseries"] = Dict(
+    return data["bus_timeseries"] = Dict(
         "time" => ones(Int, nb),
         "bus" => copy(b["bus_i"]),
         "pd" => copy(b["pd"]),
@@ -118,12 +118,14 @@ function extend_bus_timeseries!(data::Dict{String, Any}, T::Int)
     @warn "bus_timeseries tem dados apenas até t=$last_time. Repetindo valores para t=$(last_time+1):$T automaticamente."
 
     for bus in bus_ids
-        indices = [i for (i, (b, t)) in enumerate(zip(buses, times)) if b == bus && t == last_time]
+        indices = [
+            i for (i, (b, t)) in enumerate(zip(buses, times)) if b == bus && t == last_time
+        ]
         if isempty(indices)
             continue
         end
         idx = indices[1]
-        for t in (last_time + 1):T
+        for t in (last_time+1):T
             for key in keys(ts)
                 push!(ts[key], ts[key][idx])  # copia o valor da linha
             end
@@ -182,12 +184,13 @@ function extend_gencost_timeseries!(data::Dict{String, Any}, T::Int)
     @warn "gencost_timeseries tem dados apenas até t=$last_time. Repetindo valores para t=$(last_time+1):$T automaticamente."
 
     for gen in gen_ids
-        indices = [i for (i, (g, t)) in enumerate(zip(gens, times)) if g == gen && t == last_time]
+        indices =
+            [i for (i, (g, t)) in enumerate(zip(gens, times)) if g == gen && t == last_time]
         if isempty(indices)
             continue
         end
         idx = indices[1]
-        for t in (last_time + 1):T
+        for t in (last_time+1):T
             for key in keys(ts)
                 push!(ts[key], ts[key][idx])
             end
@@ -195,7 +198,6 @@ function extend_gencost_timeseries!(data::Dict{String, Any}, T::Int)
         end
     end
 end
-
 
 function extend_prosumer_timeseries!(data::Dict{String, Any}, T::Int)
     if !haskey(data, "prosumer_timeseries")
@@ -215,12 +217,15 @@ function extend_prosumer_timeseries!(data::Dict{String, Any}, T::Int)
     @warn "prosumer_timeseries tem dados apenas até t=$last_time. Repetindo valores para t=$(last_time+1):$T automaticamente."
 
     for p in prosumer_ids
-        indices = [i for (i, (pid, t)) in enumerate(zip(prosumers, times)) if pid == p && t == last_time]
+        indices = [
+            i for (i, (pid, t)) in enumerate(zip(prosumers, times)) if
+            pid == p && t == last_time
+        ]
         if isempty(indices)
             continue
         end
         idx = indices[1]
-        for t in (last_time + 1):T
+        for t in (last_time+1):T
             for key in keys(ts)
                 push!(ts[key], ts[key][idx])
             end

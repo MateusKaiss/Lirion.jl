@@ -7,7 +7,7 @@ struct DistributedOPFModel <: OPFModel
     base_model::Type{<:OPFModel}  # DC, AC, SOCP
     method::Symbol                #:admm, :benders, etc.
     max_iter::Int
-    rho::Float64            
+    rho::Float64
 end
 
 function get_method_runner(model::DistributedOPFModel)

@@ -14,7 +14,12 @@ function build_and_optimize_model(
     optimizer === nothing && (optimizer = Ipopt.Optimizer)
     times = get_model_times(matpower_data)
     if length(unique(times)) > 1
-        return build_and_optimize_multiperiod_model(matpower_data, model_type; optimizer, times=times)
+        return build_and_optimize_multiperiod_model(
+            matpower_data,
+            model_type;
+            optimizer,
+            times = times,
+        )
     else
         return build_and_optimize_singleperiod_model(matpower_data, model_type; optimizer)
     end
@@ -79,7 +84,8 @@ function try_with_fallback_scale(
         @warn "Model still failed with scale=300 (status: $status). Trying scale=500 (final attempt)..."
         matpower_data_extreme_attempt = deepcopy(matpower_data)
         matpower_data_extreme_attempt["selected_scale"] = 500
-        model = build_and_optimize_model(matpower_data_extreme_attempt, model_type; optimizer)
+        model =
+            build_and_optimize_model(matpower_data_extreme_attempt, model_type; optimizer)
     end
 
     return model

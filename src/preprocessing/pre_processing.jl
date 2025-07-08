@@ -1,7 +1,7 @@
 function load_input_data(path::String)
     result = if endswith(lowercase(path), ".m")
         open(path) do io
-            parse_matpower_string_silent(read(io, String))
+            return parse_matpower_string_silent(read(io, String))
         end
     elseif isdir(path)
         parse_case_from_csv_silent(path)
@@ -33,7 +33,6 @@ function preprocess_case_data!(data::Dict{String, Any})
     return nothing
 end
 
-
 function parse_case_from_csv_silent(dir::String)
     with_logger(NullLogger()) do
         return parse_case_from_csv(dir)
@@ -46,7 +45,7 @@ function parse_matpower_string_silent(data_string::String)
     end
 end
 
-function map_items_by_bus(bus_vec::Vector{T}) where T
+function map_items_by_bus(bus_vec::Vector{T}) where {T}
     mapping = Dict{Int, Vector{Int}}()
     for (i, b) in enumerate(bus_vec)
         push!(get!(mapping, b, Int[]), i)

@@ -150,10 +150,9 @@ const _mp_gencost_timeseries_columns = [
 const _mp_bus_timeseries_columns = [
     ("time", Int),
     ("bus", Int),
-    ("pd", Float64),       
-    ("qd", Float64),       
+    ("pd", Float64),
+    ("qd", Float64),
 ]
-
 
 # ---------------------------------------------------------------------
 # Matpower Parser
@@ -346,7 +345,6 @@ function _parse_matpower_string(data_string::String)
     if haskey(matlab_data, "mpc.prosumer")
         case["prosumer"] = _parse_table(matlab_data["mpc.prosumer"], _mp_prosumer_columns)
     end
-
 
     if haskey(matlab_data, "mpc.bus_timeseries")
         case["bus_timeseries"] = _parse_table(

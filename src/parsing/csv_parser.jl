@@ -150,8 +150,8 @@ const _mp_gencost_timeseries_columns_csv = [
 const _mp_bus_timeseries_columns_csv = [
     ("time", Int),
     ("bus", Int),
-    ("pd", Float64),       
-    ("qd", Float64),       
+    ("pd", Float64),
+    ("qd", Float64),
 ]
 
 function parse_csv_table(path::String, columns::Vector{Tuple{String, DataType}})
@@ -261,7 +261,7 @@ function parse_case_from_csv(dir::String)
         ("storage", _mp_storage_columns_csv),
         ("switch", _mp_switch_columns_csv),
         ("prosumer", _mp_prosumer_columns_csv),
-        ("bus_name", _mp_bus_name_columns_csv)
+        ("bus_name", _mp_bus_name_columns_csv),
     ]
         path = joinpath(dir, "$name.csv")
         if isfile(path)
@@ -288,7 +288,8 @@ function parse_case_from_csv(dir::String)
             @warn "plant_type missing in gen.csv. Assuming 'T'."
             case["gen"]["plant_type"] = fill("T", ngens)
         end
-        if !haskey(case["gen"], "curtailment_cost") || isempty(case["gen"]["curtailment_cost"])
+        if !haskey(case["gen"], "curtailment_cost") ||
+           isempty(case["gen"]["curtailment_cost"])
             @warn "curtailment_cost missing in gen.csv. Assuming 0.0."
             case["gen"]["curtailment_cost"] = fill(0.0, ngens)
         end

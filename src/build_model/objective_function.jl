@@ -7,7 +7,8 @@ function compute_generation_cost(model, params)
             begin
                 coefs = params.generator_costs[t][g]
                 sum(
-                    coefs[i] * (params.sbase * model[:p_generation][g, t])^(length(coefs) - i)
+                    coefs[i] *
+                    (params.sbase * model[:p_generation][g, t])^(length(coefs) - i)
                     for i in 1:length(coefs)
                 )
             end
@@ -16,7 +17,6 @@ function compute_generation_cost(model, params)
         )
     )
 end
-
 
 # function compute_curtailment_cost(model, params)
 #     T = get(model.ext, :time_periods, 1)
@@ -37,7 +37,7 @@ end
 # Objective Assembly by Model Type (usando :objective_params)
 # ---------------------------------------------------------------------
 function objective!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
-    params = matpower_data["objective_params"]  
+    params = matpower_data["objective_params"]
     compute_generation_cost(model, params)
 
     @objective(model, Min,
