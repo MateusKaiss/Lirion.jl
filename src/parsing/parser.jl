@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------
 const _mp_data_names = ["mpc.version", "mpc.baseMVA", "mpc.bus", "mpc.gen",
     "mpc.branch", "mpc.dcline", "mpc.gencost", "mpc.dclinecost",
-    "mpc.bus_name", "mpc.storage", "mpc.switch", "mpc.prosumer",
+    "mpc.bus_name", "mpc.storage", "mpc.switch", "mpc.prosumer","mpc.consumer",
     "mpc.bus_timeseries", "mpc.prosumer_timeseries"]
 
 const _mp_bus_columns = [
@@ -107,6 +107,12 @@ const _mp_gencost_columns = [
     ("shutdown", Float64),
     ("ncost", Int),
     ("cost_coefficients", Vector{Float64}),
+]
+
+const _mp_consumer_columns = [
+    ("bus", Int),
+    ("demand", Float64),
+    ("q_demand", Float64),
 ]
 
 const _mp_prosumer_columns = [
@@ -344,6 +350,13 @@ function _parse_matpower_string(data_string::String)
 
     if haskey(matlab_data, "mpc.prosumer")
         case["prosumer"] = _parse_table(matlab_data["mpc.prosumer"], _mp_prosumer_columns)
+    end
+
+    if haskey(matlab_data, "mpc.consumer")
+        case["consumer"] = _parse_table(
+            matlab_data["mpc.consumer"],
+            _mp_consumer_columns,
+        )
     end
 
     if haskey(matlab_data, "mpc.bus_timeseries")

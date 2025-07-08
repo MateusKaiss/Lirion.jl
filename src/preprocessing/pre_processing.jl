@@ -22,10 +22,12 @@ function preprocess_case_data!(data::Dict{String, Any})
     ensure_bus_timeseries!(data, T)
     ensure_gencost_timeseries!(data, T)
     ensure_prosumer_timeseries!(data, T)
+    ensure_consumer_timeseries!(data, T)
 
     extend_bus_timeseries!(data, T)
     extend_gencost_timeseries!(data, T)
     extend_prosumer_timeseries!(data, T)
+    extend_consumer_timeseries!(data, T)
 
     add_case_index_maps!(data)
     convert_to_pu!(data)

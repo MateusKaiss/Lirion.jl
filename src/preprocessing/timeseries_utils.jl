@@ -10,6 +10,9 @@ function get_model_times(data)
     if haskey(data, "gencost_timeseries")
         push!(time_vecs, data["gencost_timeseries"]["time"])
     end
+    if haskey(data, "consumer_timeseries")
+        push!(time_vecs, data["consumer_timeseries"]["time"])
+    end
 
     if isempty(time_vecs)
         return Int[]
@@ -39,6 +42,28 @@ function ensure_prosumer_timeseries!(data::Dict{String, Any}, T::Int)
         "p_curtail" => fill(0.0, nb),
     )
 end
+
+function ensure_consumer_timeseries!(data::Dict{String, Any}, T::Int)
+    ts = get(data, "consumer_timeseries", Dict("time" => Int[]))
+    if !isempty(ts["time"]) || T == 1 || !haskey(data, "consumer")
+        return
+    end
+
+    @info "Criando consumer_timeseries com base na tabela estática consumer."
+
+    c = data["consumer"]
+    nb = length(c["bus"])
+
+    data["consumer_timeseries"] = Dict(
+        "time" => ones(Int, nb),
+        "bus" => copy(c["bus"]),
+        "demand" => copy(c["demand"]),
+        "q_demand" => copy(c["q_demand"]),
+    )
+
+    return
+end
+
 
 function ensure_gencost_timeseries!(data::Dict{String, Any}, T::Int)
     if haskey(data, "gencost_timeseries") && !isempty(data["gencost_timeseries"]["time"])
@@ -232,6 +257,42 @@ function extend_prosumer_timeseries!(data::Dict{String, Any}, T::Int)
             ts["time"][end] = t
         end
     end
+end
+
+function extend_consumer_timeseries!(data::Dict{String, Any}, T::Int)
+    if !haskey(data, "consumer_timeseries")
+        return
+    end
+
+    ts = data["consumer_timeseries"]
+    times = ts["time"]
+    consumers = ts["bus"]
+    last_time = maximum(times)
+    consumer_ids = unique(consumers)
+
+    if last_time >= T
+        return
+    end
+
+    @warn "consumer_timeseries tem dados apenas até t=$last_time. Repetindo valores para t=$(last_time+1):$T automaticamente."
+
+    for c in consumer_ids
+        indices = [
+            i for (i, (cid, t)) in enumerate(zip(consumers, times)) if cid == c && t == last_time
+        ]
+        if isempty(indices)
+            continue
+        end
+        idx = indices[1]
+        for t in (last_time+1):T
+            for key in keys(ts)
+                push!(ts[key], ts[key][idx])
+            end
+            ts["time"][end] = t
+        end
+    end
+
+    return
 end
 
 function check_time_alignment(data)

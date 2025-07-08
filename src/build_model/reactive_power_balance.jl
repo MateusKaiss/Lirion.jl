@@ -48,7 +48,24 @@ function compute_reactive_power_balance(model, matpower_data, params, bus_index,
         )
     end
 
-    return q_gen - q_bat + q_pros - qd - q_out - q_in
+    q_cons = if params.has_timeseries
+        tsc = matpower_data["consumer_timeseries"]
+        sum(
+            tsc["q_demand"][i]
+            for i in eachindex(tsc["bus"])
+            if tsc["bus"][i] == bus_index && tsc["time"][i] == t;
+            init = 0.0,
+        )
+    else
+        c = matpower_data["consumer"]
+        sum(
+            c["q_demand"][i]
+            for i in eachindex(c["bus"])
+            if c["bus"][i] == bus_index;
+            init = 0.0,
+        )
+    end
+    return q_gen - q_bat + q_pros - qd - q_cons - q_out - q_in
 end
 
 # ---------------------------------------------------------------------

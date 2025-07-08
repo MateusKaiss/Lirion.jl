@@ -1,10 +1,13 @@
 # ---------------------------------------------------------------------
 # Expected columns from CSV files (same as Matpower)
 # ---------------------------------------------------------------------
-const _mp_data_names_csv = ["mpc.version", "mpc.baseMVA", "mpc.bus", "mpc.gen",
+const _mp_data_names_csv = [
+    "mpc.version", "mpc.baseMVA", "mpc.bus", "mpc.gen",
     "mpc.branch", "mpc.dcline", "mpc.gencost", "mpc.dclinecost",
     "mpc.bus_name", "mpc.storage", "mpc.switch", "mpc.prosumer",
-    "mpc.bus_timeseries", "mpc.prosumer_timeseries"]
+    "mpc.bus_timeseries", "mpc.prosumer_timeseries",
+    "mpc.consumer"
+]
 
 const _mp_bus_columns_csv = [
     ("bus_i", Int),
@@ -117,6 +120,12 @@ const _mp_prosumer_columns_csv = [
     ("q_demand", Float64),
     ("cost_injection", Float64),
     ("inverter_capacity", Float64),
+]
+
+const _mp_consumer_columns_csv = [
+    ("bus", Int),
+    ("demand", Float64),
+    ("q_demand", Float64),
 ]
 
 const _mp_consumer_timeseries_columns_csv = [
@@ -261,6 +270,7 @@ function parse_case_from_csv(dir::String)
         ("storage", _mp_storage_columns_csv),
         ("switch", _mp_switch_columns_csv),
         ("prosumer", _mp_prosumer_columns_csv),
+        ("consumer", _mp_consumer_columns_csv),
         ("bus_name", _mp_bus_name_columns_csv),
     ]
         path = joinpath(dir, "$name.csv")
