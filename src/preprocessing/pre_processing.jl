@@ -1,36 +1,44 @@
 function load_input_data(path::String)
-    if endswith(lowercase(path), ".m")
-        return open(path) do io
-            return parse_matpower_string_silent(read(io, String))
+    result = if endswith(lowercase(path), ".m")
+        open(path) do io
+            parse_matpower_string_silent(read(io, String))
         end
     elseif isdir(path)
-        return parse_case_from_csv_silent(path)
+        parse_case_from_csv_silent(path)
     else
         error("Unrecognized input format. Use .m or folder with .csv files.")
     end
-end
-
-function preprocess_case_data!(data::Dict{String, Any})
-    add_case_index_maps!(data)
-    convert_to_pu!(data)
-    return nothing
-end
-
-function parse_case_from_csv_silent(dir::String)
-    original_logger = current_logger()
-    logger = NullLogger()
-    global_logger(logger)
-    result = parse_case_from_csv(dir)
-    global_logger(original_logger)
+    global_logger(ConsoleLogger(stderr, Logging.Info))
     return result
 end
 
+function preprocess_case_data!(data::Dict{String, Any})
+    T_all = get_model_times(data)
+    T = isempty(T_all) ? 1 : maximum(T_all)
+
+    check_time_alignment(data)
+
+    extend_bus_timeseries!(data, T)
+    extend_gencost_timeseries!(data, T)
+    extend_prosumer_timeseries!(data, T)
+
+    add_case_index_maps!(data)
+    convert_to_pu!(data)
+    convert_timeseries_to_pu!(data)
+    return nothing
+end
+
+
+function parse_case_from_csv_silent(dir::String)
+    with_logger(NullLogger()) do
+        return parse_case_from_csv(dir)
+    end
+end
+
 function parse_matpower_string_silent(data_string::String)
-    original_logger = current_logger()
-    global_logger(NullLogger())
-    case = _parse_matpower_string(data_string)
-    global_logger(original_logger)
-    return case
+    with_logger(NullLogger()) do
+        return _parse_matpower_string(data_string)
+    end
 end
 
 function map_items_by_bus(bus_vec::Vector{T}) where T
@@ -115,6 +123,36 @@ function convert_to_pu!(case::Dict{String, Any})
             ["ps", "qs", "energy", "energy_rating", "charge_rating", "discharge_rating",
             "thermal_rating", "qmin", "qmax", "q_loss", "p_loss"]
             case["storage"][field] ./= Sbase
+        end
+    end
+
+    return case
+end
+
+function convert_timeseries_to_pu!(case::Dict{String, Any})
+    Sbase = case["baseMVA"]
+
+    if haskey(case, "bus_timeseries")
+        for field in ["pd", "qd", "gs", "bs"]
+            if haskey(case["bus_timeseries"], field)
+                case["bus_timeseries"][field] ./= Sbase
+            end
+        end
+    end
+
+    if haskey(case, "prosumer_timeseries")
+        for field in ["p_load", "p_pv", "p_curtail"]
+            if haskey(case["prosumer_timeseries"], field)
+                case["prosumer_timeseries"][field] ./= Sbase
+            end
+        end
+    end
+
+    if haskey(case, "gencost_timeseries")
+        for field in ["pmax", "pmin"]
+            if haskey(case["gencost_timeseries"], field)
+                case["gencost_timeseries"][field] ./= Sbase
+            end
         end
     end
 
