@@ -21,6 +21,8 @@ include("args/args.jl")
 
 include("parsing/parser.jl")
 include("parsing/csv_parser.jl")
+
+include("preprocessing/timeseries_utils.jl")
 include("preprocessing/pre_processing.jl")
 include("preprocessing/parameter_extractors.jl")
 
