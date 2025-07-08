@@ -12,9 +12,9 @@ function build_and_optimize_model(
     optimizer = Ipopt.Optimizer,
 )
     optimizer === nothing && (optimizer = Ipopt.Optimizer)
-    has_time_series = haskey(matpower_data, "bus_timeseries")
-    if has_time_series
-        return build_and_optimize_multiperiod_model(matpower_data, model_type; optimizer)
+    times = get_model_times(matpower_data)
+    if length(unique(times)) > 1
+        return build_and_optimize_multiperiod_model(matpower_data, model_type; optimizer, times=times)
     else
         return build_and_optimize_singleperiod_model(matpower_data, model_type; optimizer)
     end
@@ -116,17 +116,8 @@ function build_and_optimize_multiperiod_model(
     matpower_data,
     model_type::Type{<:OPFModel};
     optimizer = Ipopt.Optimizer,
+    times::Vector{Any},
 )
-    times = unique(
-        vcat(
-            haskey(matpower_data, "bus_timeseries") ?
-            matpower_data["bus_timeseries"][!, :time] : [],
-            haskey(matpower_data, "bus_timeseries.csv") ?
-            matpower_data["bus_timeseries.csv"][!, :time] : [],
-        ),
-    )
-    sort!(times)
-
     model = JuMP.Model(optimizer)
     model.ext[:time_periods] = length(times)
     model.ext[:times] = times
