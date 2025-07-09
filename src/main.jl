@@ -11,7 +11,7 @@ function main(ARGS)
 
     if args.model_type isa DistributedOPFModel
         runner = get_method_runner(args.model_type)
-        result = runner(args.model_type, args.database_path)
+        result = runner(args.model_type, data)
         return result
     end
 
