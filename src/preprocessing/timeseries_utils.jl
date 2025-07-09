@@ -1,3 +1,22 @@
+function check_time_alignment(data)
+    time_sets = Dict()
+
+    for key in ("bus_timeseries", "prosumer_timeseries", "gencost_timeseries", "consumer_timeseries")
+        if haskey(data, key)
+            time_sets[key] = Set(data[key]["time"])
+        end
+    end
+
+    if length(time_sets) > 1
+        ref_key, ref_times = first(time_sets)
+        for (key, ts) in time_sets
+            if ts != ref_times
+                @warn "Table $key has different time points from $ref_key. Time vectors will be unified using full union. ($key: $(sort(collect(ts))) vs $ref_key: $(sort(collect(ref_times))))"
+            end
+        end
+    end
+end
+
 function get_model_times(data)
     time_vecs = []
 
@@ -293,23 +312,4 @@ function extend_consumer_timeseries!(data::Dict{String, Any}, T::Int)
     end
 
     return
-end
-
-function check_time_alignment(data)
-    time_sets = Dict()
-
-    for key in ("bus_timeseries", "prosumer_timeseries", "gencost_timeseries")
-        if haskey(data, key)
-            time_sets[key] = Set(data[key]["time"])
-        end
-    end
-
-    if length(time_sets) > 1
-        ref_key, ref_times = first(time_sets)
-        for (key, ts) in time_sets
-            if ts != ref_times
-                @warn "Tabela $key possui tempos diferentes das demais. Tempos serão unificados via união total. ($key: $(sort(collect(ts))) vs $ref_key: $(sort(collect(ref_times))))"
-            end
-        end
-    end
 end
