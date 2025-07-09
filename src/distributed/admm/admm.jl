@@ -7,7 +7,6 @@ import ..DistributedOPF: DistributedOPFModel
 const PowerOptimization = Main.PowerOptimization
 
 function run_admm(config::DistributedOPFModel, data)
-    PowerOptimization.preprocess_case_data!(data)
 
     # partitions = partition_system!(data)
 
