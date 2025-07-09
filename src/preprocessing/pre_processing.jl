@@ -29,6 +29,8 @@ function preprocess_case_data!(data::Dict{String, Any})
     extend_prosumer_timeseries!(data, T)
     extend_consumer_timeseries!(data, T)
 
+    sort_timeseries_by_time_and_id!(data)
+
     add_case_index_maps!(data)
     convert_to_pu!(data)
     convert_timeseries_to_pu!(data)
@@ -159,6 +161,14 @@ function convert_timeseries_to_pu!(case::Dict{String, Any})
         for field in ["pmax", "pmin"]
             if haskey(case["gencost_timeseries"], field)
                 case["gencost_timeseries"][field] ./= Sbase
+            end
+        end
+    end
+
+    if haskey(case, "consumer_timeseries")
+        for field in ["demand", "q_demand"]
+            if haskey(case["consumer_timeseries"], field)
+                case["consumer_timeseries"][field] ./= Sbase
             end
         end
     end

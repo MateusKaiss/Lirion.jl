@@ -277,3 +277,24 @@ function extend_consumer_timeseries!(data::Dict{String, Any}, T::Int)
 
     return
 end
+
+function sort_timeseries_by_time_and_id!(data::Dict{String, Any})
+    id_fields = Dict(
+        "bus_timeseries" => "bus",
+        "gencost_timeseries" => "gen_id",
+        "prosumer_timeseries" => "prosumer_id",
+        "consumer_timeseries" => "consumer_id"
+    )
+
+    for (key, id_field) in id_fields
+        if haskey(data, key)
+            ts = data[key]
+            if haskey(ts, "time") && haskey(ts, id_field)
+                order = sortperm([(ts["time"][i], ts[id_field][i]) for i in eachindex(ts["time"])])
+                for k in keys(ts)
+                    ts[k] = ts[k][order]
+                end
+            end
+        end
+    end
+end
