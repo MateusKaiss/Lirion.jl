@@ -216,58 +216,48 @@ function run_model_tests(
     return true
 end
 
-@testset "PowerOptimization vs PowerModels Unified Comparison" begin
-    dc_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer)
-    run_model_tests(
-        PowerOptimization.DC,
-        "DC";
-        optimizer = dc_optimizer,
-        case_list = reduced_list,
-    )
+function run_test_objective()
+    @testset "PowerOptimization vs PowerModels Unified Comparison" begin
+        dc_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer)
+        run_model_tests(
+            PowerOptimization.DC,
+            "DC";
+            optimizer = dc_optimizer,
+            case_list = reduced_list,
+        )
 
-    run_model_tests(
-        PowerOptimization.AC,
-        "AC";
-        optimizer = Ipopt.Optimizer,
-        case_list = reduced_testlist_ac,
-    )
+        run_model_tests(
+            PowerOptimization.AC,
+            "AC";
+            optimizer = Ipopt.Optimizer,
+            case_list = reduced_testlist_ac,
+        )
 
-    socp_optimizer = get_available_optimizer(Gurobi.Optimizer, SCS.Optimizer)
-    run_model_tests(
-        PowerOptimization.SOCP,
-        "SOCP";
-        optimizer = socp_optimizer,
-        case_list = reduced_list,
-    )
+        socp_optimizer = get_available_optimizer(Gurobi.Optimizer, SCS.Optimizer)
+        run_model_tests(
+            PowerOptimization.SOCP,
+            "SOCP";
+            optimizer = socp_optimizer,
+            case_list = reduced_list,
+        )
 
-    run_model_tests(
-        PowerOptimization.DC,
-        "DC com baterias";
-        optimizer = dc_optimizer,
-        case_list = battery_cases,
-    )
-    run_model_tests(
-        PowerOptimization.AC,
-        "AC com baterias";
-        optimizer = Ipopt.Optimizer,
-        case_list = battery_cases,
-    )
-    run_model_tests(
-        PowerOptimization.SOCP,
-        "SOCP com baterias";
-        optimizer = socp_optimizer,
-        case_list = battery_cases,
-    )
-end
-
-println("\n===== GLOBAL SUMMARY OF FAILURES BY MODEL =====")
-for (label, failures) in GLOBAL_FAILED_CASES
-    println("\n[$label]")
-    for (source, cases) in failures
-        println("  $source error in $(length(cases)) case(s):")
-        for c in cases
-            println("    - $c")
-        end
+        run_model_tests(
+            PowerOptimization.DC,
+            "DC com baterias";
+            optimizer = dc_optimizer,
+            case_list = battery_cases,
+        )
+        run_model_tests(
+            PowerOptimization.AC,
+            "AC com baterias";
+            optimizer = Ipopt.Optimizer,
+            case_list = battery_cases,
+        )
+        run_model_tests(
+            PowerOptimization.SOCP,
+            "SOCP com baterias";
+            optimizer = socp_optimizer,
+            case_list = battery_cases,
+        )
     end
 end
-println("==============================================\n")
