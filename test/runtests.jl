@@ -7,5 +7,5 @@ using Ipopt
 using SCS
 
 include("test_objective.jl")
-include("test_preprocessing.jl")
+include("test_timeseries.jl")
 
