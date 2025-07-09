@@ -285,8 +285,8 @@ function sort_timeseries_by_time_and_id!(data::Dict{String, Any})
     id_fields = Dict(
         "bus_timeseries" => "bus",
         "gencost_timeseries" => "gen_id",
-        "prosumer_timeseries" => "prosumer_id",
-        "consumer_timeseries" => "consumer_id"
+        "prosumer_timeseries" => "bus",
+        "consumer_timeseries" => "bus"
     )
 
     for (key, id_field) in id_fields
