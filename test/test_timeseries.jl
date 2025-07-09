@@ -5,7 +5,7 @@
         args = [
             case_path,
             "--model", "dc",
-            "--optimizer", string(Gurobi.Optimizer),
+            "--optimizer", string(SCS.Optimizer),
         ]
         result_dict, _ = PowerOptimization.main(args)
         obj = result_dict["objective"]
