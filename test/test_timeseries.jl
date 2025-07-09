@@ -1,4 +1,4 @@
-@testset "Validação de objetivos para case3_timeseries.m" begin
+@testset "Objective validation for case3_timeseries.m" begin
     case_path = joinpath(@__DIR__, "matpower_cases", "case3_timeseries.m")
 
     @testset "DC" begin
@@ -39,10 +39,8 @@
 end
 
 @testset "Test preprocessing extension for timeseries (Dict-style)" begin
-    # Caminho do caso
     case_path = joinpath(@__DIR__, "matpower_cases", "case3_timeseries_mismatch.m")
 
-    # Carregar e pré-processar
     data = PowerOptimization.load_input_data(case_path)
     PowerOptimization.preprocess_case_data!(data)
 
