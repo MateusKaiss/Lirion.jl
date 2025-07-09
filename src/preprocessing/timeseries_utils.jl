@@ -178,6 +178,9 @@ function extend_bus_timeseries!(data::Dict{String, Any}, T::Int)
 end
 
 function extend_gencost_timeseries!(data::Dict{String, Any}, T::Int)
+    if !haskey(data, "gencost_timeseries")
+        return
+    end
     ts = data["gencost_timeseries"]
     times = ts["time"]
     gens = ts["gen_id"]
