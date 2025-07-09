@@ -26,7 +26,12 @@ end
 function check_time_alignment(data)
     time_sets = Dict()
 
-    for key in ("bus_timeseries", "prosumer_timeseries", "gencost_timeseries", "consumer_timeseries")
+    for key in (
+        "bus_timeseries",
+        "prosumer_timeseries",
+        "gencost_timeseries",
+        "consumer_timeseries",
+    )
         if haskey(data, key)
             time_sets[key] = Set(data[key]["time"])
         end
@@ -286,14 +291,16 @@ function sort_timeseries_by_time_and_id!(data::Dict{String, Any})
         "bus_timeseries" => "bus",
         "gencost_timeseries" => "gen_id",
         "prosumer_timeseries" => "bus",
-        "consumer_timeseries" => "bus"
+        "consumer_timeseries" => "bus",
     )
 
     for (key, id_field) in id_fields
         if haskey(data, key)
             ts = data[key]
             if haskey(ts, "time") && haskey(ts, id_field)
-                order = sortperm([(ts["time"][i], ts[id_field][i]) for i in eachindex(ts["time"])])
+                order = sortperm([
+                    (ts["time"][i], ts[id_field][i]) for i in eachindex(ts["time"])
+                ])
                 for k in keys(ts)
                     ts[k] = ts[k][order]
                 end

@@ -8,4 +8,3 @@ using SCS
 
 include("test_objective.jl")
 include("test_timeseries.jl")
-

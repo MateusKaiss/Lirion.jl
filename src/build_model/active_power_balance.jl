@@ -66,7 +66,6 @@ function compute_power_balance(model, matpower_data, params, bus_index, t)
         0.0
     end
 
-
     return p_gen - p_bat - p_pros - pd - p_cons - p_out - p_in
 end
 
