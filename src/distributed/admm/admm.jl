@@ -3,9 +3,6 @@ module ADMM
 # Acesso ao tipo
 import ..DistributedOPF: DistributedOPFModel
 
-# Acesso ao módulo principal
-const PowerOptimization = Main.PowerOptimization
-
 function run_admm(config::DistributedOPFModel, data)
 
     # partitions = partition_system!(data)

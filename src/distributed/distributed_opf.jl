@@ -1,9 +1,6 @@
 module DistributedOPF
 
 export DistributedOPFModel, get_method_runner
-
-const PowerOptimization = Main.PowerOptimization
-
 import ..PowerOptimization: OPFModel
 
 struct DistributedOPFModel <: OPFModel
