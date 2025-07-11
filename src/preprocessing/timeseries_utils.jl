@@ -226,6 +226,10 @@ function extend_prosumer_timeseries!(data::Dict{String, Any}, T::Int)
     ts = data["prosumer_timeseries"]
     times = ts["time"]
     prosumers = ts["bus"]
+
+    if isempty(times)
+        return
+    end
     last_time = maximum(times)
     prosumer_ids = unique(prosumers)
 
@@ -260,6 +264,10 @@ function extend_consumer_timeseries!(data::Dict{String, Any}, T::Int)
 
     ts = data["consumer_timeseries"]
     times = ts["time"]
+
+    if isempty(times)
+        return
+    end
     consumers = ts["bus"]
     last_time = maximum(times)
     consumer_ids = unique(consumers)

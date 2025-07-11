@@ -34,16 +34,21 @@ function prepare_admm_partitions(data::Dict{String, Any})
         for key in ["gen", "prosumer", "consumer", "storage"]
             if haskey(data, key)
                 table = data[key]
-                bus_key = haskey(table, "bus") ? "bus" :
-                        haskey(table, "gen_bus") ? "gen_bus" :
-                        haskey(table, "storage_bus") ? "storage_bus" :
-                        nothing
+                bus_key =
+                    haskey(table, "bus") ? "bus" :
+                    haskey(table, "gen_bus") ? "gen_bus" :
+                    haskey(table, "storage_bus") ? "storage_bus" :
+                    nothing
 
                 if bus_key !== nothing
-                    keep = findall(i -> table[bus_key][i] in zone_bus_ids, 1:length(table[bus_key]))
+                    keep = findall(
+                        i -> table[bus_key][i] in zone_bus_ids,
+                        1:length(table[bus_key]),
+                    )
                     if !isempty(keep)
                         subdata[key] = Dict(
-                            k => v[keep] for (k, v) in table if length(v) == length(table[bus_key])
+                            k => v[keep] for
+                            (k, v) in table if length(v) == length(table[bus_key])
                         )
                     else
                         subdata[key] = Dict(k => Any[] for k in keys(table))
@@ -53,7 +58,6 @@ function prepare_admm_partitions(data::Dict{String, Any})
                 end
             end
         end
-
 
         if haskey(data, "branch")
             f_bus = data["branch"]["f_bus"]
@@ -77,43 +81,47 @@ function prepare_admm_partitions(data::Dict{String, Any})
             end
         end
 
-    if haskey(data, "gen")
-        gen = data["gen"]
-        bus_field = haskey(gen, "bus") ? "bus" : "gen_bus"
-        if haskey(gen, bus_field)
-            keep = findall(i -> gen[bus_field][i] in zone_bus_ids, 1:length(gen[bus_field]))
-            if !isempty(keep)
-                subdata["gen"] = Dict(
-                    k => v[keep] for (k, v) in gen if length(v) == length(gen[bus_field])
+        if haskey(data, "gen")
+            gen = data["gen"]
+            bus_field = haskey(gen, "bus") ? "bus" : "gen_bus"
+            if haskey(gen, bus_field)
+                keep = findall(
+                    i -> gen[bus_field][i] in zone_bus_ids,
+                    1:length(gen[bus_field]),
                 )
+                if !isempty(keep)
+                    subdata["gen"] = Dict(
+                        k => v[keep] for
+                        (k, v) in gen if length(v) == length(gen[bus_field])
+                    )
+                else
+                    subdata["gen"] = Dict(k => Any[] for k in keys(gen))
+                end
+
+                if haskey(data, "gencost")
+                    subdata["gencost"] = Dict(
+                        k => v[keep] for
+                        (k, v) in data["gencost"] if length(v) == length(gen[bus_field])
+                    )
+                end
+
+                if haskey(data, "gencost_timeseries")
+                    subdata["gencost_timeseries"] = Dict(
+                        k => v[keep] for
+                        (k, v) in data["gencost_timeseries"] if
+                        length(v) == length(gen[bus_field])
+                    )
+                end
             else
                 subdata["gen"] = Dict(k => Any[] for k in keys(gen))
-            end
-
-            if haskey(data, "gencost")
-                subdata["gencost"] = Dict(
-                    k => v[keep] for
-                    (k, v) in data["gencost"] if length(v) == length(gen[bus_field])
-                )
-            end
-
-            if haskey(data, "gencost_timeseries")
-                subdata["gencost_timeseries"] = Dict(
-                    k => v[keep] for
-                    (k, v) in data["gencost_timeseries"] if length(v) == length(gen[bus_field])
-                )
+                subdata["gencost"] = Dict{String, Vector{Any}}()
+                subdata["gencost_timeseries"] = Dict{String, Vector{Any}}()
             end
         else
-            subdata["gen"] = Dict(k => Any[] for k in keys(gen))
+            subdata["gen"] = Dict{String, Vector{Any}}()
             subdata["gencost"] = Dict{String, Vector{Any}}()
             subdata["gencost_timeseries"] = Dict{String, Vector{Any}}()
         end
-    else
-        subdata["gen"] = Dict{String, Vector{Any}}()
-        subdata["gencost"] = Dict{String, Vector{Any}}()
-        subdata["gencost_timeseries"] = Dict{String, Vector{Any}}()
-    end
-
 
         preprocess_case_data!(subdata)
         partitions[zone] = subdata
