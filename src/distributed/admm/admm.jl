@@ -1,10 +1,3 @@
-module ADMM
-
-# Acesso ao tipo
-import ..DistributedOPF: DistributedOPFModel
-
-const PowerOptimization = Main.PowerOptimization
-
 function run_admm(config::DistributedOPFModel, data)
     partitions = prepare_admm_partitions(data)
 
@@ -119,11 +112,10 @@ function prepare_admm_partitions(data::Dict{String, Any})
             subdata["gencost_timeseries"] = Dict{String, Vector{Any}}()
         end
 
-        PowerOptimization.preprocess_case_data!(subdata)
+        preprocess_case_data!(subdata)
         partitions[zone] = subdata
     end
 
     return partitions
 end
 
-end
