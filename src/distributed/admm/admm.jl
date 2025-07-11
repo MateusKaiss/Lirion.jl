@@ -3,9 +3,10 @@ module ADMM
 # Acesso ao tipo
 import ..DistributedOPF: DistributedOPFModel
 
-function run_admm(config::DistributedOPFModel, data)
+const PowerOptimization = Main.PowerOptimization
 
-    # partitions = partition_system!(data)
+function run_admm(config::DistributedOPFModel, data)
+    partitions = prepare_admm_partitions(data)
 
     # for k = 1:config.max_iter
     #     for zone_id in keys(partitions)
@@ -16,72 +17,113 @@ function run_admm(config::DistributedOPFModel, data)
     return partitions
 end
 
-# function partition_system!(data::Dict{String, Any})
-#     bus_data = data["bus"]
-#     zones = bus_data["zone"]
-#     bus_ids = bus_data["bus_i"]
+function prepare_admm_partitions(data::Dict{String, Any})
+    bus_data = data["bus"]
+    zones = bus_data["zone"]
+    bus_ids = bus_data["bus_i"]
 
-#     unique_zones = unique(zones)
-#     partitions = Dict{Int, Dict{String, Any}}()
+    unique_zones = unique(zones)
+    partitions = Dict{Int, Dict{String, Any}}()
 
-#     for zone in unique_zones
-#         subdata = Dict{String, Any}()
-#         zone_mask = findall(==(zone), zones)
-#         zone_bus_ids = bus_ids[zone_mask]
+    for zone in unique_zones
+        zone_mask = findall(==(zone), zones)
+        zone_bus_ids = bus_ids[zone_mask]
 
-#         sub_bus = Dict{String, Vector}()
-#         for (k, v) in bus_data
-#             if length(v) == length(zones)
-#                 sub_bus[k] = v[zone_mask]
-#             else
-#                 sub_bus[k] = v 
-#             end
-#         end
-#         subdata["bus"] = sub_bus
+        subdata = Dict{String, Any}()
+        subdata["baseMVA"] = data["baseMVA"]
+        subdata["T"] = data["T"]
+        subdata["source_type"] = data["source_type"]
+        subdata["source_version"] = data["source_version"]
+        subdata["name"] = "$(data["name"])_zone_$zone"
+        subdata["bus"] =
+            Dict(k => v[zone_mask] for (k, v) in data["bus"] if length(v) == length(zones))
 
-#         for key in ["gen", "prosumer", "consumer", "storage"]
-#             if haskey(data, key)
-#                 table = data[key]
-#                 if !haskey(table, "bus")
-#                     @warn "Tabela $key não possui coluna 'bus'. Ignorando particionamento desta tabela."
-#                     continue
-#                 end
+        for key in ["gen", "prosumer", "consumer", "storage"]
+            if haskey(data, key)
+                table = data[key]
+                if haskey(table, "bus")
+                    keep = findall(
+                        i -> table["bus"][i] in zone_bus_ids,
+                        1:length(table["bus"]),
+                    )
+                    if !isempty(keep)
+                        subdata[key] = Dict(
+                            k => v[keep] for
+                            (k, v) in table if length(v) == length(table["bus"])
+                        )
+                    else
+                        subdata[key] = Dict(k => Any[] for k in keys(table))  # cria estrutura vazia
+                    end
+                else
+                    subdata[key] = Dict(k => Any[] for k in keys(table))  # segurança extra
+                end
+            end
+        end
 
-#                 bus_col = table["bus"]
-#                 keep = findall(x -> x in zone_bus_ids, bus_col)
+        if haskey(data, "branch")
+            f_bus = data["branch"]["f_bus"]
+            t_bus = data["branch"]["t_bus"]
+            keep = findall(
+                i -> f_bus[i] in zone_bus_ids && t_bus[i] in zone_bus_ids,
+                eachindex(f_bus),
+            )
+            subdata["branch"] = Dict(
+                k => v[keep] for (k, v) in data["branch"] if length(v) == length(f_bus)
+            )
+        end
 
-#                 sub_table = Dict{String, Vector}()
-#                 for (k, v) in table
-#                     if length(v) == length(bus_col)
-#                         sub_table[k] = v[keep]
-#                     else
-#                         sub_table[k] = v
-#                     end
-#                 end
-#                 subdata[key] = sub_table
-#             end
-#         end
+        for key in ["bus_timeseries", "prosumer_timeseries", "consumer_timeseries"]
+            if haskey(data, key)
+                ts = data[key]
+                id_field = "bus"
+                keep = findall(i -> ts[id_field][i] in zone_bus_ids, 1:length(ts[id_field]))
+                subdata[key] =
+                    Dict(k => v[keep] for (k, v) in ts if length(v) == length(ts[id_field]))
+            end
+        end
 
-#         if haskey(data, "branch")
-#             branch = data["branch"]
-#             f_bus = branch["f_bus"]
-#             t_bus = branch["t_bus"]
-#             keep = findall(i -> (f_bus[i] in zone_bus_ids) && (t_bus[i] in zone_bus_ids), eachindex(f_bus))
+        # Tratamento especial para gen, gencost e gencost_timeseries
+        if haskey(data, "gen")
+            gen = data["gen"]
+            if haskey(gen, "bus")
+                keep = findall(i -> gen["bus"][i] in zone_bus_ids, 1:length(gen["bus"]))
+                if !isempty(keep)
+                    subdata["gen"] = Dict(
+                        k => v[keep] for (k, v) in gen if length(v) == length(gen["bus"])
+                    )
+                else
+                    subdata["gen"] = Dict(k => Any[] for k in keys(gen))
+                end
 
-#             sub_branch = Dict{String, Vector}()
-#             for (k, v) in branch
-#                 if length(v) == length(f_bus)
-#                     sub_branch[k] = v[keep]
-#                 else
-#                     sub_branch[k] = v
-#                 end
-#             end
-#             subdata["branch"] = sub_branch
-#         end
+                if haskey(data, "gencost")
+                    subdata["gencost"] = Dict(
+                        k => v[keep] for
+                        (k, v) in data["gencost"] if length(v) == length(keep)
+                    )
+                end
 
-#         partitions[zone] = subdata
-#     end
-#     return partitions
-# end
+                if haskey(data, "gencost_timeseries")
+                    subdata["gencost_timeseries"] = Dict(
+                        k => v[keep] for (k, v) in data["gencost_timeseries"] if
+                        length(v) == length(keep)
+                    )
+                end
+            else
+                subdata["gen"] = Dict(k => Any[] for k in keys(gen))
+                subdata["gencost"] = Dict{String, Vector{Any}}()
+                subdata["gencost_timeseries"] = Dict{String, Vector{Any}}()
+            end
+        else
+            subdata["gen"] = Dict{String, Vector{Any}}()
+            subdata["gencost"] = Dict{String, Vector{Any}}()
+            subdata["gencost_timeseries"] = Dict{String, Vector{Any}}()
+        end
+
+        PowerOptimization.preprocess_case_data!(subdata)
+        partitions[zone] = subdata
+    end
+
+    return partitions
+end
 
 end

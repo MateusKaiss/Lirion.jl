@@ -1,16 +1,16 @@
 function get_model_times(data)
     time_vecs = []
 
-    if haskey(data, "bus_timeseries")
+    if haskey(data, "bus_timeseries") && !isempty(data["bus_timeseries"])
         push!(time_vecs, data["bus_timeseries"]["time"])
     end
-    if haskey(data, "prosumer_timeseries")
+    if haskey(data, "prosumer_timeseries") && !isempty(data["prosumer_timeseries"])
         push!(time_vecs, data["prosumer_timeseries"]["time"])
     end
-    if haskey(data, "gencost_timeseries")
+    if haskey(data, "gencost_timeseries") && !isempty(data["gencost_timeseries"])
         push!(time_vecs, data["gencost_timeseries"]["time"])
     end
-    if haskey(data, "consumer_timeseries")
+    if haskey(data, "consumer_timeseries") && !isempty(data["consumer_timeseries"])
         push!(time_vecs, data["consumer_timeseries"]["time"])
     end
 
@@ -32,7 +32,7 @@ function check_time_alignment(data)
         "gencost_timeseries",
         "consumer_timeseries",
     )
-        if haskey(data, key)
+        if haskey(data, key) && haskey(data[key], "time") && !isempty(data[key]["time"])
             time_sets[key] = Set(data[key]["time"])
         end
     end
@@ -69,9 +69,12 @@ function ensure_bus_timeseries!(data::Dict{String, Any}, T::Int)
 end
 
 function ensure_gencost_timeseries!(data::Dict{String, Any}, T::Int)
-    if haskey(data, "gencost_timeseries") && !isempty(data["gencost_timeseries"]["time"])
+    if haskey(data, "gencost_timeseries") &&
+       haskey(data["gencost_timeseries"], "time") &&
+       !isempty(data["gencost_timeseries"]["time"])
         return
     end
+
     if T == 1 || !haskey(data, "gencost")
         return
     end
@@ -183,9 +186,10 @@ function extend_bus_timeseries!(data::Dict{String, Any}, T::Int)
 end
 
 function extend_gencost_timeseries!(data::Dict{String, Any}, T::Int)
-    if !haskey(data, "gencost_timeseries")
+    if !haskey(data, "gencost_timeseries") || !haskey(data["gencost_timeseries"], "time")
         return
     end
+
     ts = data["gencost_timeseries"]
     times = ts["time"]
     gens = ts["gen_id"]
@@ -196,7 +200,7 @@ function extend_gencost_timeseries!(data::Dict{String, Any}, T::Int)
         return
     end
 
-    @warn "gencost_timeseries has data only up to t=$last_time. Repeating values ​​for t=$(last_time+1):$T automatically."
+    @warn "gencost_timeseries has data only up to t=$last_time. Repeating values for t=$(last_time+1):$T automatically."
 
     for gen in gen_ids
         indices =

@@ -1,0 +1,46 @@
+function mpc = case3zones_storage
+mpc.version = '2';
+mpc.baseMVA = 100.0;
+
+%% bus data
+%	bus_i	type	Pd	Qd	Gs	Bs	area	Vm	Va	baseKV	zone	Vmax	Vmin
+mpc.bus = [
+	1	 3	 110.0	 40.0	 0.0	 0.0	 1	 1.00000	 0.0	 240.0	 1	 1.1	0.9;
+	2	 2	 110.0	 40.0	 0.0	 0.0	 1	 1.00000	 0.0	 240.0	 2	 1.1	0.9;
+	3	 2	 95.0	 50.0	 0.0	 0.0	 1	 1.00000	 0.0	 240.0	 3	 1.1	0.9;
+	10	 1	 0.0	 0.0	 0.0	 0.0	 1	 1.00000	 0.0	 240.0	 1	 1.1	0.9;
+];
+
+%% generator data
+%	bus	Pg	Qg	Qmax	Qmin	Vg	mBase	status	Pmax	Pmin
+mpc.gen = [
+	1	 1000.0	 0.0	 1000.0	 -1000.0	 1.0	 100.0	 1	 2000.0	 0.0;
+	2	 1000.0	 0.0	 1000.0	 -1000.0	 1.0	 100.0	 1	 2000.0	 0.0;
+	3	 0.0	 0.0	 1000.0	 -1000.0	 1.0	 100.0	 1	 0.0	 0.0;
+];
+
+%% generator cost data
+%	2	startup	shutdown	n	c(n-1)	...	c0
+mpc.gencost = [
+	2	 0.0	 0.0	 3	   0.11	   5.0	   0.0;
+	2	 0.0	 0.0	 3	   0.085	   1.2	   0.0;
+	2	 0.0	 0.0	 3	   0.0	   0.0	   0.0;
+];
+
+%% branch data
+%	fbus	tbus	r	x	b	rateA	rateB	rateC	ratio	angle	status	angmin	angmax
+mpc.branch = [
+	1	 3	 0.065	 0.62	 0.45	 9000.0	 9000.0	 9000.0	 0.0	 0.0	 1	 -30.0	 30.0;
+	3	 2	 0.025	 0.75	 0.7	 50.0	 50.0	 50.0	 0.0	 0.0	 1	 -30.0	 30.0;
+	1	 2	 0.042	 0.9	 0.3	 9000.0	 9000.0	 9000.0	 0.0	 0.0	 1	 -30.0	 30.0;
+];
+
+% hours
+mpc.time_elapsed = 1.0
+
+%% storage data
+%   storage_bus ps qs energy  energy_rating charge_rating  discharge_rating  charge_efficiency  discharge_efficiency  thermal_rating  qmin  qmax  r  x  p_loss  q_loss  status
+mpc.storage = [
+	 3	 0.0	 0.0	 20.0	 100.0	 50.0	 70.0	 0.8	 0.9	 100.0	 -50.0	 70.0	 0.1	 0.1	 0.1	 0.1	 1;
+	 10	 0.0	 0.0	 30.0	 100.0	 50.0	 70.0	 0.9	 0.8	 100.0	 -50.0	 70.0	 0.1	 0.1	 0.1	 0.1	 1;
+];

@@ -21,6 +21,9 @@ end
 function get_bus_parameters(bus_data)
     bus_ids = bus_data["bus_i"]
     reference_bus_idx = findfirst(==(3), bus_data["bus_type"])
+    if reference_bus_idx === nothing
+        reference_bus_idx = findfirst(x -> x in (1, 2), bus_data["bus_type"])
+    end
     reference_bus = bus_ids[reference_bus_idx]
     vmin = Dict{Int, Float64}()
     vmax = Dict{Int, Float64}()
