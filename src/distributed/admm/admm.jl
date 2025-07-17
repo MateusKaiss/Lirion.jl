@@ -1,130 +1,51 @@
 function run_admm(config::DistributedOPFModel, data)
     partitions = prepare_admm_partitions(data)
+    shared_buses = find_shared_buses(data, partitions)
+    base_model = config.base_model
 
-    # for k = 1:config.max_iter
-    #     for zone_id in keys(partitions)
-    #         # Ex: PowerOptimization.build_model(...)
-    #     end
-    # end
+    duals = Dict{Int, Dict{Int, Float64}}()
+    θ_avg = Dict{Int, Float64}()
+    for zone_id in keys(partitions)
+        duals[zone_id] = Dict{Int, Float64}()
+    end
 
-    return partitions
-end
+    for k = 1:config.max_iter
+        println("Iteração $k")
 
-function prepare_admm_partitions(data::Dict{String, Any})
-    bus_data = data["bus"]
-    zones = bus_data["zone"]
-    bus_ids = bus_data["bus_i"]
+        # --- Passo 1: resolve os subproblemas locais ---
+        for (zone_id, subdata) in partitions
+            local_model = build_model(subdata, base_model; optimizer = Ipopt.Optimizer)
 
-    unique_zones = unique(zones)
-    partitions = Dict{Int, Dict{String, Any}}()
+            if base_model isa DCModel
+                bus_ids = subdata["bus"]["bus_i"]
+                @expression(local_model, admm_penalty, 0.0)
 
-    for zone in unique_zones
-        zone_mask = findall(==(zone), zones)
-        zone_bus_ids = bus_ids[zone_mask]
-
-        subdata = Dict{String, Any}()
-        subdata["baseMVA"] = data["baseMVA"]
-        subdata["T"] = data["T"]
-        subdata["source_type"] = data["source_type"]
-        subdata["source_version"] = data["source_version"]
-        subdata["name"] = "$(data["name"])_zone_$zone"
-        subdata["bus"] =
-            Dict(k => v[zone_mask] for (k, v) in data["bus"] if length(v) == length(zones))
-
-        for key in ["gen", "prosumer", "consumer", "storage"]
-            if haskey(data, key)
-                table = data[key]
-                bus_key =
-                    haskey(table, "bus") ? "bus" :
-                    haskey(table, "gen_bus") ? "gen_bus" :
-                    haskey(table, "storage_bus") ? "storage_bus" :
-                    nothing
-
-                if bus_key !== nothing
-                    keep = findall(
-                        i -> table[bus_key][i] in zone_bus_ids,
-                        1:length(table[bus_key]),
-                    )
-                    if !isempty(keep)
-                        subdata[key] = Dict(
-                            k => v[keep] for
-                            (k, v) in table if length(v) == length(table[bus_key])
-                        )
-                    else
-                        subdata[key] = Dict(k => Any[] for k in keys(table))
+                for b in shared_buses
+                    if b in bus_ids
+                        idx = findfirst(isequal(b), bus_ids)
+                        θ = local_model[:θ][idx]
+                        θ̄ = get(θ_avg, b, 0.0)
+                        λ = get(duals[zone_id], b, 0.0)
+                        admm_penalty += λ * (θ - θ̄) + (config.rho / 2) * (θ - θ̄)^2
                     end
-                else
-                    subdata[key] = Dict(k => Any[] for k in keys(table))
-                end
-            end
-        end
-
-        if haskey(data, "branch")
-            f_bus = data["branch"]["f_bus"]
-            t_bus = data["branch"]["t_bus"]
-            keep = findall(
-                i -> f_bus[i] in zone_bus_ids && t_bus[i] in zone_bus_ids,
-                eachindex(f_bus),
-            )
-            subdata["branch"] = Dict(
-                k => v[keep] for (k, v) in data["branch"] if length(v) == length(f_bus)
-            )
-        end
-
-        for key in ["bus_timeseries", "prosumer_timeseries", "consumer_timeseries"]
-            if haskey(data, key)
-                ts = data[key]
-                id_field = "bus"
-                keep = findall(i -> ts[id_field][i] in zone_bus_ids, 1:length(ts[id_field]))
-                subdata[key] =
-                    Dict(k => v[keep] for (k, v) in ts if length(v) == length(ts[id_field]))
-            end
-        end
-
-        if haskey(data, "gen")
-            gen = data["gen"]
-            bus_field = haskey(gen, "bus") ? "bus" : "gen_bus"
-            if haskey(gen, bus_field)
-                keep = findall(
-                    i -> gen[bus_field][i] in zone_bus_ids,
-                    1:length(gen[bus_field]),
-                )
-                if !isempty(keep)
-                    subdata["gen"] = Dict(
-                        k => v[keep] for
-                        (k, v) in gen if length(v) == length(gen[bus_field])
-                    )
-                else
-                    subdata["gen"] = Dict(k => Any[] for k in keys(gen))
                 end
 
-                if haskey(data, "gencost")
-                    subdata["gencost"] = Dict(
-                        k => v[keep] for
-                        (k, v) in data["gencost"] if length(v) == length(gen[bus_field])
-                    )
-                end
-
-                if haskey(data, "gencost_timeseries")
-                    subdata["gencost_timeseries"] = Dict(
-                        k => v[keep] for
-                        (k, v) in data["gencost_timeseries"] if
-                        length(v) == length(gen[bus_field])
-                    )
-                end
+                existing_objective = objective_function(local_model)
+                @objective(local_model, Min, existing_objective + admm_penalty)
             else
-                subdata["gen"] = Dict(k => Any[] for k in keys(gen))
-                subdata["gencost"] = Dict{String, Vector{Any}}()
-                subdata["gencost_timeseries"] = Dict{String, Vector{Any}}()
+                error("Base model $(base_model) ainda não implementado no ADMM")
             end
-        else
-            subdata["gen"] = Dict{String, Vector{Any}}()
-            subdata["gencost"] = Dict{String, Vector{Any}}()
-            subdata["gencost_timeseries"] = Dict{String, Vector{Any}}()
+
+            optimize!(local_model)
+            subdata[:model] = local_model
         end
 
-        preprocess_case_data!(subdata, DistributedOPFModel)
-        partitions[zone] = subdata
+        # --- Passo 2: atualiza variáveis compartilhadas ---
+        if base_model isa DCModel
+            update_shared_variables_dc!(
+                shared_buses, partitions, duals, θ_avg, config.rho
+            )
+        end
     end
 
     return partitions

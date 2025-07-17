@@ -37,6 +37,8 @@ include("build_model/build_model.jl")
 include("build_results/build_results.jl")
 
 include("distributed/distributed_opf.jl")
+include("distributed/admm/admm_update_dc.jl")
+include("distributed/admm/admm_utils.jl")
 include("distributed/admm/admm.jl")
 
 include("main.jl")
