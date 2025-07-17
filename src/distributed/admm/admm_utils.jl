@@ -119,8 +119,11 @@ function prepare_admm_partitions(data::Dict{String, Any})
     return partitions
 end
 
-function find_shared_buses(data::Dict{String, Any}, partitions::Dict{Int, Dict{String, Any}})
-        bus_to_zone = Dict{Int, Int}()
+function find_shared_buses(
+    data::Dict{String, Any},
+    partitions::Dict{Int, Dict{String, Any}},
+)
+    bus_to_zone = Dict{Int, Int}()
     for (zone_id, pdata) in partitions
         for b in pdata["bus"]["bus_i"]
             bus_to_zone[b] = zone_id

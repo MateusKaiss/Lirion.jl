@@ -9,7 +9,7 @@ function run_admm(config::DistributedOPFModel, data)
         duals[zone_id] = Dict{Int, Float64}()
     end
 
-    for k = 1:config.max_iter
+    for k in 1:config.max_iter
         println("Iteração $k")
 
         # --- Passo 1: resolve os subproblemas locais ---
@@ -43,7 +43,7 @@ function run_admm(config::DistributedOPFModel, data)
         # --- Passo 2: atualiza variáveis compartilhadas ---
         if base_model isa DCModel
             update_shared_variables_dc!(
-                shared_buses, partitions, duals, θ_avg, config.rho
+                shared_buses, partitions, duals, θ_avg, config.rho,
             )
         end
     end
