@@ -123,7 +123,7 @@ function prepare_admm_partitions(data::Dict{String, Any})
             subdata["gencost_timeseries"] = Dict{String, Vector{Any}}()
         end
 
-        preprocess_case_data!(subdata)
+        preprocess_case_data!(subdata, DistributedOPFModel)
         partitions[zone] = subdata
     end
 

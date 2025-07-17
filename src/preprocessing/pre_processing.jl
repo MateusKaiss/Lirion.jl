@@ -12,22 +12,27 @@ function load_input_data(path::String)
     return result
 end
 
-function preprocess_case_data!(data::Dict{String, Any})
-    T_all = get_model_times(data)
-    T = isempty(T_all) ? 1 : maximum(T_all)
-    data["T"] = T
+function preprocess_case_data!(data::Dict{String, Any}, ::Type{T}=OPFModel) where {T<:OPFModel}
+    
+    if T != DistributedOPFModel
+        all_time_steps = get_model_times(data)
+        time_horizon = isempty(all_time_steps) ? 1 : maximum(all_time_steps)
+        data["T"] = time_horizon
+    end
+
+    time_horizon = data["T"]
 
     check_time_alignment(data)
 
-    ensure_bus_timeseries!(data, T)
-    ensure_gencost_timeseries!(data, T)
-    ensure_prosumer_timeseries!(data, T)
-    ensure_consumer_timeseries!(data, T)
+    ensure_bus_timeseries!(data, time_horizon)
+    ensure_gencost_timeseries!(data, time_horizon)
+    ensure_prosumer_timeseries!(data, time_horizon)
+    ensure_consumer_timeseries!(data, time_horizon)
 
-    extend_bus_timeseries!(data, T)
-    extend_gencost_timeseries!(data, T)
-    extend_prosumer_timeseries!(data, T)
-    extend_consumer_timeseries!(data, T)
+    extend_bus_timeseries!(data, time_horizon)
+    extend_gencost_timeseries!(data, time_horizon)
+    extend_prosumer_timeseries!(data, time_horizon)
+    extend_consumer_timeseries!(data, time_horizon)
 
     sort_timeseries_by_time_and_id!(data)
 
