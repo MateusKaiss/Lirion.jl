@@ -6,7 +6,7 @@ function main(ARGS)
     @info "Optimizer: $(args.optimizer)"
 
     # --- Load and preprocess input data ---
-    data = load_input_data(args.database_path)  
+    data = load_input_data(args.database_path)
     preprocess_case_data!(data_matpower, OPFModel)
 
     if args.model_type isa DistributedOPFModel

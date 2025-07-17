@@ -12,8 +12,10 @@ function load_input_data(path::String)
     return result
 end
 
-function preprocess_case_data!(data::Dict{String, Any}, ::Type{T}=OPFModel) where {T<:OPFModel}
-    
+function preprocess_case_data!(
+    data::Dict{String, Any},
+    ::Type{T} = OPFModel,
+) where {T <: OPFModel}
     if T != DistributedOPFModel
         all_time_steps = get_model_times(data)
         time_horizon = isempty(all_time_steps) ? 1 : maximum(all_time_steps)
