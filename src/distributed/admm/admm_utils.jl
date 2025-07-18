@@ -163,3 +163,23 @@ function find_shared_buses(
 
     return collect(shared_buses)
 end
+
+function compute_residuals(θ_avg::Dict{Int, Float64}, θ_avg_prev::Dict{Int, Float64}, partitions, shared_buses)
+    primal = 0.0
+    dual = 0.0
+
+    for b in shared_buses
+        for (_, pdata) in partitions
+            if b in pdata["bus"]["bus_i"]
+                model = pdata["model"]
+                θ_val = value(model[:theta][b, 1])
+                primal += (θ_val - θ_avg[b])^2
+            end
+        end
+        if haskey(θ_avg_prev, b)
+            dual += (θ_avg[b] - θ_avg_prev[b])^2
+        end
+    end
+
+    return sqrt(primal), sqrt(dual)
+end
