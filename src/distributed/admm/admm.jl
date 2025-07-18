@@ -23,11 +23,12 @@ function run_admm(config::DistributedOPFModel, data)
 
                 for b in shared_buses
                     if b in bus_ids
-                        θ = local_model[:theta][b,1]
-                        theta_m= get(θ_avg, b, 0.0)
+                        θ = local_model[:theta][b, 1]
+                        theta_m = get(θ_avg, b, 0.0)
                         λ = get(duals[zone_id], b, 0.0)
 
-                        admm_penalty += λ * (θ - theta_m) + (config.rho / 2) * (θ - theta_m)^2
+                        admm_penalty +=
+                            λ * (θ - theta_m) + (config.rho / 2) * (θ - theta_m)^2
                     end
                 end
 
@@ -49,10 +50,15 @@ function run_admm(config::DistributedOPFModel, data)
             update_shared_variables_dc!(shared_buses, partitions, duals, θ_avg, config.rho)
         end
 
-        res_primal = sqrt(sum(
-            sum((value(partitions[z]["model"][:theta][b,1]) - θ_avg[b])^2 for b in shared_buses if b in partitions[z]["bus"]["bus_i"])
-            for z in keys(partitions)
-        ))
+        res_primal = sqrt(
+            sum(
+                sum(
+                    (value(partitions[z]["model"][:theta][b, 1]) - θ_avg[b])^2 for
+                    b in shared_buses if b in partitions[z]["bus"]["bus_i"]
+                )
+                for z in keys(partitions)
+            ),
+        )
 
         res_dual = sqrt(sum((θ_avg[b] - get(θ_avg_prev, b, 0.0))^2 for b in shared_buses))
 

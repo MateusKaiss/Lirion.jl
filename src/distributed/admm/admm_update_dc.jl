@@ -33,5 +33,4 @@ function update_shared_variables_dc!(
             end
         end
     end
-
 end

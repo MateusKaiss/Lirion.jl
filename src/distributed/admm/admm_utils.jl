@@ -164,7 +164,12 @@ function find_shared_buses(
     return collect(shared_buses)
 end
 
-function compute_residuals(θ_avg::Dict{Int, Float64}, θ_avg_prev::Dict{Int, Float64}, partitions, shared_buses)
+function compute_residuals(
+    θ_avg::Dict{Int, Float64},
+    θ_avg_prev::Dict{Int, Float64},
+    partitions,
+    shared_buses,
+)
     primal = 0.0
     dual = 0.0
 
