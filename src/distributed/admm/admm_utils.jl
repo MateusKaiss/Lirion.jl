@@ -112,7 +112,25 @@ function prepare_admm_partitions(data::Dict{String, Any})
             subdata["gencost_timeseries"] = Dict{String, Vector{Any}}()
         end
 
-        preprocess_case_data!(subdata, DistributedOPFModel)
+        add_case_index_maps!(subdata)
+
+        subdata["bus_params"] = get_bus_parameters(subdata["bus"])
+        subdata["branch_params"] = get_branch_parameters(subdata["branch"], subdata)
+        subdata["generator_params"] = get_generator_parameters(subdata["gen"])
+        subdata["power_balance_params"] = get_power_balance_parameters(subdata)
+        subdata["reactive_balance_params"] = get_reactive_power_parameters(subdata)
+        subdata["objective_params"] = merge(
+            get_objective_parameters(
+                subdata,
+                subdata["gen"],
+                get(subdata, "storage", Dict()),
+                subdata["gencost"],
+                get(subdata, "prosumer", Dict()),
+                get(subdata, "gencost_timeseries", nothing),
+            ),
+            (; sbase = subdata["baseMVA"]),
+        )
+
         partitions[zone] = subdata
     end
 

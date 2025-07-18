@@ -10,10 +10,9 @@ function update_shared_variables_dc!(
         count = 0
         for (_, pdata) in partitions
             if b in pdata["bus"]["bus_i"]
-                model = pdata[:model]
-                θ = value.(model[:θ])
-                idx = findfirst(isequal(b), pdata["bus"]["bus_i"])
-                θ_sum += θ[idx]
+                model = pdata["model"]  # ← CORRIGIDO
+                θ_val = value(model[:theta][b, 1])
+                θ_sum += θ_val
                 count += 1
             end
         end
@@ -22,17 +21,17 @@ function update_shared_variables_dc!(
 
     # Update the λ (Lagrange multipliers)
     for (zone_id, pdata) in partitions
-        model = pdata[:model]
-        θ = value.(model[:θ])
+        model = pdata["model"]
+        θ = value.(model[:theta])
         bus_ids = pdata["bus"]["bus_i"]
 
         for b in shared_buses
             if b in bus_ids
-                idx = findfirst(isequal(b), bus_ids)
                 λ = get(duals[zone_id], b, 0.0)
-                λ += ρ * (θ[idx] - θ_avg[b])
+                λ += ρ * (θ[b, 1] - θ_avg[b])  # ← CORRIGIDO: usa b diretamente
                 duals[zone_id][b] = λ
             end
         end
     end
+
 end

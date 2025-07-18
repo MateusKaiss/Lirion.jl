@@ -78,9 +78,9 @@ struct Args
             "dc" => DC,
             "ac" => AC,
             "socp" => SOCP,
-            "distributed-admm-dc" => DistributedOPFModel(DC, :admm, 10, 1.0),
-            "distributed-admm-ac" => DistributedOPFModel(AC, :admm, 10, 1.0),
-            "distributed-admm-socp" => DistributedOPFModel(SOCP, :admm, 10, 1.0),
+            "distributed-admm-dc"   => DistributedOPFModel(DC, :admm, 10, 100.0, 1e-4, 1e-4),
+            "distributed-admm-ac"   => DistributedOPFModel(AC, :admm, 100, 10.0, 1e-4, 1e-4),
+            "distributed-admm-socp" => DistributedOPFModel(SOCP, :admm, 100, 10.0, 1e-4, 1e-4),
         )
 
         model_key = lowercase(strip(parsed["model"]))
