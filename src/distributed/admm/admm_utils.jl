@@ -1,4 +1,3 @@
-
 function prepare_admm_partitions(data::Dict{String, Any})
     bus_data = data["bus"]
     zones = bus_data["zone"]

@@ -9,7 +9,7 @@ function create_voltage_angle_variables!(model, params)
     else
         local_ref_bus = first(params.bus_ids)
         @constraint(model, theta_local_ref[t in 1:T], theta[local_ref_bus, t] == 0.0)
-        @info "Usando barra local $(local_ref_bus) como referência auxiliar (não é a referência global)."
+        @info "Using local bar $(local_ref_bus) as auxiliary reference (not the global reference)."
     end
 
     return nothing
