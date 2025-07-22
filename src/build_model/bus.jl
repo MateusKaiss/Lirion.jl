@@ -4,7 +4,14 @@
 function create_voltage_angle_variables!(model, params)
     T = get(model.ext, :time_periods, 1)
     @variable(model, theta[b in params.bus_ids, t = 1:T], start = 0.0)
-    @constraint(model, theta_ref[t in 1:T], theta[params.reference_bus, t] == 0)
+    if !isnothing(params.reference_bus) && params.reference_bus in params.bus_ids
+        @constraint(model, theta_ref[t in 1:T], theta[params.reference_bus, t] == 0.0)
+    else
+        local_ref_bus = first(params.bus_ids)
+        @constraint(model, theta_local_ref[t in 1:T], theta[local_ref_bus, t] == 0.0)
+        @info "Usando barra local $(local_ref_bus) como referência auxiliar (não é a referência global)."
+    end
+
     return nothing
 end
 
