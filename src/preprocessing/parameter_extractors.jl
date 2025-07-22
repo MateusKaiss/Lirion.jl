@@ -20,11 +20,18 @@ end
 # ---------------------------------------------------------------------
 function get_bus_parameters(bus_data)
     bus_ids = bus_data["bus_i"]
+
     reference_bus_idx = findfirst(==(3), bus_data["bus_type"])
-    reference_bus = bus_ids[reference_bus_idx]
+    reference_bus = nothing
+    if reference_bus_idx !== nothing
+        reference_bus = bus_ids[reference_bus_idx]
+    else
+        @info "No reference bus (type 3) found in this zone. Skipping θ_ref constraint."
+    end
     vmin = Dict{Int, Float64}()
     vmax = Dict{Int, Float64}()
     vstart = Dict{Int, Union{Nothing, Float64}}()
+
     @inbounds for i in eachindex(bus_ids)
         b = bus_ids[i]
         vmin[b] = bus_data["vmin"][i]
@@ -162,37 +169,90 @@ end
 # Prosumer Parameters
 # ---------------------------------------------------------------------
 function get_prosumer_parameters(data)
-    return (
-        number_of_prosumers = length(data["bus"]),
-        bus_index = data["bus"],
-        generation = data["generation"],
-        demand = data["demand"],
-        q_generation = data["q_generation"],
-        q_demand = data["q_demand"],
-        cost_injection = data["cost_injection"],
-        inverter_capacity = data["inverter_capacity"],
-    )
+    ts = data["prosumer_timeseries"]
+    s = get(data, "prosumer", Dict())
+    T = data["T"]
+
+    if T > 1 && length(ts["time"]) > 0
+        nb = length(unique(ts["bus"]))
+        return (
+            is_timeseries = true,
+            number_of_prosumers = nb,
+            time = ts["time"],
+            bus_index = ts["bus"],
+            q_generation = get(ts, "q_generation", fill(0.0, length(ts["bus"]))),
+            generation = get(ts, "p_pv", fill(0.0, length(ts["bus"]))),
+            q_demand = get(ts, "q_demand", fill(0.0, length(ts["bus"]))),
+            demand = get(ts, "p_load", fill(0.0, length(ts["bus"]))),
+            curtailment = get(ts, "p_curtail", fill(0.0, length(ts["bus"]))),
+            cost_injection = get(s, "cost_injection", fill(0.0, nb)),
+            inverter_capacity = get(s, "inverter_capacity", fill(Inf, nb)),
+        )
+    else
+        nb = get(s, "bus", Int[]) |> length
+        return (
+            is_timeseries = false,
+            number_of_prosumers = nb,
+            time = ones(Int, nb),
+            bus_index = get(s, "bus", Int[]),
+            generation = get(s, "generation", Float64[]),
+            demand = get(s, "demand", Float64[]),
+            curtailment = fill(0.0, nb),
+            cost_injection = get(s, "cost_injection", fill(0.0, nb)),
+            inverter_capacity = get(s, "inverter_capacity", fill(Inf, nb)),
+        )
+    end
 end
 
 # ---------------------------------------------------------------------
 # Objective Parameters
 # ---------------------------------------------------------------------
 function get_objective_parameters(
+    data::Dict{String, Any},
     gen_data,
     battery_data,
     gencost_data,
     prosumer_data = Dict(),
+    gencost_timeseries = nothing,
 )
+    T = data["T"]
+    has_timeseries = T > 1
+
+    generator_costs = Dict{Int, Dict{Int, Vector{Float64}}}()
+
+    if has_timeseries
+        gen_ids = gencost_timeseries["gen_id"]
+        times = gencost_timeseries["time"]
+        cost_coeffs = gencost_timeseries["cost_coefficients"]
+
+        for i in eachindex(gen_ids)
+            t = times[i]
+            g = gen_ids[i]
+            c = cost_coeffs[i]
+
+            if !haskey(generator_costs, t)
+                generator_costs[t] = Dict{Int, Vector{Float64}}()
+            end
+            generator_costs[t][g] = c
+        end
+    else
+        generator_costs[1] = Dict{Int, Vector{Float64}}()
+        for (g, coefs) in enumerate(getfieldsafe(gencost_data, "cost_coefficients", []))
+            generator_costs[1][g] = coefs
+        end
+    end
+
     return (
         number_of_generators = getfieldsafe(gen_data, "gen_bus", []) |> length,
         number_of_batteries = getfieldsafe(battery_data, "storage_bus", []) |> length,
-        generator_costs = getfieldsafe(gencost_data, "cost_coefficients", []),
+        generator_costs = generator_costs,
         num_polynomial_coefs = getfieldsafe(gencost_data, "ncost", []),
         curtailment_cost = getfieldsafe(gen_data, "curtailment_cost", []),
         plant_type = getfieldsafe(gen_data, "plant_type", []),
         generator_status = getfieldsafe(gen_data, "gen_status", []),
         number_of_prosumers = getfieldsafe(prosumer_data, "bus", []) |> length,
         prosumer_costs = getfieldsafe(prosumer_data, "cost_injection", []),
+        has_timeseries = has_timeseries,
     )
 end
 
@@ -221,7 +281,7 @@ function get_power_balance_parameters(matpower_data)
         shunt_conductance = matpower_data["bus"]["gs"],
         existing = matpower_data["gen"]["gen_status"],
         branch_status = matpower_data["branch"]["br_status"],
-        has_timeseries = haskey(matpower_data, "bus_timeseries"),
+        has_timeseries = get(matpower_data, "T", 1) > 1,
         bus_to_generators = getfieldsafe(
             matpower_data,
             "bus_to_gens",
@@ -258,7 +318,7 @@ function get_reactive_power_parameters(matpower_data)
         bus_ids = matpower_data["bus"]["bus_i"],
         shunt_susceptance = matpower_data["bus"]["bs"],
         generator_status = matpower_data["gen"]["gen_status"],
-        has_timeseries = haskey(matpower_data, "bus_timeseries"),
+        has_timeseries = get(matpower_data, "T", 1) > 1,
         bus_idx_map = matpower_data["bus_idx_map"],
         branch_status = matpower_data["branch"]["br_status"],
         bus_to_generators = getfieldsafe(

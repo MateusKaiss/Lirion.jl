@@ -1,38 +1,62 @@
 function load_input_data(path::String)
-    if endswith(lowercase(path), ".m")
-        return open(path) do io
+    result = if endswith(lowercase(path), ".m")
+        open(path) do io
             return parse_matpower_string_silent(read(io, String))
         end
     elseif isdir(path)
-        return parse_case_from_csv_silent(path)
+        parse_case_from_csv_silent(path)
     else
         error("Unrecognized input format. Use .m or folder with .csv files.")
     end
-end
-
-function preprocess_case_data!(data::Dict{String, Any})
-    add_case_index_maps!(data)
-    return convert_to_pu!(data)
-end
-
-function parse_case_from_csv_silent(dir::String)
-    original_logger = current_logger()
-    logger = NullLogger()
-    global_logger(logger)
-    result = parse_case_from_csv(dir)
-    global_logger(original_logger)
+    global_logger(ConsoleLogger(stderr, Logging.Info))
     return result
 end
 
-function parse_matpower_string_silent(data_string::String)
-    original_logger = current_logger()
-    global_logger(NullLogger())
-    case = _parse_matpower_string(data_string)
-    global_logger(original_logger)
-    return case
+function preprocess_case_data!(
+    data::Dict{String, Any},
+    ::Type{T} = OPFModel,
+) where {T <: OPFModel}
+    if T != DistributedOPFModel
+        all_time_steps = get_model_times(data)
+        time_horizon = isempty(all_time_steps) ? 1 : maximum(all_time_steps)
+        data["T"] = time_horizon
+    end
+
+    time_horizon = data["T"]
+
+    check_time_alignment(data)
+
+    ensure_bus_timeseries!(data, time_horizon)
+    ensure_gencost_timeseries!(data, time_horizon)
+    ensure_prosumer_timeseries!(data, time_horizon)
+    ensure_consumer_timeseries!(data, time_horizon)
+
+    extend_bus_timeseries!(data, time_horizon)
+    extend_gencost_timeseries!(data, time_horizon)
+    extend_prosumer_timeseries!(data, time_horizon)
+    extend_consumer_timeseries!(data, time_horizon)
+
+    sort_timeseries_by_time_and_id!(data)
+
+    add_case_index_maps!(data)
+    convert_to_pu!(data)
+    convert_timeseries_to_pu!(data)
+    return nothing
 end
 
-function map_items_by_bus(bus_vec::Vector{Any})
+function parse_case_from_csv_silent(dir::String)
+    with_logger(NullLogger()) do
+        return parse_case_from_csv(dir)
+    end
+end
+
+function parse_matpower_string_silent(data_string::String)
+    with_logger(NullLogger()) do
+        return _parse_matpower_string(data_string)
+    end
+end
+
+function map_items_by_bus(bus_vec::Vector{T}) where {T}
     mapping = Dict{Int, Vector{Int}}()
     for (i, b) in enumerate(bus_vec)
         push!(get!(mapping, b, Int[]), i)
@@ -57,6 +81,14 @@ function add_case_index_maps!(case::Dict{String, Any})
         t_bus = case["branch"]["t_bus"]
         case["bus_to_branches_from"] = map_items_by_bus(f_bus)
         case["bus_to_branches_to"] = map_items_by_bus(t_bus)
+        f_bus = case["branch"]["f_bus"]
+        t_bus = case["branch"]["t_bus"]
+        bus_to_neighbors = Dict{Int, Vector{Int}}()
+        for (f, t) in zip(f_bus, t_bus)
+            push!(get!(bus_to_neighbors, f, Int[]), t)
+            push!(get!(bus_to_neighbors, t, Int[]), f)
+        end
+        case["bus_to_neighbors"] = bus_to_neighbors
     end
 
     if haskey(case, "prosumer")
@@ -74,10 +106,12 @@ function add_case_index_maps!(case::Dict{String, Any})
     case["reactive_balance_params"] = get_reactive_power_parameters(case)
     case["objective_params"] = merge(
         get_objective_parameters(
+            case,
             case["gen"],
             get(case, "storage", Dict()),
             case["gencost"],
             get(case, "prosumer", Dict()),
+            get(case, "gencost_timeseries", nothing),
         ),
         (; sbase = case["baseMVA"]),
     )
@@ -105,6 +139,44 @@ function convert_to_pu!(case::Dict{String, Any})
             ["ps", "qs", "energy", "energy_rating", "charge_rating", "discharge_rating",
             "thermal_rating", "qmin", "qmax", "q_loss", "p_loss"]
             case["storage"][field] ./= Sbase
+        end
+    end
+
+    return case
+end
+
+function convert_timeseries_to_pu!(case::Dict{String, Any})
+    Sbase = case["baseMVA"]
+
+    if haskey(case, "bus_timeseries")
+        for field in ["pd", "qd", "gs", "bs"]
+            if haskey(case["bus_timeseries"], field)
+                case["bus_timeseries"][field] ./= Sbase
+            end
+        end
+    end
+
+    if haskey(case, "prosumer_timeseries")
+        for field in ["p_load", "p_pv", "p_curtail"]
+            if haskey(case["prosumer_timeseries"], field)
+                case["prosumer_timeseries"][field] ./= Sbase
+            end
+        end
+    end
+
+    if haskey(case, "gencost_timeseries")
+        for field in ["pmax", "pmin"]
+            if haskey(case["gencost_timeseries"], field)
+                case["gencost_timeseries"][field] ./= Sbase
+            end
+        end
+    end
+
+    if haskey(case, "consumer_timeseries")
+        for field in ["demand", "q_demand"]
+            if haskey(case["consumer_timeseries"], field)
+                case["consumer_timeseries"][field] ./= Sbase
+            end
         end
     end
 

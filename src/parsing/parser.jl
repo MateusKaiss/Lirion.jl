@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------
 const _mp_data_names = ["mpc.version", "mpc.baseMVA", "mpc.bus", "mpc.gen",
     "mpc.branch", "mpc.dcline", "mpc.gencost", "mpc.dclinecost",
-    "mpc.bus_name", "mpc.storage", "mpc.switch", "mpc.prosumer",
+    "mpc.bus_name", "mpc.storage", "mpc.switch", "mpc.prosumer", "mpc.consumer",
     "mpc.bus_timeseries", "mpc.prosumer_timeseries"]
 
 const _mp_bus_columns = [
@@ -109,6 +109,12 @@ const _mp_gencost_columns = [
     ("cost_coefficients", Vector{Float64}),
 ]
 
+const _mp_consumer_columns = [
+    ("bus", Int),
+    ("demand", Float64),
+    ("q_demand", Float64),
+]
+
 const _mp_prosumer_columns = [
     ("bus", Int),
     ("generation", Float64),
@@ -117,6 +123,41 @@ const _mp_prosumer_columns = [
     ("q_demand", Float64),
     ("cost_injection", Float64),
     ("inverter_capacity", Float64),
+]
+
+const _mp_consumer_timeseries_columns = [
+    ("time", Int),
+    ("bus", Int),
+    ("demand", Float64),
+    ("q_demand", Float64),
+]
+
+const _mp_prosumer_timeseries_columns = [
+    ("time", Int),
+    ("bus", Int),
+    ("generation", Float64),
+    ("demand", Float64),
+    ("q_generation", Float64),
+    ("q_demand", Float64),
+]
+
+const _mp_gencost_timeseries_columns = [
+    ("time", Int),
+    ("gen_id", Int),
+    ("model", Int),
+    ("startup", Float64),
+    ("shutdown", Float64),
+    ("ncost", Int),
+    ("cost_coefficients", Vector{Float64}),
+    ("tou", Float64),
+    ("feed_in_tariff", Float64),
+]
+
+const _mp_bus_timeseries_columns = [
+    ("time", Int),
+    ("bus", Int),
+    ("pd", Float64),
+    ("qd", Float64),
 ]
 
 # ---------------------------------------------------------------------
@@ -158,6 +199,35 @@ function _parse_gencost_table(data::Array)
         ncost = row[4]
         cost_coefficients = row[5:5+ncost-1]
         push!(table["cost_coefficients"], cost_coefficients)
+    end
+
+    return table
+end
+
+function _parse_gencost_timeseries_table(data::Array)
+    table = Dict{String, Vector}()
+    table["time"] = Int[]
+    table["gen_id"] = Int[]
+    table["model"] = Int[]
+    table["startup"] = Float64[]
+    table["shutdown"] = Float64[]
+    table["ncost"] = Int[]
+    table["cost_coefficients"] = Vector{Vector{Float64}}()
+    table["tou"] = Float64[]
+    table["feed_in_tariff"] = Float64[]
+
+    for row in data
+        push!(table["time"], row[1])
+        push!(table["gen_id"], row[2])
+        push!(table["model"], row[3])
+        push!(table["startup"], row[4])
+        push!(table["shutdown"], row[5])
+        push!(table["ncost"], row[6])
+        ncost = row[6]
+        cost_coefficients = row[7:6+ncost]
+        push!(table["cost_coefficients"], cost_coefficients)
+        push!(table["tou"], row[7+ncost])
+        push!(table["feed_in_tariff"], row[8+ncost])
     end
 
     return table
@@ -282,38 +352,35 @@ function _parse_matpower_string(data_string::String)
         case["prosumer"] = _parse_table(matlab_data["mpc.prosumer"], _mp_prosumer_columns)
     end
 
-    if haskey(matlab_data, "mpc.bus_timeseries")
-        df = DataFrame(
-            [
-                Symbol(k) => [] for
-                (k, _) in zip(["time", "bus", "pd", "qd"], [Int, Int, Float64, Float64])
-            ]...,
+    if haskey(matlab_data, "mpc.consumer")
+        case["consumer"] = _parse_table(
+            matlab_data["mpc.consumer"],
+            _mp_consumer_columns,
         )
-        for row in matlab_data["mpc.bus_timeseries"]
-            push!(df, (time = row[1], bus = row[2], pd = row[3], qd = row[4]))
-        end
-        case["bus_timeseries"] = df
     end
 
-    if haskey(matlab_data, "mpc.prosumer_timeseries")
-        df = DataFrame(
-            [
-                Symbol(k) => [] for (k, _) in zip(
-                    ["time", "bus", "generation", "demand", "q_generation", "q_demand"],
-                    [Int, Int, Float64, Float64, Float64, Float64],
-                )
-            ]...,
+    if haskey(matlab_data, "mpc.bus_timeseries")
+        case["bus_timeseries"] = _parse_table(
+            matlab_data["mpc.bus_timeseries"],
+            _mp_bus_timeseries_columns,
         )
-        for row in matlab_data["mpc.prosumer_timeseries"]
-            push!(
-                df,
-                (
-                    time = row[1], bus = row[2],
-                    generation = row[3], demand = row[4],
-                    q_generation = row[5], q_demand = row[6]),
-            )
-        end
-        case["prosumer_timeseries"] = df
+    end
+    if haskey(matlab_data, "mpc.prosumer_timeseries")
+        case["prosumer_timeseries"] = _parse_table(
+            matlab_data["mpc.prosumer_timeseries"],
+            _mp_prosumer_timeseries_columns,
+        )
+    end
+    if haskey(matlab_data, "mpc.consumer_timeseries")
+        case["consumer_timeseries"] = _parse_table(
+            matlab_data["mpc.consumer_timeseries"],
+            _mp_consumer_timeseries_columns,
+        )
+    end
+
+    if haskey(matlab_data, "mpc.gencost_timeseries")
+        case["gencost_timeseries"] =
+            _parse_gencost_timeseries_table(matlab_data["mpc.gencost_timeseries"])
     end
 
     return case

@@ -30,9 +30,11 @@ function compute_power_balance(model, matpower_data, params, bus_index, t)
     )
 
     pd = if params.has_timeseries
+        ts = matpower_data["bus_timeseries"]
         sum(
-            r.pd for r in eachrow(matpower_data["bus_timeseries"])
-            if r.bus == bus_index && r.time == t;
+            ts["pd"][i]
+            for i in eachindex(ts["bus"])
+            if ts["bus"][i] == bus_index && ts["time"][i] == t;
             init = 0.0,
         )
     else
@@ -44,7 +46,27 @@ function compute_power_balance(model, matpower_data, params, bus_index, t)
         )
     end
 
-    return p_gen - p_bat - p_pros - pd - p_out - p_in
+    p_cons = if params.has_timeseries && haskey(matpower_data, "consumer_timeseries")
+        tsc = matpower_data["consumer_timeseries"]
+        sum(
+            tsc["demand"][i]
+            for i in eachindex(tsc["bus"])
+            if tsc["bus"][i] == bus_index && tsc["time"][i] == t;
+            init = 0.0,
+        )
+    elseif haskey(matpower_data, "consumer")
+        c = matpower_data["consumer"]
+        sum(
+            c["demand"][i]
+            for i in eachindex(c["bus"])
+            if c["bus"][i] == bus_index;
+            init = 0.0,
+        )
+    else
+        0.0
+    end
+
+    return p_gen - p_bat - p_pros - pd - p_cons - p_out - p_in
 end
 
 # ---------------------------------------------------------------------
