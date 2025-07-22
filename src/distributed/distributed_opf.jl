@@ -1,4 +1,3 @@
-
 function get_method_runner(model::DistributedOPFModel)
     if model.method == :admm
         return run_admm
