@@ -10,7 +10,7 @@ function update_shared_variables_dc!(
         count = 0
         for (_, pdata) in partitions
             if b in pdata["bus"]["bus_i"]
-                model = pdata["model"]  # ← CORRIGIDO
+                model = pdata["model"]
                 θ_val = value(model[:theta][b, 1])
                 θ_sum += θ_val
                 count += 1
@@ -28,7 +28,7 @@ function update_shared_variables_dc!(
         for b in shared_buses
             if b in bus_ids
                 λ = get(duals[zone_id], b, 0.0)
-                λ += ρ * (θ[b, 1] - θ_avg[b])  # ← CORRIGIDO: usa b diretamente
+                λ += ρ * (θ[b, 1] - θ_avg[b])
                 duals[zone_id][b] = λ
             end
         end

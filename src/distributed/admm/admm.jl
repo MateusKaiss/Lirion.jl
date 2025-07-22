@@ -14,7 +14,8 @@ function run_admm(config::DistributedOPFModel, data)
     for k in 1:config.max_iter
         println("\nIteração $k")
 
-        # --- Passo 1: resolve os subproblemas locais ---
+
+        # --- Step 1: solve the local subproblems ---
         for (zone_id, subdata) in partitions
             local_model = build_model(subdata, base_model; optimizer = Ipopt.Optimizer)
             if base_model == DC
@@ -34,7 +35,7 @@ function run_admm(config::DistributedOPFModel, data)
 
                 @objective(local_model, Min, local_model[:generation_cost] + admm_penalty)
             else
-                error("Base model $(base_model) ainda não implementado no ADMM")
+                error("Base model $(base_model) not yet implemented in ADMM")
             end
 
             optimize!(local_model)
@@ -42,7 +43,7 @@ function run_admm(config::DistributedOPFModel, data)
             subdata["model"] = local_model
             real_cost = value(local_model[:generation_cost])
             subdata["real_generation_cost"] = real_cost
-            println("→ Custo de geração da zona $zone_id: $real_cost")
+            println("Zone generation cost $zone_id: $real_cost")
         end
 
         if base_model == DC
@@ -62,17 +63,17 @@ function run_admm(config::DistributedOPFModel, data)
 
         res_dual = sqrt(sum((θ_avg[b] - get(θ_avg_prev, b, 0.0))^2 for b in shared_buses))
 
-        println("‣ Resíduo primal: $res_primal")
-        println("‣ Resíduo dual:   $res_dual")
+        println("Res Primal: $res_primal")
+        println("Res Dual:   $res_dual")
 
         if res_primal < 1e-4 && res_dual < 1e-4
-            println("✓ Critério de parada atingido.")
+            println("Stopping criterion met.")
             break
         end
     end
 
-    # --- Cálculo do custo final ---
+    # --- Final cost calculation ---
     total_objective = sum(subdata["real_generation_cost"] for subdata in values(partitions))
-    println("→ Valor total da função objetivo: $total_objective")
+    println("Total value of the objective function: $total_objective")
     return total_objective, partitions
 end
