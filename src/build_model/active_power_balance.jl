@@ -66,7 +66,22 @@ function compute_power_balance(model, matpower_data, params, bus_index, t)
         0.0
     end
 
-    return p_gen - p_bat - p_pros - pd - p_cons - p_out - p_in
+    p_inter_in = sum(
+        model[:p_reverse_flow_branches][l, t]
+        for l in get(params.bus_to_inter_in_branches, bus_index, Int[])
+        if l in axes(model[:p_reverse_flow_branches], 1) && t in axes(model[:p_reverse_flow_branches], 2);
+        init = 0.0,
+    )
+
+    p_inter_out = sum(
+        model[:p_flow_branches][l, t]
+        for l in get(params.bus_to_inter_out_branches, bus_index, Int[])
+        if l in axes(model[:p_flow_branches], 1) && t in axes(model[:p_flow_branches], 2);
+        init = 0.0,
+    )
+
+    return p_gen - p_bat - p_pros - pd - p_cons - p_out - p_in - p_inter_out + p_inter_in
+
 end
 
 # ---------------------------------------------------------------------

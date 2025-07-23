@@ -76,6 +76,22 @@ function prepare_admm_partitions(data::Dict{String, Any})
 
             subdata["inter_out_branches"] = inter_out
             subdata["inter_in_branches"] = inter_in
+            bus_to_inter_out_branches = Dict{Int, Vector{Int}}()
+            for l in inter_out
+                f = data["branch"]["f_bus"][l]
+                push!(get!(bus_to_inter_out_branches, f, Int[]), l)
+            end
+            bus_to_inter_in_branches = Dict{Int, Vector{Int}}()
+            for l in inter_in
+                t = data["branch"]["t_bus"][l]
+                push!(get!(bus_to_inter_in_branches, t, Int[]), l)
+            end
+
+            subdata["bus_to_inter_out_branches"] = bus_to_inter_out_branches
+
+    
+            subdata["bus_to_inter_in_branches"] = bus_to_inter_in_branches
+
             subdata["branch"] = Dict(k => v[keep] for (k, v) in data["branch"] if length(v) == length(f_bus))
         end
 
