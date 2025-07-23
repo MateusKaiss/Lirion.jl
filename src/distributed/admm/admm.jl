@@ -54,14 +54,16 @@ function run_admm(config::DistributedOPFModel, data)
         res_primal = sqrt(
             sum(
                 sum(
-                    (value(partitions[z]["model"][:theta][b, 1]) - θ_avg[b])^2 for
-                    b in shared_buses if b in partitions[z]["bus"]["bus_i"]
-                )
-                for z in keys(partitions)
-            ),
+                    (value(partitions[z]["model"][:theta][b, 1]) - θ_avg[b])^2
+                    for b in shared_buses if b in partitions[z]["bus"]["bus_i"]
+                ; init = 0.0)
+            for z in keys(partitions)
+            ; init = 0.0)
         )
 
-        res_dual = sqrt(sum((θ_avg[b] - get(θ_avg_prev, b, 0.0))^2 for b in shared_buses))
+        res_dual = sqrt(
+            sum((θ_avg[b] - get(θ_avg_prev, b, 0.0))^2 for b in shared_buses; init = 0.0)
+        )
 
         println("Res Primal: $res_primal")
         println("Res Dual:   $res_dual")
