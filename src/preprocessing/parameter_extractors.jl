@@ -307,6 +307,17 @@ function get_power_balance_parameters(matpower_data)
             "bus_to_branches_to",
             Dict{Int, Vector{Int}}(),
         ),
+                bus_to_inter_in_branches = getfieldsafe(
+            matpower_data,
+            "bus_to_inter_in_branches",
+            Dict{Int, Vector{Int}}(),
+        ),
+        bus_to_inter_out_branches = getfieldsafe(
+            matpower_data,
+            "bus_to_inter_out_branches",
+            Dict{Int, Vector{Int}}(),
+        ),
+
     )
 end
 

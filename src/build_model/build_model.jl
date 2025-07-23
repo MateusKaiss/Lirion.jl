@@ -114,6 +114,8 @@ function build_and_optimize_singleperiod_model(
         @show JuMP.objective_value(model)
     else
         @warn "Modelo não resolveu com sucesso. Status: $termination_status"
+        # print(model)
+        # ss
     end
     return model
 end

@@ -1,5 +1,5 @@
 function run_admm(config::DistributedOPFModel, data)
-    partitions = prepare_admm_partitions(data)
+    partitions, interconnection_limits = prepare_admm_partitions(data)
     shared_buses = find_shared_buses(data, partitions)
     base_model = config.base_model
 

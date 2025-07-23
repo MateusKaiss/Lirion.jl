@@ -1,6 +1,36 @@
 # ---------------------------------------------------------------------
 # DC Branch Modeling
 # ---------------------------------------------------------------------
+
+function create_dc_interconnection_constraints(model::JuMP.Model, data::Dict)
+    T = get(model.ext, :time_periods, 1)
+
+    if !haskey(data, "inter_out_branches") || !haskey(data, "interconnection_limits") || !haskey(data, "bus_params")
+        return
+    end
+
+    zone_map = data["bus_params"]["zone_map"]
+    f_bus = data["branch"]["f_bus"]
+    t_bus = data["branch"]["t_bus"]
+    b = data["branch_params"]["susceptance"]
+    inter_out = data["inter_out_branches"]
+
+    current_zone = only(unique(data["bus"]["zone"]))
+
+    for ((z_from, z_to), limit) in data["interconnection_limits"]
+        if z_from == current_zone
+            for t in 1:T
+                @expression(model, total_flow_to_other_zone,
+                    sum(b[i] * (
+                            model[:theta][f_bus[i], t] - model[:theta][t_bus[i], t]
+                        ) for i in inter_out if get(zone_map, t_bus[i], -1) == z_to)
+                )
+                @constraint(model, -limit <= total_flow_to_other_zone <= limit)
+            end
+        end
+    end
+end
+
 function compute_dc_branch_expressions(model, params)
     T = get(model.ext, :time_periods, 1)
 
@@ -274,6 +304,7 @@ function branches!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{Subprobl
     params = matpower_data["branch_params"]
     compute_dc_branch_expressions(model, params)
     create_dc_branch_constraints(model, params)
+    create_dc_interconnection_constraints(model, matpower_data)
     return nothing
 end
 
