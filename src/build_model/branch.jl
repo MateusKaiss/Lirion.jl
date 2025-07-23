@@ -5,7 +5,8 @@
 function create_dc_interconnection_constraints(model::JuMP.Model, data::Dict)
     T = get(model.ext, :time_periods, 1)
 
-    if !haskey(data, "inter_out_branches") || !haskey(data, "interconnection_limits") || !haskey(data, "bus_params")
+    if !haskey(data, "inter_out_branches") || !haskey(data, "interconnection_limits") ||
+       !haskey(data, "bus_params")
         return
     end
 
@@ -21,9 +22,11 @@ function create_dc_interconnection_constraints(model::JuMP.Model, data::Dict)
         if z_from == current_zone
             for t in 1:T
                 @expression(model, total_flow_to_other_zone,
-                    sum(b[i] * (
+                    sum(
+                        b[i] * (
                             model[:theta][f_bus[i], t] - model[:theta][t_bus[i], t]
-                        ) for i in inter_out if get(zone_map, t_bus[i], -1) == z_to)
+                        ) for i in inter_out if get(zone_map, t_bus[i], -1) == z_to
+                    )
                 )
                 @constraint(model, -limit <= total_flow_to_other_zone <= limit)
             end
