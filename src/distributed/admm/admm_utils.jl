@@ -2,17 +2,24 @@ function prepare_admm_partitions(data::Dict{String, Any})
     bus_data = data["bus"]
     zones = bus_data["zone"]
     bus_ids = bus_data["bus_i"]
-
     unique_zones = unique(zones)
+
     partitions = Dict{Int, Dict{String, Any}}()
     zone_map = Dict(bus_ids[i] => zones[i] for i in eachindex(bus_ids))
     interconnection_limits = Dict{Tuple{Int, Int}, Float64}()
+    zone_to_pmax = Dict{Int, Float64}()
+    if haskey(data, "gen")
+        gen_data = data["gen"]
+        gen_buses = haskey(gen_data, "gen_bus") ? gen_data["gen_bus"] : gen_data["bus"]
+        for (i, bus) in enumerate(gen_buses)
+            z = zone_map[bus]
+            zone_to_pmax[z] = get(zone_to_pmax, z, 0.0) + gen_data["pmax"][i]
+        end
+    end
 
     for zone in unique_zones
         zone_mask = findall(==(zone), zones)
         zone_bus_ids = bus_ids[zone_mask]
-
-        # 🔧 Novo: adicionar também buses conectadas via ramos interzonais
         extra_bus_ids = Int[]
         if haskey(data, "branch")
             f_bus = data["branch"]["f_bus"]
@@ -101,13 +108,31 @@ function prepare_admm_partitions(data::Dict{String, Any})
                 push!(get!(bus_to_inter_in_branches, t, Int[]), l)
             end
 
-            subdata["bus_to_inter_out_branches"] = bus_to_inter_out_branches
+            zone_virtual_limits = Dict{Int, Float64}()
+            bus_to_zone = zone_map
+            neighbor_zones = Set{Int}()
+            for (i, (f, t)) in enumerate(zip(f_bus, t_bus))
+                z1 = bus_to_zone[f]
+                z2 = bus_to_zone[t]
+                if z1 != z2 && (z1 == zone || z2 == zone)
+                    push!(neighbor_zones, z1 == zone ? z2 : z1)
+                end
+            end
+            total_gen = sum(get(zone_to_pmax, z, 0.0) for z in neighbor_zones)
+            n_borders = length(extra_bus_ids)
+            for b in extra_bus_ids
+                zone_virtual_limits[b] = n_borders > 0 ? total_gen / n_borders : 0.0
+            end
 
+            subdata["virtual_limits"] = zone_virtual_limits
+            subdata["bus_to_inter_out_branches"] = bus_to_inter_out_branches
             subdata["bus_to_inter_in_branches"] = bus_to_inter_in_branches
 
             subdata["branch"] = Dict(
                 k => v[keep] for (k, v) in data["branch"] if length(v) == length(f_bus)
             )
+            subdata["branch_full"] = data["branch"]
+            subdata["branch_local_indices"] = keep
         end
 
         for key in ["bus_timeseries", "prosumer_timeseries", "consumer_timeseries"]
@@ -173,34 +198,46 @@ function prepare_admm_partitions(data::Dict{String, Any})
         partitions[zone] = subdata
     end
 
-    return partitions, interconnection_limits
+    bus_zone_appearance = Dict{Int, Set{Int}}()
+    for (zone_id, subdata) in partitions
+        bus_ids = subdata["bus"]["bus_i"]
+        for b in bus_ids
+            push!(get!(bus_zone_appearance, b, Set{Int}()), zone_id)
+        end
+    end
+
+    shared_buses = [b for (b, zones) in bus_zone_appearance if length(zones) > 1]
+
+    for (zone_id, subdata) in partitions
+        bus_ids = subdata["bus"]["bus_i"]
+        subdata["shared_buses"] = [b for b in shared_buses if b in bus_ids]
+    end
+
+    return partitions, shared_buses
 end
 
-function find_shared_buses(
-    data::Dict{String, Any},
-    partitions::Dict{Int, Dict{String, Any}},
-)
-    bus_to_zone = Dict{Int, Int}()
-    for (zone_id, pdata) in partitions
-        for b in pdata["bus"]["bus_i"]
-            bus_to_zone[b] = zone_id
-        end
-    end
+function compute_virtual_limits(shared_buses::Vector{Int}, data::Dict)
+    branch = data["branch"]
+    f_bus = branch["f_bus"]
+    t_bus = branch["t_bus"]
+    rateA = branch["rate_a"]
 
-    shared_buses = Set{Int}()
-    f_bus = data["branch"]["f_bus"]
-    t_bus = data["branch"]["t_bus"]
+    zone_map = Dict(b => z for (z, part) in data["partitions"] for b in part["bus"]["bus_i"])
 
-    for (f, t) in zip(f_bus, t_bus)
-        if haskey(bus_to_zone, f) && haskey(bus_to_zone, t)
-            if bus_to_zone[f] != bus_to_zone[t]
-                push!(shared_buses, f)
-                push!(shared_buses, t)
+    virtual_limits = Dict{Int, Float64}()
+
+    for b in shared_buses
+        cap_sum = 0.0
+        for (i, (f, t)) in enumerate(zip(f_bus, t_bus))
+            if f == b && zone_map[f] != zone_map[t]
+                cap_sum += abs(rateA[i])
+            elseif t == b && zone_map[f] != zone_map[t]
+                cap_sum += abs(rateA[i])
             end
         end
+        virtual_limits[b] = cap_sum
     end
-
-    return collect(shared_buses)
+    return virtual_limits
 end
 
 function compute_residuals(

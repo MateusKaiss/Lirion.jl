@@ -112,6 +112,7 @@ function get_branch_parameters(branch_data, matpower_data)
         g = g,
         b = b,
         active = active,
+        zone =  matpower_data["bus"]["zone"],
     )
 end
 

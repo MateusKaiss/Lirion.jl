@@ -1,6 +1,5 @@
 function run_admm(config::DistributedOPFModel, data)
-    partitions, interconnection_limits = prepare_admm_partitions(data)
-    shared_buses = find_shared_buses(data, partitions)
+    partitions, shared_buses = prepare_admm_partitions(data)
     base_model = config.base_model
 
     duals = Dict{Int, Dict{Int, Float64}}()

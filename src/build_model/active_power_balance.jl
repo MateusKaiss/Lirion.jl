@@ -1,4 +1,5 @@
 function compute_power_balance(model, matpower_data, params, bus_index, t)
+
     p_gen = sum(
         model[:p_generation][g, t]
         for g in get(params.bus_to_generators, bus_index, Int[])
@@ -66,23 +67,16 @@ function compute_power_balance(model, matpower_data, params, bus_index, t)
         0.0
     end
 
-    p_inter_in = sum(
-        model[:p_reverse_flow_branches][l, t]
-        for l in get(params.bus_to_inter_in_branches, bus_index, Int[])
-        if l in axes(model[:p_reverse_flow_branches], 1) &&
-        t in axes(model[:p_reverse_flow_branches], 2);
-        init = 0.0,
-    )
+    if haskey(model.ext, :p_virtual) && bus_index in axes(model.ext[:p_virtual], 1)
+        p_virt = model.ext[:p_virtual][bus_index, t]
+    else
+        p_virt = 0.0
+    end
 
-    p_inter_out = sum(
-        model[:p_flow_branches][l, t]
-        for l in get(params.bus_to_inter_out_branches, bus_index, Int[])
-        if
-        l in axes(model[:p_flow_branches], 1) && t in axes(model[:p_flow_branches], 2);
-        init = 0.0,
-    )
 
-    return p_gen - p_bat - p_pros - pd - p_cons - p_out - p_in - p_inter_out + p_inter_in
+
+    return p_gen - p_bat - p_pros - pd - p_cons - p_out - p_in + p_virt
+
 end
 
 # ---------------------------------------------------------------------
@@ -91,6 +85,24 @@ end
 function active_power_balance!(model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
     params = matpower_data["power_balance_params"]
     T = get(model.ext, :time_periods, 1)
+
+    if haskey(matpower_data, "shared_buses") && haskey(matpower_data, "virtual_limits")
+        shared_buses = matpower_data["shared_buses"]
+        virtual_limits = matpower_data["virtual_limits"]
+        T = get(model.ext, :time_periods, 1)
+        all_shared_buses = matpower_data["shared_buses"]
+        shared_buses = filter(b -> b in keys(virtual_limits), all_shared_buses)
+        @show shared_buses
+        @show virtual_limits
+
+        p_virtual = @variable(model, [b in shared_buses, t in 1:T],
+            lower_bound = -virtual_limits[b],
+            upper_bound =  virtual_limits[b],
+            base_name = "p_virtual"
+        )
+        
+        model.ext[:p_virtual] = p_virtual
+    end
 
     @constraint(model, [b in params.bus_ids, t in 1:T],
         compute_power_balance(model, matpower_data, params, b, t) -
