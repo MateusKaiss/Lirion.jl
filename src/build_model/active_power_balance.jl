@@ -72,8 +72,6 @@ function compute_power_balance(model, matpower_data, params, bus_index, t)
         p_virt = 0.0
     end
 
-
-
     return p_gen - p_bat - p_pros - pd - p_cons - p_out - p_in + p_virt
 
 end
@@ -85,24 +83,26 @@ function active_power_balance!(model, matpower_data, ::Type{DC}, ::Type{Subprobl
     params = matpower_data["power_balance_params"]
     T = get(model.ext, :time_periods, 1)
 
-    if haskey(matpower_data, "shared_buses") && haskey(matpower_data, "virtual_limits")
-        shared_buses = matpower_data["shared_buses"]
-        virtual_limits = matpower_data["virtual_limits"]
-        T = get(model.ext, :time_periods, 1)
-        all_shared_buses = matpower_data["shared_buses"]
-        shared_buses = filter(b -> b in keys(virtual_limits), all_shared_buses)
-        @show shared_buses
-        @show virtual_limits
+    if haskey(matpower_data, "shared_buses") &&
+    haskey(matpower_data, "virtual_limits_demand") &&
+    haskey(matpower_data, "virtual_limits_generation")
 
-        p_virtual = @variable(model, [b in shared_buses, t in 1:T],
-            # lower_bound = -0.49,
-            lower_bound = -virtual_limits[b],
-            upper_bound =  virtual_limits[b],
+        shared_buses = matpower_data["shared_buses"]
+        demand_limits = matpower_data["virtual_limits_demand"]
+        generation_limits = matpower_data["virtual_limits_generation"]
+
+        shared_buses = filter(b -> b in keys(demand_limits) && b in keys(generation_limits), shared_buses)
+
+        @variable(model, p_virtual[b in shared_buses, t in 1:T],
+            lower_bound = -demand_limits[b],
+            # lower_bound = -generation_limits[b],
+            upper_bound = generation_limits[b],
             base_name = "p_virtual"
         )
-        
+
         model.ext[:p_virtual] = p_virtual
     end
+
 
     @constraint(model, [b in params.bus_ids, t in 1:T],
         compute_power_balance(model, matpower_data, params, b, t) -

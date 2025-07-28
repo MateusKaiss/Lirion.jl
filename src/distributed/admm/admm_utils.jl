@@ -108,7 +108,6 @@ function prepare_admm_partitions(data::Dict{String, Any})
                 push!(get!(bus_to_inter_in_branches, t, Int[]), l)
             end
 
-            zone_virtual_limits = Dict{Int, Float64}()
             bus_to_zone = zone_map
             neighbor_zones = Set{Int}()
             for (f, t) in zip(f_bus, t_bus)
@@ -118,13 +117,32 @@ function prepare_admm_partitions(data::Dict{String, Any})
                     push!(neighbor_zones, z1 == zone ? z2 : z1)
                 end
             end
-            total_gen = sum(get(zone_to_pmax, z, 0.0) for z in neighbor_zones)
-            n_borders = length(extra_bus_ids)
-            for b in extra_bus_ids
-                zone_virtual_limits[b] = n_borders > 0 ? total_gen / n_borders : 0.0
+
+            # Calcular demanda total das zonas vizinhas
+            zone_to_pd = Dict{Int, Float64}()
+            for (i, z) in enumerate(data["bus"]["zone"])
+                pd = data["bus"]["pd"][i]
+                zone_to_pd[z] = get(zone_to_pd, z, 0.0) + pd
             end
 
-            subdata["virtual_limits"] = zone_virtual_limits
+            # Já temos zone_to_pmax da parte superior da função
+
+            total_gen = sum(get(zone_to_pmax, z, 0.0) for z in neighbor_zones)
+            total_dem = sum(get(zone_to_pd, z, 0.0) for z in neighbor_zones)
+
+            n_borders = length(extra_bus_ids)
+
+            virtual_limits_generation = Dict{Int, Float64}()
+            virtual_limits_demand = Dict{Int, Float64}()
+
+            for b in extra_bus_ids
+                virtual_limits_generation[b] = n_borders > 0 ? total_gen / n_borders : 0.0
+                virtual_limits_demand[b] = n_borders > 0 ? total_dem / n_borders : 0.0
+            end
+
+            subdata["virtual_limits_generation"] = virtual_limits_generation
+            subdata["virtual_limits_demand"] = virtual_limits_demand
+
             subdata["bus_to_inter_out_branches"] = bus_to_inter_out_branches
             subdata["bus_to_inter_in_branches"] = bus_to_inter_in_branches
 
