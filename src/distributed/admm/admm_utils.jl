@@ -20,18 +20,19 @@ function prepare_admm_partitions(data::Dict{String, Any})
     for zone in unique_zones
         zone_mask = findall(==(zone), zones)
         zone_bus_ids = bus_ids[zone_mask]
-        extra_bus_ids = Int[]
+        extra_bus_ids_set = Set{Int}()
         if haskey(data, "branch")
             f_bus = data["branch"]["f_bus"]
             t_bus = data["branch"]["t_bus"]
             for i in eachindex(f_bus)
                 if (f_bus[i] in zone_bus_ids) && !(t_bus[i] in zone_bus_ids)
-                    push!(extra_bus_ids, t_bus[i])
+                    push!(extra_bus_ids_set, t_bus[i])
                 elseif (t_bus[i] in zone_bus_ids) && !(f_bus[i] in zone_bus_ids)
-                    push!(extra_bus_ids, f_bus[i])
+                    push!(extra_bus_ids_set, f_bus[i])
                 end
             end
         end
+        extra_bus_ids = collect(extra_bus_ids_set)
         all_bus_ids = union(zone_bus_ids, extra_bus_ids)
         bus_mask = findall(b -> b in all_bus_ids, bus_ids)
 
@@ -61,8 +62,7 @@ function prepare_admm_partitions(data::Dict{String, Any})
                         Dict(
                             k => v[keep] for
                             (k, v) in table if length(v) == length(table[bus_key])
-                        ) :
-                        Dict(k => Any[] for k in keys(table))
+                        ) : Dict(k => Any[] for k in keys(table))
                 else
                     subdata[key] = Dict(k => Any[] for k in keys(table))
                 end
@@ -111,7 +111,7 @@ function prepare_admm_partitions(data::Dict{String, Any})
             zone_virtual_limits = Dict{Int, Float64}()
             bus_to_zone = zone_map
             neighbor_zones = Set{Int}()
-            for (i, (f, t)) in enumerate(zip(f_bus, t_bus))
+            for (f, t) in zip(f_bus, t_bus)
                 z1 = bus_to_zone[f]
                 z2 = bus_to_zone[t]
                 if z1 != z2 && (z1 == zone || z2 == zone)
@@ -155,8 +155,7 @@ function prepare_admm_partitions(data::Dict{String, Any})
                 !isempty(keep) ?
                 Dict(
                     k => v[keep] for (k, v) in gen if length(v) == length(gen[bus_field])
-                ) :
-                Dict(k => Any[] for k in keys(gen))
+                ) : Dict(k => Any[] for k in keys(gen))
 
             if haskey(data, "gencost")
                 subdata["gencost"] = Dict(
@@ -195,7 +194,7 @@ function prepare_admm_partitions(data::Dict{String, Any})
             (; sbase = subdata["baseMVA"]),
         )
 
-        partitions[zone] = subdata
+        partitions[zone] = deepcopy(subdata)
     end
 
     bus_zone_appearance = Dict{Int, Set{Int}}()
@@ -222,7 +221,8 @@ function compute_virtual_limits(shared_buses::Vector{Int}, data::Dict)
     t_bus = branch["t_bus"]
     rateA = branch["rate_a"]
 
-    zone_map = Dict(b => z for (z, part) in data["partitions"] for b in part["bus"]["bus_i"])
+    zone_map =
+        Dict(b => z for (z, part) in data["partitions"] for b in part["bus"]["bus_i"])
 
     virtual_limits = Dict{Int, Float64}()
 

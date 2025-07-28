@@ -66,7 +66,6 @@ function compute_power_balance(model, matpower_data, params, bus_index, t)
     else
         0.0
     end
-
     if haskey(model.ext, :p_virtual) && bus_index in axes(model.ext[:p_virtual], 1)
         p_virt = model.ext[:p_virtual][bus_index, t]
     else
@@ -96,6 +95,7 @@ function active_power_balance!(model, matpower_data, ::Type{DC}, ::Type{Subprobl
         @show virtual_limits
 
         p_virtual = @variable(model, [b in shared_buses, t in 1:T],
+            # lower_bound = -0.49,
             lower_bound = -virtual_limits[b],
             upper_bound =  virtual_limits[b],
             base_name = "p_virtual"
