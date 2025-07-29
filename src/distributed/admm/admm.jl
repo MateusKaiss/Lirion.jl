@@ -14,7 +14,6 @@ function run_admm(config::DistributedOPFModel, data)
     for k in 1:config.max_iter
         println("\nIteração $k")
 
-
         # --- Step 1: solve the local subproblems ---
         for (zone_id, subdata) in partitions
             local_model = build_model(subdata, base_model; optimizer = Ipopt.Optimizer)
@@ -56,13 +55,13 @@ function run_admm(config::DistributedOPFModel, data)
                 sum(
                     (value(partitions[z]["model"][:theta][b, 1]) - θ_avg[b])^2
                     for b in shared_buses if b in partitions[z]["bus"]["bus_i"]
-                ; init = 0.0)
-            for z in keys(partitions)
-            ; init = 0.0)
+                    ; init = 0.0)
+                for z in keys(partitions)
+                ; init = 0.0),
         )
 
         res_dual = sqrt(
-            sum((θ_avg[b] - get(θ_avg_prev, b, 0.0))^2 for b in shared_buses; init = 0.0)
+            sum((θ_avg[b] - get(θ_avg_prev, b, 0.0))^2 for b in shared_buses; init = 0.0),
         )
 
         println("Res Primal: $res_primal")
