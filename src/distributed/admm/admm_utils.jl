@@ -117,19 +117,14 @@ function prepare_admm_partitions(data::Dict{String, Any})
                     push!(neighbor_zones, z1 == zone ? z2 : z1)
                 end
             end
-
-            # Calcular demanda total das zonas vizinhas
+            
             zone_to_pd = Dict{Int, Float64}()
             for (i, z) in enumerate(data["bus"]["zone"])
                 pd = data["bus"]["pd"][i]
                 zone_to_pd[z] = get(zone_to_pd, z, 0.0) + pd
             end
-
-            # Já temos zone_to_pmax da parte superior da função
-
             total_gen = sum(get(zone_to_pmax, z, 0.0) for z in neighbor_zones)
             total_dem = sum(get(zone_to_pd, z, 0.0) for z in neighbor_zones)
-
             n_borders = length(extra_bus_ids)
 
             virtual_limits_generation = Dict{Int, Float64}()
@@ -231,54 +226,4 @@ function prepare_admm_partitions(data::Dict{String, Any})
     end
 
     return partitions, shared_buses
-end
-
-function compute_virtual_limits(shared_buses::Vector{Int}, data::Dict)
-    branch = data["branch"]
-    f_bus = branch["f_bus"]
-    t_bus = branch["t_bus"]
-    rateA = branch["rate_a"]
-
-    zone_map =
-        Dict(b => z for (z, part) in data["partitions"] for b in part["bus"]["bus_i"])
-
-    virtual_limits = Dict{Int, Float64}()
-
-    for b in shared_buses
-        cap_sum = 0.0
-        for (i, (f, t)) in enumerate(zip(f_bus, t_bus))
-            if f == b && zone_map[f] != zone_map[t]
-                cap_sum += abs(rateA[i])
-            elseif t == b && zone_map[f] != zone_map[t]
-                cap_sum += abs(rateA[i])
-            end
-        end
-        virtual_limits[b] = cap_sum
-    end
-    return virtual_limits
-end
-
-function compute_residuals(
-    θ_avg::Dict{Int, Float64},
-    θ_avg_prev::Dict{Int, Float64},
-    partitions,
-    shared_buses,
-)
-    primal = 0.0
-    dual = 0.0
-
-    for b in shared_buses
-        for (_, pdata) in partitions
-            if b in pdata["bus"]["bus_i"]
-                model = pdata["model"]
-                θ_val = value(model[:theta][b, 1])
-                primal += (θ_val - θ_avg[b])^2
-            end
-        end
-        if haskey(θ_avg_prev, b)
-            dual += (θ_avg[b] - θ_avg_prev[b])^2
-        end
-    end
-
-    return sqrt(primal), sqrt(dual)
 end
