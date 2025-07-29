@@ -107,7 +107,7 @@ function save_subdict_to_csv(subdict::Dict, name::String, output_dir::String)
         if v !== nothing
             df[!, string(k)] = vec(v)
         else
-            println("Campo '$(k)' do bloco '$(name)' é `nothing` e foi ignorado.")
+            println("Field '$(k)' in section '$(name)' is `nothing` and was skipped.")
         end
     end
     CSV.write(joinpath(output_dir, "$name.csv"), df)
