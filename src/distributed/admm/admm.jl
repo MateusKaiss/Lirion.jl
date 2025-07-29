@@ -9,6 +9,7 @@ function run_admm(config::DistributedOPFModel, data)
     res_dual_vec = Float64[]
     eps_primal_vec = Float64[]
     eps_dual_vec = Float64[]
+    rho_vec = Float64[]
 
     for zone_id in keys(partitions)
         duals[zone_id] = Dict{Int, Float64}()
@@ -21,7 +22,6 @@ function run_admm(config::DistributedOPFModel, data)
     for k in 1:config.max_iter
         println("\nIteração $k")
 
-        # --- Step 1: solve the local subproblems ---
         for (zone_id, subdata) in partitions
             local_model = build_model(subdata, base_model; optimizer = Ipopt.Optimizer)
             if base_model == DC
@@ -56,8 +56,7 @@ function run_admm(config::DistributedOPFModel, data)
                 sum(
                     (value(partitions[z]["model"][:theta][b, 1]) - θ_avg[b])^2
                     for b in shared_buses if b in partitions[z]["bus"]["bus_i"]
-                )
-                for z in keys(partitions)
+                ) for z in keys(partitions)
             ),
         )
 
@@ -84,16 +83,17 @@ function run_admm(config::DistributedOPFModel, data)
 
         push!(eps_primal_vec, ϵ_primal)
         push!(eps_dual_vec, ϵ_dual)
-        
         println("‖r‖ = $res_primal | ε_pri = $ϵ_primal")
         println("‖s‖ = $res_dual   | ε_dual = $ϵ_dual")
 
-        if res_primal < 1e-4 && res_dual < 1e-4
+        push!(rho_vec, config.rho)
+
+        if res_primal < ϵ_primal && res_dual < ϵ_dual
             println("Stopping criterion met.")
             break
         end
 
-        # --- ρ adaptive heuristic ---
+        # ρ adaptive heuristic ---
         if res_primal > μ_incr * res_dual
             config.rho *= τ_incr
         elseif res_dual > μ_decr * res_primal
@@ -107,8 +107,11 @@ function run_admm(config::DistributedOPFModel, data)
         "convergencia_admm.html",
     )
 
+    plot_rho(rho_vec, "rho_admm.html")
+
     total_cost = sum(subdata["real_generation_cost"] for subdata in values(partitions))
     println("Total objective value: $total_cost")
+    println("Valor final de rho: $(config.rho)")
     return total_cost, partitions
 end
 
@@ -160,5 +163,26 @@ function plot_admm_convergence(
     p.layout.yaxis.type = "log"
 
     PlotlyLight.save(p, path)
-    return println("Graph saved in $path")
+    return println("Gráfico de convergência salvo em $path")
+end
+
+function plot_rho(rho_vec::Vector{Float64}, path::String)
+    x_vals = 1:length(rho_vec)
+    p = Plot()
+    p(;
+        x = x_vals,
+        y = rho_vec,
+        type = :scatter,
+        mode = "lines+markers",
+        name = "ρ",
+        line = (; color = "green"),
+    )
+
+    p.layout.title = "Evolução de ρ (rho) no ADMM"
+    p.layout.xaxis.title = "Iterações k"
+    p.layout.yaxis.title = "ρ"
+    p.layout.yaxis.type = "log"
+
+    PlotlyLight.save(p, path)
+    return println("Gráfico de rho salvo em $path")
 end
