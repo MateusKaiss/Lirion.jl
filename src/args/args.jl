@@ -28,6 +28,10 @@ function parse_commandline(args)
         "--write-lp"
         help = "Write LP file"
         action = :store_true
+
+        "--outputs"
+        help = "Generate CSV output files"
+        action = :store_true
     end
 
     parsed_args = parse_args(args, s)
@@ -46,6 +50,7 @@ struct Args
     optimizer::Any
     plot_outputs::Bool
     write_lp::Bool
+    write_outputs::Bool
 
     function Args(raw_args::Vector{String})
         s = ArgParseSettings()
@@ -69,6 +74,10 @@ struct Args
 
             "--write-lp"
             help = "Write LP file"
+            action = :store_true
+
+            "--outputs"
+            help = "Generate CSV output files"
             action = :store_true
         end
 
@@ -109,6 +118,7 @@ struct Args
             optimizer,
             get(parsed, "plot-outputs", false),
             get(parsed, "write-lp", false),
+            get(parsed, "outputs", false),
         )
     end
 end
