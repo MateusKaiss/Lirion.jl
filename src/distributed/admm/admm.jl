@@ -221,7 +221,7 @@ function plot_theta_avg_heatmap(θ_avg_history::Dict{Int, Vector{Float64}}, path
 
     p.layout.title = "Evolução de θ_avg por Barra Compartilhada"
     p.layout.xaxis.title = "Iterações"
-    p.layout.yaxis.title = "Barras Compartilhadas"
+    p.layout.yaxis.title = "Ângulo de fase (rad) por Barra Compartilhada"
 
     PlotlyLight.save(p, path)
     return println("Heatmap salvo em $path")
@@ -242,9 +242,9 @@ function plot_theta_local_heatmaps(θ_local_history::Dict{Int, Dict{Int, Vector{
             colorbar = (; title = "θ (local)"),
         )
 
-        p.layout.title = "Zona $zone_id – θ local por Barra Compartilhada"
+        p.layout.title = "Zona $zone_id – θ local por Barra Local"
         p.layout.xaxis.title = "Iterações"
-        p.layout.yaxis.title = "Barra"
+        p.layout.yaxis.title = "Ângulo de fase (rad) por Barra Local"
 
         path = "$(base_path)_zone_$zone_id.html"
         PlotlyLight.save(p, path)
