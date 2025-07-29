@@ -20,6 +20,7 @@ function main(ARGS)
 
     # --- Post-process and organize results ---
     result_dict = build_result_dict(result_model, data)
+    save_result_to_csv(result_dict, data, args.database_path)
 
     return result_dict, result_model, data
 end
