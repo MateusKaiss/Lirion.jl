@@ -10,6 +10,8 @@ function run_admm(config::DistributedOPFModel, data)
     eps_primal_vec = Float64[]
     eps_dual_vec = Float64[]
     rho_vec = Float64[]
+    θ_avg_history = Dict{Int, Vector{Float64}}()
+    θ_local_history = Dict{Int, Dict{Int, Vector{Float64}}}()  # zona → barra → histórico
 
     for zone_id in keys(partitions)
         duals[zone_id] = Dict{Int, Float64}()
@@ -44,11 +46,26 @@ function run_admm(config::DistributedOPFModel, data)
             subdata["model"] = local_model
             subdata["real_generation_cost"] = value(local_model[:generation_cost])
             println("Zone generation cost $zone_id: $(subdata["real_generation_cost"])")
+
+            if base_model == DC
+                model = subdata["model"]
+                θ_vals = value.(model[:theta])
+                bus_ids = subdata["bus"]["bus_i"]
+                for b in shared_buses
+                    if b in bus_ids
+                        θ_b = θ_vals[b, 1]
+                        push!(get!(get!(θ_local_history, zone_id, Dict{Int, Vector{Float64}}()), b, Float64[]), θ_b)
+                    end
+                end
+            end
         end
 
         if base_model == DC
             θ_avg_prev = deepcopy(θ_avg)
             update_shared_variables_dc!(shared_buses, partitions, duals, θ_avg, config.rho)
+            for b in shared_buses
+                push!(get!(θ_avg_history, b, Float64[]), θ_avg[b])
+            end
         end
 
         res_primal = sqrt(
@@ -93,7 +110,6 @@ function run_admm(config::DistributedOPFModel, data)
             break
         end
 
-        # ρ adaptive heuristic ---
         if res_primal > μ_incr * res_dual
             config.rho *= τ_incr
         elseif res_dual > μ_decr * res_primal
@@ -108,6 +124,8 @@ function run_admm(config::DistributedOPFModel, data)
     )
 
     plot_rho(rho_vec, "rho_admm.html")
+    plot_theta_avg_heatmap(θ_avg_history, "theta_avg_heatmap.html")
+    plot_theta_local_heatmaps(θ_local_history, "theta_local_heatmap")
 
     total_cost = sum(subdata["real_generation_cost"] for subdata in values(partitions))
     println("Total objective value: $total_cost")
@@ -185,4 +203,51 @@ function plot_rho(rho_vec::Vector{Float64}, path::String)
 
     PlotlyLight.save(p, path)
     return println("Gráfico de rho salvo em $path")
+end
+
+function plot_theta_avg_heatmap(θ_avg_history::Dict{Int, Vector{Float64}}, path::String)
+    buses = sort(collect(keys(θ_avg_history)))
+    z_matrix = [θ_avg_history[b] for b in buses]
+
+    p = Plot()
+    p(;
+        z = z_matrix,
+        x = 1:length(z_matrix[1]),
+        y = buses,
+        type = :heatmap,
+        colorscale = "Viridis",
+        colorbar = (; title = "θ_avg"),
+    )
+
+    p.layout.title = "Evolução de θ_avg por Barra Compartilhada"
+    p.layout.xaxis.title = "Iterações"
+    p.layout.yaxis.title = "Barras Compartilhadas"
+
+    PlotlyLight.save(p, path)
+    return println("Heatmap salvo em $path")
+end
+
+function plot_theta_local_heatmaps(θ_local_history::Dict{Int, Dict{Int, Vector{Float64}}}, base_path::String)
+    for (zone_id, zone_data) in θ_local_history
+        buses = sort(collect(keys(zone_data)))
+        z_matrix = [zone_data[b] for b in buses]
+
+        p = Plot()
+        p(
+            z = z_matrix,
+            x = 1:length(z_matrix[1]),
+            y = buses,
+            type = :heatmap,
+            colorscale = "Viridis",
+            colorbar = (; title = "θ (local)"),
+        )
+
+        p.layout.title = "Zona $zone_id – θ local por Barra Compartilhada"
+        p.layout.xaxis.title = "Iterações"
+        p.layout.yaxis.title = "Barra"
+
+        path = "$(base_path)_zone_$zone_id.html"
+        PlotlyLight.save(p, path)
+        println(" Heatmap local salvo em $path")
+    end
 end
