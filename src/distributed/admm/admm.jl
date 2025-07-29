@@ -67,7 +67,6 @@ function run_admm(config::DistributedOPFModel, data)
         push!(res_primal_vec, res_primal)
         push!(res_dual_vec, res_dual)
 
-
         println("Res Primal: $res_primal")
         println("Res Dual:   $res_dual")
 
@@ -87,8 +86,8 @@ end
 function plot_admm_residuals(primal::Vector{Float64}, dual::Vector{Float64}, path::String)
     x_vals = 1:length(primal)
     p = Plot()
-    p(; x=x_vals, y=primal, type=:scatter, mode="lines+markers", name="Primal")
-    p(; x=x_vals, y=dual,   type=:scatter, mode="lines+markers", name="Dual")
+    p(; x = x_vals, y = primal, type = :scatter, mode = "lines+markers", name = "Primal")
+    p(; x = x_vals, y = dual, type = :scatter, mode = "lines+markers", name = "Dual")
 
     p.layout.title = "Convergência do ADMM"
     p.layout.xaxis.title = "Iteração"
@@ -96,5 +95,5 @@ function plot_admm_residuals(primal::Vector{Float64}, dual::Vector{Float64}, pat
     p.layout.yaxis.type = "log"
 
     PlotlyLight.save(p, path)
-    println(" Gráfico salvo em $path")
+    return println(" Gráfico salvo em $path")
 end

@@ -48,11 +48,17 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{Subprob
         p_virtual = model.ext[:p_virtual]
         if isa(virtual_cost_coeff, Number)
             @expression(model, virtual_penalty,
-                sum(virtual_cost_coeff * p_virtual[b, t]^2 for b in axes(p_virtual, 1), t in 1:T)
+                sum(
+                    virtual_cost_coeff * p_virtual[b, t]^2 for b in axes(p_virtual, 1),
+                    t in 1:T
+                )
             )
         elseif isa(virtual_cost_coeff, Dict)
             @expression(model, virtual_penalty,
-                sum(virtual_cost_coeff[b] * p_virtual[b, t]^2 for b in axes(p_virtual, 1), t in 1:T)
+                sum(
+                    virtual_cost_coeff[b] * p_virtual[b, t]^2 for b in axes(p_virtual, 1),
+                    t in 1:T
+                )
             )
         else
             error("Unsupported virtual_cost_coeff format")
