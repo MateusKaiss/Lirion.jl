@@ -111,6 +111,7 @@ function save_subdict_to_csv(subdict::Dict, name::String, output_dir::String)
         end
     end
     CSV.write(joinpath(output_dir, "$name.csv"), df)
+    return nothing
 end
 
 function save_result_to_csv(result_dict::Dict, data::Dict, case_path::AbstractString)
@@ -120,9 +121,12 @@ function save_result_to_csv(result_dict::Dict, data::Dict, case_path::AbstractSt
         if subdict isa Dict
             save_subdict_to_csv(subdict, section, output_dir)
         elseif section == "objective"
-            CSV.write(joinpath(output_dir, "objective.csv"), DataFrame(objective = [subdict]))
+            CSV.write(
+                joinpath(output_dir, "objective.csv"),
+                DataFrame(; objective = [subdict]),
+            )
         end
     end
 
-    println("Resultados salvos em: $output_dir")
+    return println("Resultados salvos em: $output_dir")
 end
