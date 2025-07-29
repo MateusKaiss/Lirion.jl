@@ -1,5 +1,6 @@
 module PowerOptimization
 
+using PlotlyLight
 using JuMP
 using Ipopt
 using Gurobi

@@ -5,6 +5,8 @@ function run_admm(config::DistributedOPFModel, data)
     duals = Dict{Int, Dict{Int, Float64}}()
     θ_avg = Dict{Int, Float64}()
     θ_avg_prev = Dict{Int, Float64}()
+    res_primal_vec = Float64[]
+    res_dual_vec = Float64[]
 
     for zone_id in keys(partitions)
         duals[zone_id] = Dict{Int, Float64}()
@@ -62,6 +64,9 @@ function run_admm(config::DistributedOPFModel, data)
         res_dual = sqrt(
             sum((θ_avg[b] - get(θ_avg_prev, b, 0.0))^2 for b in shared_buses; init = 0.0),
         )
+        push!(res_primal_vec, res_primal)
+        push!(res_dual_vec, res_dual)
+
 
         println("Res Primal: $res_primal")
         println("Res Dual:   $res_dual")
@@ -71,9 +76,25 @@ function run_admm(config::DistributedOPFModel, data)
             break
         end
     end
+    plot_admm_residuals(res_primal_vec, res_dual_vec, "residuos_admm.html")
 
     # --- Final cost calculation ---
     total_objective = sum(subdata["real_generation_cost"] for subdata in values(partitions))
     println("Total value of the objective function: $total_objective")
     return total_objective, partitions
+end
+
+function plot_admm_residuals(primal::Vector{Float64}, dual::Vector{Float64}, path::String)
+    x_vals = 1:length(primal)
+    p = Plot()
+    p(; x=x_vals, y=primal, type=:scatter, mode="lines+markers", name="Primal")
+    p(; x=x_vals, y=dual,   type=:scatter, mode="lines+markers", name="Dual")
+
+    p.layout.title = "Convergência do ADMM"
+    p.layout.xaxis.title = "Iteração"
+    p.layout.yaxis.title = "Resíduo"
+    p.layout.yaxis.type = "log"
+
+    PlotlyLight.save(p, path)
+    println(" Gráfico salvo em $path")
 end
