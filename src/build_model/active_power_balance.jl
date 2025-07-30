@@ -93,12 +93,23 @@ function active_power_balance!(model, matpower_data, ::Type{DC}, ::Type{Subprobl
             shared_buses,
         )
 
+        virtual_bounds = Dict{Int, Tuple{Float64, Float64}}()
+
+        for b in shared_buses
+            saldo = generation_limits[b] - demand_limits[b]
+            if saldo ≥ 0
+                virtual_bounds[b] = (0.0, generation_limits[b])
+            else
+                virtual_bounds[b] = (-demand_limits[b], 0.0)
+            end
+        end
+
         @variable(model, p_virtual[b in shared_buses, t in 1:T],
-            lower_bound = -demand_limits[b],
-            # lower_bound = -generation_limits[b],
-            upper_bound = generation_limits[b],
+            lower_bound = virtual_bounds[b][1],
+            upper_bound = virtual_bounds[b][2],
             base_name = "p_virtual"
         )
+
 
         model.ext[:p_virtual] = p_virtual
     end
