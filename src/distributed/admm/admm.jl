@@ -37,7 +37,10 @@ function run_admm(config::DistributedOPFModel, data)
                         admm_penalty += λ * (θ - θ̄) + (config.rho / 2) * (θ - θ̄)^2
                     end
                 end
-                @objective(local_model, Min, local_model[:generation_cost] + admm_penalty)
+                @objective(local_model, Min,
+                    local_model[:generation_cost] + local_model[:virtual_penalty] + admm_penalty
+                )
+
             else
                 error("Base model $(base_model) not yet implemented in ADMM")
             end

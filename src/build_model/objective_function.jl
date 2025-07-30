@@ -41,7 +41,7 @@ function objective!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{Subprob
     compute_generation_cost(model, params)
 
     T = get(model.ext, :time_periods, 1)
-    virtual_cost_coeff = get(matpower_data, "virtual_cost_coeff", 100000.0)  # pode ser escalar ou Dict
+    virtual_cost_coeff = get(matpower_data, "virtual_cost_coeff", 750.0)
     penalty_expr = 0.0
 
     if haskey(model.ext, :p_virtual)
