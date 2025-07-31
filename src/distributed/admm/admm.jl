@@ -129,12 +129,12 @@ function run_admm(config::DistributedOPFModel, data)
     plot_admm_convergence(
         res_primal_vec, res_dual_vec,
         eps_primal_vec, eps_dual_vec,
-        "convergencia_admm.html",
+        "plot_convergencia_admm.html",
     )
 
-    plot_rho(rho_vec, "rho_admm.html")
-    plot_theta_avg_heatmap(θ_avg_history, "theta_avg_heatmap.html")
-    plot_theta_local_heatmaps(θ_local_history, "theta_local_heatmap")
+    plot_rho(rho_vec, "plot_rho_admm.html")
+    plot_theta_avg_heatmap(θ_avg_history, "plot_theta_avg_heatmap.html")
+    plot_theta_local_heatmaps(θ_local_history, "plot_theta_local_heatmap")
 
     total_cost = sum(subdata["real_generation_cost"] for subdata in values(partitions))
     println("Total objective value: $total_cost")
