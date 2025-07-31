@@ -1,3 +1,21 @@
+function compute_real_generation_cost(model, params)
+    T = get(model.ext, :time_periods, 1)
+    active_generators = findall(params.generator_status .== 1)
+
+    total_cost = 0.0
+    for t in 1:T, g in active_generators
+        if haskey(params.generator_costs, t) && haskey(params.generator_costs[t], g)
+            pgen = value(model[:p_generation][g, t]) * params.sbase
+            coefs = params.generator_costs[t][g]
+            degree = length(coefs)
+            for i in 1:degree
+                total_cost += coefs[i] * pgen^(degree - i)
+            end
+        end
+    end
+    return total_cost
+end
+
 function run_admm(config::DistributedOPFModel, data)
     partitions, shared_buses = prepare_admm_partitions(data)
     base_model = config.base_model
@@ -14,7 +32,7 @@ function run_admm(config::DistributedOPFModel, data)
     eps_dual_vec = Float64[]
     rho_vec = Float64[]
     θ_avg_history = Dict{Int, Vector{Float64}}()
-    θ_local_history = Dict{Int, Dict{Int, Vector{Float64}}}()  # zona → barra → histórico
+    θ_local_history = Dict{Int, Dict{Int, Vector{Float64}}}()
 
     for zone_id in keys(partitions)
         duals[zone_id] = Dict{Int, Float64}()
@@ -22,7 +40,7 @@ function run_admm(config::DistributedOPFModel, data)
 
     μ_incr, μ_decr = 1.15, 1.15
     τ_incr, τ_decr = 1.15, 0.9
-    ϵ_abs, ϵ_rel = 1e-4, 1e-4
+    ϵ_abs, ϵ_rel = 3e-4, 3e-4
 
     for k in 1:config.max_iter
         println("\nIteração $k")
@@ -41,9 +59,9 @@ function run_admm(config::DistributedOPFModel, data)
                     end
                 end
                 @objective(local_model, Min,
-                    local_model[:generation_cost] + local_model[:virtual_penalty] + admm_penalty
+                    local_model[:generation_cost] + local_model[:virtual_penalty] +
+                    admm_penalty
                 )
-
             else
                 error("Base model $(base_model) not yet implemented in ADMM")
             end
@@ -58,7 +76,12 @@ function run_admm(config::DistributedOPFModel, data)
             ### This conclusion comes after reducing the ϵ_abs and ϵ_rel to 1e-6, 1e-6, and having much smaller 
             ### ADMM convergence residuals of 498e-12 and 107e-12 for ||r_k|| and ||s_k||, respectively, but
             ### resulting in worse "Total objective value" output.
-            subdata["real_generation_cost"] = value(local_model[:generation_cost])
+
+            # Cost calculated directly from the model (with possible distortions)
+            subdata["generation_cost_model_expr"] = value(local_model[:generation_cost])
+
+            # Actual cost recalculated from variable values
+            subdata["real_generation_cost"] = compute_real_generation_cost(local_model, subdata["objective_params"])
             println("Zone generation cost $zone_id: $(subdata["real_generation_cost"])")
 
             if base_model == DC
@@ -109,8 +132,8 @@ function run_admm(config::DistributedOPFModel, data)
             ϵ_rel * max(
                 sqrt(
                     sum(
-                        (value(partitions[z]["model"][:theta][b, 1]))^2
-                        for z in keys(partitions), b in shared_buses if
+                        (value(partitions[z]["model"][:theta][b, 1]))^2 for
+                        z in keys(partitions), b in shared_buses if
                         b in partitions[z]["bus"]["bus_i"]
                     ),
                 ),
@@ -125,7 +148,6 @@ function run_admm(config::DistributedOPFModel, data)
         println("‖r‖ = $res_primal | ε_pri = $ϵ_primal")
         println("‖s‖ = $res_dual   | ε_dual = $ϵ_dual")
 
-        # Track current_rho instead of config.rho
         push!(rho_vec, current_rho)
 
         if res_primal < ϵ_primal && res_dual < ϵ_dual
@@ -143,20 +165,26 @@ function run_admm(config::DistributedOPFModel, data)
     end
 
     plot_admm_convergence(
-        res_primal_vec, res_dual_vec,
-        eps_primal_vec, eps_dual_vec,
+        res_primal_vec,
+        res_dual_vec,
+        eps_primal_vec,
+        eps_dual_vec,
         "plot_convergencia_admm.html",
     )
-
     plot_rho(rho_vec, "plot_rho_admm.html")
     plot_theta_avg_heatmap(θ_avg_history, "plot_theta_avg_heatmap.html")
     plot_theta_local_heatmaps(θ_local_history, "plot_theta_local_heatmap")
 
-    total_cost = sum(subdata["real_generation_cost"] for subdata in values(partitions))
-    println("Total objective value: $total_cost")
+    total_real_cost = sum(subdata["real_generation_cost"] for subdata in values(partitions))
+    total_expr_cost = sum(subdata["generation_cost_model_expr"] for subdata in values(partitions))
+
+    println("\nResumo geral:")
+    println("→ Total (value(:generation_cost)) = $total_expr_cost")
+    println("→ Total (reavaliado via p_generation) = $total_real_cost")
     println("Valor inicial de rho: $(config.rho)")
     println("Valor final de rho: $current_rho")
-    return total_cost, partitions
+
+    return total_real_cost, partitions
 end
 
 function plot_admm_convergence(
