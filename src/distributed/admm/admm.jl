@@ -157,6 +157,42 @@ function run_admm(config::DistributedOPFModel, data)
 
         # Adaptive rho update: modify current_rho according to [...]
         ### TODO: add publication reference here
+        
+        #=
+        Adaptive update of the ADMM penalty parameter ρ based on the relative size of
+        primal and dual residuals.
+
+        This strategy, known as *residual balancing*, adjusts ρ to improve convergence:
+        - If the primal residual is much larger than the dual, ρ is increased to penalize consensus violation.
+        - If the dual residual dominates, ρ is reduced to allow better primal progress.
+
+        This heuristic is commonly adopted in distributed OPF methods to accelerate convergence
+        and improve robustness under ill-conditioned settings.
+
+        @article{mhanna2019adaptive,
+            title  = {Adaptive ADMM for Distributed AC Optimal Power Flow},
+            author = {Mhanna, Sleiman and Verbi{\v{c}}, Gregor and Chapman, Archie C},
+            journal = {IEEE Transactions on Power Systems},
+            volume = {34},
+            number = {3},
+            pages  = {2025--2035},
+            year   = {2019},
+            publisher = {IEEE},
+            doi    = {10.1109/TPWRS.2018.2886344}
+        }
+
+        @article{gebbran2021fair,
+            title  = {Fair coordination of distributed energy resources with Volt-Var control and PV curtailment},
+            author = {Gebbran, Daniel and Mhanna, Sleiman and Ma, Yiju and Chapman, Archie C and Verbi{\v{c}}, Gregor},
+            journal = {Applied Energy},
+            volume  = {286},
+            pages   = {116546},
+            year    = {2021},
+            publisher = {Elsevier},
+            doi     = {10.1016/j.apenergy.2021.116546}
+        }
+        =#
+
         if res_primal > μ_incr * res_dual
             current_rho *= τ_incr
         elseif res_dual > μ_decr * res_primal
