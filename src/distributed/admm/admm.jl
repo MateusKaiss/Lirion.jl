@@ -2,6 +2,9 @@ function run_admm(config::DistributedOPFModel, data)
     partitions, shared_buses = prepare_admm_partitions(data)
     base_model = config.base_model
 
+    # Initialize local rho variable from config (don't mutate config.rho)
+    current_rho = config.rho
+
     duals = Dict{Int, Dict{Int, Float64}}()
     θ_avg = Dict{Int, Float64}()
     θ_avg_prev = Dict{Int, Float64}()
@@ -34,7 +37,7 @@ function run_admm(config::DistributedOPFModel, data)
                         θ = local_model[:theta][b, 1]
                         θ̄ = get(θ_avg, b, 0.0)
                         λ = get(duals[zone_id], b, 0.0)
-                        admm_penalty += λ * (θ - θ̄) + (config.rho / 2) * (θ - θ̄)^2
+                        admm_penalty += λ * (θ - θ̄) + (current_rho / 2) * (θ - θ̄)^2
                     end
                 end
                 @objective(local_model, Min,
@@ -106,17 +109,20 @@ function run_admm(config::DistributedOPFModel, data)
         println("‖r‖ = $res_primal | ε_pri = $ϵ_primal")
         println("‖s‖ = $res_dual   | ε_dual = $ϵ_dual")
 
-        push!(rho_vec, config.rho)
+        # Track current_rho instead of config.rho
+        push!(rho_vec, current_rho)
 
         if res_primal < ϵ_primal && res_dual < ϵ_dual
             println("Stopping criterion met.")
             break
         end
 
+        # Adaptive rho update: modify current_rho according to [...]
+        ### TODO: add publication reference here
         if res_primal > μ_incr * res_dual
-            config.rho *= τ_incr
+            current_rho *= τ_incr
         elseif res_dual > μ_decr * res_primal
-            config.rho *= τ_decr
+            current_rho *= τ_decr
         end
     end
 
@@ -132,7 +138,8 @@ function run_admm(config::DistributedOPFModel, data)
 
     total_cost = sum(subdata["real_generation_cost"] for subdata in values(partitions))
     println("Total objective value: $total_cost")
-    println("Valor final de rho: $(config.rho)")
+    println("Valor inicial de rho: $(config.rho)")
+    println("Valor final de rho: $current_rho")
     return total_cost, partitions
 end
 
