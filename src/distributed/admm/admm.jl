@@ -50,6 +50,14 @@ function run_admm(config::DistributedOPFModel, data)
 
             optimize!(local_model)
             subdata["model"] = local_model
+            ### TODO: review whether local_model[:generation_cost]:
+            ### The local ADMM subproblem's generation cost is not the same as the real, true generation cost.
+            ### Needs reviewing whether [:generation_cost] is the correct variable to use, or re-computing the 
+            ### generation cost from the local model at the end of the ADMM execution is more appropriate.
+            ### (I used to do the latter and it works as expected.)
+            ### This conclusion comes after reducing the ϵ_abs and ϵ_rel to 1e-6, 1e-6, and having much smaller 
+            ### ADMM convergence residuals of 498e-12 and 107e-12 for ||r_k|| and ||s_k||, respectively, but
+            ### resulting in worse "Total objective value" output.
             subdata["real_generation_cost"] = value(local_model[:generation_cost])
             println("Zone generation cost $zone_id: $(subdata["real_generation_cost"])")
 
@@ -57,6 +65,9 @@ function run_admm(config::DistributedOPFModel, data)
                 model = subdata["model"]
                 θ_vals = value.(model[:theta])
                 bus_ids = subdata["bus"]["bus_i"]
+
+                ### θ_local_history is only recorded for shared buses, not for local buses
+                ### TODO: add local buses to θ_local_history and ensure consistency with input file of 57 buses
                 for b in shared_buses
                     if b in bus_ids
                         θ_b = θ_vals[b, 1]
@@ -70,6 +81,10 @@ function run_admm(config::DistributedOPFModel, data)
             θ_avg_prev = deepcopy(θ_avg)
             update_shared_variables_dc!(shared_buses, partitions, duals, θ_avg, current_rho)
             
+            ### TODO: ensure consistency with input file of 57 buses and actual shared buses. 
+            ### There seems to be quite a few shared buses that are not reflected in the output html,
+            ### which indicated that θ_avg_history is not consistent with the input file.
+            ### Perhaps a processing issue?
             for b in shared_buses
                 push!(get!(θ_avg_history, b, Float64[]), θ_avg[b])
             end
