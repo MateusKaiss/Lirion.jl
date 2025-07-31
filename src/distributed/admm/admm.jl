@@ -91,11 +91,9 @@ function run_admm(config::DistributedOPFModel, data)
 
                 ### θ_local_history is only recorded for shared buses, not for local buses
                 ### TODO: add local buses to θ_local_history and ensure consistency with input file of 57 buses
-                for b in shared_buses
-                    if b in bus_ids
-                        θ_b = θ_vals[b, 1]
-                        push!(get!(get!(θ_local_history, zone_id, Dict{Int, Vector{Float64}}()), b, Float64[]), θ_b)
-                    end
+                for b in bus_ids
+                    θ_b = θ_vals[b, 1]
+                    push!(get!(get!(θ_local_history, zone_id, Dict{Int, Vector{Float64}}()), b, Float64[]), θ_b)
                 end
             end
         end
@@ -157,7 +155,7 @@ function run_admm(config::DistributedOPFModel, data)
 
         # Adaptive rho update: modify current_rho according to [...]
         ### TODO: add publication reference here
-        
+
         #=
         Adaptive update of the ADMM penalty parameter ρ based on the relative size of
         primal and dual residuals.
