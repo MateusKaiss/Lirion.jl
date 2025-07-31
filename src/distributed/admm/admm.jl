@@ -68,7 +68,8 @@ function run_admm(config::DistributedOPFModel, data)
 
         if base_model == DC
             θ_avg_prev = deepcopy(θ_avg)
-            update_shared_variables_dc!(shared_buses, partitions, duals, θ_avg, config.rho)
+            update_shared_variables_dc!(shared_buses, partitions, duals, θ_avg, current_rho)
+            
             for b in shared_buses
                 push!(get!(θ_avg_history, b, Float64[]), θ_avg[b])
             end
