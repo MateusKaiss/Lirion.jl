@@ -93,3 +93,40 @@ function build_result_dict(model::JuMP.Model, data::Dict)
 
     return result
 end
+
+function get_output_directory(case_path::AbstractString)
+    case_dir = dirname(case_path)
+    output_dir = joinpath(case_dir, "outputs")
+    mkpath(output_dir)
+    return output_dir
+end
+
+function save_subdict_to_csv(subdict::Dict, name::String, output_dir::String)
+    df = DataFrame()
+    for (k, v) in subdict
+        if v !== nothing
+            df[!, string(k)] = vec(v)
+        else
+            println("Field '$(k)' in section '$(name)' is `nothing` and was skipped.")
+        end
+    end
+    CSV.write(joinpath(output_dir, "$name.csv"), df)
+    return nothing
+end
+
+function save_result_to_csv(result_dict::Dict, data::Dict, case_path::AbstractString)
+    output_dir = get_output_directory(case_path)
+
+    for (section, subdict) in result_dict
+        if subdict isa Dict
+            save_subdict_to_csv(subdict, section, output_dir)
+        elseif section == "objective"
+            CSV.write(
+                joinpath(output_dir, "objective.csv"),
+                DataFrame(; objective = [subdict]),
+            )
+        end
+    end
+
+    return println("Resultados salvos em: $output_dir")
+end
