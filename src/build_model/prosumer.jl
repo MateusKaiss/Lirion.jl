@@ -50,7 +50,6 @@ function prosumer(
     end
 
     params = get_prosumer_parameters(data)
-
     create_prosumer_variables!(model, params)
     create_prosumer_constraints!(model, params)
 

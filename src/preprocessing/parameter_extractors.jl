@@ -170,39 +170,44 @@ end
 # Prosumer Parameters
 # ---------------------------------------------------------------------
 function get_prosumer_parameters(data)
-    ts = data["prosumer_timeseries"]
+    has_ts = haskey(data, "prosumer_timeseries")
+    T = get(data, "T", 1)
     s = get(data, "prosumer", Dict())
-    T = data["T"]
 
-    if T > 1 && length(ts["time"]) > 0
-        nb = length(unique(ts["bus"]))
-        return (
-            is_timeseries = true,
-            number_of_prosumers = nb,
-            time = ts["time"],
-            bus_index = ts["bus"],
-            q_generation = get(ts, "q_generation", fill(0.0, length(ts["bus"]))),
-            generation = get(ts, "p_pv", fill(0.0, length(ts["bus"]))),
-            q_demand = get(ts, "q_demand", fill(0.0, length(ts["bus"]))),
-            demand = get(ts, "p_load", fill(0.0, length(ts["bus"]))),
-            curtailment = get(ts, "p_curtail", fill(0.0, length(ts["bus"]))),
-            cost_injection = get(s, "cost_injection", fill(0.0, nb)),
-            inverter_capacity = get(s, "inverter_capacity", fill(Inf, nb)),
-        )
-    else
-        nb = get(s, "bus", Int[]) |> length
-        return (
-            is_timeseries = false,
-            number_of_prosumers = nb,
-            time = ones(Int, nb),
-            bus_index = get(s, "bus", Int[]),
-            generation = get(s, "generation", Float64[]),
-            demand = get(s, "demand", Float64[]),
-            curtailment = fill(0.0, nb),
-            cost_injection = get(s, "cost_injection", fill(0.0, nb)),
-            inverter_capacity = get(s, "inverter_capacity", fill(Inf, nb)),
-        )
+    if has_ts
+        ts = data["prosumer_timeseries"]
+        if T > 1 && length(ts["time"]) > 0
+            nb = length(unique(ts["bus"]))
+            return (
+                is_timeseries = true,
+                number_of_prosumers = nb,
+                time = ts["time"],
+                bus_index = ts["bus"],
+                q_generation = get(ts, "q_generation", fill(0.0, length(ts["bus"]))),
+                generation = get(ts, "p_pv", fill(0.0, length(ts["bus"]))),
+                q_demand = get(ts, "q_demand", fill(0.0, length(ts["bus"]))),
+                demand = get(ts, "p_load", fill(0.0, length(ts["bus"]))),
+                curtailment = get(ts, "p_curtail", fill(0.0, length(ts["bus"]))),
+                cost_injection = get(s, "cost_injection", fill(0.0, nb)),
+                inverter_capacity = get(s, "inverter_capacity", fill(Inf, nb)),
+            )
+        end
     end
+
+    nb = get(s, "bus", Int[]) |> length
+    return (
+        is_timeseries = false,
+        number_of_prosumers = nb,
+        time = ones(Int, nb),
+        bus_index = get(s, "bus", Int[]),
+        generation = get(s, "generation", fill(0.0, nb)),
+        demand = get(s, "demand", fill(0.0, nb)),
+        q_generation = get(s, "q_generation", fill(0.0, nb)),
+        q_demand = get(s, "q_demand", fill(0.0, nb)),
+        curtailment = fill(0.0, nb),
+        cost_injection = get(s, "cost_injection", fill(0.0, nb)),
+        inverter_capacity = get(s, "inverter_capacity", fill(Inf, nb)),
+    )
 end
 
 # ---------------------------------------------------------------------
