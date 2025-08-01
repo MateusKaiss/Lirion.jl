@@ -6,10 +6,10 @@ function create_voltage_angle_variables!(model, params)
     @variable(model, theta[b in params.bus_ids, t = 1:T], start = 0.0)
     if !isnothing(params.reference_bus) && params.reference_bus in params.bus_ids
         @constraint(model, theta_ref[t in 1:T], theta[params.reference_bus, t] == 0.0)
-    else
-        local_ref_bus = first(params.bus_ids)
-        @constraint(model, theta_local_ref[t in 1:T], theta[local_ref_bus, t] == 0.0)
-        @info "Using local bar $(local_ref_bus) as auxiliary reference (not the global reference)."
+    # else
+    #     local_ref_bus = first(params.bus_ids)
+    #     @constraint(model, theta_local_ref[t in 1:T], theta[local_ref_bus, t] == 0.0)
+    #     @info "Using local bar $(local_ref_bus) as auxiliary reference (not the global reference)."
     end
 
     return nothing

@@ -40,7 +40,7 @@ function run_admm(config::DistributedOPFModel, data)
 
     μ_incr, μ_decr = 1.15, 1.15
     τ_incr, τ_decr = 1.15, 0.9
-    ϵ_abs, ϵ_rel = 3e-4, 3e-4
+    ϵ_abs, ϵ_rel = 1e-4, 1e-4
 
     for k in 1:config.max_iter
         println("\nIteração $k")
@@ -59,7 +59,7 @@ function run_admm(config::DistributedOPFModel, data)
                     end
                 end
                 @objective(local_model, Min,
-                    local_model[:generation_cost] + local_model[:virtual_penalty] +
+                    local_model[:generation_cost] +
                     admm_penalty
                 )
             else
@@ -81,7 +81,8 @@ function run_admm(config::DistributedOPFModel, data)
             subdata["generation_cost_model_expr"] = value(local_model[:generation_cost])
 
             # Actual cost recalculated from variable values
-            subdata["real_generation_cost"] = compute_real_generation_cost(local_model, subdata["objective_params"])
+            subdata["real_generation_cost"] =
+                compute_real_generation_cost(local_model, subdata["objective_params"])
             println("Zone generation cost $zone_id: $(subdata["real_generation_cost"])")
 
             if base_model == DC
@@ -93,7 +94,14 @@ function run_admm(config::DistributedOPFModel, data)
                 ### TODO: add local buses to θ_local_history and ensure consistency with input file of 57 buses
                 for b in bus_ids
                     θ_b = θ_vals[b, 1]
-                    push!(get!(get!(θ_local_history, zone_id, Dict{Int, Vector{Float64}}()), b, Float64[]), θ_b)
+                    push!(
+                        get!(
+                            get!(θ_local_history, zone_id, Dict{Int, Vector{Float64}}()),
+                            b,
+                            Float64[],
+                        ),
+                        θ_b,
+                    )
                 end
             end
         end
@@ -101,7 +109,7 @@ function run_admm(config::DistributedOPFModel, data)
         if base_model == DC
             θ_avg_prev = deepcopy(θ_avg)
             update_shared_variables_dc!(shared_buses, partitions, duals, θ_avg, current_rho)
-            
+
             ### TODO: ensure consistency with input file of 57 buses and actual shared buses. 
             ### There seems to be quite a few shared buses that are not reflected in the output html,
             ### which indicated that θ_avg_history is not consistent with the input file.
@@ -210,7 +218,8 @@ function run_admm(config::DistributedOPFModel, data)
     plot_theta_local_heatmaps(θ_local_history, "plot_theta_local_heatmap")
 
     total_real_cost = sum(subdata["real_generation_cost"] for subdata in values(partitions))
-    total_expr_cost = sum(subdata["generation_cost_model_expr"] for subdata in values(partitions))
+    total_expr_cost =
+        sum(subdata["generation_cost_model_expr"] for subdata in values(partitions))
 
     println("\nResumo geral:")
     println("→ Total (value(:generation_cost)) = $total_expr_cost")
@@ -315,13 +324,16 @@ function plot_theta_avg_heatmap(θ_avg_history::Dict{Int, Vector{Float64}}, path
     return println("Heatmap salvo em $path")
 end
 
-function plot_theta_local_heatmaps(θ_local_history::Dict{Int, Dict{Int, Vector{Float64}}}, base_path::String)
+function plot_theta_local_heatmaps(
+    θ_local_history::Dict{Int, Dict{Int, Vector{Float64}}},
+    base_path::String,
+)
     for (zone_id, zone_data) in θ_local_history
         buses = sort(collect(keys(zone_data)))
         z_matrix = [zone_data[b] for b in buses]
 
         p = Plot()
-        p(
+        p(;
             z = z_matrix,
             x = 1:length(z_matrix[1]),
             y = buses,

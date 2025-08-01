@@ -45,6 +45,14 @@ function prepare_admm_partitions(data::Dict{String, Any})
         subdata["bus"] =
             Dict(k => v[bus_mask] for (k, v) in data["bus"] if length(v) == length(bus_ids))
 
+        for (i, b) in enumerate(subdata["bus"]["bus_i"])
+            if !(b in zone_bus_ids)
+                subdata["bus"]["pd"][i] = 0.0
+                subdata["bus"]["qd"][i] = 0.0
+                subdata["bus"]["bus_type"][i] = 1 
+            end
+        end
+
         for key in ["gen", "prosumer", "consumer", "storage"]
             if haskey(data, key)
                 table = data[key]
@@ -62,7 +70,8 @@ function prepare_admm_partitions(data::Dict{String, Any})
                         Dict(
                             k => v[keep] for
                             (k, v) in table if length(v) == length(table[bus_key])
-                        ) : Dict(k => Any[] for k in keys(table))
+                        ) :
+                        Dict(k => Any[] for k in keys(table))
                 else
                     subdata[key] = Dict(k => Any[] for k in keys(table))
                 end
@@ -80,7 +89,6 @@ function prepare_admm_partitions(data::Dict{String, Any})
 
             inter_out = Int[]
             inter_in = Int[]
-
             for i in keep
                 zb_f = zone_map[f_bus[i]]
                 zb_t = zone_map[t_bus[i]]
@@ -117,7 +125,7 @@ function prepare_admm_partitions(data::Dict{String, Any})
                     push!(neighbor_zones, z1 == zone ? z2 : z1)
                 end
             end
-            
+
             zone_to_pd = Dict{Int, Float64}()
             for (i, z) in enumerate(data["bus"]["zone"])
                 pd = data["bus"]["pd"][i]
@@ -129,7 +137,6 @@ function prepare_admm_partitions(data::Dict{String, Any})
 
             virtual_limits_generation = Dict{Int, Float64}()
             virtual_limits_demand = Dict{Int, Float64}()
-
             for b in extra_bus_ids
                 virtual_limits_generation[b] = n_borders > 0 ? total_gen / n_borders : 0.0
                 virtual_limits_demand[b] = n_borders > 0 ? total_dem / n_borders : 0.0
@@ -137,7 +144,6 @@ function prepare_admm_partitions(data::Dict{String, Any})
 
             subdata["virtual_limits_generation"] = virtual_limits_generation
             subdata["virtual_limits_demand"] = virtual_limits_demand
-
             subdata["bus_to_inter_out_branches"] = bus_to_inter_out_branches
             subdata["bus_to_inter_in_branches"] = bus_to_inter_in_branches
 
@@ -168,7 +174,8 @@ function prepare_admm_partitions(data::Dict{String, Any})
                 !isempty(keep) ?
                 Dict(
                     k => v[keep] for (k, v) in gen if length(v) == length(gen[bus_field])
-                ) : Dict(k => Any[] for k in keys(gen))
+                ) :
+                Dict(k => Any[] for k in keys(gen))
 
             if haskey(data, "gencost")
                 subdata["gencost"] = Dict(

@@ -39,35 +39,8 @@ end
 function objective!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
     params = matpower_data["objective_params"]
     compute_generation_cost(model, params)
-
-    T = get(model.ext, :time_periods, 1)
-    virtual_cost_coeff = get(matpower_data, "virtual_cost_coeff", 100000.0)
-    penalty_expr = 0.0
-
-    if haskey(model.ext, :p_virtual)
-        p_virtual = model.ext[:p_virtual]
-        if isa(virtual_cost_coeff, Number)
-            @expression(model, virtual_penalty,
-                sum(
-                    virtual_cost_coeff * p_virtual[b, t]^2 for b in axes(p_virtual, 1),
-                    t in 1:T
-                )
-            )
-        elseif isa(virtual_cost_coeff, Dict)
-            @expression(model, virtual_penalty,
-                sum(
-                    virtual_cost_coeff[b] * p_virtual[b, t]^2 for b in axes(p_virtual, 1),
-                    t in 1:T
-                )
-            )
-        else
-            error("Unsupported virtual_cost_coeff format")
-        end
-        penalty_expr = model[:virtual_penalty]
-    end
-
     @objective(model, Min,
-        model[:generation_cost] + penalty_expr
+        model[:generation_cost]
     )
 end
 
