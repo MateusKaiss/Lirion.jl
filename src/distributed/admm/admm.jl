@@ -40,7 +40,7 @@ function run_admm(config::DistributedOPFModel, data)
 
     μ_incr, μ_decr = 1.15, 1.15
     τ_incr, τ_decr = 1.15, 0.9
-    ϵ_abs, ϵ_rel = 1e-4, 1e-4
+    ϵ_abs, ϵ_rel = 1e-2, 1e-2
 
     for k in 1:config.max_iter
         println("\nIteração $k")
@@ -92,16 +92,22 @@ function run_admm(config::DistributedOPFModel, data)
 
                 ### θ_local_history is only recorded for shared buses, not for local buses
                 ### TODO: add local buses to θ_local_history and ensure consistency with input file of 57 buses
-                for b in bus_ids
-                    θ_b = θ_vals[b, 1]
-                    push!(
-                        get!(
-                            get!(θ_local_history, zone_id, Dict{Int, Vector{Float64}}()),
-                            b,
-                            Float64[],
-                        ),
-                        θ_b,
-                    )
+                # for b in bus_ids
+                #     θ_b = θ_vals[b, 1]
+                #     push!(
+                #         get!(
+                #             get!(θ_local_history, zone_id, Dict{Int, Vector{Float64}}()),
+                #             b,
+                #             Float64[],
+                #         ),
+                #         θ_b,
+                #     )
+                # end
+                for b in shared_buses
+                    if b in bus_ids
+                        θ_b = θ_vals[b, 1]
+                        push!(get!(get!(θ_local_history, zone_id, Dict{Int, Vector{Float64}}()), b, Float64[]), θ_b)
+                    end
                 end
             end
         end
