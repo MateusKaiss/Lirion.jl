@@ -45,6 +45,8 @@ function prepare_admm_partitions(data::Dict{String, Any})
         subdata["bus"] =
             Dict(k => v[bus_mask] for (k, v) in data["bus"] if length(v) == length(bus_ids))
 
+        is_virtual_bus = [b ∈ extra_bus_ids_set for b in subdata["bus"]["bus_i"]]
+        subdata["bus"]["is_virtual"] = is_virtual_bus
         for (i, b) in enumerate(subdata["bus"]["bus_i"])
             if !(b in zone_bus_ids)
                 subdata["bus"]["pd"][i] = 0.0

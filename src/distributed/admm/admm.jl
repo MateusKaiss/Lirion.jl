@@ -40,7 +40,7 @@ function run_admm(config::DistributedOPFModel, data)
 
     μ_incr, μ_decr = 1.15, 1.15
     τ_incr, τ_decr = 1.15, 0.9
-    ϵ_abs, ϵ_rel = 1e-2, 1e-2
+    ϵ_abs, ϵ_rel = 1e-7, 1e-7
 
     for k in 1:config.max_iter
         println("\nIteração $k")

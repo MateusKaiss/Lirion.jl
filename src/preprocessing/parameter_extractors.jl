@@ -287,6 +287,7 @@ function get_power_balance_parameters(matpower_data)
         shunt_conductance = matpower_data["bus"]["gs"],
         existing = matpower_data["gen"]["gen_status"],
         branch_status = matpower_data["branch"]["br_status"],
+        is_virtual = get(matpower_data["bus"], "is_virtual", fill(false, length(matpower_data["bus"]["bus_i"]))),
         has_timeseries = get(matpower_data, "T", 1) > 1,
         bus_to_generators = getfieldsafe(
             matpower_data,
