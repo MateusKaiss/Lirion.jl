@@ -38,9 +38,10 @@ function run_admm(config::DistributedOPFModel, data)
         duals[zone_id] = Dict{Int, Float64}()
     end
 
-    μ_incr, μ_decr = 1.15, 1.15
-    τ_incr, τ_decr = 1.15, 0.9
-    ϵ_abs, ϵ_rel = 1e-7, 1e-7
+    μ_incr, μ_decr = 2.0, 2.0       # Higher tolerance for imbalance between residuals
+    τ_incr, τ_decr = 1.1, 0.95     # Smooth increase/decrease of ρ
+    ϵ_abs, ϵ_rel = 1e-6, 1e-6       # Good precision without being too strict
+
 
     for k in 1:config.max_iter
         println("\nIteração $k")
@@ -67,6 +68,7 @@ function run_admm(config::DistributedOPFModel, data)
             end
 
             optimize!(local_model)
+            print(local_model)
             subdata["model"] = local_model
             ### TODO: review whether local_model[:generation_cost]:
             ### The local ADMM subproblem's generation cost is not the same as the real, true generation cost.
