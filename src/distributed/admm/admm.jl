@@ -39,7 +39,7 @@ function run_admm(config::DistributedOPFModel, data)
     end
 
     μ_incr, μ_decr = 2.0, 2.0       # Higher tolerance for imbalance between residuals
-    τ_incr, τ_decr = 1.1, 0.95     # Smooth increase/decrease of ρ
+    τ_incr, τ_decr = 1.05, 0.98     # Smooth increase/decrease of ρ
     ϵ_abs, ϵ_rel = 1e-6, 1e-6       # Good precision without being too strict
 
 
