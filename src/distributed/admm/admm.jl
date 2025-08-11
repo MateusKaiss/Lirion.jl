@@ -42,7 +42,6 @@ function run_admm(config::DistributedOPFModel, data)
     τ_incr, τ_decr = 1.05, 0.98     # Smooth increase/decrease of ρ
     ϵ_abs, ϵ_rel = 1e-6, 1e-6       # Good precision without being too strict
 
-
     for k in 1:config.max_iter
         println("\nIteração $k")
 
@@ -108,7 +107,18 @@ function run_admm(config::DistributedOPFModel, data)
                 for b in shared_buses
                     if b in bus_ids
                         θ_b = θ_vals[b, 1]
-                        push!(get!(get!(θ_local_history, zone_id, Dict{Int, Vector{Float64}}()), b, Float64[]), θ_b)
+                        push!(
+                            get!(
+                                get!(
+                                    θ_local_history,
+                                    zone_id,
+                                    Dict{Int, Vector{Float64}}(),
+                                ),
+                                b,
+                                Float64[],
+                            ),
+                            θ_b,
+                        )
                     end
                 end
             end

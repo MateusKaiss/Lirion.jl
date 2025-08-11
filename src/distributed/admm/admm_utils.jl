@@ -51,7 +51,7 @@ function prepare_admm_partitions(data::Dict{String, Any})
             if !(b in zone_bus_ids)
                 subdata["bus"]["pd"][i] = 0.0
                 subdata["bus"]["qd"][i] = 0.0
-                subdata["bus"]["bus_type"][i] = 1 
+                subdata["bus"]["bus_type"][i] = 1
             end
         end
 
