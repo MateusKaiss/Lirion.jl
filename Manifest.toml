@@ -2,7 +2,7 @@
 
 julia_version = "1.9.4"
 manifest_format = "2.0"
-project_hash = "7cb60e10e5dd7d2b57f61f4c7d569f4cbd22cff9"
+project_hash = "0436cece05b523cad9b22d9bf0f2f4602d3829b8"
 
 [[deps.ASL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -79,6 +79,12 @@ deps = ["CodecZlib", "Dates", "FilePathsBase", "InlineStrings", "Mmap", "Parsers
 git-tree-sha1 = "deddd8725e5e1cc49ee205a1964256043720a6c3"
 uuid = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 version = "0.10.15"
+
+[[deps.Cobweb]]
+deps = ["DefaultApplication", "OrderedCollections", "Scratch"]
+git-tree-sha1 = "6665ec6b16446379fb76ad58a2a7b65687c77271"
+uuid = "ec354790-cf28-43e8-bb59-b484409b7bad"
+version = "0.7.2"
 
 [[deps.CodecBzip2]]
 deps = ["Bzip2_jll", "TranscodingStreams"]
@@ -159,6 +165,12 @@ version = "1.0.0"
 deps = ["Printf"]
 uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
 
+[[deps.DefaultApplication]]
+deps = ["InteractiveUtils"]
+git-tree-sha1 = "c0dfa5a35710a193d83f03124356eef3386688fc"
+uuid = "3f0dd361-4fe0-5fc6-8523-80b14ec94d85"
+version = "1.1.0"
+
 [[deps.DiffResults]]
 deps = ["StaticArraysCore"]
 git-tree-sha1 = "782dd5f4561f5d267313f23853baaaa4c52ea621"
@@ -199,6 +211,12 @@ version = "0.9.3"
 deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 version = "1.6.0"
+
+[[deps.EasyConfig]]
+deps = ["JSON3", "OrderedCollections", "StructTypes"]
+git-tree-sha1 = "11fa8ecd53631b01a2af60e16795f8b4731eb391"
+uuid = "acab07b0-f158-46d4-8913-50acef6d41fe"
+version = "0.1.16"
 
 [[deps.FilePathsBase]]
 deps = ["Compat", "Dates"]
@@ -540,6 +558,12 @@ deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 version = "1.9.2"
 
+[[deps.PlotlyLight]]
+deps = ["Artifacts", "Cobweb", "Dates", "Downloads", "EasyConfig", "JSON3"]
+git-tree-sha1 = "1cb364fafd75dc7a8a0fcf384acc6fb6d115e32a"
+uuid = "ca7969ec-10b3-423e-8d99-40f33abb42bf"
+version = "0.12.0"
+
 [[deps.PooledArrays]]
 deps = ["DataAPI", "Future"]
 git-tree-sha1 = "36d8b4b899628fb92c2749eb488d884a926614d3"
@@ -626,6 +650,12 @@ deps = ["Artifacts", "CompilerSupportLibraries_jll", "Hwloc_jll", "JLLWrappers",
 git-tree-sha1 = "11f3da4b25efacd1cec8e263421f2a9003a5e8e0"
 uuid = "319450e9-13b8-58e8-aa9f-8fd1420848ab"
 version = "2024.5.8+0"
+
+[[deps.Scratch]]
+deps = ["Dates"]
+git-tree-sha1 = "9b81b8393e50b7d4e6d0a9f14e192294d3b7c109"
+uuid = "6c6a2e73-6563-6170-7368-637461726353"
+version = "1.3.0"
 
 [[deps.SentinelArrays]]
 deps = ["Dates", "Random"]

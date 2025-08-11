@@ -1,6 +1,3 @@
-# ---------------------------------------------------------------------
-# DC Branch Modeling
-# ---------------------------------------------------------------------
 function compute_dc_branch_expressions(model, params)
     T = get(model.ext, :time_periods, 1)
 
@@ -21,7 +18,7 @@ end
 function create_dc_branch_constraints(model, params)
     T = get(model.ext, :time_periods, 1)
 
-    @constraint(model, [i in params.active, t in 1:T],
+    @constraint(model, capacity[i in params.active, t in 1:T],
         -params.capacity[i] <= model[:p_flow_branches][i, t] <= params.capacity[i]
     )
 

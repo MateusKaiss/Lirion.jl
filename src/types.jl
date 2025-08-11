@@ -4,8 +4,8 @@ struct DC <: OPFModel end
 struct AC <: OPFModel end
 struct SOCP <: OPFModel end
 
-struct DistributedOPFModel <: OPFModel
-    base_model::Type{<:OPFModel}
+mutable struct DistributedOPFModel
+    base_model::Any
     method::Symbol
     max_iter::Int
     rho::Float64

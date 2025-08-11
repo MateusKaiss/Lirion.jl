@@ -112,6 +112,7 @@ function get_branch_parameters(branch_data, matpower_data)
         g = g,
         b = b,
         active = active,
+        zone = matpower_data["bus"]["zone"],
     )
 end
 
@@ -286,6 +287,11 @@ function get_power_balance_parameters(matpower_data)
         shunt_conductance = matpower_data["bus"]["gs"],
         existing = matpower_data["gen"]["gen_status"],
         branch_status = matpower_data["branch"]["br_status"],
+        is_virtual = get(
+            matpower_data["bus"],
+            "is_virtual",
+            fill(false, length(matpower_data["bus"]["bus_i"])),
+        ),
         has_timeseries = get(matpower_data, "T", 1) > 1,
         bus_to_generators = getfieldsafe(
             matpower_data,
@@ -310,6 +316,16 @@ function get_power_balance_parameters(matpower_data)
         bus_to_branches_to = getfieldsafe(
             matpower_data,
             "bus_to_branches_to",
+            Dict{Int, Vector{Int}}(),
+        ),
+        bus_to_inter_in_branches = getfieldsafe(
+            matpower_data,
+            "bus_to_inter_in_branches",
+            Dict{Int, Vector{Int}}(),
+        ),
+        bus_to_inter_out_branches = getfieldsafe(
+            matpower_data,
+            "bus_to_inter_out_branches",
             Dict{Int, Vector{Int}}(),
         ),
     )

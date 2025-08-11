@@ -88,7 +88,11 @@ struct Args
             "ac" => AC,
             "socp" => SOCP,
             "distributed-admm-dc" =>
-                DistributedOPFModel(DC, :admm, 10, 100.0, 1e-4, 1e-4),
+                DistributedOPFModel(DC, :admm, 350, 1000, 1e-7, 1e-7),
+            # DistributedOPFModel(DC, :admm, 700 , 1000, 1e-7, 1e-7),
+            # DistributedOPFModel(DC, :admm, 350 , 1000, 1e-7, 1e-7),
+            # DistributedOPFModel(DC, :admm, 500 , 500_000, 1e-7, 1e-7),
+            # DistributedOPFModel(DC, :admm, 600 , 1_000_000, 1e-7, 1e-7),
             "distributed-admm-ac" =>
                 DistributedOPFModel(AC, :admm, 100, 10.0, 1e-4, 1e-4),
             "distributed-admm-socp" =>

@@ -65,6 +65,11 @@ function compute_power_balance(model, matpower_data, params, bus_index, t)
     else
         0.0
     end
+    if haskey(model.ext, :p_virtual) && bus_index in axes(model.ext[:p_virtual], 1)
+        p_virt = model.ext[:p_virtual][bus_index, t]
+    else
+        p_virt = 0.0
+    end
 
     return p_gen - p_bat - p_pros - pd - p_cons - p_out - p_in
 end
@@ -76,7 +81,9 @@ function active_power_balance!(model, matpower_data, ::Type{DC}, ::Type{Subprobl
     params = matpower_data["power_balance_params"]
     T = get(model.ext, :time_periods, 1)
 
-    @constraint(model, [b in params.bus_ids, t in 1:T],
+    valid_bus_ids = filter(b -> !params.is_virtual[params.bus_idx_map[b]], params.bus_ids)
+
+    @constraint(model, [b in valid_bus_ids, t in 1:T],
         compute_power_balance(model, matpower_data, params, b, t) -
         params.shunt_conductance[params.bus_idx_map[b]] == 0
     )

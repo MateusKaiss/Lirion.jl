@@ -39,7 +39,6 @@ end
 function objective!(model::JuMP.Model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
     params = matpower_data["objective_params"]
     compute_generation_cost(model, params)
-
     @objective(model, Min,
         model[:generation_cost]
     )

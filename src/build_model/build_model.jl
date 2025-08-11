@@ -109,11 +109,16 @@ function build_and_optimize_singleperiod_model(
     )
 
     JuMP.optimize!(model)
+    print(model)
+    # sss
     termination_status = JuMP.termination_status(model)
     if termination_status == MOI.OPTIMAL || termination_status == MOI.LOCALLY_SOLVED
         @show JuMP.objective_value(model)
     else
         @warn "Modelo não resolveu com sucesso. Status: $termination_status"
+        print(model)
+        # compute_conflict!(model)
+        ss
     end
     return model
 end
