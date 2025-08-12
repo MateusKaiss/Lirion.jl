@@ -5,13 +5,20 @@ const distributed_zone_cases = [
     # 14 buses
     "pglib_opf_case14_2zones_ieee.m", 
     "pglib_opf_case14_3zones_ieee.m",
-    # 24 buses
+    # # 24 buses
     "pglib_opf_case24_2zones_ieee_rts.m",
     "pglib_opf_case24_3zones_ieee_rts.m",
-    # 30 buses
+    # # 30 buses
     "pglib_opf_case30_2zones_as.m",
-    # "pglib_opf_case30_3zones_as.m",
-    #
+    "pglib_opf_case30_3zones_as.m",
+    # # 57 buses
+    "pglib_opf_case57_2zones_ieee.m",
+    "pglib_opf_case57_4zones_ieee.m",
+    # # 118 buses
+    "pglib_opf_case118_2zones_ieee",
+    # 500 buses
+    "pglib_opf_case500_2zones_goc.m",
+    "pglib_opf_case500_3zones_goc.m",
 ]
 
 function track_failure_dist(label::String, origin::String, case_name::String)
@@ -95,16 +102,29 @@ function run_distributed_objective_tests(; case_list = distributed_zone_cases, l
     for (i, file) in enumerate(selected_files)
         case_name = basename(file)
 
-        admm_max_iter, admm_rho =
+        # defaults por zonas
+        admm_max_iter_case, admm_rho_case =
             if occursin("_3zones_", case_name)
-                (550, 1_000_000.0)
+                (700, 1_000.0)
             elseif occursin("_2zones_", case_name)
-                (200, 1_000.0)
+                (300, 1_000.0)
             else
-                (350, 1_000.0)  # fallback
+                (350, 1_000.0)
             end
 
-        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$admm_max_iter, rho=$admm_rho)"
+        # eps padrão vindos da assinatura
+        admm_eps_primal_case = admm_eps_primal
+        admm_eps_dual_case   = admm_eps_dual
+
+        # ---- OVERRIDE para casos de 500 barras ----
+        if occursin("case500_", case_name)
+            admm_max_iter_case   = 600
+            admm_rho_case        = 1_000_000.0
+            admm_eps_primal_case = 1e-7
+            admm_eps_dual_case   = 1e-7
+        end
+
+        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"
         @testset "$(label) - $(case_name)" begin
             compare_distributed_vs_centralized(
                 file;
@@ -113,10 +133,10 @@ function run_distributed_objective_tests(; case_list = distributed_zone_cases, l
                 distributed_optimizer = distributed_optimizer,
                 rtol = rtol,
                 atol = atol,
-                admm_rho = admm_rho,
-                admm_max_iter = admm_max_iter,
-                admm_eps_primal = admm_eps_primal,
-                admm_eps_dual = admm_eps_dual,
+                admm_rho = admm_rho_case,
+                admm_max_iter = admm_max_iter_case,
+                admm_eps_primal = admm_eps_primal_case,
+                admm_eps_dual = admm_eps_dual_case,
             )
         end
     end
