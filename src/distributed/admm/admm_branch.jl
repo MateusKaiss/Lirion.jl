@@ -31,11 +31,11 @@ end
 
 function run_admm_branch(config::DistributedOPFModel, data::Dict{String, Any})
     partitions, _shared_buses_unused = prepare_admm_partitions(data)
-    base_model = config.base_model         
+    base_model = config.base_model
     cut_edges = _find_cut_edges(data)
 
-    duals   = Dict{Int, Dict{Int, Float64}}()
-    z_flow  = Dict{Int, Float64}()             
+    duals = Dict{Int, Dict{Int, Float64}}()
+    z_flow = Dict{Int, Float64}()
     z_flow_prev = Dict{Int, Float64}()
 
     current_rho = config.rho
@@ -46,13 +46,15 @@ function run_admm_branch(config::DistributedOPFModel, data::Dict{String, Any})
         z_flow[e] = 0.0
     end
 
-    res_primal_vec = Float64[]; res_dual_vec = Float64[]
-    eps_primal_vec = Float64[]; eps_dual_vec = Float64[]
+    res_primal_vec = Float64[]
+    res_dual_vec = Float64[]
+    eps_primal_vec = Float64[]
+    eps_dual_vec = Float64[]
     rho_vec = Float64[]
 
     μ_incr, μ_decr = 2.0, 2.0
     τ_incr, τ_decr = 1.05, 0.98
-    ϵ_abs, ϵ_rel   = 1e-6, 1e-6
+    ϵ_abs, ϵ_rel = 1e-6, 1e-6
 
     for k in 1:config.max_iter
         println("\n[ADMM-branch] Iteração $k")
@@ -85,13 +87,15 @@ function run_admm_branch(config::DistributedOPFModel, data::Dict{String, Any})
         z_flow_prev = deepcopy(z_flow)
 
         for e in cut_edges
-            num = 0; acc = 0.0
+            num = 0
+            acc = 0.0
             for (_, subdata) in partitions
                 local_idx = findfirst(==(e), subdata["branch_local_indices"])
                 if local_idx !== nothing
                     m = subdata["model"]
                     p_val = value(_dc_flow_expr(m, subdata, local_idx))
-                    acc += p_val; num += 1
+                    acc += p_val
+                    num += 1
                 end
             end
             z_flow[e] = (num > 0) ? acc / num : 0.0
@@ -121,17 +125,19 @@ function run_admm_branch(config::DistributedOPFModel, data::Dict{String, Any})
         res_dual = sqrt(sum((z_flow[e] - get(z_flow_prev, e, 0.0))^2 for e in cut_edges))
 
         push!(res_primal_vec, res_primal)
-        push!(res_dual_vec,   res_dual)
+        push!(res_dual_vec, res_dual)
         dim_pri = sum(length(_zone_cut_edges(sub, cut_edges)) for (_, sub) in partitions)
-        dim_du  = length(cut_edges)
+        dim_du = length(cut_edges)
 
-        ϵ_primal = sqrt(max(1, dim_pri)) * ϵ_abs +
-                   ϵ_rel * max(sqrt(sum(z_flow[e]^2 for e in cut_edges)), 1e-12)
-        ϵ_dual   = sqrt(max(1, dim_du))  * ϵ_abs +
-                   ϵ_rel * sqrt(sum((z_flow[e] - get(z_flow_prev, e, 0.0))^2 for e in cut_edges))
+        ϵ_primal =
+            sqrt(max(1, dim_pri)) * ϵ_abs +
+            ϵ_rel * max(sqrt(sum(z_flow[e]^2 for e in cut_edges)), 1e-12)
+        ϵ_dual =
+            sqrt(max(1, dim_du)) * ϵ_abs +
+            ϵ_rel * sqrt(sum((z_flow[e] - get(z_flow_prev, e, 0.0))^2 for e in cut_edges))
 
         push!(eps_primal_vec, ϵ_primal)
-        push!(eps_dual_vec,   ϵ_dual)
+        push!(eps_dual_vec, ϵ_dual)
 
         println("‖r‖ = $res_primal | ε_pri = $ϵ_primal")
         println("‖s‖ = $res_dual   | ε_dual = $ϵ_dual")
@@ -151,7 +157,7 @@ function run_admm_branch(config::DistributedOPFModel, data::Dict{String, Any})
     end
 
     plot_admm_convergence(res_primal_vec, res_dual_vec, eps_primal_vec, eps_dual_vec,
-                          "plot_convergencia_admm_branch.html")
+        "plot_convergencia_admm_branch.html")
     plot_rho(rho_vec, "plot_rho_admm_branch.html")
 
     total_real_cost = sum(p["real_generation_cost"] for p in values(partitions))

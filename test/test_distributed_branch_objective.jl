@@ -88,7 +88,7 @@ end
 """
 Roda a suíte de testes para ADMM-Branch-DC vs DC nos casos de zonas.
 """
-function run_distributed_branch_objective_tests(; 
+function run_distributed_branch_objective_tests(;
     case_list = distributed_branch_zone_cases,
     label = "ADMM-Branch-DC vs DC",
     central_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer),
@@ -122,13 +122,13 @@ function run_distributed_branch_objective_tests(;
             end
 
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case   = admm_eps_dual
+        admm_eps_dual_case = admm_eps_dual
 
         if occursin("case500_", case_name)
-            admm_max_iter_case   = 600
-            admm_rho_case        = 1_000_000.0
+            admm_max_iter_case = 600
+            admm_rho_case = 1_000_000.0
             admm_eps_primal_case = 1e-7
-            admm_eps_dual_case   = 1e-7
+            admm_eps_dual_case = 1e-7
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"
