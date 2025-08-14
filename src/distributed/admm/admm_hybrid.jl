@@ -31,7 +31,7 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
 
     μ_incr, μ_decr = 2.0, 2.0
     τ_incr, τ_decr = 1.05, 0.98
-    ϵ_abs, ϵ_rel = config.eps_primal, config.eps_dual
+    ϵ_abs, ϵ_rel = 1e-6, 1e-6
     θ_avg_history = Dict{Int, Vector{Float64}}()
 
     for k in 1:config.max_iter
