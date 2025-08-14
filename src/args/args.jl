@@ -15,17 +15,17 @@ struct Args
 
         @add_arg_table! s begin
             "path"
-            help = "Path to MATPOWER .m file or CSV folder"
+            help = "Path to MATPOWER .m file or a CSV folder"
             arg_type = String
             required = true
 
             "--model"
-            help = "Model: dc | ac | socp | distributed-admm-dc | distributed-admm-branch-dc"
+            help = "Model: dc | ac | socp | distributed-admm-dc | distributed-admm-branch-dc | distributed-admm-hybrid-dc"
             arg_type = String
             required = true
 
             "--optimizer"
-            help = "Optimizer function (e.g., Ipopt.Optimizer, Gurobi.Optimizer)"
+            help = "Optimizer function, e.g., Ipopt.Optimizer or Gurobi.Optimizer (default: Ipopt.Optimizer)"
             arg_type = String
 
             "--plot-outputs"
@@ -33,7 +33,7 @@ struct Args
             action = :store_true
 
             "--write-lp"
-            help = "Write LP file"
+            help = "Write LP file exported by JuMP/optimizer (if supported)"
             action = :store_true
 
             "--outputs"
@@ -42,22 +42,22 @@ struct Args
 
             # ======= ADMM =======
             "--admm-rho"
-            help = "Initial ρ (only for distributed-admm-*)"
+            help = "Initial ρ (for ADMM consensus penalty)"
             arg_type = Float64
             default = 1_000.0
 
             "--admm-max-iter"
-            help = "Max ADMM iterations (only for distributed-admm-*)"
+            help = "Max ADMM iterations"
             arg_type = Int
             default = 350
 
             "--admm-eps-primal"
-            help = "Primal tolerance ε_primal (only for distributed-admm-*)"
+            help = "Primal tolerance ε_primal"
             arg_type = Float64
             default = 1e-7
 
             "--admm-eps-dual"
-            help = "Dual tolerance ε_dual (only for distributed-admm-*)"
+            help = "Dual tolerance ε_dual"
             arg_type = Float64
             default = 1e-7
         end
@@ -82,11 +82,12 @@ struct Args
                 # accepted formats:
                 #  - distributed-admm-dc
                 #  - distributed-admm-branch-dc
+                #  - distributed-admm-hybrid-dc
                 if length(parts) == 3
                     _, method_str, base_str = parts
-                    variant_str = ""
+                    variant_str = ""  # ex.: "distributed-admm-dc"
                 elseif length(parts) == 4
-                    _, method_str, variant_str, base_str = parts
+                    _, method_str, variant_str, base_str = parts  # ex.: "distributed-admm-branch-dc"
                 else
                     error("Invalid distributed model key: $(parsed["model"])")
                 end
@@ -96,16 +97,15 @@ struct Args
                 haskey(base_map, base_str) ||
                     error("Invalid base model in distributed-* key: $base_str")
 
-                method_sym = if variant_str == ""
-                    :admm                      # Bus partitioning 
-                elseif variant_str == "branch"
-                    :admm_branch              # Branch partitioning
-                else
+                method_sym =
+                    variant_str == "" ? :admm :
+                    variant_str == "branch" ? :admm_branch :
+                    variant_str == "hybrid" ? :admm_hybrid :
                     error("Unsupported distributed method variant: $variant_str")
-                end
 
-                if method_sym == :admm_branch && base_str != "dc"
-                    error("distributed-admm-branch-* currently supported only with DC")
+                if (method_sym == :admm_branch || method_sym == :admm_hybrid) &&
+                   base_str != "dc"
+                    error("distributed-admm-[branch|hybrid]-* currently supported only with DC")
                 end
 
                 DistributedOPFModel(
@@ -122,7 +122,7 @@ struct Args
             end
         end
 
-        # Optimizer (fallback Ipopt)
+        # Optimizer (fallback: Ipopt.Optimizer)
         optimizer = if haskey(parsed, "optimizer") && !isnothing(parsed["optimizer"])
             try
                 eval(Meta.parse(parsed["optimizer"]))

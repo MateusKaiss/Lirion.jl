@@ -42,6 +42,7 @@ include("distributed/admm/admm_update_dc.jl")
 include("distributed/admm/admm_utils.jl")
 include("distributed/admm/admm.jl")
 include("distributed/admm/admm_branch.jl")
+include("distributed/admm/admm_hybrid.jl")
 
 include("main.jl")
 
