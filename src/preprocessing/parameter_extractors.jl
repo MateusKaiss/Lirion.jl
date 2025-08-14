@@ -342,6 +342,11 @@ function get_reactive_power_parameters(matpower_data)
         has_timeseries = get(matpower_data, "T", 1) > 1,
         bus_idx_map = matpower_data["bus_idx_map"],
         branch_status = matpower_data["branch"]["br_status"],
+        is_virtual = get(
+            matpower_data["bus"],
+            "is_virtual",
+            fill(false, length(matpower_data["bus"]["bus_i"])),
+        ),
         bus_to_generators = getfieldsafe(
             matpower_data,
             "bus_to_gens",

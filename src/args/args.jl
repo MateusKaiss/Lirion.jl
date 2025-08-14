@@ -20,7 +20,7 @@ struct Args
             required = true
 
             "--model"
-            help = "Model: dc | ac | socp | distributed-admm-dc | distributed-admm-branch-dc | distributed-admm-hybrid-dc"
+            help = "Model: dc | ac | socp | distributed-admm-dc | distributed-admm-ac | distributed-admm-branch-dc | distributed-admm-hybrid-dc"
             arg_type = String
             required = true
 
@@ -42,9 +42,17 @@ struct Args
 
             # ======= ADMM =======
             "--admm-rho"
-            help = "Initial ρ (for ADMM consensus penalty)"
+            help = "Initial ρ (fallback if --admm-rho-theta/--admm-rho-v not provided)"
             arg_type = Float64
             default = 1_000.0
+
+            "--admm-rho-theta"
+            help = "Initial ρθ (consensus penalty for bus angles)"
+            arg_type = Float64
+
+            "--admm-rho-v"
+            help = "Initial ρV (consensus penalty for voltage magnitudes)"
+            arg_type = Float64
 
             "--admm-max-iter"
             help = "Max ADMM iterations"
@@ -76,16 +84,23 @@ struct Args
             "socp" => SOCP,
         )
 
+        rho_base = parsed["admm-rho"]
+        rho_theta = get(parsed, "admm-rho-theta", nothing)
+        rho_v     = get(parsed, "admm-rho-v", nothing)
+        rho_theta = isnothing(rho_theta) ? rho_base : rho_theta
+        rho_v     = isnothing(rho_v)     ? rho_base : rho_v
+
         model_type = begin
             if startswith(model_key, "distributed-")
                 parts = split(model_key, '-')
                 # accepted formats:
                 #  - distributed-admm-dc
+                #  - distributed-admm-ac
                 #  - distributed-admm-branch-dc
                 #  - distributed-admm-hybrid-dc
                 if length(parts) == 3
                     _, method_str, base_str = parts
-                    variant_str = ""  # ex.: "distributed-admm-dc"
+                    variant_str = ""  # ex.: "distributed-admm-dc" ou "distributed-admm-ac"
                 elseif length(parts) == 4
                     _, method_str, variant_str, base_str = parts  # ex.: "distributed-admm-branch-dc"
                 else
@@ -98,13 +113,12 @@ struct Args
                     error("Invalid base model in distributed-* key: $base_str")
 
                 method_sym =
-                    variant_str == "" ? :admm :
+                    variant_str == ""       ? :admm :
                     variant_str == "branch" ? :admm_branch :
                     variant_str == "hybrid" ? :admm_hybrid :
                     error("Unsupported distributed method variant: $variant_str")
 
-                if (method_sym == :admm_branch || method_sym == :admm_hybrid) &&
-                   base_str != "dc"
+                if (method_sym == :admm_branch || method_sym == :admm_hybrid) && base_str != "dc"
                     error("distributed-admm-[branch|hybrid]-* currently supported only with DC")
                 end
 
@@ -112,7 +126,8 @@ struct Args
                     base_map[base_str],
                     method_sym,
                     parsed["admm-max-iter"],
-                    parsed["admm-rho"],
+                    rho_theta,             # << ρθ
+                    rho_v,                 # << ρV
                     parsed["admm-eps-primal"],
                     parsed["admm-eps-dual"],
                 )

@@ -43,6 +43,7 @@ include("distributed/admm/admm_utils.jl")
 include("distributed/admm/admm.jl")
 include("distributed/admm/admm_branch.jl")
 include("distributed/admm/admm_hybrid.jl")
+include("distributed/admm/admm_ac.jl")
 
 include("main.jl")
 
