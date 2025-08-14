@@ -20,7 +20,7 @@ struct Args
             required = true
 
             "--model"
-            help = "Model: dc | ac | socp | distributed-admm-dc | distributed-admm-ac | distributed-admm-socp"
+            help = "Model: dc | ac | socp | distributed-admm-dc | distributed-admm-branch-dc"
             arg_type = String
             required = true
 
@@ -79,20 +79,38 @@ struct Args
         model_type = begin
             if startswith(model_key, "distributed-")
                 parts = split(model_key, '-')
-                if length(parts) != 3
+                # accepted formats:
+                #  - distributed-admm-dc
+                #  - distributed-admm-branch-dc
+                if length(parts) == 3
+                    _, method_str, base_str = parts
+                    variant_str = ""
+                elseif length(parts) == 4
+                    _, method_str, variant_str, base_str = parts
+                else
                     error("Invalid distributed model key: $(parsed["model"])")
                 end
-                method_str = parts[2]  # "admm"
-                base_str = parts[3]  # "dc" | "ac" | "socp"
 
                 method_str == "admm" ||
                     error("Only ADMM is supported for distributed-* now.")
                 haskey(base_map, base_str) ||
                     error("Invalid base model in distributed-* key: $base_str")
 
+                method_sym = if variant_str == ""
+                    :admm                      # Bus partitioning 
+                elseif variant_str == "branch"
+                    :admm_branch              # Branch partitioning
+                else
+                    error("Unsupported distributed method variant: $variant_str")
+                end
+
+                if method_sym == :admm_branch && base_str != "dc"
+                    error("distributed-admm-branch-* currently supported only with DC")
+                end
+
                 DistributedOPFModel(
                     base_map[base_str],
-                    :admm,
+                    method_sym,
                     parsed["admm-max-iter"],
                     parsed["admm-rho"],
                     parsed["admm-eps-primal"],
