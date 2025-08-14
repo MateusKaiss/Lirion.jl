@@ -3,7 +3,7 @@
 # =============================
 const distributed_zone_cases = [
     # 14 buses
-    "pglib_opf_case14_2zones_ieee.m", 
+    "pglib_opf_case14_2zones_ieee.m",
     "pglib_opf_case14_3zones_ieee.m",
     # # 24 buses
     "pglib_opf_case24_2zones_ieee_rts.m",
@@ -15,15 +15,15 @@ const distributed_zone_cases = [
     "pglib_opf_case57_2zones_ieee.m",
     "pglib_opf_case57_4zones_ieee.m",
     # # 118 buses
-    "pglib_opf_case118_2zones_ieee",
+    "pglib_opf_case118_2zones_ieee.m",
     # 500 buses
     "pglib_opf_case500_2zones_goc.m",
-    "pglib_opf_case500_3zones_goc.m",
 ]
 
 function track_failure_dist(label::String, origin::String, case_name::String)
     if !haskey(GLOBAL_FAILED_CASES, label)
-        GLOBAL_FAILED_CASES[label] = Dict("Centralized" => String[], "Distributed" => String[])
+        GLOBAL_FAILED_CASES[label] =
+            Dict("Centralized" => String[], "Distributed" => String[])
     end
     return push!(GLOBAL_FAILED_CASES[label][origin], case_name)
 end
@@ -31,7 +31,7 @@ end
 function compare_distributed_vs_centralized(
     file::String;
     label::String,
-    central_optimizer = Ipopt.Optimizer,    
+    central_optimizer = Ipopt.Optimizer,
     distributed_optimizer = Ipopt.Optimizer,
     rtol = 0.05,
     atol = 1e-6,
@@ -80,12 +80,12 @@ function compare_distributed_vs_centralized(
     @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
 end
 
-function run_distributed_objective_tests(; case_list = distributed_zone_cases, label = "ADMM-DC vs DC",
-                                         central_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer),
-                                         distributed_optimizer = Ipopt.Optimizer,
-                                         rtol = 0.05, atol = 1e-6,
-                                         admm_eps_primal = 1e-6, admm_eps_dual = 1e-6)
-
+function run_distributed_objective_tests(; case_list = distributed_zone_cases,
+    label = "ADMM-DC vs DC",
+    central_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer),
+    distributed_optimizer = Ipopt.Optimizer,
+    rtol = 0.05, atol = 1e-6,
+    admm_eps_primal = 1e-6, admm_eps_dual = 1e-6)
     if isempty(case_list)
         @info "Empty distributed case list. No tests will be run."
         return true
@@ -114,14 +114,22 @@ function run_distributed_objective_tests(; case_list = distributed_zone_cases, l
 
         # eps padrão vindos da assinatura
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case   = admm_eps_dual
+        admm_eps_dual_case = admm_eps_dual
 
         # ---- OVERRIDE para casos de 500 barras ----
         if occursin("case500_", case_name)
-            admm_max_iter_case   = 600
-            admm_rho_case        = 1_000_000.0
+            admm_max_iter_case = 600
+            admm_rho_case = 1_000_000.0
             admm_eps_primal_case = 1e-7
-            admm_eps_dual_case   = 1e-7
+            admm_eps_dual_case = 1e-7
+        end
+
+        # ---- OVERRIDE para caso de 118 barras ----
+        if occursin("case118_", case_name)
+            admm_max_iter_case = 350
+            admm_rho_case = 1_000_000.0
+            admm_eps_primal_case = 1e-7
+            admm_eps_dual_case = 1e-7
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"

@@ -67,7 +67,7 @@ function run_admm(config::DistributedOPFModel, data)
             end
 
             optimize!(local_model)
-            print(local_model)
+            # print(local_model)
             subdata["model"] = local_model
             ### TODO: review whether local_model[:generation_cost]:
             ### The local ADMM subproblem's generation cost is not the same as the real, true generation cost.
