@@ -10,12 +10,14 @@ include("test_objective.jl")
 include("test_timeseries.jl")
 include("test_distributed_objective.jl")
 include("test_distributed_branch_objective.jl")
+include("test_distributed_hybrid_objective.jl")
 
 @testset "PowerOptimization - All Tests" begin
     run_test_objective()
     run_test_timeseries()
     run_distributed_objective_tests(; rtol = 0.05)
     run_distributed_branch_objective_tests(; rtol = 0.05)
+    run_distributed_hybrid_objective_tests(; rtol = 0.05)
 end
 
 println("\n===== GLOBAL SUMMARY OF FAILURES BY MODEL =====")
