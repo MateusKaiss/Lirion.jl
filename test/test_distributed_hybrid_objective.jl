@@ -10,12 +10,12 @@ const distributed_hybrid_zone_cases = [
     "pglib_opf_case30_2zones_as.m",
     "pglib_opf_case30_3zones_as.m",
     # 57 buses
-    # "pglib_opf_case57_2zones_ieee.m",
-    # # "pglib_opf_case57_4zones_ieee.m", # se estiver instável ainda, mantenha comentado
+    "pglib_opf_case57_2zones_ieee.m",
+    "pglib_opf_case57_4zones_ieee.m",
     # # 118 buses
-    # "pglib_opf_case118_2zones_ieee.m",
+    "pglib_opf_case118_2zones_ieee.m",
     # # 500 buses
-    # "pglib_opf_case500_2zones_goc.m",
+    "pglib_opf_case500_2zones_goc.m",
 ]
 
 function track_failure_hybrid(label::String, origin::String, case_name::String)
@@ -112,20 +112,20 @@ function run_distributed_hybrid_objective_tests(;
             end
 
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case   = admm_eps_dual
+        admm_eps_dual_case = admm_eps_dual
 
         # Overrides
         if occursin("case500_", case_name)
-            admm_max_iter_case   = 600
-            admm_rho_case        = 1_000_000.0
+            admm_max_iter_case = 600
+            admm_rho_case = 1_000_000.0
             admm_eps_primal_case = 1e-7
-            admm_eps_dual_case   = 1e-7
+            admm_eps_dual_case = 1e-7
         end
         if occursin("case118_", case_name)
-            admm_max_iter_case   = 350
-            admm_rho_case        = 1_000_000.0
+            admm_max_iter_case = 350
+            admm_rho_case = 1_000_000.0
             admm_eps_primal_case = 1e-7
-            admm_eps_dual_case   = 1e-7
+            admm_eps_dual_case = 1e-7
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"
