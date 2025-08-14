@@ -19,8 +19,7 @@ const distributed_branch_zone_cases = [
     # # 118 buses
     "pglib_opf_case118_2zones_ieee.m",
     # # 500 buses
-    # "pglib_opf_case500_2zones_goc.m",
-    # "pglib_opf_case500_3zones_goc.m",
+    "pglib_opf_case500_2zones_goc.m",
 ]
 
 function track_failure_branch(label::String, origin::String, case_name::String)
@@ -115,7 +114,7 @@ function run_distributed_branch_objective_tests(;
 
         admm_max_iter_case, admm_rho_case =
             if occursin("_3zones_", case_name)
-                (500, 1_000.0)
+                (400, 1_000.0)
             elseif occursin("_2zones_", case_name)
                 (350, 1_000.0)
             else

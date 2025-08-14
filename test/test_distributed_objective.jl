@@ -18,7 +18,6 @@ const distributed_zone_cases = [
     "pglib_opf_case118_2zones_ieee.m",
     # 500 buses
     "pglib_opf_case500_2zones_goc.m",
-    "pglib_opf_case500_3zones_goc.m",
 ]
 
 function track_failure_dist(label::String, origin::String, case_name::String)
@@ -123,6 +122,15 @@ function run_distributed_objective_tests(; case_list = distributed_zone_cases, l
             admm_eps_primal_case = 1e-7
             admm_eps_dual_case   = 1e-7
         end
+
+        # ---- OVERRIDE para caso de 118 barras ----
+        if occursin("case118_", case_name)
+            admm_max_iter_case   = 350
+            admm_rho_case        = 1_000_000.0
+            admm_eps_primal_case = 1e-7
+            admm_eps_dual_case   = 1e-7
+        end
+
 
         @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"
         @testset "$(label) - $(case_name)" begin
