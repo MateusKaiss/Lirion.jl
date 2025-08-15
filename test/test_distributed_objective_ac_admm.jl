@@ -118,35 +118,35 @@ function run_distributed_ac_objective_tests(;
             end
 
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case   = admm_eps_dual
+        admm_eps_dual_case = admm_eps_dual
 
         # ---- Overrides para sistemas grandes ----
         if occursin("case118_", case_name)
-            admm_max_iter_case  = max(admm_max_iter_case, 500)
-            admm_rho_case       = 1_000_00.0 
+            admm_max_iter_case = max(admm_max_iter_case, 500)
+            admm_rho_case = 1_000_00.0
             admm_eps_primal_case = min(admm_eps_primal_case, 1e-7)
-            admm_eps_dual_case   = min(admm_eps_dual_case,   1e-7)
+            admm_eps_dual_case = min(admm_eps_dual_case, 1e-7)
         end
         if occursin("case500_", case_name)
-            admm_max_iter_case  = max(admm_max_iter_case, 800)
-            admm_rho_case       = 1_000_000.0
+            admm_max_iter_case = max(admm_max_iter_case, 800)
+            admm_rho_case = 1_000_000.0
             admm_eps_primal_case = min(admm_eps_primal_case, 1e-7)
-            admm_eps_dual_case   = min(admm_eps_dual_case,   1e-7)
+            admm_eps_dual_case = min(admm_eps_dual_case, 1e-7)
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"
         @testset "$(label) - $(case_name)" begin
             compare_distributed_ac_vs_centralized(
                 file;
-                label               = label,
-                central_optimizer   = central_optimizer,
+                label = label,
+                central_optimizer = central_optimizer,
                 distributed_optimizer = distributed_optimizer,
-                rtol                = rtol,
-                atol                = atol,
-                admm_rho            = admm_rho_case,
-                admm_max_iter       = admm_max_iter_case,
-                admm_eps_primal     = admm_eps_primal_case,
-                admm_eps_dual       = admm_eps_dual_case,
+                rtol = rtol,
+                atol = atol,
+                admm_rho = admm_rho_case,
+                admm_max_iter = admm_max_iter_case,
+                admm_eps_primal = admm_eps_primal_case,
+                admm_eps_dual = admm_eps_dual_case,
             )
         end
     end
