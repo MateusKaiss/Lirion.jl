@@ -19,8 +19,8 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         z_flow[e] = 0.0
     end
 
-    ρθ = config.rho
-    ρe = config.rho
+    ρθ = config.rho_theta
+    ρe = config.rho_flow
 
     res_primal_vec = Float64[]   # híbrido (agregado)
     res_dual_vec = Float64[]   # híbrido (agregado)
@@ -31,7 +31,7 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
 
     μ_incr, μ_decr = 2.0, 2.0
     τ_incr, τ_decr = 1.05, 0.98
-    ϵ_abs, ϵ_rel = 1e-6, 1e-6
+    ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
     θ_avg_history = Dict{Int, Vector{Float64}}()
 
     for k in 1:config.max_iter
@@ -45,8 +45,8 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
                 if b in bus_ids
                     θ = local_model[:theta][b, 1]
                     θ̄ = get(θ_avg, b, 0.0)
-                    λ = get(duals_theta[zone_id], b, 0.0)
-                    admm_penalty += λ * (θ - θ̄) + (ρθ / 2) * (θ - θ̄)^2
+                    λθ = get(duals_theta[zone_id], b, 0.0)
+                    admm_penalty += λθ * (θ - θ̄) + (ρθ / 2) * (θ - θ̄)^2
                 end
             end
 
@@ -121,7 +121,7 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
 
         # r_pri^2 = sum_b,sum_z (θ_zb - θ̄_b)^2  +  sum_e,sum_z (p_ze - z_e)^2
         res_primal_sq = 0.0
-        for (zone_id, subdata) in partitions
+        for (_, subdata) in partitions
             # ângulos
             for b in shared_buses
                 if b in subdata["bus"]["bus_i"]
@@ -149,8 +149,8 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
 
         dim_pri = 0
         for (_, subdata) in partitions
-            dim_pri += sum(b in subdata["bus"]["bus_i"] for b in shared_buses)
-            dim_pri += length(_zone_cut_edges(subdata, cut_edges))
+            dim_pri += sum(b in subdata["bus"]["bus_i"] for b in shared_buses)  # θ
+            dim_pri += length(_zone_cut_edges(subdata, cut_edges))               # fluxos
         end
         dim_du = length(shared_buses) + length(cut_edges)
 
@@ -185,7 +185,6 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
             break
         end
 
-        # ====== 5) Atualização adaptativa de ρ (separada) ======
         if res_primal > μ_incr * res_dual
             ρθ *= τ_incr
             ρe *= τ_incr
