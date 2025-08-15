@@ -5,17 +5,17 @@
 # Casos particionados (2/3/4 zonas)
 const distributed_ac_zone_cases = [
     # 14 buses
-    "pglib_opf_case14_2zones_ieee.m",
-    "pglib_opf_case14_3zones_ieee.m",
-    # 24 buses
-    "pglib_opf_case24_2zones_ieee_rts.m",
-    "pglib_opf_case24_3zones_ieee_rts.m",
-    # 30 buses
-    "pglib_opf_case30_2zones_as.m",
-    "pglib_opf_case30_3zones_as.m",
+    # "pglib_opf_case14_2zones_ieee.m",
+    # "pglib_opf_case14_3zones_ieee.m",
+    # # 24 buses
+    # "pglib_opf_case24_2zones_ieee_rts.m",
+    # "pglib_opf_case24_3zones_ieee_rts.m",
+    # # 30 buses
+    # "pglib_opf_case30_2zones_as.m",
+    # "pglib_opf_case30_3zones_as.m",
     # 57 buses
-    # "pglib_opf_case57_2zones_ieee.m",
-    # "pglib_opf_case57_4zones_ieee.m",
+    "pglib_opf_case57_2zones_ieee.m",
+    "pglib_opf_case57_4zones_ieee.m",
     # # 118 buses
     # "pglib_opf_case118_2zones_ieee.m",
     # # 500 buses
@@ -69,7 +69,6 @@ function compare_distributed_ac_vs_centralized(
             "--admm-max-iter", string(admm_max_iter),
             "--admm-eps-primal", string(admm_eps_primal),
             "--admm-eps-dual", string(admm_eps_dual),
-            # Dica: se quiser testar rhos separados, pode trocar as duas linhas abaixo
             # "--admm-rho-theta", string(admm_rho),
             # "--admm-rho-v",     string(admm_rho),
         ]
@@ -85,9 +84,6 @@ function compare_distributed_ac_vs_centralized(
     @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
 end
 
-"""
-Roda a suíte de testes para ADMM-AC vs AC nos casos de zonas.
-"""
 function run_distributed_ac_objective_tests(;
     case_list = distributed_ac_zone_cases,
     label = "ADMM-AC vs AC",
