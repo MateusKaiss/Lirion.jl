@@ -20,8 +20,9 @@ function run_admm(config::DistributedOPFModel, data)
     partitions, shared_buses = prepare_admm_partitions(data)
     base_model = config.base_model
 
-    # Initialize local rho variable from config (don't mutate config.rho)
-    current_rho = config.rho
+    base_model == DC || error("run_admm (bus-consensus) está implementado para DC.")
+
+    current_rho = config.rho_theta
 
     duals = Dict{Int, Dict{Int, Float64}}()
     θ_avg = Dict{Int, Float64}()
@@ -38,33 +39,28 @@ function run_admm(config::DistributedOPFModel, data)
         duals[zone_id] = Dict{Int, Float64}()
     end
 
-    μ_incr, μ_decr = 2.0, 2.0       # Higher tolerance for imbalance between residuals
-    τ_incr, τ_decr = 1.05, 0.98     # Smooth increase/decrease of ρ
-    ϵ_abs, ϵ_rel = 1e-6, 1e-6       # Good precision without being too strict
+    μ_incr, μ_decr = 2.0, 2.0
+    τ_incr, τ_decr = 1.05, 0.98
+    ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
 
     for k in 1:config.max_iter
         println("\nIteração $k")
 
         for (zone_id, subdata) in partitions
             local_model = build_model(subdata, base_model; optimizer = Ipopt.Optimizer)
-            if base_model == DC
-                bus_ids = subdata["bus"]["bus_i"]
-                @expression(local_model, admm_penalty, 0.0)
-                for b in shared_buses
-                    if b in bus_ids
-                        θ = local_model[:theta][b, 1]
-                        θ̄ = get(θ_avg, b, 0.0)
-                        λ = get(duals[zone_id], b, 0.0)
-                        admm_penalty += λ * (θ - θ̄) + (current_rho / 2) * (θ - θ̄)^2
-                    end
+
+            bus_ids = subdata["bus"]["bus_i"]
+            @expression(local_model, admm_penalty, 0.0)
+            for b in shared_buses
+                if b in bus_ids
+                    θ = local_model[:theta][b, 1]
+                    θ̄ = get(θ_avg, b, 0.0)
+                    λ = get(duals[zone_id], b, 0.0)
+                    admm_penalty += λ * (θ - θ̄) + (current_rho / 2) * (θ - θ̄)^2
                 end
-                @objective(local_model, Min,
-                    local_model[:generation_cost] +
-                    admm_penalty
-                )
-            else
-                error("Base model $(base_model) not yet implemented in ADMM")
             end
+
+            @objective(local_model, Min, local_model[:generation_cost] + admm_penalty)
 
             optimize!(local_model)
             # print(local_model)
@@ -86,55 +82,27 @@ function run_admm(config::DistributedOPFModel, data)
                 compute_real_generation_cost(local_model, subdata["objective_params"])
             println("Zone generation cost $zone_id: $(subdata["real_generation_cost"])")
 
-            if base_model == DC
-                model = subdata["model"]
-                θ_vals = value.(model[:theta])
-                bus_ids = subdata["bus"]["bus_i"]
-
-                ### θ_local_history is only recorded for shared buses, not for local buses
-                ### TODO: add local buses to θ_local_history and ensure consistency with input file of 57 buses
-                # for b in bus_ids
-                #     θ_b = θ_vals[b, 1]
-                #     push!(
-                #         get!(
-                #             get!(θ_local_history, zone_id, Dict{Int, Vector{Float64}}()),
-                #             b,
-                #             Float64[],
-                #         ),
-                #         θ_b,
-                #     )
-                # end
-                for b in shared_buses
-                    if b in bus_ids
-                        θ_b = θ_vals[b, 1]
-                        push!(
-                            get!(
-                                get!(
-                                    θ_local_history,
-                                    zone_id,
-                                    Dict{Int, Vector{Float64}}(),
-                                ),
-                                b,
-                                Float64[],
-                            ),
-                            θ_b,
-                        )
-                    end
+            θ_vals = value.(local_model[:theta])
+            for b in shared_buses
+                if b in bus_ids
+                    θ_b = θ_vals[b, 1]
+                    push!(
+                        get!(
+                            get!(θ_local_history, zone_id, Dict{Int, Vector{Float64}}()),
+                            b,
+                            Float64[],
+                        ),
+                        θ_b,
+                    )
                 end
             end
         end
 
-        if base_model == DC
-            θ_avg_prev = deepcopy(θ_avg)
-            update_shared_variables_dc!(shared_buses, partitions, duals, θ_avg, current_rho)
-
-            ### TODO: ensure consistency with input file of 57 buses and actual shared buses. 
-            ### There seems to be quite a few shared buses that are not reflected in the output html,
-            ### which indicated that θ_avg_history is not consistent with the input file.
-            ### Perhaps a processing issue?
-            for b in shared_buses
-                push!(get!(θ_avg_history, b, Float64[]), θ_avg[b])
-            end
+        # Atualiza variáveis de consenso e registra histórico
+        θ_avg_prev = deepcopy(θ_avg)
+        update_shared_variables_dc!(shared_buses, partitions, duals, θ_avg, current_rho)
+        for b in shared_buses
+            push!(get!(θ_avg_history, b, Float64[]), θ_avg[b])
         end
 
         res_primal = sqrt(
@@ -156,9 +124,9 @@ function run_admm(config::DistributedOPFModel, data)
             ϵ_rel * max(
                 sqrt(
                     sum(
-                        (value(partitions[z]["model"][:theta][b, 1]))^2 for
-                        z in keys(partitions), b in shared_buses if
-                        b in partitions[z]["bus"]["bus_i"]
+                        (value(partitions[z]["model"][:theta][b, 1]))^2
+                        for z in keys(partitions), b in shared_buses
+                        if b in partitions[z]["bus"]["bus_i"]
                     ),
                 ),
                 sqrt(sum(θ_avg[b]^2 for b in shared_buses)),
@@ -224,13 +192,8 @@ function run_admm(config::DistributedOPFModel, data)
         end
     end
 
-    plot_admm_convergence(
-        res_primal_vec,
-        res_dual_vec,
-        eps_primal_vec,
-        eps_dual_vec,
-        "plot_convergencia_admm.html",
-    )
+    plot_admm_convergence(res_primal_vec, res_dual_vec, eps_primal_vec, eps_dual_vec,
+        "plot_convergencia_admm.html")
     plot_rho(rho_vec, "plot_rho_admm.html")
     plot_theta_avg_heatmap(θ_avg_history, "plot_theta_avg_heatmap.html")
     plot_theta_local_heatmaps(θ_local_history, "plot_theta_local_heatmap")
@@ -242,8 +205,8 @@ function run_admm(config::DistributedOPFModel, data)
     println("\nResumo geral:")
     println("→ Total (value(:generation_cost)) = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
-    println("Valor inicial de rho: $(config.rho)")
-    println("Valor final de rho: $current_rho")
+    println("Valor inicial de ρθ: $(config.rho_theta)")
+    println("Valor final de ρθ: $current_rho")
 
     return total_real_cost, partitions
 end

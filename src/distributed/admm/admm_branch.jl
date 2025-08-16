@@ -32,13 +32,15 @@ end
 function run_admm_branch(config::DistributedOPFModel, data::Dict{String, Any})
     partitions, _shared_buses_unused = prepare_admm_partitions(data)
     base_model = config.base_model
+    base_model == DC || error("ADMM-branch está implementado aqui apenas para DC.")
     cut_edges = _find_cut_edges(data)
 
     duals = Dict{Int, Dict{Int, Float64}}()
     z_flow = Dict{Int, Float64}()
     z_flow_prev = Dict{Int, Float64}()
 
-    current_rho = config.rho
+    current_rho = config.rho_flow
+
     for zone_id in keys(partitions)
         duals[zone_id] = Dict{Int, Float64}()
     end
@@ -54,16 +56,12 @@ function run_admm_branch(config::DistributedOPFModel, data::Dict{String, Any})
 
     μ_incr, μ_decr = 2.0, 2.0
     τ_incr, τ_decr = 1.05, 0.98
-    ϵ_abs, ϵ_rel = 1e-6, 1e-6
+    ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
 
     for k in 1:config.max_iter
         println("\n[ADMM-branch] Iteração $k")
         for (zone_id, subdata) in partitions
             local_model = build_model(subdata, base_model; optimizer = Ipopt.Optimizer)
-
-            if base_model != DC
-                error("Branch ADMM implemented here for DC only.")
-            end
 
             zone_edges = _zone_cut_edges(subdata, cut_edges)
             @expression(local_model, admm_penalty, 0.0)
@@ -166,6 +164,7 @@ function run_admm_branch(config::DistributedOPFModel, data::Dict{String, Any})
     println("\n[ADMM-branch] Resumo:")
     println("→ Total (value(:generation_cost)) = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
+    println("ρe inicial: $(config.rho_flow) | ρe final: $current_rho")
 
     return total_real_cost, partitions
 end
