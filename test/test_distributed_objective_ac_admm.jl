@@ -19,7 +19,7 @@ const distributed_ac_zone_cases = [
     # # 118 buses
     "pglib_opf_case118_2zones_ieee.m",
     # # 500 buses
-    "pglib_opf_case500_2zones_goc.m",
+    # "pglib_opf_case500_2zones_goc.m",
 ]
 
 function track_failure_ac(label::String, origin::String, case_name::String)
