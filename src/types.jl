@@ -55,9 +55,9 @@ DistributedOPFModel(
     rho::Float64 = 1_000.0,
     rho_theta::Union{Nothing, Float64} = nothing,
     rho_v::Union{Nothing, Float64} = nothing,
-    rho_flow::Union{Nothing, Float64} = nothing,   # mantém sua flag antiga (aplica em P e Q)
-    rho_flow_p::Union{Nothing, Float64} = nothing, # novo
-    rho_flow_q::Union{Nothing, Float64} = nothing, # novo
+    rho_flow::Union{Nothing, Float64} = nothing,   
+    rho_flow_p::Union{Nothing, Float64} = nothing, 
+    rho_flow_q::Union{Nothing, Float64} = nothing, 
     ε_primal::Float64 = 1e-7,
     ε_dual::Float64 = 1e-7,
 ) = DistributedOPFModel(
@@ -74,14 +74,17 @@ rho(c::DistributedOPFModel) = c.rho_theta
 const ρ = rho
 
 Base.getproperty(c::DistributedOPFModel, s::Symbol) =
-    s === :rho ? c.rho_theta : getfield(c, s)
+    s === :rho ? c.rho_theta :
+    s === :rho_flow ? c.rho_flow_p :
+    getfield(c, s)
 
 Base.setproperty!(c::DistributedOPFModel, s::Symbol, v) =
     s === :rho ? (c.rho_theta = v; c.rho_v = v; c.rho_flow_p = v; c.rho_flow_q = v) :
+    s === :rho_flow ? (c.rho_flow_p = v; c.rho_flow_q = v) :
     Base.setfield!(c, s, v)
 
 Base.propertynames(c::DistributedOPFModel, private::Bool = false) =
-    (propertynames(typeof(c), private)..., :rho)
+    (propertynames(typeof(c), private)..., :rho, :rho_flow)
 
 abstract type SubproblemAction end
 
