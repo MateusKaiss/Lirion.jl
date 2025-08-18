@@ -70,13 +70,16 @@ function compare_distributed_branch_ac_vs_centralized(
             "--admm-eps-dual", string(admm_eps_dual),
         ]
         if admm_rho_flow_p === nothing && admm_rho_flow_q === nothing
-            push!(args_dist, "--admm-rho-flow"); push!(args_dist, string(admm_rho_flow))
+            push!(args_dist, "--admm-rho-flow")
+            push!(args_dist, string(admm_rho_flow))
         else
             if admm_rho_flow_p !== nothing
-                push!(args_dist, "--admm-rho-flow-p"); push!(args_dist, string(admm_rho_flow_p))
+                push!(args_dist, "--admm-rho-flow-p")
+                push!(args_dist, string(admm_rho_flow_p))
             end
             if admm_rho_flow_q !== nothing
-                push!(args_dist, "--admm-rho-flow-q"); push!(args_dist, string(admm_rho_flow_q))
+                push!(args_dist, "--admm-rho-flow-q")
+                push!(args_dist, string(admm_rho_flow_q))
             end
         end
 
@@ -118,7 +121,7 @@ function run_distributed_branch_ac_objective_tests(;
 
         admm_max_iter_case, admm_rho_case =
             if occursin("_3zones_", case_name)
-                (500, 1.0e5)
+                (500, 1.0e6)
             elseif occursin("_2zones_", case_name)
                 (400, 1.0e5)
             else
@@ -136,7 +139,15 @@ function run_distributed_branch_ac_objective_tests(;
         #     admm_eps_dual_case = min(admm_eps_dual_case, 1e-7)
         # end
 
-        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho_flow=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"
+        if occursin("_3zones_", case_name)
+            admm_eps_primal_case = 1e-8
+            admm_eps_dual_case = 1e-8
+        end
+
+        @info "[$label] Rodando caso $i de $n: $case_name " *
+              "(max_iter=$(admm_max_iter_case), rho_flow=$(admm_rho_case), " *
+              "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"
+
         @testset "$(label) - $(case_name)" begin
             compare_distributed_branch_ac_vs_centralized(
                 file;
