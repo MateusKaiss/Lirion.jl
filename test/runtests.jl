@@ -13,6 +13,7 @@ include("test_distributed_branch_objective.jl")
 include("test_distributed_hybrid_objective.jl")
 include("test_distributed_objective_ac_admm.jl")
 include("test_distributed_branch_objective_ac.jl")
+include("test_distributed_hybrid_objective_ac.jl")
 
 @testset "PowerOptimization - All Tests" begin
     run_test_objective()
@@ -22,6 +23,7 @@ include("test_distributed_branch_objective_ac.jl")
     run_distributed_hybrid_objective_tests(; rtol = 0.05)
     run_distributed_ac_objective_tests(; rtol = 0.05)
     run_distributed_branch_ac_objective_tests(; rtol = 0.05)
+    run_distributed_hybrid_ac_objective_tests(; rtol = 0.05) 
 end
 
 println("\n===== GLOBAL SUMMARY OF FAILURES BY MODEL =====")
