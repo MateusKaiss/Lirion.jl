@@ -20,7 +20,7 @@ struct Args
             required = true
 
             "--model"
-            help = "Model: dc | ac | socp | distributed-admm-dc | distributed-admm-ac | distributed-admm-branch-dc | distributed-admm-hybrid-dc"
+            help = "Model: dc | ac | socp | distributed-admm-dc | distributed-admm-ac | distributed-admm-branch-dc | distributed-admm-branch-ac | distributed-admm-hybrid-dc"
             arg_type = String
             required = true
 
@@ -42,7 +42,7 @@ struct Args
 
             # ======= ADMM =======
             "--admm-rho"
-            help = "Default ρ used if a specific rho (theta/flow/v) is not provided (default: 1000.0)"
+            help = "Default ρ used if a specific rho (theta/v/flow) is not provided (default: 1000.0)"
             arg_type = Float64
             default = 1_000.0
 
@@ -55,7 +55,15 @@ struct Args
             arg_type = Float64
 
             "--admm-rho-flow"
-            help = "ρe (consensus penalty for branch flows)"
+            help = "ρe (consensus penalty for branch flows; applies to P and Q if specifics are absent)"
+            arg_type = Float64
+
+            "--admm-rho-flow-p"
+            help = "ρP (consensus penalty for active power flow in branch consensus)"
+            arg_type = Float64
+
+            "--admm-rho-flow-q"
+            help = "ρQ (consensus penalty for reactive power flow in branch consensus)"
             arg_type = Float64
 
             "--admm-max-iter"
@@ -88,15 +96,23 @@ struct Args
             "socp" => SOCP,
         )
 
+        # ===== rhos =====
         rho_base = parsed["admm-rho"]
         rho_theta_ = get(parsed, "admm-rho-theta", nothing)
         rho_v_ = get(parsed, "admm-rho-v", nothing)
         rho_flow_ = get(parsed, "admm-rho-flow", nothing)
+        rho_flow_p_ = get(parsed, "admm-rho-flow-p", nothing)
+        rho_flow_q_ = get(parsed, "admm-rho-flow-q", nothing)
 
-        # fallback: usa rho_base
+        # fallback: específicos > flow genérico > base
         rho_theta_val = isnothing(rho_theta_) ? rho_base : rho_theta_
         rho_v_val = isnothing(rho_v_) ? rho_base : rho_v_
-        rho_flow_val = isnothing(rho_flow_) ? rho_base : rho_flow_
+        rho_flow_p_val =
+            isnothing(rho_flow_p_) ? (isnothing(rho_flow_) ? rho_base : rho_flow_) :
+            rho_flow_p_
+        rho_flow_q_val =
+            isnothing(rho_flow_q_) ? (isnothing(rho_flow_) ? rho_base : rho_flow_) :
+            rho_flow_q_
 
         local function _warn_irrelevant_rhos(
             method_sym::Symbol,
@@ -105,24 +121,32 @@ struct Args
             rho_theta_orig::Union{Nothing, Float64},
             rho_v_orig::Union{Nothing, Float64},
             rho_flow_orig::Union{Nothing, Float64},
+            rho_flow_p_orig::Union{Nothing, Float64},
+            rho_flow_q_orig::Union{Nothing, Float64},
         )
-            uses_theta =
-                (method_sym == :admm && base_str == "dc") ||
-                (method_sym == :admm_hybrid && base_str == "dc") ||
-                (method_sym == :admm && base_str == "ac")
+            uses_theta = (method_sym == :admm) && (base_str == "dc" || base_str == "ac")
+            uses_v = (method_sym == :admm) && (base_str == "ac")
             uses_flow =
-                (method_sym == :admm_branch && base_str == "dc") ||
+                (method_sym == :admm_branch) ||
                 (method_sym == :admm_hybrid && base_str == "dc")
-            uses_v = (method_sym == :admm && base_str == "ac")
 
             if rho_theta_orig !== nothing && !uses_theta
                 @warn "Flag --admm-rho-theta fornecida mas ignorada para '$model_key_local'."
             end
-            if rho_flow_orig !== nothing && !uses_flow
-                @warn "Flag --admm-rho-flow fornecida mas ignorada para '$model_key_local'."
-            end
             if rho_v_orig !== nothing && !uses_v
                 @warn "Flag --admm-rho-v fornecida mas ignorada para '$model_key_local'."
+            end
+
+            if !(uses_flow)
+                if rho_flow_orig !== nothing
+                    @warn "Flag --admm-rho-flow fornecida mas ignorada para '$model_key_local'."
+                end
+                if rho_flow_p_orig !== nothing
+                    @warn "Flag --admm-rho-flow-p fornecida mas ignorada para '$model_key_local'."
+                end
+                if rho_flow_q_orig !== nothing
+                    @warn "Flag --admm-rho-flow-q fornecida mas ignorada para '$model_key_local'."
+                end
             end
             return nothing
         end
@@ -134,6 +158,7 @@ struct Args
                 #  - distributed-admm-dc
                 #  - distributed-admm-ac
                 #  - distributed-admm-branch-dc
+                #  - distributed-admm-branch-ac
                 #  - distributed-admm-hybrid-dc
                 if length(parts) == 3
                     _, method_str, base_str = parts
@@ -159,9 +184,12 @@ struct Args
                     variant_str == "hybrid" ? :admm_hybrid :
                     error("Unsupported distributed method variant: $variant_str")
 
-                if (method_sym == :admm_branch || method_sym == :admm_hybrid) &&
-                   base_str != "dc"
-                    error("distributed-admm-[branch|hybrid]-* currently supported only with DC")
+                # suportes:
+                # - admm (bus): dc e ac
+                # - admm_branch: dc e ac
+                # - admm_hybrid: dc 
+                if method_sym == :admm_hybrid && base_str != "dc"
+                    error("distributed-admm-hybrid-* currently supported only with DC")
                 end
 
                 _warn_irrelevant_rhos(
@@ -171,6 +199,8 @@ struct Args
                     rho_theta_,
                     rho_v_,
                     rho_flow_,
+                    rho_flow_p_,
+                    rho_flow_q_,
                 )
 
                 DistributedOPFModel(
@@ -180,7 +210,8 @@ struct Args
                     rho = rho_base,
                     rho_theta = rho_theta_val,
                     rho_v = rho_v_val,
-                    rho_flow = rho_flow_val,
+                    rho_flow_p = rho_flow_p_val,
+                    rho_flow_q = rho_flow_q_val,
                     ε_primal = parsed["admm-eps-primal"],
                     ε_dual = parsed["admm-eps-dual"],
                 )
