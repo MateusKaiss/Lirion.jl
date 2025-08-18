@@ -98,7 +98,7 @@ function run_admm(config::DistributedOPFModel, data)
             end
         end
 
-        # Atualiza variáveis de consenso e registra histórico
+        # Updates the shared variables (e.g., θ_avg) and records their history
         θ_avg_prev = deepcopy(θ_avg)
         update_shared_variables_dc!(shared_buses, partitions, duals, θ_avg, current_rho)
         for b in shared_buses
