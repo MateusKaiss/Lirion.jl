@@ -18,7 +18,8 @@ const distributed_hybrid_ac_zone_cases = [
 
 function track_failure_hybrid_ac(label::String, origin::String, case_name::String)
     if !haskey(GLOBAL_FAILED_CASES, label)
-        GLOBAL_FAILED_CASES[label] = Dict("Centralized" => String[], "Distributed" => String[])
+        GLOBAL_FAILED_CASES[label] =
+            Dict("Centralized" => String[], "Distributed" => String[])
     end
     return push!(GLOBAL_FAILED_CASES[label][origin], case_name)
 end
@@ -30,11 +31,11 @@ function compare_distributed_hybrid_ac_vs_centralized(
     distributed_optimizer = Ipopt.Optimizer,
     rtol = 0.05,
     atol = 1e-6,
-    rho_base::Union{Nothing,Float64} = 1.0e3,
-    rho_theta::Union{Nothing,Float64} = nothing,
-    rho_v::Union{Nothing,Float64} = nothing,
-    rho_flow_p::Union{Nothing,Float64} = 1.0e5,
-    rho_flow_q::Union{Nothing,Float64} = 1.0e5,
+    rho_base::Union{Nothing, Float64} = 1.0e3,
+    rho_theta::Union{Nothing, Float64} = nothing,
+    rho_v::Union{Nothing, Float64} = nothing,
+    rho_flow_p::Union{Nothing, Float64} = 1.0e5,
+    rho_flow_q::Union{Nothing, Float64} = 1.0e5,
     admm_max_iter::Int = 500,
     admm_eps_primal::Float64 = 1e-7,
     admm_eps_dual::Float64 = 1e-7,
@@ -72,16 +73,20 @@ function compare_distributed_hybrid_ac_vs_centralized(
             push!(args_dist, string(rho_base))
         end
         if rho_theta !== nothing
-            push!(args_dist, "--admm-rho-theta"); push!(args_dist, string(rho_theta))
+            push!(args_dist, "--admm-rho-theta")
+            push!(args_dist, string(rho_theta))
         end
         if rho_v !== nothing
-            push!(args_dist, "--admm-rho-v");     push!(args_dist, string(rho_v))
+            push!(args_dist, "--admm-rho-v")
+            push!(args_dist, string(rho_v))
         end
         if rho_flow_p !== nothing
-            push!(args_dist, "--admm-rho-flow-p"); push!(args_dist, string(rho_flow_p))
+            push!(args_dist, "--admm-rho-flow-p")
+            push!(args_dist, string(rho_flow_p))
         end
         if rho_flow_q !== nothing
-            push!(args_dist, "--admm-rho-flow-q"); push!(args_dist, string(rho_flow_q))
+            push!(args_dist, "--admm-rho-flow-q")
+            push!(args_dist, string(rho_flow_q))
         end
 
         obj, _ = PowerOptimization.main(args_dist)
@@ -130,7 +135,7 @@ function run_distributed_hybrid_ac_objective_tests(;
             end
 
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case   = admm_eps_dual
+        admm_eps_dual_case = admm_eps_dual
 
         # ---- overrides para casos maiores (descomente quando ativar) ----
         # if occursin("case118_", case_name)
@@ -160,9 +165,9 @@ function run_distributed_hybrid_ac_objective_tests(;
                 distributed_optimizer = distributed_optimizer,
                 rtol = rtol,
                 atol = atol,
-                rho_base = nothing, 
+                rho_base = nothing,
                 rho_theta = rho_bus_base,
-                rho_v     = rho_bus_base,
+                rho_v = rho_bus_base,
                 rho_flow_p = rho_flow_base,
                 rho_flow_q = rho_flow_base,
                 admm_max_iter = admm_max_iter_case,

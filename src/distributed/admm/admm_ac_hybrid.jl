@@ -23,9 +23,9 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
         dualsQ[z] = Dict{Int, Float64}()
     end
 
-    θ̄ = Dict{Int, Float64}()        
-    V̄ = Dict{Int, Float64}()        
-    zP = Dict{Int, Float64}()        
+    θ̄ = Dict{Int, Float64}()
+    V̄ = Dict{Int, Float64}()
+    zP = Dict{Int, Float64}()
     zQ = Dict{Int, Float64}()
 
     θ̄_prev = Dict{Int, Float64}()
@@ -44,8 +44,8 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
     ρQ = config.rho_flow_q
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
 
-    res_pri_hist = Float64[]   
-    res_du_hist = Float64[]    
+    res_pri_hist = Float64[]
+    res_du_hist = Float64[]
     eps_pri_hist = Float64[]
     eps_du_hist = Float64[]
     rhoθ_hist = Float64[]
@@ -253,7 +253,6 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
             println("Stopping criterion met.")
             break
         end
-
 
         # BUS: (θ, V)
         if r_bus_sq > (μ_incr^2) * (s_bus^2) && s_bus > 0.0
