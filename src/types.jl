@@ -55,9 +55,9 @@ DistributedOPFModel(
     rho::Float64 = 1_000.0,
     rho_theta::Union{Nothing, Float64} = nothing,
     rho_v::Union{Nothing, Float64} = nothing,
-    rho_flow::Union{Nothing, Float64} = nothing,   
-    rho_flow_p::Union{Nothing, Float64} = nothing, 
-    rho_flow_q::Union{Nothing, Float64} = nothing, 
+    rho_flow::Union{Nothing, Float64} = nothing,
+    rho_flow_p::Union{Nothing, Float64} = nothing,
+    rho_flow_q::Union{Nothing, Float64} = nothing,
     ε_primal::Float64 = 1e-7,
     ε_dual::Float64 = 1e-7,
 ) = DistributedOPFModel(
