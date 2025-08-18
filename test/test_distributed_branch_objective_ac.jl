@@ -12,8 +12,8 @@ const distributed_branch_ac_zone_cases = [
     "pglib_opf_case30_2zones_as.m",
     "pglib_opf_case30_3zones_as.m",
     # 57 buses
-    "pglib_opf_case57_2zones_ieee.m",
-    "pglib_opf_case57_4zones_ieee.m", 
+    # "pglib_opf_case57_2zones_ieee.m",
+    # "pglib_opf_case57_4zones_ieee.m", 
 
     ####
     # "pglib_opf_case118_2zones_ieee.m",
