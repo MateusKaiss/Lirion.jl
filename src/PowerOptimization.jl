@@ -45,6 +45,7 @@ include("distributed/admm/admm_branch.jl")
 include("distributed/admm/admm_hybrid.jl")
 include("distributed/admm/admm_ac.jl")
 include("distributed/admm/admm_ac_branch.jl")
+include("distributed/admm/admm_ac_hybrid.jl")
 
 include("main.jl")
 

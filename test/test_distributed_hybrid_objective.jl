@@ -104,9 +104,9 @@ function run_distributed_hybrid_objective_tests(;
 
         admm_max_iter_case, admm_rho_case =
             if occursin("_3zones_", case_name)
-                (700, 1_000.0)
+                (400, 1_000.0)
             elseif occursin("_2zones_", case_name)
-                (300, 1_000.0)
+                (350, 1_000.0)
             else
                 (350, 1_000.0)
             end

@@ -9,6 +9,8 @@ function get_method_runner(model::DistributedOPFModel)
         return run_admm_ac_branch
     elseif model.method == :admm_hybrid && model.base_model == DC
         return run_admm_hybrid
+    elseif model.method == :admm_hybrid && model.base_model == AC
+        return run_admm_ac_hybrid
     else
         error(
             "Distributed method $(model.method) with base $(model.base_model) not implemented.",
