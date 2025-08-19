@@ -121,11 +121,11 @@ function run_distributed_branch_ac_objective_tests(;
 
         admm_max_iter_case, admm_rho_case =
             if occursin("_3zones_", case_name)
-                (500, 1.0e6)
+                (400, 1.0e6)
             elseif occursin("_2zones_", case_name)
-                (400, 1.0e5)
+                (350, 1.0e5)
             else
-                (450, 1.0e5)
+                (300, 1.0e5)
             end
 
         admm_eps_primal_case = admm_eps_primal

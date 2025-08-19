@@ -110,11 +110,11 @@ function run_distributed_ac_objective_tests(;
 
         admm_max_iter_case, admm_rho_case =
             if occursin("_3zones_", case_name)
-                (700, 1_000.0)
+                (400, 1_000.0)
             elseif occursin("_2zones_", case_name)
                 (350, 1_000.0)
             else
-                (400, 1_000.0)
+                (300, 1_000.0)
             end
 
         admm_eps_primal_case = admm_eps_primal

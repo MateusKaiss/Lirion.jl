@@ -127,11 +127,11 @@ function run_distributed_hybrid_ac_objective_tests(;
 
         admm_max_iter_case, rho_bus_base, rho_flow_base =
             if occursin("_3zones_", case_name)
-                (600, 1.0e3, 1.0e5)
+                (400, 1.0e3, 1.0e5)
             elseif occursin("_2zones_", case_name)
-                (500, 1.0e3, 1.0e5)
+                (350, 1.0e3, 1.0e5)
             else
-                (500, 1.0e3, 1.0e5)
+                (300, 1.0e3, 1.0e5)
             end
 
         admm_eps_primal_case = admm_eps_primal

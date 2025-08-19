@@ -118,7 +118,7 @@ function run_distributed_branch_objective_tests(;
             elseif occursin("_2zones_", case_name)
                 (350, 1_000.0)
             else
-                (350, 1_000.0)
+                (300, 1_000.0)
             end
 
         admm_eps_primal_case = admm_eps_primal
