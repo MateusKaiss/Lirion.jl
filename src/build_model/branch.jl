@@ -199,18 +199,19 @@ function compute_socp_branch_expressions(model, params)
     end
 
     # ---------- fluxos p,q em DOIS sentidos ----------
-    @variable(model, p_fr[(l,t) in Iterators.product(active, 1:T)], base_name = "0_p_fr")
-    @variable(model, q_fr[(l,t) in Iterators.product(active, 1:T)], base_name = "0_q_fr")
-    @variable(model, p_to[(l,t) in Iterators.product(active, 1:T)], base_name = "0_p_to")
-    @variable(model, q_to[(l,t) in Iterators.product(active, 1:T)], base_name = "0_q_to")
+    @variable(model, p_fr[l in active, t in 1:T], base_name = "0_p_fr")
+    @variable(model, q_fr[l in active, t in 1:T], base_name = "0_q_fr")
+    @variable(model, p_to[l in active, t in 1:T], base_name = "0_p_to")
+    @variable(model, q_to[l in active, t in 1:T], base_name = "0_q_to")
 
     for l in active, t in 1:T
         cap = params.capacity[l]
-        set_lower_bound(p_fr[(l,t)], -cap); set_upper_bound(p_fr[(l,t)],  cap)
-        set_lower_bound(q_fr[(l,t)], -cap); set_upper_bound(q_fr[(l,t)],  cap)
-        set_lower_bound(p_to[(l,t)], -cap); set_upper_bound(p_to[(l,t)],  cap)
-        set_lower_bound(q_to[(l,t)], -cap); set_upper_bound(q_to[(l,t)],  cap)
+        set_lower_bound(p_fr[l,t], -cap); set_upper_bound(p_fr[l,t],  cap)
+        set_lower_bound(q_fr[l,t], -cap); set_upper_bound(q_fr[l,t],  cap)
+        set_lower_bound(p_to[l,t], -cap); set_upper_bound(p_to[l,t],  cap)
+        set_lower_bound(q_to[l,t], -cap); set_upper_bound(q_to[l,t],  cap)
     end
+
 
     model[:wr] = wr
     model[:wi] = wi
@@ -250,11 +251,11 @@ function compute_socp_branch_expressions(model, params)
         c_wr_to_q = -(b*tr[l] - g*ti[l]) * it2[l]
         c_wi_to_q = -(g*tr[l] + b*ti[l]) * it2[l]
 
-        @constraint(model, -c_w_fr_p*w[i,t] + c_wr_fr_p*wr[pkey,t] + c_wi_fr_p*wi[pkey,t] + p_fr[(l,t)] == 0)
-        @constraint(model, c_w_fr_q*w[i,t] + c_wr_fr_q*wr[pkey,t] + c_wi_fr_q*wi[pkey,t] + q_fr[(l,t)] == 0)
+        @constraint(model, -c_w_fr_p*w[i,t] + c_wr_fr_p*wr[pkey,t] + c_wi_fr_p*wi[pkey,t] + p_fr[l,t] == 0)
+        @constraint(model,  c_w_fr_q*w[i,t] + c_wr_fr_q*wr[pkey,t] + c_wi_fr_q*wi[pkey,t] + q_fr[l,t] == 0)
 
-        @constraint(model, -c_w_to_p*w[j,t] + c_wr_to_p*wr[pkey,t] + c_wi_to_p*wi[pkey,t] + p_to[(l,t)] == 0)
-        @constraint(model, c_w_to_q*w[j,t] + c_wr_to_q*wr[pkey,t] + c_wi_to_q*wi[pkey,t] + q_to[(l,t)] == 0)
+        @constraint(model, -c_w_to_p*w[j,t] + c_wr_to_p*wr[pkey,t] + c_wi_to_p*wi[pkey,t] + p_to[l,t] == 0)
+        @constraint(model,  c_w_to_q*w[j,t] + c_wr_to_q*wr[pkey,t] + c_wi_to_q*wi[pkey,t] + q_to[l,t] == 0)
     end
 
     return nothing
@@ -282,12 +283,8 @@ function create_socp_branch_constraints(model, params)
         ] in JuMP.RotatedSecondOrderCone()
     )
 
-    @constraint(model, [l in active, t in 1:T],
-        [params.capacity[l], p_fr[(l,t)], q_fr[(l,t)]] in JuMP.SecondOrderCone()
-    )
-    @constraint(model, [l in active, t in 1:T],
-        [params.capacity[l], p_to[(l,t)], q_to[(l,t)]] in JuMP.SecondOrderCone()
-    )
+    @constraint(model, [l in active, t in 1:T], [params.capacity[l], p_fr[l,t], q_fr[l,t]] in SecondOrderCone())
+    @constraint(model, [l in active, t in 1:T], [params.capacity[l], p_to[l,t], q_to[l,t]] in SecondOrderCone())
 
     for l in active, t in 1:T
         i = params.bus_from[l]; j = params.bus_to[l]

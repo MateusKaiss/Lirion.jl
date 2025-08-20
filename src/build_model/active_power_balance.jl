@@ -1,36 +1,37 @@
 function _sum_p_out(model, params, b, t)
-    p_fr = model[:p_flow_branches]          # from → to
-    p_to = model[:p_reverse_flow_branches]  # to   → from
+    p_fr = model[:p_flow_branches]          # from → to   
+    p_to = model[:p_reverse_flow_branches]  # to   → from 
     s = 0.0
     for l in get(params.bus_to_branches_from, b, Int[])    # ramos com from = b
         if params.branch_status[l] == 1
-            s += p_fr[(l, t)]
+            s += p_fr[l, t] 
         end
     end
     for l in get(params.bus_to_branches_to, b, Int[])      # ramos com to = b
         if params.branch_status[l] == 1
-            s += p_to[(l, t)]
+            s += p_to[l, t] 
         end
     end
     return s
 end
 
 function _sum_q_out(model, params, b, t)
-    q_fr = model[:q_flow_branches]
-    q_to = model[:q_reverse_flow_branches]
+    q_fr = model[:q_flow_branches]          # 2D
+    q_to = model[:q_reverse_flow_branches]  # 2D
     s = 0.0
     for l in get(params.bus_to_branches_from, b, Int[])
         if params.branch_status[l] == 1
-            s += q_fr[(l, t)]
+            s += q_fr[l, t]  
         end
     end
     for l in get(params.bus_to_branches_to, b, Int[])
         if params.branch_status[l] == 1
-            s += q_to[(l, t)]
+            s += q_to[l, t]   
         end
     end
     return s
 end
+
 
 function compute_power_balance(model, matpower_data, params, bus_index, t)
     # geração

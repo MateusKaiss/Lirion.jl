@@ -5,15 +5,17 @@ function build_result_dict(model::JuMP.Model, data::Dict)
     result["objective"] = objective_value(model)
     bus_ids = data["bus"]["bus_i"]
     result["bus"] = Dict(
-        "theta" => [
-            value(model[:theta][b, t]) for b in bus_ids, t in 1:T
-        ],
         "vm" =>
             haskey(model, :v_magnitude) ?
             [value(model[:v_magnitude][b, t]) for b in bus_ids, t in 1:T] : nothing,
-        "vm_sq" =>
+        
+        "theta" =>
             haskey(model, :v_magnitude_sq) ?
             [value(model[:v_magnitude_sq][b, t]) for b in bus_ids, t in 1:T] : nothing,
+    
+        "vm_sq" =>
+            haskey(model, :theta) ?
+            [value(model[:theta][b, t]) for b in bus_ids, t in 1:T] : nothing,
     )
 
     if haskey(model, :p_generation)
