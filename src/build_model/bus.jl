@@ -4,6 +4,7 @@
 function create_voltage_angle_variables!(model, params)
     T = get(model.ext, :time_periods, 1)
     @variable(model, theta[b in params.bus_ids, t = 1:T], start = 0.0)
+
     if !isnothing(params.reference_bus) && params.reference_bus in params.bus_ids
         @constraint(model, theta_ref[t in 1:T], theta[params.reference_bus, t] == 0.0)
         # else
@@ -27,41 +28,18 @@ function create_voltage_magnitude_variables!(model, params)
     return nothing
 end
 
+# SOCWR (SOCP): usar w = |V|^2 (sem theta)
 function create_socp_variables!(model, params)
     T = get(model.ext, :time_periods, 1)
 
-    create_voltage_magnitude_variables!(model, params)
-
-    @variable(model,
+    @variable(
+        model,
         v_magnitude_sq[b in params.bus_ids, t in 1:T],
         lower_bound = params.vmin[b]^2,
         upper_bound = params.vmax[b]^2,
-        start = params.vstart[b]^2
+        start = max(params.vstart[b]^2, params.vmin[b]^2 + 1.0e-3),
+        base_name = "0_w"  
     )
-
-    scale = get(model.ext, :selected_scale, nothing)
-    scale = isnothing(scale) ? select_cone_scale(params) : scale
-
-    @constraint(model, voltage_sq_def[b in params.bus_ids, t in 1:T],
-        [
-            sqrt(scale),
-            model[:v_magnitude][b, t] * sqrt(scale),
-            model[:v_magnitude_sq][b, t] * sqrt(scale),
-        ]
-        in
-        JuMP.RotatedSecondOrderCone()
-    )
-
-    # Alternatives (not used, but kept for reference):
-    # Strict equality (usually slower and less numerically stable)
-    # @constraint(model, voltage_sq_def[b in params.bus_ids, t in 1:T],
-    #     v_magnitude_sq[b, t] == model[:v_magnitude][b, t]^2
-    # )
-
-    # Relaxed inequality (faster but physically inaccurate)
-    # @constraint(model, voltage_sq_def[b in params.bus_ids, t in 1:T],
-    #     v_magnitude_sq[b, t] >= model[:v_magnitude][b, t]^2
-    # )
 
     return nothing
 end
@@ -84,7 +62,7 @@ end
 
 function buses!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{SubproblemBuild})
     params = matpower_data["bus_params"]
-    create_voltage_angle_variables!(model, params)
+    # SOCWR: não criar theta; somente w = |V|^2
     create_socp_variables!(model, params)
     return nothing
 end

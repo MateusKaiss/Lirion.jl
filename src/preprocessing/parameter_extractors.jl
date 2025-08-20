@@ -86,6 +86,13 @@ function get_branch_parameters(branch_data, matpower_data)
 
     bus_ids = matpower_data["bus"]["bus_i"]
 
+    vmin_dict = Dict{Int,Float64}()
+    vmax_dict = Dict{Int,Float64}()
+    @inbounds for (k,b) in enumerate(bus_ids)
+        vmin_dict[b] = matpower_data["bus"]["vmin"][k]
+        vmax_dict[b] = matpower_data["bus"]["vmax"][k]
+    end
+
     den = resistance .^ 2 .+ reactance .^ 2
     g = resistance ./ den
     b = -reactance ./ den
@@ -113,8 +120,11 @@ function get_branch_parameters(branch_data, matpower_data)
         b = b,
         active = active,
         zone = matpower_data["bus"]["zone"],
+        vmin = vmin_dict,
+        vmax = vmax_dict,
     )
 end
+
 
 # ---------------------------------------------------------------------------
 # Generator Parameters

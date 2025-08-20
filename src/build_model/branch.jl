@@ -155,111 +155,150 @@ function create_ac_branch_constraints(model, params)
     return nothing
 end
 
-# ---------------------------------------------------------------------
-# Creating SOCP Branch Variables, Expressions and Constraints
-# ---------------------------------------------------------------------
+
+buspair(i, j) = (max(i, j), min(i, j))
+
 function compute_socp_branch_expressions(model, params)
     T = get(model.ext, :time_periods, 1)
     active = findall(i -> params.existing[i] == 1, 1:params.number_of_branches)
-    inv_tap = [1.0 / (isnan(t) || t == 0.0 ? 1.0 : t) for t in params.tap_position]
 
-    @variable(model, R[l in active, t = 1:T])
-    @variable(model, T_var[l in active, t = 1:T])
+    w     = model[:v_magnitude_sq]
+    tap   = params.tap_position
+    shift = params.tap_angle
+    tr    = tap .* cos.(shift)
+    ti    = tap .* sin.(shift)
+    it2   = [1.0 / (isnan(t) || t == 0.0 ? 1.0 : t)^2 for t in tap]  # 1/|tap|^2
 
-    @inbounds for l in active, t in 1:T
-        i_from = params.bus_idx_map[params.bus_from[l]]
-        i_to = params.bus_idx_map[params.bus_to[l]]
+    # ---------- wr, wi (por par de barras) ----------
+    @variable(model,
+        wr[p in Set(buspair(params.bus_from[l], params.bus_to[l]) for l in active), t in 1:T],
+        base_name = "0_wr",
+    )
+    @variable(model,
+        wi[p in Set(buspair(params.bus_from[l], params.bus_to[l]) for l in active), t in 1:T],
+        base_name = "0_wi",
+    )
 
-        Vm_from = params.initial_voltage_magnitude[i_from]
-        Vm_to = params.initial_voltage_magnitude[i_to]
-        Va_from = params.initial_voltage_angle[i_from]
-        Va_to = params.initial_voltage_angle[i_to]
+    # bounds wr/wi como no PM
+    for l in active, t in 1:T
+        i = params.bus_from[l]; j = params.bus_to[l]
+        pkey = buspair(i, j)
 
-        if !any(isnan.([Vm_from, Vm_to, Va_from, Va_to]))
-            shift = params.tap_angle
-            set_start_value(R[l, t], Vm_from * Vm_to * cos(Va_from - Va_to - shift[l]))
-            set_start_value(T_var[l, t], Vm_from * Vm_to * sin(Va_from - Va_to - shift[l]))
-        end
+        vmin_i = params.vmin[i]; vmax_i = params.vmax[i]
+        vmin_j = params.vmin[j]; vmax_j = params.vmax[j]
+        admax  = max(abs(params.min_ang[l]), abs(params.max_ang[l]))
+
+        wr_lb = vmin_i * vmin_j * cos(admax)
+        wr_ub = vmax_i * vmax_j
+        JuMP.set_lower_bound(wr[pkey, t], wr_lb)
+        JuMP.set_upper_bound(wr[pkey, t], wr_ub)
+
+        wi_abs = vmax_i * vmax_j * sin(admax)
+        JuMP.set_lower_bound(wi[pkey, t], -wi_abs)
+        JuMP.set_upper_bound(wi[pkey, t],  wi_abs)
     end
 
-    tap = params.tap_position
-    shift = params.tap_angle
-    tr = tap .* cos.(shift)
-    ti = tap .* sin.(shift)
+    # ---------- fluxos p,q em DOIS sentidos ----------
+    @variable(model, p_fr[(l,t) in Iterators.product(active, 1:T)], base_name = "0_p_fr")
+    @variable(model, q_fr[(l,t) in Iterators.product(active, 1:T)], base_name = "0_q_fr")
+    @variable(model, p_to[(l,t) in Iterators.product(active, 1:T)], base_name = "0_p_to")
+    @variable(model, q_to[(l,t) in Iterators.product(active, 1:T)], base_name = "0_q_to")
 
-    @expression(model, p_flow_branches[l in active, t in 1:T],
-        (
-            params.g[l] * inv_tap[l]^2 * model[:v_magnitude_sq][params.bus_from[l], t] +
-            (-params.g[l] * tr[l] + params.b[l] * ti[l]) * inv_tap[l]^2 * R[l, t] +
-            (-params.b[l] * tr[l] - params.g[l] * ti[l]) * inv_tap[l]^2 * T_var[l, t]
-        )
-    )
+    for l in active, t in 1:T
+        cap = params.capacity[l]
+        set_lower_bound(p_fr[(l,t)], -cap); set_upper_bound(p_fr[(l,t)],  cap)
+        set_lower_bound(q_fr[(l,t)], -cap); set_upper_bound(q_fr[(l,t)],  cap)
+        set_lower_bound(p_to[(l,t)], -cap); set_upper_bound(p_to[(l,t)],  cap)
+        set_lower_bound(q_to[(l,t)], -cap); set_upper_bound(q_to[(l,t)],  cap)
+    end
 
-    @expression(model, p_reverse_flow_branches[l in active, t in 1:T],
-        (
-            params.g[l] * model[:v_magnitude_sq][params.bus_to[l], t] +
-            (-params.g[l] * tr[l] - params.b[l] * ti[l]) * inv_tap[l]^2 * R[l, t] +
-            (-params.b[l] * tr[l] + params.g[l] * ti[l]) * inv_tap[l]^2 * -T_var[l, t]
-        )
-    )
+    model[:wr] = wr
+    model[:wi] = wi
+    model[:p_flow_branches]         = p_fr    # from → to
+    model[:q_flow_branches]         = q_fr
+    model[:p_reverse_flow_branches] = p_to    # to → from
+    model[:q_reverse_flow_branches] = q_to
 
-    @expression(model, q_flow_branches[l in active, t in 1:T],
-        (
-            -(params.b[l] + params.b_shunt[l] / 2) * inv_tap[l]^2 *
-            model[:v_magnitude_sq][params.bus_from[l], t] -
-            (-params.b[l] * tr[l] - params.g[l] * ti[l]) * inv_tap[l]^2 * R[l, t] +
-            (-params.g[l] * tr[l] + params.b[l] * ti[l]) * inv_tap[l]^2 * T_var[l, t]
-        )
-    )
+    @inbounds for l in active, t in 1:T
+        i = params.bus_from[l]; j = params.bus_to[l]
+        pkey = buspair(i, j)
 
-    @expression(model, q_reverse_flow_branches[l in active, t in 1:T],
-        (
-            -(params.b[l] + params.b_shunt[l] / 2) *
-            model[:v_magnitude_sq][params.bus_to[l], t] -
-            (-params.b[l] * tr[l] + params.g[l] * ti[l]) * inv_tap[l]^2 * R[l, t] +
-            (-params.g[l] * tr[l] - params.b[l] * ti[l]) * inv_tap[l]^2 * -T_var[l, t]
-        )
-    )
+        g = params.g[l]
+        b = params.b[l]
+
+        b_sh_total = abs(params.b_shunt[l])   
+        b_fr = b_sh_total/2
+        b_to = b_sh_total/2
+
+        # p (from → to)
+        c_w_fr_p  = g * it2[l]
+        c_wr_fr_p = ( g*tr[l] -  b*ti[l]) * it2[l]
+        c_wi_fr_p = ( b*tr[l] +  g*ti[l]) * it2[l]
+
+        # q (from → to)
+        c_w_fr_q  = (b + b_fr) * it2[l]
+        c_wr_fr_q = -(b*tr[l] + g*ti[l]) * it2[l]
+        c_wi_fr_q =  (g*tr[l] - b*ti[l]) * it2[l]
+
+        # p (to → from)
+        c_w_to_p  =  g
+        c_wr_to_p = ( g*tr[l] +  b*ti[l]) * it2[l]
+        c_wi_to_p = -(b*tr[l] -  g*ti[l]) * it2[l]
+
+        # q (to → from)
+        c_w_to_q  = (b + b_to)
+        c_wr_to_q = -(b*tr[l] - g*ti[l]) * it2[l]
+        c_wi_to_q = -(g*tr[l] + b*ti[l]) * it2[l]
+
+        @constraint(model, -c_w_fr_p*w[i,t] + c_wr_fr_p*wr[pkey,t] + c_wi_fr_p*wi[pkey,t] + p_fr[(l,t)] == 0)
+        @constraint(model, c_w_fr_q*w[i,t] + c_wr_fr_q*wr[pkey,t] + c_wi_fr_q*wi[pkey,t] + q_fr[(l,t)] == 0)
+
+        @constraint(model, -c_w_to_p*w[j,t] + c_wr_to_p*wr[pkey,t] + c_wi_to_p*wi[pkey,t] + p_to[(l,t)] == 0)
+        @constraint(model, c_w_to_q*w[j,t] + c_wr_to_q*wr[pkey,t] + c_wi_to_q*wi[pkey,t] + q_to[(l,t)] == 0)
+    end
+
+    return nothing
 end
+
 
 function create_socp_branch_constraints(model, params)
     T = get(model.ext, :time_periods, 1)
     active = findall(i -> params.existing[i] == 1, 1:params.number_of_branches)
 
-    @constraint(model, branch_angle_lb[i in active, t in 1:T; !isnan(params.min_ang[i])],
-        params.min_ang[i] <=
-        model[:theta][params.bus_from[i], t] - model[:theta][params.bus_to[i], t]
-    )
-
-    @constraint(model, branch_angle_ub[i in active, t in 1:T; !isnan(params.max_ang[i])],
-        model[:theta][params.bus_from[i], t] - model[:theta][params.bus_to[i], t] <=
-        params.max_ang[i]
-    )
+    w  = model[:v_magnitude_sq]
+    wr = model[:wr]
+    wi = model[:wi]
+    p_fr = model[:p_flow_branches]
+    q_fr = model[:q_flow_branches]
+    p_to = model[:p_reverse_flow_branches]
+    q_to = model[:q_reverse_flow_branches]
 
     @constraint(model, [l in active, t in 1:T],
         [
-            model[:v_magnitude_sq][params.bus_from[l], t] / sqrt(2),
-            model[:v_magnitude_sq][params.bus_to[l], t] / sqrt(2),
-            model[:R][l, t],
-            model[:T_var][l, t],
+            w[params.bus_from[l], t] / sqrt(2),
+            w[params.bus_to[l],   t] / sqrt(2),
+            wr[buspair(params.bus_from[l], params.bus_to[l]), t],
+            wi[buspair(params.bus_from[l], params.bus_to[l]), t],
         ] in JuMP.RotatedSecondOrderCone()
     )
 
     @constraint(model, [l in active, t in 1:T],
-        [
-            params.capacity[l],
-            model[:p_flow_branches][l, t],
-            model[:q_flow_branches][l, t],
-        ] in JuMP.SecondOrderCone()
+        [params.capacity[l], p_fr[(l,t)], q_fr[(l,t)]] in JuMP.SecondOrderCone()
+    )
+    @constraint(model, [l in active, t in 1:T],
+        [params.capacity[l], p_to[(l,t)], q_to[(l,t)]] in JuMP.SecondOrderCone()
     )
 
-    @constraint(model, [l in active, t in 1:T],
-        [
-            params.capacity[l],
-            model[:p_reverse_flow_branches][l, t],
-            model[:q_reverse_flow_branches][l, t],
-        ] in JuMP.SecondOrderCone()
-    )
+    for l in active, t in 1:T
+        i = params.bus_from[l]; j = params.bus_to[l]
+        pkey = buspair(i, j)
+
+        admax = max(abs(params.min_ang[l]), abs(params.max_ang[l]))
+        τ = tan(admax)
+
+        @constraint(model,  τ*wr[pkey,t] + wi[pkey,t] >= 0)
+        @constraint(model, -τ*wr[pkey,t] + wi[pkey,t] <= 0)
+    end
 
     return nothing
 end
