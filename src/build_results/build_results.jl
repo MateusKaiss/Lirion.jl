@@ -8,11 +8,9 @@ function build_result_dict(model::JuMP.Model, data::Dict)
         "vm" =>
             haskey(model, :v_magnitude) ?
             [value(model[:v_magnitude][b, t]) for b in bus_ids, t in 1:T] : nothing,
-        
         "theta" =>
             haskey(model, :v_magnitude_sq) ?
             [value(model[:v_magnitude_sq][b, t]) for b in bus_ids, t in 1:T] : nothing,
-    
         "vm_sq" =>
             haskey(model, :theta) ?
             [value(model[:theta][b, t]) for b in bus_ids, t in 1:T] : nothing,

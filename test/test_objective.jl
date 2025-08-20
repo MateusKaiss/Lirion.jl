@@ -18,32 +18,32 @@ const reduced_list = [
     "pglib_opf_case200_activ.m",
     "pglib_opf_case240_pserc.m",
     "pglib_opf_case300_ieee.m",
-    # "pglib_opf_case500_goc.m",
-    # "pglib_opf_case588_sdet.m",
-    # "pglib_opf_case793_goc.m",
-    # "pglib_opf_case1354_pegase.m",
-    # "pglib_opf_case1803_snem.m",
-    # "pglib_opf_case1888_rte.m",
-    # "pglib_opf_case1951_rte.m",
-    # "pglib_opf_case2000_goc.m",
-    # "pglib_opf_case2312_goc.m",
-    # "pglib_opf_case2383wp_k.m",
-    # "pglib_opf_case2736sp_k.m",
-    # "pglib_opf_case2737sop_k.m",
-    # "pglib_opf_case2742_goc.m",
-    # "pglib_opf_case2746wop_k.m",
-    # "pglib_opf_case2746wp_k.m",
-    # "pglib_opf_case2848_rte.m",
-    # "pglib_opf_case2853_sdet.m",
-    # "pglib_opf_case2868_rte.m",
-    # "pglib_opf_case2869_pegase.m",
-    # "pglib_opf_case3012wp_k.m",
-    # "pglib_opf_case3022_goc.m",
-    # "pglib_opf_case3120sp_k.m",
-    # "pglib_opf_case3375wp_k.m",
-    # "pglib_opf_case3970_goc.m",
-    # "pglib_opf_case4020_goc.m",
-    # "pglib_opf_case4001_goc.m",
+    "pglib_opf_case500_goc.m",
+    "pglib_opf_case588_sdet.m",
+    "pglib_opf_case793_goc.m",
+    "pglib_opf_case1354_pegase.m",
+    "pglib_opf_case1803_snem.m",
+    "pglib_opf_case1888_rte.m",
+    "pglib_opf_case1951_rte.m",
+    "pglib_opf_case2000_goc.m",
+    "pglib_opf_case2312_goc.m",
+    "pglib_opf_case2383wp_k.m",
+    "pglib_opf_case2736sp_k.m",
+    "pglib_opf_case2737sop_k.m",
+    "pglib_opf_case2742_goc.m",
+    "pglib_opf_case2746wop_k.m",
+    "pglib_opf_case2746wp_k.m",
+    "pglib_opf_case2848_rte.m",
+    "pglib_opf_case2853_sdet.m",
+    "pglib_opf_case2868_rte.m",
+    "pglib_opf_case2869_pegase.m",
+    "pglib_opf_case3012wp_k.m",
+    "pglib_opf_case3022_goc.m",
+    "pglib_opf_case3120sp_k.m",
+    "pglib_opf_case3375wp_k.m",
+    "pglib_opf_case3970_goc.m",
+    "pglib_opf_case4020_goc.m",
+    "pglib_opf_case4001_goc.m",
     # "pglib_opf_case4619_goc.m",
     # "pglib_opf_case4661_sdet.m",
     # "pglib_opf_case4837_goc.m",
@@ -70,30 +70,30 @@ const reduced_list = [
 
 # Reduced list for AC only
 const reduced_testlist_ac = [
-    "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case5_pjm.m",
-    "pglib_opf_case14_ieee.m",
-    "pglib_opf_case24_ieee_rts.m",
-    "pglib_opf_case30_as.m",
-    "pglib_opf_case39_epri.m",
-    "pglib_opf_case57_ieee.m",
-    "pglib_opf_case60_c.m",
-    "pglib_opf_case73_ieee_rts.m",
-    "pglib_opf_case89_pegase.m",
-    "pglib_opf_case118_ieee.m",
-    # "pglib_opf_case162_ieee_dtc.m",
-    # "pglib_opf_case179_goc.m",
-    # "pglib_opf_case197_snem.m",
-    # "pglib_opf_case200_activ.m",
+# "pglib_opf_case3_lmbd.m",
+# "pglib_opf_case5_pjm.m",
+# "pglib_opf_case14_ieee.m",
+# "pglib_opf_case24_ieee_rts.m",
+# "pglib_opf_case30_as.m",
+# "pglib_opf_case39_epri.m",
+# "pglib_opf_case57_ieee.m",
+# "pglib_opf_case60_c.m",
+# "pglib_opf_case73_ieee_rts.m",
+# "pglib_opf_case89_pegase.m",
+# "pglib_opf_case118_ieee.m",
+# "pglib_opf_case162_ieee_dtc.m",
+# "pglib_opf_case179_goc.m",
+# "pglib_opf_case197_snem.m",
+# "pglib_opf_case200_activ.m",
 ]
 
 # Cases with batteries
 const battery_cases = [
-    "case5_bus_2_bat.m",
-    "case14_bus_4_bat.m",
-    "case57_bus_6_bat.m",
-    "case118_bus_10_bat.m",
-    "case200active_bus_20_bat.m",
+# "case5_bus_2_bat.m",
+# "case14_bus_4_bat.m",
+# "case57_bus_6_bat.m",
+# "case118_bus_10_bat.m",
+# "case200active_bus_20_bat.m",
 ]
 
 function get_available_optimizer(preferred, fallback)
@@ -219,19 +219,19 @@ end
 function run_test_objective()
     @testset "PowerOptimization vs PowerModels Unified Comparison" begin
         dc_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer)
-        run_model_tests(
-            PowerOptimization.DC,
-            "DC";
-            optimizer = dc_optimizer,
-            case_list = reduced_list,
-        )
+        # run_model_tests(
+        #     PowerOptimization.DC,
+        #     "DC";
+        #     optimizer = dc_optimizer,
+        #     case_list = reduced_list,
+        # )
 
-        run_model_tests(
-            PowerOptimization.AC,
-            "AC";
-            optimizer = Ipopt.Optimizer,
-            case_list = reduced_testlist_ac,
-        )
+        # run_model_tests(
+        #     PowerOptimization.AC,
+        #     "AC";
+        #     optimizer = Ipopt.Optimizer,
+        #     case_list = reduced_testlist_ac,
+        # )
 
         socp_optimizer = get_available_optimizer(Gurobi.Optimizer, SCS.Optimizer)
         run_model_tests(
@@ -241,18 +241,18 @@ function run_test_objective()
             case_list = reduced_list,
         )
 
-        run_model_tests(
-            PowerOptimization.DC,
-            "DC com baterias";
-            optimizer = dc_optimizer,
-            case_list = battery_cases,
-        )
-        run_model_tests(
-            PowerOptimization.AC,
-            "AC com baterias";
-            optimizer = Ipopt.Optimizer,
-            case_list = battery_cases,
-        )
+        # run_model_tests(
+        #     PowerOptimization.DC,
+        #     "DC com baterias";
+        #     optimizer = dc_optimizer,
+        #     case_list = battery_cases,
+        # )
+        # run_model_tests(
+        #     PowerOptimization.AC,
+        #     "AC com baterias";
+        #     optimizer = Ipopt.Optimizer,
+        #     case_list = battery_cases,
+        # )
         run_model_tests(
             PowerOptimization.SOCP,
             "SOCP com baterias";

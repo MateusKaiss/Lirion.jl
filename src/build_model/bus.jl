@@ -38,7 +38,7 @@ function create_socp_variables!(model, params)
         lower_bound = params.vmin[b]^2,
         upper_bound = params.vmax[b]^2,
         start = max(params.vstart[b]^2, params.vmin[b]^2 + 1.0e-3),
-        base_name = "0_w"  
+        base_name = "0_w"
     )
 
     return nothing
