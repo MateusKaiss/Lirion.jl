@@ -101,10 +101,12 @@ function reactive_power_balance!(
     params = matpower_data["reactive_balance_params"]
     T = get(model.ext, :time_periods, 1)
 
-    @inbounds for (idx, b) in enumerate(params.bus_ids), t in 1:T
+    valid_bus_ids = filter(b -> !params.is_virtual[params.bus_idx_map[b]], params.bus_ids)
+
+    @inbounds for b in valid_bus_ids, t in 1:T
+        idx = params.bus_idx_map[b]
         balance = compute_reactive_power_balance(model, matpower_data, params, b, t)
-        @constraint(
-            model,
+        @constraint(model,
             balance + params.shunt_susceptance[idx] * model[:v_magnitude_sq][b, t] == 0
         )
     end

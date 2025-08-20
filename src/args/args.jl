@@ -20,7 +20,7 @@ struct Args
             required = true
 
             "--model"
-            help = "Model: dc | ac | socp | distributed-admm-dc | distributed-admm-ac | distributed-admm-branch-dc | distributed-admm-branch-ac | distributed-admm-hybrid-dc | distributed-admm-hybrid-ac"
+            help = "Model: dc | ac | socp | distributed-admm-dc | distributed-admm-ac | distributed-admm-socp | distributed-admm-branch-dc | distributed-admm-branch-ac | distributed-admm-branch-socp | distributed-admm-hybrid-dc | distributed-admm-hybrid-ac | distributed-admm-hybrid-socp"
             arg_type = String
             required = true
 
@@ -104,7 +104,6 @@ struct Args
         rho_flow_p_ = get(parsed, "admm-rho-flow-p", nothing)
         rho_flow_q_ = get(parsed, "admm-rho-flow-q", nothing)
 
-        # fallback: específicos > flow genérico > base
         rho_theta_val = isnothing(rho_theta_) ? rho_base : rho_theta_
         rho_v_val = isnothing(rho_v_) ? rho_base : rho_v_
         rho_flow_p_val =
@@ -126,10 +125,10 @@ struct Args
         )
             uses_theta =
                 (method_sym == :admm || method_sym == :admm_hybrid) &&
-                (base_str == "dc" || base_str == "ac")
+                (base_str == "dc" || base_str == "ac" || base_str == "socp")
             uses_v =
                 (method_sym == :admm || method_sym == :admm_hybrid) &&
-                (base_str == "ac")
+                (base_str == "ac" || base_str == "socp")
             uses_flow = (method_sym == :admm_branch) || (method_sym == :admm_hybrid)
 
             if rho_theta_orig !== nothing && !uses_theta
@@ -138,7 +137,7 @@ struct Args
             if rho_v_orig !== nothing && !uses_v
                 @warn "Flag --admm-rho-v fornecida mas ignorada para '$model_key_local'."
             end
-            if !(uses_flow)
+            if !uses_flow
                 if rho_flow_orig !== nothing
                     @warn "Flag --admm-rho-flow fornecida mas ignorada para '$model_key_local'."
                 end
@@ -156,12 +155,9 @@ struct Args
             if startswith(model_key, "distributed-")
                 parts = split(model_key, '-')
                 # accepted formats:
-                #  - distributed-admm-dc
-                #  - distributed-admm-ac
-                #  - distributed-admm-branch-dc
-                #  - distributed-admm-branch-ac
-                #  - distributed-admm-hybrid-dc
-                #  - distributed-admm-hybrid-ac
+                #  - distributed-admm-dc | -ac | -socp
+                #  - distributed-admm-branch-dc | -ac | -socp
+                #  - distributed-admm-hybrid-dc | -ac | -socp
                 if length(parts) == 3
                     _, method_str, base_str = parts
                     variant_str = ""
@@ -186,10 +182,6 @@ struct Args
                     variant_str == "hybrid" ? :admm_hybrid :
                     error("Unsupported distributed method variant: $variant_str")
 
-                # suportes:
-                # - admm (bus): dc e ac
-                # - admm_branch: dc e ac
-                # - admm_hybrid: dc e ac (AC = bus + branch consensus)
                 _warn_irrelevant_rhos(
                     method_sym,
                     base_str,
