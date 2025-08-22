@@ -27,42 +27,14 @@ function create_voltage_magnitude_variables!(model, params)
     return nothing
 end
 
-function create_socp_variables!(model, params)
+function create_socp_bus_variables!(model, bus_params)
     T = get(model.ext, :time_periods, 1)
-
-    create_voltage_magnitude_variables!(model, params)
-
     @variable(model,
-        v_magnitude_sq[b in params.bus_ids, t in 1:T],
-        lower_bound = params.vmin[b]^2,
-        upper_bound = params.vmax[b]^2,
-        start = params.vstart[b]^2
+        v_magnitude_sq[b in bus_params.bus_ids, t in 1:T],
+        lower_bound = bus_params.vmin[b]^2,
+        upper_bound = bus_params.vmax[b]^2,
+        start = isnothing(bus_params.vstart[b]) ? 1.0 : (bus_params.vstart[b]^2)
     )
-
-    scale = get(model.ext, :selected_scale, nothing)
-    scale = isnothing(scale) ? select_cone_scale(params) : scale
-
-    @constraint(model, voltage_sq_def[b in params.bus_ids, t in 1:T],
-        [
-            sqrt(scale),
-            model[:v_magnitude][b, t] * sqrt(scale),
-            model[:v_magnitude_sq][b, t] * sqrt(scale),
-        ]
-        in
-        JuMP.RotatedSecondOrderCone()
-    )
-
-    # Alternatives (not used, but kept for reference):
-    # Strict equality (usually slower and less numerically stable)
-    # @constraint(model, voltage_sq_def[b in params.bus_ids, t in 1:T],
-    #     v_magnitude_sq[b, t] == model[:v_magnitude][b, t]^2
-    # )
-
-    # Relaxed inequality (faster but physically inaccurate)
-    # @constraint(model, voltage_sq_def[b in params.bus_ids, t in 1:T],
-    #     v_magnitude_sq[b, t] >= model[:v_magnitude][b, t]^2
-    # )
-
     return nothing
 end
 
@@ -83,8 +55,8 @@ function buses!(model::JuMP.Model, matpower_data, ::Type{AC}, ::Type{SubproblemB
 end
 
 function buses!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{SubproblemBuild})
-    params = matpower_data["bus_params"]
-    create_voltage_angle_variables!(model, params)
-    create_socp_variables!(model, params)
+    bus_params = matpower_data["bus_params"]
+    create_voltage_angle_variables!(model, bus_params)
+    create_socp_bus_variables!(model, bus_params)
     return nothing
 end
