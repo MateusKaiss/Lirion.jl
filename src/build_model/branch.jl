@@ -158,10 +158,6 @@ end
 # ---------------------------------------------------------------------
 # Creating SOCP Branch Variables, Expressions and Constraints
 # ---------------------------------------------------------------------
-
-# ---------------------------------------------------------------------
-# Bounds R/T_var por ramo
-# ---------------------------------------------------------------------
 function _rt_product_bounds(bus_params, branch_params)
     vmin = bus_params.vmin
     vmax = bus_params.vmax
@@ -255,8 +251,7 @@ function create_rt_variables_with_bounds!(
 
         if !(
             Vm_i === nothing || Vm_j === nothing || Va_i === nothing || Va_j === nothing
-        ) &&
-           !any(isnan.((Vm_i, Vm_j, Va_i, Va_j, shf[l])))
+        ) && !any(isnan.((Vm_i, Vm_j, Va_i, Va_j, shf[l])))
             set_start_value(R[l, t], Vm_i * Vm_j * cos(Va_i - Va_j - shf[l]))
             set_start_value(T_var[l, t], Vm_i * Vm_j * sin(Va_i - Va_j - shf[l]))
         end
@@ -281,6 +276,12 @@ end
 # ---------------------------------------------------------------------
 # Tangent cuts: T_var <= tan(angmax)*R  e  T_var >= tan(angmin)*R
 # ---------------------------------------------------------------------
+@inline function _tan_clip(x; eps = 1e-6)
+    b = (pi / 2) - eps
+    x = min(max(x, -b), b)
+    return tan(x)
+end
+
 function add_rt_tangent_angle_cuts!(model, branch_params)
     T = get(model.ext, :time_periods, 1)
     active =
@@ -290,10 +291,10 @@ function add_rt_tangent_angle_cuts!(model, branch_params)
     T_var = model[:T_var]
 
     @constraint(model, [l in active, t in 1:T; !isnan(branch_params.max_ang[l])],
-        T_var[l, t] <= tan(branch_params.max_ang[l]) * R[l, t]
+        T_var[l, t] <= _tan_clip(branch_params.max_ang[l]) * R[l, t]
     )
     @constraint(model, [l in active, t in 1:T; !isnan(branch_params.min_ang[l])],
-        T_var[l, t] >= tan(branch_params.min_ang[l]) * R[l, t]
+        T_var[l, t] >= _tan_clip(branch_params.min_ang[l]) * R[l, t]
     )
     return nothing
 end
@@ -304,7 +305,7 @@ function compute_socp_branch_expressions(model, params)
     inv_tap = [1.0 / (isnan(t) || t == 0.0 ? 1.0 : t) for t in params.tap_position]
 
     R = model[:R]
-    T_var = model[:T_var]
+    Tv = model[:T_var]
 
     tap = params.tap_position
     shift = params.tap_angle
@@ -314,25 +315,26 @@ function compute_socp_branch_expressions(model, params)
     @expression(model, p_flow_branches[l in active, t in 1:T],
         params.g[l] * inv_tap[l]^2 * model[:v_magnitude_sq][params.bus_from[l], t] +
         (-params.g[l] * tr[l] + params.b[l] * ti[l]) * inv_tap[l]^2 * R[l, t] +
-        (-params.b[l] * tr[l] - params.g[l] * ti[l]) * inv_tap[l]^2 * T_var[l, t]
+        (-params.b[l] * tr[l] - params.g[l] * ti[l]) * inv_tap[l]^2 * Tv[l, t]
     )
     @expression(model, q_flow_branches[l in active, t in 1:T],
         -(params.b[l] + params.b_shunt[l] / 2) * inv_tap[l]^2 *
         model[:v_magnitude_sq][params.bus_from[l], t] -
         (-params.b[l] * tr[l] - params.g[l] * ti[l]) * inv_tap[l]^2 * R[l, t] +
-        (-params.g[l] * tr[l] + params.b[l] * ti[l]) * inv_tap[l]^2 * T_var[l, t]
+        (-params.g[l] * tr[l] + params.b[l] * ti[l]) * inv_tap[l]^2 * Tv[l, t]
     )
 
+    # lado "to": termos com -T_var (equivalente ao PM)
     @expression(model, p_reverse_flow_branches[l in active, t in 1:T],
         params.g[l] * model[:v_magnitude_sq][params.bus_to[l], t] +
         (-params.g[l] * tr[l] - params.b[l] * ti[l]) * inv_tap[l]^2 * R[l, t] +
-        (+params.b[l] * tr[l] - params.g[l] * ti[l]) * inv_tap[l]^2 * T_var[l, t]
+        (-params.b[l] * tr[l] + params.g[l] * ti[l]) * inv_tap[l]^2 * (-Tv[l, t])
     )
     @expression(model, q_reverse_flow_branches[l in active, t in 1:T],
         -(params.b[l] + params.b_shunt[l] / 2) *
-        model[:v_magnitude_sq][params.bus_to[l], t] +
-        (+params.b[l] * tr[l] - params.g[l] * ti[l]) * inv_tap[l]^2 * R[l, t] +
-        (+params.g[l] * tr[l] + params.b[l] * ti[l]) * inv_tap[l]^2 * T_var[l, t]   # = (-g*tr-b*ti)*(1/|t|^2)*(-T_var)
+        model[:v_magnitude_sq][params.bus_to[l], t] -
+        (-params.b[l] * tr[l] + params.g[l] * ti[l]) * inv_tap[l]^2 * R[l, t] +
+        (-params.g[l] * tr[l] - params.b[l] * ti[l]) * inv_tap[l]^2 * (-Tv[l, t])
     )
     model[:p_flow_branches] = p_flow_branches
     model[:q_flow_branches] = q_flow_branches
@@ -341,9 +343,6 @@ function compute_socp_branch_expressions(model, params)
     return nothing
 end
 
-# ---------------------------------------------------------------------
-# Constraints (inclui RSOC, limites térmicos e cortes tangentes)
-# ---------------------------------------------------------------------
 function create_socp_branch_constraints(model, params)
     T = get(model.ext, :time_periods, 1)
     active = findall(i -> params.existing[i] == 1, 1:params.number_of_branches)
@@ -358,7 +357,6 @@ function create_socp_branch_constraints(model, params)
         params.max_ang[i]
     )
 
-    # cone rotacionado: wr^2+wi^2 ≤ w_i*w_j  ⇒  [w_i/√2, w_j/√2, R, T] ∈ RSOC
     @constraint(model, [l in active, t in 1:T],
         [
             model[:v_magnitude_sq][params.bus_from[l], t] / sqrt(2),
@@ -384,7 +382,6 @@ function create_socp_branch_constraints(model, params)
         ] in JuMP.SecondOrderCone()
     )
 
-    # cortes de ângulo em (R,T_var) estilo PM
     add_rt_tangent_angle_cuts!(model, params)
 
     return nothing
@@ -409,14 +406,12 @@ end
 
 function branches!(model::JuMP.Model, matpower_data, ::Type{SOCP}, ::Type{SubproblemBuild})
     params = matpower_data["branch_params"]
+    bus_params = matpower_data["bus_params"]
 
-    # 1) criar R/T_var com bounds e starts
     create_rt_variables_with_bounds!(model, matpower_data, params)
 
-    # 2) expressões (usam R/T_var criados)
     compute_socp_branch_expressions(model, params)
 
-    # 3) constraints (RSOC, térmicos e cortes tangentes)
     create_socp_branch_constraints(model, params)
     return nothing
 end
