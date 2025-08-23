@@ -31,12 +31,13 @@ function get_bus_parameters(bus_data)
     vmin = Dict{Int, Float64}()
     vmax = Dict{Int, Float64}()
     vstart = Dict{Int, Union{Nothing, Float64}}()
-
+    vastart = Dict{Int, Union{Nothing, Float64}}()
     @inbounds for i in eachindex(bus_ids)
         b = bus_ids[i]
         vmin[b] = bus_data["vmin"][i]
         vmax[b] = bus_data["vmax"][i]
         vstart[b] = isnan(bus_data["vm"][i]) ? nothing : bus_data["vm"][i]
+        vastart[b] = isnan(bus_data["va"][i]) ? nothing : bus_data["va"][i]
     end
 
     return (
@@ -45,6 +46,7 @@ function get_bus_parameters(bus_data)
         vmin = vmin,
         vmax = vmax,
         vstart = vstart,
+        initial_voltage_angle = vastart,
     )
 end
 
