@@ -20,7 +20,7 @@ struct Args
             required = true
 
             "--model"
-            help = "Model: dc | ac | socp | distributed-admm-dc | distributed-admm-ac | distributed-admm-branch-dc | distributed-admm-branch-ac | distributed-admm-hybrid-dc | distributed-admm-hybrid-ac"
+            help = "Model: dc | ac | socp | distributed-admm-dc | distributed-admm-ac | distributed-admm-socp | distributed-admm-branch-dc | distributed-admm-branch-ac | distributed-admm-hybrid-dc | distributed-admm-hybrid-ac"  # <<<
             arg_type = String
             required = true
 
@@ -51,7 +51,7 @@ struct Args
             arg_type = Float64
 
             "--admm-rho-v"
-            help = "ρV (consensus penalty for voltage magnitudes)"
+            help = "ρV (consensus penalty for voltage magnitudes; AC uses |V|, SOCP usa V^2)"
             arg_type = Float64
 
             "--admm-rho-flow"
@@ -97,16 +97,16 @@ struct Args
         )
 
         # ===== rhos =====
-        rho_base = parsed["admm-rho"]
-        rho_theta_ = get(parsed, "admm-rho-theta", nothing)
-        rho_v_ = get(parsed, "admm-rho-v", nothing)
-        rho_flow_ = get(parsed, "admm-rho-flow", nothing)
+        rho_base    = parsed["admm-rho"]
+        rho_theta_  = get(parsed, "admm-rho-theta", nothing)
+        rho_v_      = get(parsed, "admm-rho-v", nothing)
+        rho_flow_   = get(parsed, "admm-rho-flow", nothing)
         rho_flow_p_ = get(parsed, "admm-rho-flow-p", nothing)
         rho_flow_q_ = get(parsed, "admm-rho-flow-q", nothing)
 
         # fallback: específicos > flow genérico > base
-        rho_theta_val = isnothing(rho_theta_) ? rho_base : rho_theta_
-        rho_v_val = isnothing(rho_v_) ? rho_base : rho_v_
+        rho_theta_val  = isnothing(rho_theta_)  ? rho_base : rho_theta_
+        rho_v_val      = isnothing(rho_v_)      ? rho_base : rho_v_
         rho_flow_p_val =
             isnothing(rho_flow_p_) ? (isnothing(rho_flow_) ? rho_base : rho_flow_) :
             rho_flow_p_
@@ -124,12 +124,13 @@ struct Args
             rho_flow_p_orig::Union{Nothing, Float64},
             rho_flow_q_orig::Union{Nothing, Float64},
         )
+            # agora θ e V também são usados por SOCP no modo "admm" (bus)
             uses_theta =
                 (method_sym == :admm || method_sym == :admm_hybrid) &&
-                (base_str == "dc" || base_str == "ac")
+                (base_str == "dc" || base_str == "ac" || base_str == "socp")   # <<<
             uses_v =
                 (method_sym == :admm || method_sym == :admm_hybrid) &&
-                (base_str == "ac")
+                (base_str == "ac" || base_str == "socp")                        # <<<
             uses_flow = (method_sym == :admm_branch) || (method_sym == :admm_hybrid)
 
             if rho_theta_orig !== nothing && !uses_theta
@@ -155,9 +156,10 @@ struct Args
         model_type = begin
             if startswith(model_key, "distributed-")
                 parts = split(model_key, '-')
-                # accepted formats:
+                # formatos aceitos:
                 #  - distributed-admm-dc
                 #  - distributed-admm-ac
+                #  - distributed-admm-socp
                 #  - distributed-admm-branch-dc
                 #  - distributed-admm-branch-ac
                 #  - distributed-admm-hybrid-dc
@@ -171,8 +173,8 @@ struct Args
                     error("Invalid distributed model key: $(parsed["model"])")
                 end
 
-                method_str = String(method_str)
-                base_str = String(base_str)
+                method_str  = String(method_str)
+                base_str    = String(base_str)
                 variant_str = String(variant_str)
 
                 method_str == "admm" ||
@@ -186,10 +188,15 @@ struct Args
                     variant_str == "hybrid" ? :admm_hybrid :
                     error("Unsupported distributed method variant: $variant_str")
 
+                # bloqueia combinações não implementadas com SOCP
+                if base_str == "socp" && method_sym != :admm
+                    error("For SOCP, only 'distributed-admm-socp' (bus consensus) is supported for now.")  # <<<
+                end
+
                 # suportes:
-                # - admm (bus): dc e ac
-                # - admm_branch: dc e ac
-                # - admm_hybrid: dc e ac (AC = bus + branch consensus)
+                # - admm (bus): dc, ac, socp
+                # - admm_branch: dc, ac
+                # - admm_hybrid: dc, ac
                 _warn_irrelevant_rhos(
                     method_sym,
                     base_str,
