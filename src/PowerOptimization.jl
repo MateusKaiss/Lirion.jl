@@ -47,6 +47,7 @@ include("distributed/admm/admm_ac.jl")
 include("distributed/admm/admm_ac_branch.jl")
 include("distributed/admm/admm_ac_hybrid.jl")
 include("distributed/admm/admm_socp_bus.jl")
+include("distributed/admm/admm_socp_branch.jl")
 
 include("main.jl")
 
