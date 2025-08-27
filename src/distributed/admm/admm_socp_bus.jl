@@ -47,7 +47,7 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String,Any})
     τ_incr, τ_decr = 1.05, 0.98
 
     for k in 1:config.max_iter
-        println("\n[ADMM-SOCP(no-θ)] Iteração $k")
+        println("\n[ADMM-SOCP] Iteração $k")
 
         # 1) resolve subproblemas locais (SOCP)
         for (zone_id, subdata) in partitions
