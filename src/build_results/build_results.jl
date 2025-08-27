@@ -42,21 +42,25 @@ function build_result_dict(model::JuMP.Model, data::Dict)
         branch_status = data["branch"]["br_status"]
         branch_ids = [g for g in 1:length(branch_status) if branch_status[g] == 1]
         result["branch"] = Dict(
-            "p_from" =>
-                [value(model[:p_flow_branches][l, t]) for l in branch_ids, t in 1:T],
-            "p_to" => [
-                value(model[:p_reverse_flow_branches][l, t]) for l in branch_ids, t in 1:T
-            ],
+            "p_from" => [value(model[:p_flow_branches][l, t]) for l in branch_ids, t in 1:T],
+            "p_to"   => [value(model[:p_reverse_flow_branches][l, t]) for l in branch_ids, t in 1:T],
             "q_from" =>
                 haskey(model, :q_flow_branches) ?
                 [value(model[:q_flow_branches][l, t]) for l in branch_ids, t in 1:T] :
                 nothing,
-            "q_to" =>
+            "q_to"   =>
                 haskey(model, :q_reverse_flow_branches) ?
-                [
-                    value(model[:q_reverse_flow_branches][l, t]) for l in branch_ids,
-                    t in 1:T
-                ] : nothing,
+                [value(model[:q_reverse_flow_branches][l, t]) for l in branch_ids, t in 1:T] :
+                nothing,
+            # --- extras só existem em SOCP ---
+            "R" =>
+                haskey(model, :R) ?
+                [value(model[:R][l, t]) for l in branch_ids, t in 1:T] :
+                nothing,
+            "T_var" =>
+                haskey(model, :T_var) ?
+                [value(model[:T_var][l, t]) for l in branch_ids, t in 1:T] :
+                nothing,
         )
     end
 
