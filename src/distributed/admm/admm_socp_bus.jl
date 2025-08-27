@@ -1,17 +1,4 @@
-# -------------------------------------------------------------------
-# ADMM-SOCP (sem ângulo) — consenso em V^2 (bus) e R,T (ramo corte)
-#   - Subproblema: SOCP com SCS (ou outro solver cônico)
-#   - Consenso:
-#       * barras compartilhadas: v_magnitude_sq
-#       * arestas de corte: R e T_var (lado "from"; é simétrico)
-#   - Duais/penalidades:
-#       * λV2, ρV2 para V^2
-#       * λR, ρR  e λT, ρT para R e T
-#   - Sem variável de ângulo!
-# -------------------------------------------------------------------
-
 @inline function _rt_from_exprs_socp(model::Model, l_local::Int; t::Int = 1)
-    # R e T_var são variáveis do SOCP (já criadas no build SOCP)
     return model[:R][l_local, t], model[:T_var][l_local, t]
 end
 
@@ -19,7 +6,7 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String,Any})
     @assert config.base_model == SOCP "ADMM-SOCP: base_model deve ser SOCP."
 
     partitions, shared_buses = prepare_admm_partitions(data)
-    cut_edges = _find_cut_edges(data)  # arestas que cruzam zonas
+    cut_edges = _find_cut_edges(data)
 
     # ------------------- duais -------------------
     duals_v2 = Dict{Int, Dict{Int, Float64}}()   # λV2[zone][bus]
@@ -44,12 +31,11 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String,Any})
     end
 
     # ---------------- penalidades ----------------
-    ρV2 = config.rho_v       # usamos o "rho_v" para V^2 (SOCP)
-    ρR  = config.rho_flow_p  # aproveitamos rho_flow_p para R
-    ρT  = config.rho_flow_q  # e rho_flow_q para T
+    ρV2 = config.rho_v       
+    ρR  = config.rho_flow_p  
+    ρT  = config.rho_flow_q 
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
 
-    # históricos para plots
     res_primal_vec = Float64[]
     res_dual_vec   = Float64[]
     eps_primal_vec = Float64[]
@@ -57,8 +43,6 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String,Any})
     rhoV2_vec      = Float64[]
     rhoR_vec       = Float64[]
     rhoT_vec       = Float64[]
-
-    # ajuste adaptativo
     μ_incr, μ_decr = 2.0, 2.0
     τ_incr, τ_decr = 1.05, 0.98
 
@@ -68,6 +52,9 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String,Any})
         # 1) resolve subproblemas locais (SOCP)
         for (zone_id, subdata) in partitions
             local_model = build_model(subdata, SOCP; optimizer = SCS.Optimizer)
+            set_optimizer_attribute(local_model, "eps_abs", 1e-6)
+            set_optimizer_attribute(local_model, "eps_rel", 1e-6)
+            set_optimizer_attribute(local_model, "max_iters", 200_000)
 
             @expression(local_model, admm_penalty, 0.0)
 
