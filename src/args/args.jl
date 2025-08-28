@@ -20,12 +20,12 @@ struct Args
             required = true
 
             "--model"
-            help = "Model: dc | ac | socp | distributed-admm-dc | distributed-admm-ac | distributed-admm-socp | distributed-admm-branch-dc | distributed-admm-branch-ac | distributed-admm-hybrid-dc | distributed-admm-hybrid-ac"  # <<<
+            help = "Model: dc | ac | socp | distributed-admm-dc | distributed-admm-ac | distributed-admm-socp | distributed-admm-branch-dc | distributed-admm-branch-ac | distributed-admm-branch-socp | distributed-admm-hybrid-dc | distributed-admm-hybrid-ac"
             arg_type = String
             required = true
 
             "--optimizer"
-            help = "Optimizer function, e.g., Ipopt.Optimizer or Gurobi.Optimizer (default: Ipopt.Optimizer)"
+            help = "Optimizer function, e.g., Ipopt.Optimizer or SCS.Optimizer or Gurobi.Optimizer (default: Ipopt.Optimizer)"
             arg_type = String
 
             "--plot-outputs"
@@ -51,7 +51,7 @@ struct Args
             arg_type = Float64
 
             "--admm-rho-v"
-            help = "ρV (consensus penalty for voltage magnitudes; AC uses |V|, SOCP usa V^2)"
+            help = "ρV (consensus penalty for voltage magnitudes; AC usa |V|, SOCP usa V^2)"
             arg_type = Float64
 
             "--admm-rho-flow"
@@ -97,16 +97,16 @@ struct Args
         )
 
         # ===== rhos =====
-        rho_base    = parsed["admm-rho"]
-        rho_theta_  = get(parsed, "admm-rho-theta", nothing)
-        rho_v_      = get(parsed, "admm-rho-v", nothing)
-        rho_flow_   = get(parsed, "admm-rho-flow", nothing)
+        rho_base = parsed["admm-rho"]
+        rho_theta_ = get(parsed, "admm-rho-theta", nothing)
+        rho_v_ = get(parsed, "admm-rho-v", nothing)
+        rho_flow_ = get(parsed, "admm-rho-flow", nothing)
         rho_flow_p_ = get(parsed, "admm-rho-flow-p", nothing)
         rho_flow_q_ = get(parsed, "admm-rho-flow-q", nothing)
 
         # fallback: específicos > flow genérico > base
-        rho_theta_val  = isnothing(rho_theta_)  ? rho_base : rho_theta_
-        rho_v_val      = isnothing(rho_v_)      ? rho_base : rho_v_
+        rho_theta_val = isnothing(rho_theta_) ? rho_base : rho_theta_
+        rho_v_val = isnothing(rho_v_) ? rho_base : rho_v_
         rho_flow_p_val =
             isnothing(rho_flow_p_) ? (isnothing(rho_flow_) ? rho_base : rho_flow_) :
             rho_flow_p_
@@ -124,13 +124,13 @@ struct Args
             rho_flow_p_orig::Union{Nothing, Float64},
             rho_flow_q_orig::Union{Nothing, Float64},
         )
-            # agora θ e V também são usados por SOCP no modo "admm" (bus)
+            # θ e V são usados no modo :admm (bus) para DC/AC/SOCP; não no :admm_branch
             uses_theta =
                 (method_sym == :admm || method_sym == :admm_hybrid) &&
-                (base_str == "dc" || base_str == "ac" || base_str == "socp")   # <<<
+                (base_str == "dc" || base_str == "ac" || base_str == "socp")
             uses_v =
                 (method_sym == :admm || method_sym == :admm_hybrid) &&
-                (base_str == "ac" || base_str == "socp")                        # <<<
+                (base_str == "ac" || base_str == "socp")
             uses_flow = (method_sym == :admm_branch) || (method_sym == :admm_hybrid)
 
             if rho_theta_orig !== nothing && !uses_theta
@@ -162,6 +162,7 @@ struct Args
                 #  - distributed-admm-socp
                 #  - distributed-admm-branch-dc
                 #  - distributed-admm-branch-ac
+                #  - distributed-admm-branch-socp
                 #  - distributed-admm-hybrid-dc
                 #  - distributed-admm-hybrid-ac
                 if length(parts) == 3
@@ -173,8 +174,8 @@ struct Args
                     error("Invalid distributed model key: $(parsed["model"])")
                 end
 
-                method_str  = String(method_str)
-                base_str    = String(base_str)
+                method_str = String(method_str)
+                base_str = String(base_str)
                 variant_str = String(variant_str)
 
                 method_str == "admm" ||
@@ -188,24 +189,16 @@ struct Args
                     variant_str == "hybrid" ? :admm_hybrid :
                     error("Unsupported distributed method variant: $variant_str")
 
-                # bloqueia combinações não implementadas com SOCP
-                if base_str == "socp" && method_sym != :admm
-                    error("For SOCP, only 'distributed-admm-socp' (bus consensus) is supported for now.")  # <<<
+                # SOCP: suportados 'admm' (bus) e 'admm_branch' (branch). Híbrido ainda não.
+                if base_str == "socp" && method_sym == :admm_hybrid
+                    error(
+                        "For SOCP, 'distributed-admm-hybrid-socp' ainda não está implementado.",
+                    )
                 end
 
-                # suportes:
-                # - admm (bus): dc, ac, socp
-                # - admm_branch: dc, ac
-                # - admm_hybrid: dc, ac
                 _warn_irrelevant_rhos(
-                    method_sym,
-                    base_str,
-                    model_key,
-                    rho_theta_,
-                    rho_v_,
-                    rho_flow_,
-                    rho_flow_p_,
-                    rho_flow_q_,
+                    method_sym, base_str, model_key,
+                    rho_theta_, rho_v_, rho_flow_, rho_flow_p_, rho_flow_q_,
                 )
 
                 DistributedOPFModel(
@@ -247,10 +240,3 @@ struct Args
         )
     end
 end
-
-# Examples of how DistributedOPFModel(DC, :admm, ...) was hardcoded before CLI parameters:
-# DistributedOPFModel(DC, :admm, 350,       1000,       1e-7, 1e-7)       # default ADMM parameters
-# DistributedOPFModel(DC, :admm, 700,       1000,       1e-7, 1e-7)       # more iterations
-# DistributedOPFModel(DC, :admm, 350,       1000,       1e-7, 1e-7)       # duplicate default example
-# DistributedOPFModel(DC, :admm, 500,       500_000,    1e-7, 1e-7)       # very large rho
-# DistributedOPFModel(DC, :admm, 600,       1_000_000,  1e-7, 1e-7)       # extreme rho and iterations

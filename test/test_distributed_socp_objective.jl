@@ -71,15 +71,13 @@ function compare_distributed_socp_vs_centralized(
         args_dist = String[
             file,
             "--model", "distributed-admm-socp",
-            "--optimizer", string(distributed_optimizer),
-
-            "--admm-rho-v",      string(rho_v),
+            "--optimizer", string(distributed_optimizer), "--admm-rho-v",
+            string(rho_v),
             "--admm-rho-flow-p", string(rho_flow_p),
-            "--admm-rho-flow-q", string(rho_flow_q),
-
-            "--admm-max-iter",   string(admm_max_iter),
+            "--admm-rho-flow-q", string(rho_flow_q), "--admm-max-iter",
+            string(admm_max_iter),
             "--admm-eps-primal", string(admm_eps_primal),
-            "--admm-eps-dual",   string(admm_eps_dual),
+            "--admm-eps-dual", string(admm_eps_dual),
         ]
         obj, _ = PowerOptimization.main(args_dist)
         obj
@@ -117,12 +115,12 @@ function run_distributed_socp_objective_tests(;
     for (i, file) in enumerate(selected_files)
         case_name = basename(file)
 
-        rho_v_case      = 1.0e3
+        rho_v_case = 1.0e3
         rho_flow_p_case = 3.0e2
         rho_flow_q_case = 3.0e2
         admm_max_iter_case = 1000
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case   = admm_eps_dual
+        admm_eps_dual_case = admm_eps_dual
 
         # ajustes leves por tamanho/zonas (mantendo os mesmos ρ)
         if occursin("_3zones_", case_name) || occursin("_4zones_", case_name)

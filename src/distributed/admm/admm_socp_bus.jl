@@ -2,7 +2,7 @@
     return model[:R][l_local, t], model[:T_var][l_local, t]
 end
 
-function run_admm_socp(config::DistributedOPFModel, data::Dict{String,Any})
+function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
     @assert config.base_model == SOCP "ADMM-SOCP: base_model deve ser SOCP."
 
     partitions, shared_buses = prepare_admm_partitions(data)
@@ -10,39 +10,39 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String,Any})
 
     # ------------------- duais -------------------
     duals_v2 = Dict{Int, Dict{Int, Float64}}()   # λV2[zone][bus]
-    duals_R  = Dict{Int, Dict{Int, Float64}}()   # λR[zone][edge]
-    duals_T  = Dict{Int, Dict{Int, Float64}}()   # λT[zone][edge]
+    duals_R = Dict{Int, Dict{Int, Float64}}()   # λR[zone][edge]
+    duals_T = Dict{Int, Dict{Int, Float64}}()   # λT[zone][edge]
     for z in keys(partitions)
         duals_v2[z] = Dict{Int, Float64}()
-        duals_R[z]  = Dict{Int, Float64}()
-        duals_T[z]  = Dict{Int, Float64}()
+        duals_R[z] = Dict{Int, Float64}()
+        duals_T[z] = Dict{Int, Float64}()
     end
 
     # ---------------- consenso -------------------
-    v2_avg     = Dict{Int, Float64}()  # V^2 médio por barra compartilhada
-    v2_prev    = Dict{Int, Float64}()
-    zR         = Dict{Int, Float64}()  # consenso R por aresta de corte
-    zT         = Dict{Int, Float64}()  # consenso T por aresta de corte
-    zR_prev    = Dict{Int, Float64}()
-    zT_prev    = Dict{Int, Float64}()
+    v2_avg = Dict{Int, Float64}()  # V^2 médio por barra compartilhada
+    v2_prev = Dict{Int, Float64}()
+    zR = Dict{Int, Float64}()  # consenso R por aresta de corte
+    zT = Dict{Int, Float64}()  # consenso T por aresta de corte
+    zR_prev = Dict{Int, Float64}()
+    zT_prev = Dict{Int, Float64}()
     for e in cut_edges
         zR[e] = 0.0
         zT[e] = 0.0
     end
 
     # ---------------- penalidades ----------------
-    ρV2 = config.rho_v       
-    ρR  = config.rho_flow_p  
-    ρT  = config.rho_flow_q 
+    ρV2 = config.rho_v
+    ρR = config.rho_flow_p
+    ρT = config.rho_flow_q
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
 
     res_primal_vec = Float64[]
-    res_dual_vec   = Float64[]
+    res_dual_vec = Float64[]
     eps_primal_vec = Float64[]
-    eps_dual_vec   = Float64[]
-    rhoV2_vec      = Float64[]
-    rhoR_vec       = Float64[]
-    rhoT_vec       = Float64[]
+    eps_dual_vec = Float64[]
+    rhoV2_vec = Float64[]
+    rhoR_vec = Float64[]
+    rhoT_vec = Float64[]
     μ_incr, μ_decr = 2.0, 2.0
     τ_incr, τ_decr = 1.05, 0.98
 
@@ -62,7 +62,7 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String,Any})
             bus_ids = subdata["bus"]["bus_i"]
             for b in shared_buses
                 if b in bus_ids
-                    V2  = local_model[:v_magnitude_sq][b, 1]
+                    V2 = local_model[:v_magnitude_sq][b, 1]
                     V2̄ = get(v2_avg, b, 1.0)
                     λV2 = get(duals_v2[zone_id], b, 0.0)
                     admm_penalty += λV2 * (V2 - V2̄) + (ρV2 / 2) * (V2 - V2̄)^2
@@ -97,7 +97,8 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String,Any})
 
         # V^2 (bus)
         for b in shared_buses
-            acc = 0.0; n = 0
+            acc = 0.0
+            n = 0
             for (_, subdata) in partitions
                 if b in subdata["bus"]["bus_i"]
                     acc += value(subdata["model"][:v_magnitude_sq][b, 1])
@@ -111,12 +112,16 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String,Any})
 
         # R,T (edges)
         for e in cut_edges
-            accR = 0.0; accT = 0.0; n = 0
+            accR = 0.0
+            accT = 0.0
+            n = 0
             for (_, subdata) in partitions
                 l_local = findfirst(==(e), subdata["branch_local_indices"])
                 if l_local !== nothing
                     Rloc, Tloc = _rt_from_exprs_socp(subdata["model"], l_local)
-                    accR += value(Rloc); accT += value(Tloc); n += 1
+                    accR += value(Rloc)
+                    accT += value(Tloc)
+                    n += 1
                 end
             end
             if n > 0
@@ -169,11 +174,11 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String,Any})
         s_du = sqrt(
             sum((v2_avg[b] - get(v2_prev, b, 0.0))^2 for b in shared_buses) +
             sum((zR[e] - get(zR_prev, e, 0.0))^2 for e in cut_edges) +
-            sum((zT[e] - get(zT_prev, e, 0.0))^2 for e in cut_edges)
+            sum((zT[e] - get(zT_prev, e, 0.0))^2 for e in cut_edges),
         )
 
         push!(res_primal_vec, r_pri)
-        push!(res_dual_vec,   s_du)
+        push!(res_dual_vec, s_du)
 
         # dimensões para as tolerâncias
         dim_pri = 0
@@ -188,7 +193,7 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String,Any})
             ϵ_rel * max(
                 sqrt(
                     sum(v2_avg[b]^2 for b in shared_buses) +
-                    sum(zR[e]^2 for e in cut_edges) + sum(zT[e]^2 for e in cut_edges)
+                    sum(zR[e]^2 for e in cut_edges) + sum(zT[e]^2 for e in cut_edges),
                 ),
                 1e-12,
             )
@@ -197,18 +202,18 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String,Any})
             ϵ_rel * sqrt(
                 sum((v2_avg[b] - get(v2_prev, b, 0.0))^2 for b in shared_buses) +
                 sum((zR[e] - get(zR_prev, e, 0.0))^2 for e in cut_edges) +
-                sum((zT[e] - get(zT_prev, e, 0.0))^2 for e in cut_edges)
+                sum((zT[e] - get(zT_prev, e, 0.0))^2 for e in cut_edges),
             )
 
         push!(eps_primal_vec, ε_pri)
-        push!(eps_dual_vec,   ε_du)
+        push!(eps_dual_vec, ε_du)
 
         println("‖r‖ = $r_pri | ε_pri = $ε_pri")
         println("‖s‖ = $s_du  | ε_du  = $ε_du")
 
         push!(rhoV2_vec, ρV2)
-        push!(rhoR_vec,  ρR)
-        push!(rhoT_vec,  ρT)
+        push!(rhoR_vec, ρR)
+        push!(rhoT_vec, ρT)
 
         if r_pri < ε_pri && s_du < ε_du
             println("Stopping criterion met.")
@@ -217,9 +222,13 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String,Any})
 
         # 5) ajuste adaptativo (residual balancing)
         if r_pri > μ_incr * s_du
-            ρV2 *= τ_incr;  ρR *= τ_incr;  ρT *= τ_incr
+            ρV2 *= τ_incr
+            ρR *= τ_incr
+            ρT *= τ_incr
         elseif s_du > μ_decr * r_pri
-            ρV2 *= τ_decr;  ρR *= τ_decr;  ρT *= τ_decr
+            ρV2 *= τ_decr
+            ρR *= τ_decr
+            ρT *= τ_decr
         end
     end
 
@@ -227,20 +236,62 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String,Any})
     plot_admm_convergence(res_primal_vec, res_dual_vec, eps_primal_vec, eps_dual_vec,
         "plot_convergencia_admm_socp_no_theta.html")
 
-    PlotlyLight.save((()->begin
-        p = Plot(); p(; x=1:length(rhoV2_vec), y=rhoV2_vec, type=:scatter, mode="lines+markers", name="ρ(V²)")
-        p.layout.title="Evolução de ρ(V²)"; p.layout.xaxis.title="Iterações"; p.layout.yaxis.title="ρ(V²)"; p.layout.yaxis.type="log"; p
-    end)(), "plot_rho_v2_socp_no_theta.html")
+    PlotlyLight.save(
+        (
+            () -> begin
+                p = Plot()
+                p(;
+                    x = 1:length(rhoV2_vec),
+                    y = rhoV2_vec,
+                    type = :scatter,
+                    mode = "lines+markers",
+                    name = "ρ(V²)",
+                )
+                p.layout.title = "Evolução de ρ(V²)"
+                p.layout.xaxis.title = "Iterações"
+                p.layout.yaxis.title = "ρ(V²)"
+                p.layout.yaxis.type = "log"
+                p
+            end
+        )(), "plot_rho_v2_socp_no_theta.html")
 
-    PlotlyLight.save((()->begin
-        p = Plot(); p(; x=1:length(rhoR_vec), y=rhoR_vec, type=:scatter, mode="lines+markers", name="ρR")
-        p.layout.title="Evolução de ρR"; p.layout.xaxis.title="Iterações"; p.layout.yaxis.title="ρR"; p.layout.yaxis.type="log"; p
-    end)(), "plot_rho_R_socp_no_theta.html")
+    PlotlyLight.save(
+        (
+            () -> begin
+                p = Plot()
+                p(;
+                    x = 1:length(rhoR_vec),
+                    y = rhoR_vec,
+                    type = :scatter,
+                    mode = "lines+markers",
+                    name = "ρR",
+                )
+                p.layout.title = "Evolução de ρR"
+                p.layout.xaxis.title = "Iterações"
+                p.layout.yaxis.title = "ρR"
+                p.layout.yaxis.type = "log"
+                p
+            end
+        )(), "plot_rho_R_socp_no_theta.html")
 
-    PlotlyLight.save((()->begin
-        p = Plot(); p(; x=1:length(rhoT_vec), y=rhoT_vec, type=:scatter, mode="lines+markers", name="ρT")
-        p.layout.title="Evolução de ρT"; p.layout.xaxis.title="Iterações"; p.layout.yaxis.title="ρT"; p.layout.yaxis.type="log"; p
-    end)(), "plot_rho_T_socp_no_theta.html")
+    PlotlyLight.save(
+        (
+            () -> begin
+                p = Plot()
+                p(;
+                    x = 1:length(rhoT_vec),
+                    y = rhoT_vec,
+                    type = :scatter,
+                    mode = "lines+markers",
+                    name = "ρT",
+                )
+                p.layout.title = "Evolução de ρT"
+                p.layout.xaxis.title = "Iterações"
+                p.layout.yaxis.title = "ρT"
+                p.layout.yaxis.type = "log"
+                p
+            end
+        )(), "plot_rho_T_socp_no_theta.html")
 
     total_real_cost = sum(p["real_generation_cost"] for p in values(partitions))
     total_expr_cost = sum(p["generation_cost_model_expr"] for p in values(partitions))

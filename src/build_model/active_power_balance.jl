@@ -104,7 +104,7 @@ end
 function active_power_balance!(model, matpower_data, ::Type{SOCP}, ::Type{SubproblemBuild})
     params = matpower_data["power_balance_params"]
     T = get(model.ext, :time_periods, 1)
-    
+
     valid_bus_ids = filter(b -> !params.is_virtual[params.bus_idx_map[b]], params.bus_ids)
 
     @constraint(model, [b in valid_bus_ids, t in 1:T],
