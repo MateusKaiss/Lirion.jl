@@ -20,7 +20,7 @@ struct Args
             required = true
 
             "--model"
-            help = "Model: dc | ac | socp | distributed-admm-dc | distributed-admm-ac | distributed-admm-socp | distributed-admm-branch-dc | distributed-admm-branch-ac | distributed-admm-branch-socp | distributed-admm-hybrid-dc | distributed-admm-hybrid-ac"
+            help = "Model: dc | ac | socp | distributed-admm-dc | distributed-admm-ac | distributed-admm-socp | distributed-admm-branch-dc | distributed-admm-branch-ac | distributed-admm-branch-socp | distributed-admm-hybrid-dc | distributed-admm-hybrid-ac | distributed-admm-hybrid-socp"
             arg_type = String
             required = true
 
@@ -47,7 +47,7 @@ struct Args
             default = 1_000.0
 
             "--admm-rho-theta"
-            help = "ρθ (consensus penalty for bus angles)"
+            help = "ρθ (consensus penalty for bus angles; ignored for SOCP-hybrid)"
             arg_type = Float64
 
             "--admm-rho-v"
@@ -59,11 +59,11 @@ struct Args
             arg_type = Float64
 
             "--admm-rho-flow-p"
-            help = "ρP (consensus penalty for active power flow in branch consensus)"
+            help = "ρP (consensus penalty for active power flow in branch consensus; em SOCP-hybrid também usado para R=Re(W))"
             arg_type = Float64
 
             "--admm-rho-flow-q"
-            help = "ρQ (consensus penalty for reactive power flow in branch consensus)"
+            help = "ρQ (consensus penalty for reactive power flow in branch consensus; em SOCP-hybrid também usado para T=Im(W))"
             arg_type = Float64
 
             "--admm-max-iter"
@@ -97,16 +97,16 @@ struct Args
         )
 
         # ===== rhos =====
-        rho_base = parsed["admm-rho"]
-        rho_theta_ = get(parsed, "admm-rho-theta", nothing)
-        rho_v_ = get(parsed, "admm-rho-v", nothing)
-        rho_flow_ = get(parsed, "admm-rho-flow", nothing)
+        rho_base    = parsed["admm-rho"]
+        rho_theta_  = get(parsed, "admm-rho-theta", nothing)
+        rho_v_      = get(parsed, "admm-rho-v", nothing)
+        rho_flow_   = get(parsed, "admm-rho-flow", nothing)
         rho_flow_p_ = get(parsed, "admm-rho-flow-p", nothing)
         rho_flow_q_ = get(parsed, "admm-rho-flow-q", nothing)
 
         # fallback: específicos > flow genérico > base
         rho_theta_val = isnothing(rho_theta_) ? rho_base : rho_theta_
-        rho_v_val = isnothing(rho_v_) ? rho_base : rho_v_
+        rho_v_val     = isnothing(rho_v_)     ? rho_base : rho_v_
         rho_flow_p_val =
             isnothing(rho_flow_p_) ? (isnothing(rho_flow_) ? rho_base : rho_flow_) :
             rho_flow_p_
@@ -114,6 +114,7 @@ struct Args
             isnothing(rho_flow_q_) ? (isnothing(rho_flow_) ? rho_base : rho_flow_) :
             rho_flow_q_
 
+        # avisos de flags irrelevantes/ignoradas
         local function _warn_irrelevant_rhos(
             method_sym::Symbol,
             base_str::AbstractString,
@@ -124,13 +125,15 @@ struct Args
             rho_flow_p_orig::Union{Nothing, Float64},
             rho_flow_q_orig::Union{Nothing, Float64},
         )
-            # θ e V são usados no modo :admm (bus) para DC/AC/SOCP; não no :admm_branch
+            # θ é usado em :admm(bus) para DC/AC/SOCP; em :admm_hybrid só para DC/AC (SOCP-hybrid NÃO usa θ)
             uses_theta =
-                (method_sym == :admm || method_sym == :admm_hybrid) &&
-                (base_str == "dc" || base_str == "ac" || base_str == "socp")
+                (method_sym == :admm  && (base_str == "dc" || base_str == "ac" || base_str == "socp")) ||
+                (method_sym == :admm_hybrid && (base_str == "dc" || base_str == "ac"))
+            # V (|V| em AC, V^2 em SOCP) é usado em :admm e :admm_hybrid para AC/SOCP
             uses_v =
                 (method_sym == :admm || method_sym == :admm_hybrid) &&
                 (base_str == "ac" || base_str == "socp")
+            # flow (P/Q e afins) é usado em :admm_branch e :admm_hybrid para todos
             uses_flow = (method_sym == :admm_branch) || (method_sym == :admm_hybrid)
 
             if rho_theta_orig !== nothing && !uses_theta
@@ -157,14 +160,9 @@ struct Args
             if startswith(model_key, "distributed-")
                 parts = split(model_key, '-')
                 # formatos aceitos:
-                #  - distributed-admm-dc
-                #  - distributed-admm-ac
-                #  - distributed-admm-socp
-                #  - distributed-admm-branch-dc
-                #  - distributed-admm-branch-ac
-                #  - distributed-admm-branch-socp
-                #  - distributed-admm-hybrid-dc
-                #  - distributed-admm-hybrid-ac
+                #  - distributed-admm-<base>
+                #  - distributed-admm-branch-<base>
+                #  - distributed-admm-hybrid-<base>
                 if length(parts) == 3
                     _, method_str, base_str = parts
                     variant_str = ""
@@ -175,26 +173,17 @@ struct Args
                 end
 
                 method_str = String(method_str)
-                base_str = String(base_str)
+                base_str   = String(base_str)
                 variant_str = String(variant_str)
 
-                method_str == "admm" ||
-                    error("Only ADMM is supported for distributed-* now.")
-                haskey(base_map, base_str) ||
-                    error("Invalid base model in distributed-* key: $base_str")
+                method_str == "admm" || error("Only ADMM is supported for distributed-* now.")
+                haskey(base_map, base_str) || error("Invalid base model in distributed-* key: $base_str")
 
                 method_sym =
-                    variant_str == "" ? :admm :
-                    variant_str == "branch" ? :admm_branch :
-                    variant_str == "hybrid" ? :admm_hybrid :
+                    variant_str == ""        ? :admm :
+                    variant_str == "branch"  ? :admm_branch :
+                    variant_str == "hybrid"  ? :admm_hybrid :
                     error("Unsupported distributed method variant: $variant_str")
-
-                # SOCP: suportados 'admm' (bus) e 'admm_branch' (branch). Híbrido ainda não.
-                if base_str == "socp" && method_sym == :admm_hybrid
-                    error(
-                        "For SOCP, 'distributed-admm-hybrid-socp' ainda não está implementado.",
-                    )
-                end
 
                 _warn_irrelevant_rhos(
                     method_sym, base_str, model_key,
@@ -205,13 +194,13 @@ struct Args
                     base_map[base_str],
                     method_sym,
                     parsed["admm-max-iter"];
-                    rho = rho_base,
-                    rho_theta = rho_theta_val,
-                    rho_v = rho_v_val,
-                    rho_flow_p = rho_flow_p_val,
-                    rho_flow_q = rho_flow_q_val,
-                    ε_primal = parsed["admm-eps-primal"],
-                    ε_dual = parsed["admm-eps-dual"],
+                    rho         = rho_base,
+                    rho_theta   = rho_theta_val,
+                    rho_v       = rho_v_val,
+                    rho_flow_p  = rho_flow_p_val,   # em SOCP-hybrid vale para P e R
+                    rho_flow_q  = rho_flow_q_val,   # em SOCP-hybrid vale para Q e T
+                    ε_primal    = parsed["admm-eps-primal"],
+                    ε_dual      = parsed["admm-eps-dual"],
                 )
             else
                 haskey(base_map, model_key) || error("Invalid model: $model_key")
