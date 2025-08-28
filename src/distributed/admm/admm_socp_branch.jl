@@ -1,10 +1,10 @@
 @inline function _socp_flow_from_exprs_existing(
-    model::Model, l_local::Int; t::Int = 1
+    model::Model, l_local::Int; t::Int = 1,
 )
     return model[:p_flow_branches][l_local, t], model[:q_flow_branches][l_local, t]
 end
 
-function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String,Any})
+function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, Any})
     @assert config.base_model == SOCP "ADMM-SOCP-branch: base_model deve ser SOCP."
 
     partitions, _ = prepare_admm_partitions(data)
@@ -33,15 +33,14 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String,Any
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
 
     res_primal_vec = Float64[]
-    res_dual_vec   = Float64[]
+    res_dual_vec = Float64[]
     eps_primal_vec = Float64[]
-    eps_dual_vec   = Float64[]
+    eps_dual_vec = Float64[]
     rhoP_vec = Float64[]
     rhoQ_vec = Float64[]
 
     μ_incr, μ_decr = 10.0, 10.0
     τ_incr, τ_decr = 2.0, 0.5
-
 
     for k in 1:config.max_iter
         println("\n[ADMM-SOCP-branch] Iteração $k")
@@ -57,10 +56,9 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String,Any
             # aceleradores do SCS:
             set_optimizer_attribute(local_model, "acceleration_lookback", 10)
             set_optimizer_attribute(local_model, "acceleration_interval", 10)
-            set_optimizer_attribute(local_model, "alpha", 1.8) 
+            set_optimizer_attribute(local_model, "alpha", 1.8)
             set_optimizer_attribute(local_model, "normalize", true)
             set_optimizer_attribute(local_model, "scale", 1.0)
-
 
             zone_edges = _zone_cut_edges(subdata, cut_edges)
 
@@ -90,13 +88,17 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String,Any
         zP_prev = deepcopy(zP)
         zQ_prev = deepcopy(zQ)
         for e in cut_edges
-            accP = 0.0; accQ = 0.0; num = 0
+            accP = 0.0
+            accQ = 0.0
+            num = 0
             for (_, subdata) in partitions
                 l_local = findfirst(==(e), subdata["branch_local_indices"])
                 if l_local !== nothing
                     m = subdata["model"]
                     P_loc, Q_loc = _socp_flow_from_exprs_existing(m, l_local)
-                    accP += value(P_loc); accQ += value(Q_loc); num += 1
+                    accP += value(P_loc)
+                    accQ += value(Q_loc)
+                    num += 1
                 end
             end
             if num > 0
@@ -111,8 +113,10 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String,Any
                 l_local = findfirst(==(e), subdata["branch_local_indices"])
                 m = subdata["model"]
                 P_loc, Q_loc = _socp_flow_from_exprs_existing(m, l_local)
-                dualsP[zone_id][e] = get(dualsP[zone_id], e, 0.0) + ρP * (value(P_loc) - zP[e])
-                dualsQ[zone_id][e] = get(dualsQ[zone_id], e, 0.0) + ρQ * (value(Q_loc) - zQ[e])
+                dualsP[zone_id][e] =
+                    get(dualsP[zone_id], e, 0.0) + ρP * (value(P_loc) - zP[e])
+                dualsQ[zone_id][e] =
+                    get(dualsQ[zone_id], e, 0.0) + ρQ * (value(Q_loc) - zQ[e])
             end
         end
 
@@ -128,10 +132,12 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String,Any
         end
         r_pri = sqrt(res_primal_sq)
 
-        s_du = sqrt(sum(
-            (zP[e] - get(zP_prev, e, 0.0))^2 + (zQ[e] - get(zQ_prev, e, 0.0))^2
-            for e in cut_edges
-        ))
+        s_du = sqrt(
+            sum(
+                (zP[e] - get(zP_prev, e, 0.0))^2 + (zQ[e] - get(zQ_prev, e, 0.0))^2
+                for e in cut_edges
+            ),
+        )
 
         push!(res_primal_vec, r_pri)
         push!(res_dual_vec, s_du)
@@ -149,10 +155,12 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String,Any
 
         ε_du =
             sqrt(max(1, dim_du)) * ϵ_abs +
-            ϵ_rel * sqrt(sum(
-                (zP[e] - get(zP_prev, e, 0.0))^2 + (zQ[e] - get(zQ_prev, e, 0.0))^2
-                for e in cut_edges
-            ))
+            ϵ_rel * sqrt(
+                sum(
+                    (zP[e] - get(zP_prev, e, 0.0))^2 + (zQ[e] - get(zQ_prev, e, 0.0))^2
+                    for e in cut_edges
+                ),
+            )
 
         push!(eps_primal_vec, ε_pri)
         push!(eps_dual_vec, ε_du)
@@ -160,7 +168,8 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String,Any
         println("‖r‖ = $r_pri | ε_pri = $ε_pri")
         println("‖s‖ = $s_du  | ε_du  = $ε_du")
 
-        push!(rhoP_vec, ρP); push!(rhoQ_vec, ρQ)
+        push!(rhoP_vec, ρP)
+        push!(rhoQ_vec, ρQ)
 
         # parada
         if r_pri < ε_pri && s_du < ε_du
@@ -170,9 +179,11 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String,Any
 
         # 5) ajuste adaptativo
         if r_pri > μ_incr * s_du
-            ρP *= τ_incr; ρQ *= τ_incr
+            ρP *= τ_incr
+            ρQ *= τ_incr
         elseif s_du > μ_decr * r_pri
-            ρP *= τ_decr; ρQ *= τ_decr
+            ρP *= τ_decr
+            ρQ *= τ_decr
         end
     end
 
@@ -180,15 +191,43 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String,Any
     plot_admm_convergence(res_primal_vec, res_dual_vec, eps_primal_vec, eps_dual_vec,
         "plot_convergencia_admm_socp_branch.html")
 
-    PlotlyLight.save((()->begin
-        p = Plot(); p(; x=1:length(rhoP_vec), y=rhoP_vec, type=:scatter, mode="lines+markers", name="ρP")
-        p.layout.title = "Evolução de ρP"; p.layout.xaxis.title="Iterações"; p.layout.yaxis.title="ρP"; p.layout.yaxis.type="log"; p
-    end)(), "plot_rhoP_socp_branch.html")
+    PlotlyLight.save(
+        (
+            () -> begin
+                p = Plot()
+                p(;
+                    x = 1:length(rhoP_vec),
+                    y = rhoP_vec,
+                    type = :scatter,
+                    mode = "lines+markers",
+                    name = "ρP",
+                )
+                p.layout.title = "Evolução de ρP"
+                p.layout.xaxis.title = "Iterações"
+                p.layout.yaxis.title = "ρP"
+                p.layout.yaxis.type = "log"
+                p
+            end
+        )(), "plot_rhoP_socp_branch.html")
 
-    PlotlyLight.save((()->begin
-        p = Plot(); p(; x=1:length(rhoQ_vec), y=rhoQ_vec, type=:scatter, mode="lines+markers", name="ρQ")
-        p.layout.title = "Evolução de ρQ"; p.layout.xaxis.title="Iterações"; p.layout.yaxis.title="ρQ"; p.layout.yaxis.type="log"; p
-    end)(), "plot_rhoQ_socp_branch.html")
+    PlotlyLight.save(
+        (
+            () -> begin
+                p = Plot()
+                p(;
+                    x = 1:length(rhoQ_vec),
+                    y = rhoQ_vec,
+                    type = :scatter,
+                    mode = "lines+markers",
+                    name = "ρQ",
+                )
+                p.layout.title = "Evolução de ρQ"
+                p.layout.xaxis.title = "Iterações"
+                p.layout.yaxis.title = "ρQ"
+                p.layout.yaxis.type = "log"
+                p
+            end
+        )(), "plot_rhoQ_socp_branch.html")
 
     total_real_cost = sum(p["real_generation_cost"] for p in values(partitions))
     total_expr_cost = sum(p["generation_cost_model_expr"] for p in values(partitions))

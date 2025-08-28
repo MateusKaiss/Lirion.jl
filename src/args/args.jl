@@ -91,22 +91,22 @@ struct Args
 
         model_key = lowercase(strip(parsed["model"]))
         base_map = Dict(
-            "dc"   => DC,
-            "ac"   => AC,
+            "dc" => DC,
+            "ac" => AC,
             "socp" => SOCP,
         )
 
         # ===== rhos =====
-        rho_base    = parsed["admm-rho"]
-        rho_theta_  = get(parsed, "admm-rho-theta", nothing)
-        rho_v_      = get(parsed, "admm-rho-v", nothing)
-        rho_flow_   = get(parsed, "admm-rho-flow", nothing)
+        rho_base = parsed["admm-rho"]
+        rho_theta_ = get(parsed, "admm-rho-theta", nothing)
+        rho_v_ = get(parsed, "admm-rho-v", nothing)
+        rho_flow_ = get(parsed, "admm-rho-flow", nothing)
         rho_flow_p_ = get(parsed, "admm-rho-flow-p", nothing)
         rho_flow_q_ = get(parsed, "admm-rho-flow-q", nothing)
 
         # fallback: específicos > flow genérico > base
-        rho_theta_val  = isnothing(rho_theta_)  ? rho_base : rho_theta_
-        rho_v_val      = isnothing(rho_v_)      ? rho_base : rho_v_
+        rho_theta_val = isnothing(rho_theta_) ? rho_base : rho_theta_
+        rho_v_val = isnothing(rho_v_) ? rho_base : rho_v_
         rho_flow_p_val =
             isnothing(rho_flow_p_) ? (isnothing(rho_flow_) ? rho_base : rho_flow_) :
             rho_flow_p_
@@ -174,8 +174,8 @@ struct Args
                     error("Invalid distributed model key: $(parsed["model"])")
                 end
 
-                method_str  = String(method_str)
-                base_str    = String(base_str)
+                method_str = String(method_str)
+                base_str = String(base_str)
                 variant_str = String(variant_str)
 
                 method_str == "admm" ||
@@ -191,7 +191,9 @@ struct Args
 
                 # SOCP: suportados 'admm' (bus) e 'admm_branch' (branch). Híbrido ainda não.
                 if base_str == "socp" && method_sym == :admm_hybrid
-                    error("For SOCP, 'distributed-admm-hybrid-socp' ainda não está implementado.")
+                    error(
+                        "For SOCP, 'distributed-admm-hybrid-socp' ainda não está implementado.",
+                    )
                 end
 
                 _warn_irrelevant_rhos(
