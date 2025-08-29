@@ -1,828 +1,509 @@
-# ------------------------------------------------------------------------------
-# ADMM-AC por barra com consenso em θ e |V|
-#   - consenso: θ (média circular) e V (média aritmética)
-#   - resíduos e atualização de duais: usam wrap para o θ
-# ------------------------------------------------------------------------------
+# ================= AC Utils =================
+# ---------- Solver ----------
+function resolve_optimizer(config)
+    if hasproperty(config, :optimizer) && getproperty(config, :optimizer) !== nothing
+        return getproperty(config, :optimizer)
+    else
+        return Ipopt.Optimizer
+    end
+end
+
+function add_penalty_bus_ac!(m, subdata, shared_buses::Vector{Int},
+                             θ_avg::Dict{Int,Float64}, v_avg::Dict{Int,Float64},
+                             dualsθ_zone::Dict{Int,Float64}, dualsV_zone::Dict{Int,Float64},
+                             ρθ::Float64, ρV::Float64)
+    bus_ids = subdata["bus"]["bus_i"]
+    @expression(m, admm_penalty, 0.0)
+    for b in shared_buses
+        if b in bus_ids
+            θ  = m[:theta][b,1]; θ̄ = get(θ_avg, b, 0.0); λθ = get(dualsθ_zone, b, 0.0)
+            V  = m[:v_magnitude][b,1]; V̄ = get(v_avg, b, 1.0); λV = get(dualsV_zone, b, 0.0)
+            admm_penalty += λθ*(θ - θ̄) + (ρθ/2)*(θ - θ̄)^2
+            admm_penalty += λV*(V - V̄) + (ρV/2)*(V - V̄)^2
+        end
+    end
+    return admm_penalty
+end
+
+function add_penalty_branch_ac!(m, subdata, zone_edges::Vector{Int},
+                                zP::Dict{Int,Float64}, zQ::Dict{Int,Float64},
+                                dualsP_zone::Dict{Int,Float64}, dualsQ_zone::Dict{Int,Float64},
+                                ρP::Float64, ρQ::Float64)
+    @expression(m, admm_penalty, 0.0)
+    for e in zone_edges
+        l_local = findfirst(==(e), subdata["branch_local_indices"])
+        @assert l_local !== nothing "aresta global $e não encontrada na partição"
+        P_loc, Q_loc = _ac_flow_from_exprs_existing(m, subdata, l_local)
+        λP = get(dualsP_zone, e, 0.0); λQ = get(dualsQ_zone, e, 0.0)
+        admm_penalty += λP*(P_loc - zP[e]) + (ρP/2)*(P_loc - zP[e])^2
+        admm_penalty += λQ*(Q_loc - zQ[e]) + (ρQ/2)*(Q_loc - zQ[e])^2
+    end
+    return admm_penalty
+end
+
+# ---------- Consensos ----------
+function compute_ac_bus_consensus!(θ_avg::Dict{Int,Float64}, v_avg::Dict{Int,Float64},
+                                   partitions, shared_buses::Vector{Int})
+    for b in shared_buses
+        thetas = Float64[]; Vacc = 0.0; n = 0
+        for (_, sub) in partitions
+            if b in sub["bus"]["bus_i"]
+                m = sub["model"]
+                push!(thetas, value(m[:theta][b,1]))
+                Vacc += value(m[:v_magnitude][b,1])
+                n += 1
+            end
+        end
+        if n > 0
+            θ_avg[b] = _circular_mean(thetas)
+            v_avg[b] = Vacc / n
+        end
+    end
+end
+
+function compute_ac_branch_consensus!(zP::Dict{Int,Float64}, zQ::Dict{Int,Float64},
+                                      partitions, cut_edges::Vector{Int})
+    for e in cut_edges
+        accP=0.0; accQ=0.0; n=0
+        for (_, sub) in partitions
+            l_local = findfirst(==(e), sub["branch_local_indices"])
+            if l_local !== nothing
+                P_loc, Q_loc = _ac_flow_from_exprs_existing(sub["model"], sub, l_local)
+                accP += value(P_loc); accQ += value(Q_loc); n += 1
+            end
+        end
+        if n>0
+            zP[e] = accP/n; zQ[e] = accQ/n
+        end
+    end
+end
+
+# ---------- Atualização de duais ----------
+"λθ_zb ← λθ_zb + ρθ * wrap(θ_zb - θ̄_b); λV_zb ← λV_zb + ρV (V_zb - V̄_b)."
+function update_duals_bus_ac!(dualsθ, dualsV, partitions, θ_avg, v_avg, shared_buses, ρθ, ρV)
+    for (z, sub) in partitions
+        m = sub["model"]; bus_ids = sub["bus"]["bus_i"]
+        for b in shared_buses
+            if b in bus_ids
+                θloc = value(m[:theta][b,1]); Vloc = value(m[:v_magnitude][b,1])
+                dθ = _wrap_angle_diff(θloc - θ_avg[b]); dV = Vloc - v_avg[b]
+                dualsθ[z][b] = get(dualsθ[z], b, 0.0) + ρθ*dθ
+                dualsV[z][b] = get(dualsV[z], b, 0.0) + ρV*dV
+            end
+        end
+    end
+end
+
+"λP_ze ← λP_ze + ρP (P_ze - zP_e); λQ_ze ← λQ_ze + ρQ (Q_ze - zQ_e)."
+function update_duals_branch_ac!(dualsP, dualsQ, partitions, zP, zQ, cut_edges, ρP, ρQ)
+    for (z, sub) in partitions
+        for e in _zone_cut_edges(sub, cut_edges)
+            l_local = findfirst(==(e), sub["branch_local_indices"])
+            P_loc, Q_loc = _ac_flow_from_exprs_existing(sub["model"], sub, l_local)
+            dualsP[z][e] = get(dualsP[z], e, 0.0) + ρP*(value(P_loc) - zP[e])
+            dualsQ[z][e] = get(dualsQ[z], e, 0.0) + ρQ*(value(Q_loc) - zQ[e])
+        end
+    end
+end
+
+# ---------- Resíduos ----------
+"‖r‖ (bus/AC) = sqrt(Σ_z Σ_b [wrap(θ_zb-θ̄_b)]² + (V_zb-V̄_b)²)."
+function primal_residual_bus_ac(partitions, θ_avg, v_avg, shared_buses)
+    acc = 0.0
+    for (_, sub) in partitions
+        m = sub["model"]; bus_ids = sub["bus"]["bus_i"]
+        for b in shared_buses
+            if b in bus_ids
+                dθ = _wrap_angle_diff(value(m[:theta][b,1]) - θ_avg[b])
+                dV = value(m[:v_magnitude][b,1]) - v_avg[b]
+                acc += dθ^2 + dV^2
+            end
+        end
+    end
+    return sqrt(acc)
+end
+
+"‖s‖ (bus/AC) = sqrt(Σ_b wrap(θ̄_b-θ̄_b_prev)² + (V̄_b - V̄_b_prev)²)."
+function dual_residual_bus_ac(θ_avg, v_avg, θ_prev, v_prev, shared_buses)
+    sθ = sum(_wrap_angle_diff(θ_avg[b] - get(θ_prev, b, 0.0))^2 for b in shared_buses)
+    sV = sum((v_avg[b] - get(v_prev, b, 0.0))^2 for b in shared_buses)
+    return sqrt(sθ + sV)
+end
+
+function eps_primal_bus_ac(partitions, θ_avg, v_avg, shared_buses, ϵ_abs, ϵ_rel)
+    dim = 2 * sum(b in partitions[z]["bus"]["bus_i"] for z in keys(partitions), b in shared_buses)
+    z_norm = sqrt(sum(θ_avg[b]^2 for b in shared_buses) + sum(v_avg[b]^2 for b in shared_buses))
+    return sqrt(max(1, dim))*ϵ_abs + ϵ_rel*max(z_norm, 1e-12)
+end
+
+function eps_dual_bus_ac(θ_avg, v_avg, θ_prev, v_prev, shared_buses, ϵ_abs, ϵ_rel)
+    dim = 2 * length(shared_buses)
+    sθ = sum(_wrap_angle_diff(θ_avg[b] - get(θ_prev, b, 0.0))^2 for b in shared_buses)
+    sV = sum((v_avg[b] - get(v_prev, b, 0.0))^2 for b in shared_buses)
+    return sqrt(max(1, dim))*ϵ_abs + ϵ_rel*sqrt(sθ + sV)
+end
+
+"‖r‖ (branch/AC) = sqrt(Σ_z Σ_e [(P_ze - zP_e)² + (Q_ze - zQ_e)²])."
+function primal_residual_branch_ac(partitions, zP, zQ, cut_edges)
+    acc = 0.0
+    for (_, sub) in partitions
+        for e in _zone_cut_edges(sub, cut_edges)
+            l_local = findfirst(==(e), sub["branch_local_indices"])
+            P_loc, Q_loc = _ac_flow_from_exprs_existing(sub["model"], sub, l_local)
+            acc += (value(P_loc) - zP[e])^2 + (value(Q_loc) - zQ[e])^2
+        end
+    end
+    return sqrt(acc)
+end
+
+function adaptive_rho!(ρ::Base.RefValue{Float64}, r::Float64, s::Float64;
+                       μ_incr=2.0, μ_decr=2.0, τ_incr=1.05, τ_decr=0.98)
+    if r > μ_incr*s
+        ρ[] *= τ_incr
+    elseif s > μ_decr*r
+        ρ[] *= τ_decr
+    end
+end
+
+"‖s‖ (branch/AC) = sqrt(Σ_e [(zP - zP_prev)² + (zQ - zQ_prev)²])."
+function dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
+    sP = sum((zP[e] - get(zP_prev, e, 0.0))^2 for e in cut_edges)
+    sQ = sum((zQ[e] - get(zQ_prev, e, 0.0))^2 for e in cut_edges)
+    return sqrt(sP + sQ)
+end
+
+function eps_primal_branch_ac(partitions, zP, zQ, cut_edges, ϵ_abs, ϵ_rel)
+    dim_pri = 2 * sum(length(_zone_cut_edges(sub, cut_edges)) for (_, sub) in partitions)
+    z_norm = sqrt(sum(zP[e]^2 + zQ[e]^2 for e in cut_edges))
+    return sqrt(max(1, dim_pri))*ϵ_abs + ϵ_rel*max(z_norm, 1e-12)
+end
+
+function eps_dual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges, ϵ_abs, ϵ_rel)
+    dim_du = 2 * length(cut_edges)
+    s = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
+    return sqrt(max(1, dim_du))*ϵ_abs + ϵ_rel*s
+end
+
+
+# ---------- Plots (wrappers) ----------
+function save_ac_bus_plots(res_pri, res_du, eps_pri, eps_du, rhoθ_hist, rhoV_hist, θ_avg_hist;
+                           stem::String="admm_ac")
+    plot_admm_convergence(res_pri, res_du, eps_pri, eps_du, "plot_convergencia_$(stem).html")
+    PlotlyLight.save( (()->(p=Plot(); p(;x=1:length(rhoθ_hist), y=rhoθ_hist, type=:scatter, mode="lines+markers", name="ρθ");
+        p.layout.title="Evolução de ρθ"; p.layout.xaxis.title="Iterações"; p.layout.yaxis.title="ρθ"; p.layout.yaxis.type="log"; p))(),
+        "plot_rho_theta_$(stem).html")
+    PlotlyLight.save( (()->(p=Plot(); p(;x=1:length(rhoV_hist), y=rhoV_hist, type=:scatter, mode="lines+markers", name="ρV");
+        p.layout.title="Evolução de ρV"; p.layout.xaxis.title="Iterações"; p.layout.yaxis.title="ρV"; p.layout.yaxis.type="log"; p))(),
+        "plot_rho_vmag_$(stem).html")
+    plot_theta_avg_heatmap(θ_avg_hist, "plot_theta_avg_heatmap_$(stem).html")
+end
+
+function save_ac_branch_plots(res_pri, res_du, eps_pri, eps_du, rhoP_hist, rhoQ_hist;
+                              stem::String="admm_ac_branch")
+    plot_admm_convergence(res_pri, res_du, eps_pri, eps_du, "plot_convergencia_$(stem).html")
+    PlotlyLight.save( (()->(p=Plot(); p(;x=1:length(rhoP_hist), y=rhoP_hist, type=:scatter, mode="lines+markers", name="ρP");
+        p.layout.title="Evolução de ρP"; p.layout.xaxis.title="Iterações"; p.layout.yaxis.title="ρP"; p.layout.yaxis.type="log"; p))(),
+        "plot_rhoP_$(stem).html")
+    PlotlyLight.save( (()->(p=Plot(); p(;x=1:length(rhoQ_hist), y=rhoQ_hist, type=:scatter, mode="lines+markers", name="ρQ");
+        p.layout.title="Evolução de ρQ"; p.layout.xaxis.title="Iterações"; p.layout.yaxis.title="ρQ"; p.layout.yaxis.type="log"; p))(),
+        "plot_rhoQ_$(stem).html")
+end
+
 function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
     @assert config.base_model == AC "ADMM-AC: base_model deve ser AC."
     partitions, shared_buses = prepare_admm_partitions(data)
-    duals_theta = Dict{Int, Dict{Int, Float64}}()
-    duals_vmag = Dict{Int, Dict{Int, Float64}}()
-    θ_avg = Dict{Int, Float64}()
-    v_avg = Dict{Int, Float64}()
-    θ_avg_prev = Dict{Int, Float64}()
-    v_avg_prev = Dict{Int, Float64}()
 
-    for z in keys(partitions)
-        duals_theta[z] = Dict{Int, Float64}()
-        duals_vmag[z] = Dict{Int, Float64}()
-    end
-
-    ρθ = config.rho_theta
-    ρV = config.rho_v
-    @info "[ADMM-AC] rho_theta=$(ρθ), rho_v=$(ρV), eps_pri=$(config.ε_primal), eps_dual=$(config.ε_dual)"
-
-    res_primal_vec = Float64[]
-    res_dual_vec = Float64[]
-    eps_primal_vec = Float64[]
-    eps_dual_vec = Float64[]
-    rhoθ_vec = Float64[]
-    rhoV_vec = Float64[]
-    θ_avg_history = Dict{Int, Vector{Float64}}()
-
-    μ_incr, μ_decr = 2.0, 2.0
-    τ_incr, τ_decr = 1.05, 0.98
-
+    # estado
+    ρθ = Ref(config.rho_theta)
+    ρV = Ref(config.rho_v)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
+
+    dualsθ = Dict{Int, Dict{Int, Float64}}(z => Dict{Int,Float64}() for z in keys(partitions))
+    dualsV = Dict{Int, Dict{Int, Float64}}(z => Dict{Int,Float64}() for z in keys(partitions))
+    θ_avg = Dict{Int, Float64}(); v_avg = Dict{Int, Float64}()
+    θ_prev = Dict{Int, Float64}(); v_prev = Dict{Int, Float64}()
+
+    # histórico
+    res_pri_hist = Float64[]; res_du_hist = Float64[]
+    eps_pri_hist = Float64[]; eps_du_hist = Float64[]
+    rhoθ_hist = Float64[]; rhoV_hist = Float64[]
+    θ_avg_hist = Dict{Int, Vector{Float64}}()
+
+    optimizer_factory = resolve_optimizer(config)
 
     for k in 1:config.max_iter
         println("\n[ADMM-AC] Iteração $k")
 
-        for (zone_id, subdata) in partitions
-            local_model = build_model(subdata, AC; optimizer = Ipopt.Optimizer)
+        # 1) resolve locais com penalidade de BUS
+        for (zone_id, sub) in partitions
+            m = build_model(sub, AC; optimizer = optimizer_factory)
+            admm_pen = add_penalty_bus_ac!(m, sub, shared_buses, θ_avg, v_avg, dualsθ[zone_id], dualsV[zone_id], ρθ[], ρV[])
+            @objective(m, Min, m[:generation_cost] + admm_pen)
+            optimize!(m)
 
-            @expression(local_model, admm_penalty, 0.0)
-            bus_ids = subdata["bus"]["bus_i"]
-
-            for b in shared_buses
-                if b in bus_ids
-                    # Ângulo
-                    θ = local_model[:theta][b, 1]
-                    θ̄ = get(θ_avg, b, 0.0)
-                    λθ = get(duals_theta[zone_id], b, 0.0)
-                    admm_penalty += λθ * (θ - θ̄) + (ρθ / 2) * (θ - θ̄)^2
-
-                    # Magnitude de tensão
-                    V = local_model[:v_magnitude][b, 1]
-                    V̄ = get(v_avg, b, 1.0)
-                    λV = get(duals_vmag[zone_id], b, 0.0)
-                    admm_penalty += λV * (V - V̄) + (ρV / 2) * (V - V̄)^2
-                end
-            end
-
-            @objective(local_model, Min, local_model[:generation_cost] + admm_penalty)
-            optimize!(local_model)
-
-            subdata["model"] = local_model
-            subdata["generation_cost_model_expr"] = value(local_model[:generation_cost])
-            subdata["real_generation_cost"] =
-                compute_real_generation_cost(local_model, subdata["objective_params"])
+            sub["model"] = m
+            sub["generation_cost_model_expr"] = value(m[:generation_cost])
+            sub["real_generation_cost"] = compute_real_generation_cost(m, sub["objective_params"])
         end
 
-        θ_avg_prev = isempty(θ_avg) ? θ_avg : deepcopy(θ_avg)
-        v_avg_prev = isempty(v_avg) ? v_avg : deepcopy(v_avg)
-
+        # 2) consensos
+        θ_prev = isempty(θ_avg) ? θ_avg : deepcopy(θ_avg)
+        v_prev = isempty(v_avg) ? v_avg : deepcopy(v_avg)
+        compute_ac_bus_consensus!(θ_avg, v_avg, partitions, shared_buses)
         for b in shared_buses
-            θ_list = Float64[]
-            V_acc = 0.0
-            n = 0
-            for (_, subdata) in partitions
-                if b in subdata["bus"]["bus_i"]
-                    m = subdata["model"]
-                    push!(θ_list, value(m[:theta][b, 1]))
-                    V_acc += value(m[:v_magnitude][b, 1])
-                    n += 1
-                end
-            end
-            if n > 0
-                θ_avg[b] = _circular_mean(θ_list)
-                v_avg[b] = V_acc / n
-                push!(get!(θ_avg_history, b, Float64[]), θ_avg[b])
-            end
+            push!(get!(θ_avg_hist, b, Float64[]), θ_avg[b])
         end
 
-        for (zone_id, subdata) in partitions
-            m = get(subdata, "model", nothing)
-            if m === nothing
-                continue
-            end
-            bus_ids = subdata["bus"]["bus_i"]
-            for b in shared_buses
-                if b in bus_ids
-                    θloc = value(m[:theta][b, 1])
-                    Vloc = value(m[:v_magnitude][b, 1])
-                    dθ = _wrap_angle_diff(θloc - θ_avg[b])
-                    dV = Vloc - v_avg[b]
-                    duals_theta[zone_id][b] = get(duals_theta[zone_id], b, 0.0) + ρθ * dθ
-                    duals_vmag[zone_id][b] = get(duals_vmag[zone_id], b, 0.0) + ρV * dV
-                end
-            end
-        end
+        # 3) duais
+        update_duals_bus_ac!(dualsθ, dualsV, partitions, θ_avg, v_avg, shared_buses, ρθ[], ρV[])
 
-        res_primal_sq = 0.0
-        for (_, subdata) in partitions
-            m = get(subdata, "model", nothing)
-            if m === nothing
-                continue
-            end
-            bus_ids = subdata["bus"]["bus_i"]
-            for b in shared_buses
-                if b in bus_ids
-                    dθ = _wrap_angle_diff(value(m[:theta][b, 1]) - θ_avg[b])
-                    dV = value(m[:v_magnitude][b, 1]) - v_avg[b]
-                    res_primal_sq += dθ^2 + dV^2
-                end
-            end
-        end
-        res_primal = sqrt(res_primal_sq)
+        # 4) resíduos + tolerâncias
+        r = primal_residual_bus_ac(partitions, θ_avg, v_avg, shared_buses)
+        s = dual_residual_bus_ac(θ_avg, v_avg, θ_prev, v_prev, shared_buses)
+        push!(res_pri_hist, r); push!(res_du_hist, s)
 
-        res_dual = sqrt(
-            sum(
-                _wrap_angle_diff(θ_avg[b] - get(θ_avg_prev, b, 0.0))^2 for
-                b in shared_buses
-            ) +
-            sum((v_avg[b] - get(v_avg_prev, b, 0.0))^2 for b in shared_buses),
-        )
+        ε_pri = eps_primal_bus_ac(partitions, θ_avg, v_avg, shared_buses, ϵ_abs, ϵ_rel)
+        ε_du  = eps_dual_bus_ac(θ_avg, v_avg, θ_prev, v_prev, shared_buses, ϵ_abs, ϵ_rel)
+        push!(eps_pri_hist, ε_pri); push!(eps_du_hist, ε_du)
 
-        push!(res_primal_vec, res_primal)
-        push!(res_dual_vec, res_dual)
+        println("‖r‖ = $r | ε_pri = $ε_pri")
+        println("‖s‖ = $s | ε_du  = $ε_du")
 
-        dim_pri =
-            2 * sum(
-                b in partitions[z]["bus"]["bus_i"] for z in keys(partitions),
-                b in shared_buses
-            )
-        dim_du = 2 * length(shared_buses)
+        push!(rhoθ_hist, ρθ[]); push!(rhoV_hist, ρV[])
 
-        ϵ_primal =
-            sqrt(max(1, dim_pri)) * ϵ_abs +
-            ϵ_rel * max(
-                sqrt(
-                    sum(θ_avg[b]^2 for b in shared_buses) +
-                    sum(v_avg[b]^2 for b in shared_buses),
-                ),
-                1e-12,
-            )
-        ϵ_dual =
-            sqrt(max(1, dim_du)) * ϵ_abs +
-            ϵ_rel * sqrt(
-                sum(
-                    _wrap_angle_diff(θ_avg[b] - get(θ_avg_prev, b, 0.0))^2 for
-                    b in shared_buses
-                ) +
-                sum((v_avg[b] - get(v_avg_prev, b, 0.0))^2 for b in shared_buses),
-            )
-
-        push!(eps_primal_vec, ϵ_primal)
-        push!(eps_dual_vec, ϵ_dual)
-
-        println("‖r‖ = $res_primal | ε_pri = $ϵ_primal")
-        println("‖s‖ = $res_dual   | ε_dual = $ϵ_dual")
-
-        push!(rhoθ_vec, ρθ)
-        push!(rhoV_vec, ρV)
-
-        if res_primal < ϵ_primal && res_dual < ϵ_dual
+        if r < ε_pri && s < ε_du
             println("Stopping criterion met.")
             break
         end
 
-        if res_primal > μ_incr * res_dual
-            ρθ *= τ_incr
-            ρV *= τ_incr
-        elseif res_dual > μ_decr * res_primal
-            ρθ *= τ_decr
-            ρV *= τ_decr
-        end
+        adaptive_rho!(ρθ, r, s)
+        adaptive_rho!(ρV, r, s)
     end
 
-    plot_admm_convergence(res_primal_vec, res_dual_vec, eps_primal_vec, eps_dual_vec,
-        "plot_convergencia_admm_ac.html")
-
-    PlotlyLight.save(
-        (
-            () -> begin
-                p = Plot()
-                p(;
-                    x = 1:length(rhoθ_vec),
-                    y = rhoθ_vec,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρθ",
-                )
-                p.layout.title = "Evolução de ρθ"
-                p.layout.xaxis.title = "Iterações"
-                p.layout.yaxis.title = "ρθ"
-                p.layout.yaxis.type = "log"
-                p
-            end
-        )(), "plot_rho_theta_ac.html")
-
-    PlotlyLight.save(
-        (
-            () -> begin
-                p = Plot()
-                p(;
-                    x = 1:length(rhoV_vec),
-                    y = rhoV_vec,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρV",
-                )
-                p.layout.title = "Evolução de ρV"
-                p.layout.xaxis.title = "Iterações"
-                p.layout.yaxis.title = "ρV"
-                p.layout.yaxis.type = "log"
-                p
-            end
-        )(), "plot_rho_vmag_ac.html")
-
-    plot_theta_avg_heatmap(θ_avg_history, "plot_theta_avg_heatmap_ac.html")
+    save_ac_bus_plots(res_pri_hist, res_du_hist, eps_pri_hist, eps_du_hist, rhoθ_hist, rhoV_hist, θ_avg_hist; stem="admm_ac")
 
     total_real_cost = sum(p["real_generation_cost"] for p in values(partitions))
     total_expr_cost = sum(p["generation_cost_model_expr"] for p in values(partitions))
     println("\n[ADMM-AC] Resumo:")
     println("→ Total (value(:generation_cost))     = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
-    println("ρθ_final = $ρθ | ρV_final = $ρV")
+    println("ρθ_final = $(ρθ[]) | ρV_final = $(ρV[])")
 
     return total_real_cost, partitions
 end
 
-
-# ------------------------------------------------------------------------------
-# ADMM-AC por branch (consenso em P_flow e Q_flow)
-#   - penaliza P_from e Q_from (lado "from")
-#   - consenso: média aritmética entre as cópias locais
-# ------------------------------------------------------------------------------
 function run_admm_ac_branch(config::DistributedOPFModel, data::Dict{String, Any})
     @assert config.base_model == AC "ADMM-AC-branch: base_model deve ser AC."
-
     partitions, _ = prepare_admm_partitions(data)
     cut_edges = _find_cut_edges(data)
 
-    dualsP = Dict{Int, Dict{Int, Float64}}()
-    dualsQ = Dict{Int, Dict{Int, Float64}}()
-    for z in keys(partitions)
-        dualsP[z] = Dict{Int, Float64}()
-        dualsQ[z] = Dict{Int, Float64}()
-    end
-
-    zP = Dict{Int, Float64}()  # ativo
-    zQ = Dict{Int, Float64}()  # reativo
-    for e in cut_edges
-        zP[e] = 0.0
-        zQ[e] = 0.0
-    end
-    zP_prev = Dict{Int, Float64}()
-    zQ_prev = Dict{Int, Float64}()
-
-    ρP = config.rho_flow_p
-    ρQ = config.rho_flow_q
-
-    res_primal_vec = Float64[]
-    res_dual_vec = Float64[]
-    eps_primal_vec = Float64[]
-    eps_dual_vec = Float64[]
-    rhoP_vec = Float64[]
-    rhoQ_vec = Float64[]
-
-    μ_incr, μ_decr = 2.0, 2.0
-    τ_incr, τ_decr = 1.05, 0.98
+    # estado
+    ρP = Ref(config.rho_flow_p); ρQ = Ref(config.rho_flow_q)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
+
+    dualsP = Dict{Int, Dict{Int, Float64}}(z => Dict{Int,Float64}() for z in keys(partitions))
+    dualsQ = Dict{Int, Dict{Int, Float64}}(z => Dict{Int,Float64}() for z in keys(partitions))
+    zP = Dict{Int,Float64}(e => 0.0 for e in cut_edges)
+    zQ = Dict{Int,Float64}(e => 0.0 for e in cut_edges)
+    zP_prev = Dict{Int,Float64}(); zQ_prev = Dict{Int,Float64}()
+
+    # histórico
+    res_pri_hist = Float64[]; res_du_hist = Float64[]
+    eps_pri_hist = Float64[]; eps_du_hist = Float64[]
+    rhoP_hist = Float64[]; rhoQ_hist = Float64[]
+
+    optimizer_factory = resolve_optimizer(config)
 
     for k in 1:config.max_iter
         println("\n[ADMM-AC-branch] Iteração $k")
 
-        for (zone_id, subdata) in partitions
-            local_model = build_model(subdata, AC; optimizer = Ipopt.Optimizer)
+        # 1) resolve locais com penalidade de BRANCH (P,Q)
+        for (zone_id, sub) in partitions
+            m = build_model(sub, AC; optimizer = optimizer_factory)
+            zone_edges = _zone_cut_edges(sub, cut_edges)
+            admm_pen = add_penalty_branch_ac!(m, sub, zone_edges, zP, zQ, dualsP[zone_id], dualsQ[zone_id], ρP[], ρQ[])
+            @objective(m, Min, m[:generation_cost] + admm_pen)
+            optimize!(m)
 
-            zone_edges = _zone_cut_edges(subdata, cut_edges)
-
-            @expression(local_model, admm_penalty, 0.0)
-            for e in zone_edges
-                l_local = findfirst(==(e), subdata["branch_local_indices"])
-                @assert l_local !== nothing "aresta global $e não encontrada na partição $zone_id"
-
-                P_loc, Q_loc = _ac_flow_from_exprs_existing(local_model, subdata, l_local)
-
-                λP = get(dualsP[zone_id], e, 0.0)
-                λQ = get(dualsQ[zone_id], e, 0.0)
-
-                admm_penalty += λP * (P_loc - zP[e]) + (ρP / 2) * (P_loc - zP[e])^2
-                admm_penalty += λQ * (Q_loc - zQ[e]) + (ρQ / 2) * (Q_loc - zQ[e])^2
-            end
-
-            @objective(local_model, Min, local_model[:generation_cost] + admm_penalty)
-            optimize!(local_model)
-
-            subdata["model"] = local_model
-            subdata["generation_cost_model_expr"] = value(local_model[:generation_cost])
-            subdata["real_generation_cost"] =
-                compute_real_generation_cost(local_model, subdata["objective_params"])
+            sub["model"] = m
+            sub["generation_cost_model_expr"] = value(m[:generation_cost])
+            sub["real_generation_cost"] = compute_real_generation_cost(m, sub["objective_params"])
         end
 
-        zP_prev = deepcopy(zP)
-        zQ_prev = deepcopy(zQ)
-        for e in cut_edges
-            accP = 0.0
-            accQ = 0.0
-            num = 0
-            for (_, subdata) in partitions
-                l_local = findfirst(==(e), subdata["branch_local_indices"])
-                if l_local !== nothing
-                    m = subdata["model"]
-                    P_loc, Q_loc = _ac_flow_from_exprs_existing(m, subdata, l_local)
-                    accP += value(P_loc)
-                    accQ += value(Q_loc)
-                    num += 1
-                end
-            end
-            if num > 0
-                zP[e] = accP / num
-                zQ[e] = accQ / num
-            end
-        end
+        # 2) consensos (P,Q)
+        zP_prev = isempty(zP) ? zP : deepcopy(zP)
+        zQ_prev = isempty(zQ) ? zQ : deepcopy(zQ)
+        compute_ac_branch_consensus!(zP, zQ, partitions, cut_edges)
 
-        for (zone_id, subdata) in partitions
-            for e in _zone_cut_edges(subdata, cut_edges)
-                l_local = findfirst(==(e), subdata["branch_local_indices"])
-                m = subdata["model"]
-                P_loc, Q_loc = _ac_flow_from_exprs_existing(m, subdata, l_local)
-                dualsP[zone_id][e] =
-                    get(dualsP[zone_id], e, 0.0) + ρP * (value(P_loc) - zP[e])
-                dualsQ[zone_id][e] =
-                    get(dualsQ[zone_id], e, 0.0) + ρQ * (value(Q_loc) - zQ[e])
-            end
-        end
+        # 3) duais
+        update_duals_branch_ac!(dualsP, dualsQ, partitions, zP, zQ, cut_edges, ρP[], ρQ[])
 
-        res_primal_sq = 0.0
-        for (_, subdata) in partitions
-            for e in _zone_cut_edges(subdata, cut_edges)
-                l_local = findfirst(==(e), subdata["branch_local_indices"])
-                m = subdata["model"]
-                P_loc, Q_loc = _ac_flow_from_exprs_existing(m, subdata, l_local)
-                res_primal_sq += (value(P_loc) - zP[e])^2 + (value(Q_loc) - zQ[e])^2
-            end
-        end
-        res_primal = sqrt(res_primal_sq)
+        # 4) resíduos + tolerâncias
+        r = primal_residual_branch_ac(partitions, zP, zQ, cut_edges)
+        s = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
+        push!(res_pri_hist, r); push!(res_du_hist, s)
 
-        res_dual = sqrt(
-            sum(
-                (zP[e] - get(zP_prev, e, 0.0))^2 + (zQ[e] - get(zQ_prev, e, 0.0))^2 for
-                e in cut_edges
-            ),
-        )
+        ε_pri = eps_primal_branch_ac(partitions, zP, zQ, cut_edges, ϵ_abs, ϵ_rel)
+        ε_du  = eps_dual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges, ϵ_abs, ϵ_rel)
+        push!(eps_pri_hist, ε_pri); push!(eps_du_hist, ε_du)
 
-        push!(res_primal_vec, res_primal)
-        push!(res_dual_vec, res_dual)
+        println("‖r‖ = $r | ε_pri = $ε_pri")
+        println("‖s‖ = $s | ε_du  = $ε_du")
 
-        dim_pri = 0
-        for (_, subdata) in partitions
-            dim_pri += 2 * length(_zone_cut_edges(subdata, cut_edges))
-        end
-        dim_du = 2 * length(cut_edges)
+        push!(rhoP_hist, ρP[]); push!(rhoQ_hist, ρQ[])
 
-        ϵ_primal =
-            sqrt(max(1, dim_pri)) * ϵ_abs +
-            ϵ_rel * max(sqrt(sum(zP[e]^2 + zQ[e]^2 for e in cut_edges)), 1e-12)
-
-        ϵ_dual =
-            sqrt(max(1, dim_du)) * ϵ_abs +
-            ϵ_rel * sqrt(
-                sum(
-                    (zP[e] - get(zP_prev, e, 0.0))^2 +
-                    (zQ[e] - get(zQ_prev, e, 0.0))^2 for e in cut_edges
-                ),
-            )
-
-        push!(eps_primal_vec, ϵ_primal)
-        push!(eps_dual_vec, ϵ_dual)
-
-        println("‖r‖ = $res_primal | ε_pri = $ϵ_primal")
-        println("‖s‖ = $res_dual   | ε_dual = $ϵ_dual")
-
-        push!(rhoP_vec, ρP)
-        push!(rhoQ_vec, ρQ)
-
-        if res_primal < ϵ_primal && res_dual < ϵ_dual
+        if r < ε_pri && s < ε_du
             println("Stopping criterion met.")
             break
         end
 
-        if res_primal > μ_incr * res_dual
-            ρP *= τ_incr
-            ρQ *= τ_incr
-        elseif res_dual > μ_decr * res_primal
-            ρP *= τ_decr
-            ρQ *= τ_decr
-        end
+        adaptive_rho!(ρP, r, s)
+        adaptive_rho!(ρQ, r, s)
     end
 
-    plot_admm_convergence(res_primal_vec, res_dual_vec, eps_primal_vec, eps_dual_vec,
-        "plot_convergencia_admm_ac_branch.html")
-
-    PlotlyLight.save(
-        (
-            () -> begin
-                p = Plot()
-                p(;
-                    x = 1:length(rhoP_vec),
-                    y = rhoP_vec,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρP",
-                )
-                p.layout.title = "Evolução de ρP"
-                p.layout.xaxis.title = "Iterações"
-                p.layout.yaxis.title = "ρP"
-                p.layout.yaxis.type = "log"
-                p
-            end
-        )(), "plot_rhoP_ac_branch.html")
-
-    PlotlyLight.save(
-        (
-            () -> begin
-                p = Plot()
-                p(;
-                    x = 1:length(rhoQ_vec),
-                    y = rhoQ_vec,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρQ",
-                )
-                p.layout.title = "Evolução de ρQ"
-                p.layout.xaxis.title = "Iterações"
-                p.layout.yaxis.title = "ρQ"
-                p.layout.yaxis.type = "log"
-                p
-            end
-        )(), "plot_rhoQ_ac_branch.html")
+    save_ac_branch_plots(res_pri_hist, res_du_hist, eps_pri_hist, eps_du_hist, rhoP_hist, rhoQ_hist; stem="admm_ac_branch")
 
     total_real_cost = sum(p["real_generation_cost"] for p in values(partitions))
     total_expr_cost = sum(p["generation_cost_model_expr"] for p in values(partitions))
-
     println("\n[ADMM-AC-branch] Resumo:")
     println("→ Total (value(:generation_cost))     = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
-    println("ρP_final = $ρP | ρQ_final = $ρQ")
+    println("ρP_final = $(ρP[]) | ρQ_final = $(ρQ[])")
 
     return total_real_cost, partitions
 end
 
-# --------------------------------------------------------------------------
-# ADMM-AC híbrido:
-#   - Consenso por BARRA: θ (média circular) e |V| (média aritmética)
-#   - Consenso por RAMO (lado "from"): P_flow e Q_flow (médias aritméticas)
-#   - Atualização adaptativa de ρ em 2 blocos:
-#        • (ρθ, ρV) pelo balanço de resíduos BUS
-#        • (ρP, ρQ) pelo balanço de resíduos BRANCH
-# --------------------------------------------------------------------------
 function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     @assert config.base_model == AC "Hybrid AC: base_model deve ser AC."
-
     partitions, shared_buses = prepare_admm_partitions(data)
     cut_edges = _find_cut_edges(data)
 
-    dualsθ = Dict{Int, Dict{Int, Float64}}()
-    dualsV = Dict{Int, Dict{Int, Float64}}()
-    dualsP = Dict{Int, Dict{Int, Float64}}()
-    dualsQ = Dict{Int, Dict{Int, Float64}}()
-    for z in keys(partitions)
-        dualsθ[z] = Dict{Int, Float64}()
-        dualsV[z] = Dict{Int, Float64}()
-        dualsP[z] = Dict{Int, Float64}()
-        dualsQ[z] = Dict{Int, Float64}()
-    end
-
-    θ̄ = Dict{Int, Float64}()
-    V̄ = Dict{Int, Float64}()
-    zP = Dict{Int, Float64}()
-    zQ = Dict{Int, Float64}()
-
-    θ̄_prev = Dict{Int, Float64}()
-    V̄_prev = Dict{Int, Float64}()
-    zP_prev = Dict{Int, Float64}()
-    zQ_prev = Dict{Int, Float64}()
-
-    for e in cut_edges
-        zP[e] = 0.0
-        zQ[e] = 0.0
-    end
-
-    ρθ = config.rho_theta
-    ρV = config.rho_v
-    ρP = config.rho_flow_p
-    ρQ = config.rho_flow_q
+    # estado
+    ρθ = Ref(config.rho_theta); ρV = Ref(config.rho_v)
+    ρP = Ref(config.rho_flow_p); ρQ = Ref(config.rho_flow_q)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
 
-    res_pri_hist = Float64[]
-    res_du_hist = Float64[]
-    eps_pri_hist = Float64[]
-    eps_du_hist = Float64[]
-    rhoθ_hist = Float64[]
-    rhoV_hist = Float64[]
-    rhoP_hist = Float64[]
-    rhoQ_hist = Float64[]
-    θ̄_hist = Dict{Int, Vector{Float64}}()
+    dualsθ = Dict{Int, Dict{Int, Float64}}(z => Dict{Int,Float64}() for z in keys(partitions))
+    dualsV = Dict{Int, Dict{Int, Float64}}(z => Dict{Int,Float64}() for z in keys(partitions))
+    dualsP = Dict{Int, Dict{Int, Float64}}(z => Dict{Int,Float64}() for z in keys(partitions))
+    dualsQ = Dict{Int, Dict{Int, Float64}}(z => Dict{Int,Float64}() for z in keys(partitions))
 
-    μ_incr, μ_decr = 2.0, 2.0
-    τ_incr, τ_decr = 1.05, 0.98
+    θ_avg = Dict{Int,Float64}(); v_avg = Dict{Int,Float64}()
+    θ_prev = Dict{Int,Float64}(); v_prev = Dict{Int,Float64}()
+    zP = Dict{Int,Float64}(e => 0.0 for e in cut_edges)
+    zQ = Dict{Int,Float64}(e => 0.0 for e in cut_edges)
+    zP_prev = Dict{Int,Float64}(); zQ_prev = Dict{Int,Float64}()
 
-    @info "[ADMM-AC-hybrid] ρθ=$(ρθ), ρV=$(ρV), ρP=$(ρP), ρQ=$(ρQ), eps_pri=$(ϵ_abs), eps_dual=$(ϵ_rel)"
+    # histórico
+    res_pri_hist = Float64[]; res_du_hist = Float64[]
+    eps_pri_hist = Float64[]; eps_du_hist = Float64[]
+    rhoθ_hist = Float64[]; rhoV_hist = Float64[]; rhoP_hist = Float64[]; rhoQ_hist = Float64[]
+    θ_avg_hist = Dict{Int, Vector{Float64}}()
+
+    optimizer_factory = resolve_optimizer(config)
 
     for k in 1:config.max_iter
         println("\n[ADMM-AC-hybrid] Iteração $k")
 
-        for (zone_id, subdata) in partitions
-            local_model = build_model(subdata, AC; optimizer = Ipopt.Optimizer)
+        # 1) resolve locais com penalidades de BUS e BRANCH
+        for (zone_id, sub) in partitions
+            m = build_model(sub, AC; optimizer = optimizer_factory)
+            @expression(m, admm_penalty, 0.0)
 
-            @expression(local_model, admm_penalty, 0.0)
+            # BUS (θ, V)
+            admm_penalty += add_penalty_bus_ac!(m, sub, shared_buses, θ_avg, v_avg, dualsθ[zone_id], dualsV[zone_id], ρθ[], ρV[])
+            # BRANCH (P, Q)
+            zone_edges = _zone_cut_edges(sub, cut_edges)
+            admm_penalty += add_penalty_branch_ac!(m, sub, zone_edges, zP, zQ, dualsP[zone_id], dualsQ[zone_id], ρP[], ρQ[])
 
-            # --- BUS (θ, V) ---
-            bus_ids = subdata["bus"]["bus_i"]
-            for b in shared_buses
-                if b in bus_ids
-                    θloc = local_model[:theta][b, 1]
-                    Vloc = local_model[:v_magnitude][b, 1]
-                    θbar = get(θ̄, b, 0.0)
-                    Vbar = get(V̄, b, 1.0)
-                    λθ = get(dualsθ[zone_id], b, 0.0)
-                    λV = get(dualsV[zone_id], b, 0.0)
-                    admm_penalty += λθ * (θloc - θbar) + (ρθ / 2) * (θloc - θbar)^2
-                    admm_penalty += λV * (Vloc - Vbar) + (ρV / 2) * (Vloc - Vbar)^2
-                end
-            end
+            @objective(m, Min, m[:generation_cost] + admm_penalty)
+            optimize!(m)
 
-            # --- BRANCH (P,Q) ---
-            zone_edges = _zone_cut_edges(subdata, cut_edges)
-            for e in zone_edges
-                l_local = findfirst(==(e), subdata["branch_local_indices"])
-                @assert l_local !== nothing "aresta global $e não está na partição $zone_id"
-                Ploc, Qloc = _ac_flow_from_exprs_existing(local_model, subdata, l_local)
-                λP = get(dualsP[zone_id], e, 0.0)
-                λQ = get(dualsQ[zone_id], e, 0.0)
-                admm_penalty += λP * (Ploc - zP[e]) + (ρP / 2) * (Ploc - zP[e])^2
-                admm_penalty += λQ * (Qloc - zQ[e]) + (ρQ / 2) * (Qloc - zQ[e])^2
-            end
-
-            @objective(local_model, Min, local_model[:generation_cost] + admm_penalty)
-            optimize!(local_model)
-
-            subdata["model"] = local_model
-            subdata["generation_cost_model_expr"] = value(local_model[:generation_cost])
-            subdata["real_generation_cost"] =
-                compute_real_generation_cost(local_model, subdata["objective_params"])
+            sub["model"] = m
+            sub["generation_cost_model_expr"] = value(m[:generation_cost])
+            sub["real_generation_cost"] = compute_real_generation_cost(m, sub["objective_params"])
         end
 
-        θ̄_prev = isempty(θ̄) ? θ̄ : deepcopy(θ̄)
-        V̄_prev = isempty(V̄) ? V̄ : deepcopy(V̄)
-        zP_prev = deepcopy(zP)
-        zQ_prev = deepcopy(zQ)
+        # 2) consensos
+        θ_prev = isempty(θ_avg) ? θ_avg : deepcopy(θ_avg)
+        v_prev = isempty(v_avg) ? v_avg : deepcopy(v_avg)
+        zP_prev = isempty(zP) ? zP : deepcopy(zP)
+        zQ_prev = isempty(zQ) ? zQ : deepcopy(zQ)
 
+        compute_ac_bus_consensus!(θ_avg, v_avg, partitions, shared_buses)
         for b in shared_buses
-            θs = Float64[]
-            Vacc = 0.0
-            n = 0
-            for (_, subdata) in partitions
-                if b in subdata["bus"]["bus_i"]
-                    m = subdata["model"]
-                    push!(θs, value(m[:theta][b, 1]))
-                    Vacc += value(m[:v_magnitude][b, 1])
-                    n += 1
-                end
-            end
-            if n > 0
-                θ̄[b] = _circular_mean(θs)
-                V̄[b] = Vacc / n
-                push!(get!(θ̄_hist, b, Float64[]), θ̄[b])
-            end
+            push!(get!(θ_avg_hist, b, Float64[]), θ_avg[b])
         end
+        compute_ac_branch_consensus!(zP, zQ, partitions, cut_edges)
 
-        for e in cut_edges
-            accP = 0.0
-            accQ = 0.0
-            num = 0
-            for (_, subdata) in partitions
-                l_local = findfirst(==(e), subdata["branch_local_indices"])
-                if l_local !== nothing
-                    Ploc, Qloc =
-                        _ac_flow_from_exprs_existing(subdata["model"], subdata, l_local)
-                    accP += value(Ploc)
-                    accQ += value(Qloc)
-                    num += 1
-                end
-            end
-            if num > 0
-                zP[e] = accP / num
-                zQ[e] = accQ / num
-            end
+        # 3) duais
+        update_duals_bus_ac!(dualsθ, dualsV, partitions, θ_avg, v_avg, shared_buses, ρθ[], ρV[])
+        update_duals_branch_ac!(dualsP, dualsQ, partitions, zP, zQ, cut_edges, ρP[], ρQ[])
+
+        # 4) resíduos + tolerâncias (agregados)
+        r_bus = primal_residual_bus_ac(partitions, θ_avg, v_avg, shared_buses)
+        r_br  = primal_residual_branch_ac(partitions, zP, zQ, cut_edges)
+        r_tot = sqrt(r_bus^2 + r_br^2)
+
+        s_bus = dual_residual_bus_ac(θ_avg, v_avg, θ_prev, v_prev, shared_buses)
+        s_br  = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
+        s_tot = sqrt(s_bus^2 + s_br^2)
+
+        push!(res_pri_hist, r_tot); push!(res_du_hist, s_tot)
+
+        ε_pri = begin
+            εb = eps_primal_bus_ac(partitions, θ_avg, v_avg, shared_buses, ϵ_abs, ϵ_rel)
+            εe = eps_primal_branch_ac(partitions, zP, zQ, cut_edges, ϵ_abs, ϵ_rel)
+            sqrt(εb^2 + εe^2)
         end
-
-        for (zone_id, subdata) in partitions
-            m = subdata["model"]
-            bus_ids = subdata["bus"]["bus_i"]
-
-            # BUS duais
-            for b in shared_buses
-                if b in bus_ids
-                    θloc = value(m[:theta][b, 1])
-                    Vloc = value(m[:v_magnitude][b, 1])
-                    dθ = _wrap_angle_diff(θloc - θ̄[b])
-                    dV = Vloc - V̄[b]
-                    dualsθ[zone_id][b] = get(dualsθ[zone_id], b, 0.0) + ρθ * dθ
-                    dualsV[zone_id][b] = get(dualsV[zone_id], b, 0.0) + ρV * dV
-                end
-            end
-
-            # BRANCH duais
-            for e in _zone_cut_edges(subdata, cut_edges)
-                l_local = findfirst(==(e), subdata["branch_local_indices"])
-                Ploc, Qloc = _ac_flow_from_exprs_existing(m, subdata, l_local)
-                dualsP[zone_id][e] =
-                    get(dualsP[zone_id], e, 0.0) + ρP * (value(Ploc) - zP[e])
-                dualsQ[zone_id][e] =
-                    get(dualsQ[zone_id], e, 0.0) + ρQ * (value(Qloc) - zQ[e])
-            end
+        ε_du = begin
+            εb = eps_dual_bus_ac(θ_avg, v_avg, θ_prev, v_prev, shared_buses, ϵ_abs, ϵ_rel)
+            εe = eps_dual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges, ϵ_abs, ϵ_rel)
+            sqrt(εb^2 + εe^2)
         end
+        push!(eps_pri_hist, ε_pri); push!(eps_du_hist, ε_du)
 
-        r_bus_sq = 0.0
-        r_branch_sq = 0.0
-        for (_, subdata) in partitions
-            m = subdata["model"]
-            bus_ids = subdata["bus"]["bus_i"]
-            # BUS
-            for b in shared_buses
-                if b in bus_ids
-                    dθ = _wrap_angle_diff(value(m[:theta][b, 1]) - θ̄[b])
-                    dV = value(m[:v_magnitude][b, 1]) - V̄[b]
-                    r_bus_sq += dθ^2 + dV^2
-                end
-            end
-            # BRANCH
-            for e in _zone_cut_edges(subdata, cut_edges)
-                l_local = findfirst(==(e), subdata["branch_local_indices"])
-                Ploc, Qloc = _ac_flow_from_exprs_existing(m, subdata, l_local)
-                r_branch_sq += (value(Ploc) - zP[e])^2 + (value(Qloc) - zQ[e])^2
-            end
-        end
-        r_pri = sqrt(r_bus_sq + r_branch_sq)
-
-        s_bus = sqrt(
-            sum(_wrap_angle_diff(θ̄[b] - get(θ̄_prev, b, 0.0))^2 for b in shared_buses) +
-            sum((V̄[b] - get(V̄_prev, b, 0.0))^2 for b in shared_buses),
-        )
-        s_branch = sqrt(
-            sum((zP[e] - get(zP_prev, e, 0.0))^2 for e in cut_edges) +
-            sum((zQ[e] - get(zQ_prev, e, 0.0))^2 for e in cut_edges),
-        )
-        s_tot = sqrt(s_bus^2 + s_branch^2)
-
-        push!(res_pri_hist, r_pri)
-        push!(res_du_hist, s_tot)
-
-        dim_pri = 0
-        for (_, sub) in partitions
-            dim_pri += 2 * sum(b in sub["bus"]["bus_i"] for b in shared_buses)     # θ,V
-            dim_pri += 2 * length(_zone_cut_edges(sub, cut_edges))                 # P,Q
-        end
-        dim_du = 2 * length(shared_buses) + 2 * length(cut_edges)                  # θ̄,V̄,P̄,Q̄
-
-        ε_pri =
-            sqrt(max(1, dim_pri)) * ϵ_abs +
-            ϵ_rel * max(
-                sqrt(
-                    sum(θ̄[b]^2 for b in shared_buses) +
-                    sum(V̄[b]^2 for b in shared_buses) +
-                    sum(zP[e]^2 for e in cut_edges) + sum(zQ[e]^2 for e in cut_edges),
-                ),
-                1e-12,
-            )
-        ε_du =
-            sqrt(max(1, dim_du)) * ϵ_abs +
-            ϵ_rel * sqrt(
-                sum(
-                    _wrap_angle_diff(θ̄[b] - get(θ̄_prev, b, 0.0))^2 for b in shared_buses
-                ) +
-                sum((V̄[b] - get(V̄_prev, b, 0.0))^2 for b in shared_buses) +
-                sum((zP[e] - get(zP_prev, e, 0.0))^2 for e in cut_edges) +
-                sum((zQ[e] - get(zQ_prev, e, 0.0))^2 for e in cut_edges),
-            )
-
-        push!(eps_pri_hist, ε_pri)
-        push!(eps_du_hist, ε_du)
-
-        println("‖r‖ = $r_pri | ε_pri = $ε_pri")
+        println("‖r‖ = $r_tot | ε_pri = $ε_pri")
         println("‖s‖ = $s_tot | ε_du  = $ε_du")
 
-        push!(rhoθ_hist, ρθ)
-        push!(rhoV_hist, ρV)
-        push!(rhoP_hist, ρP)
-        push!(rhoQ_hist, ρQ)
+        push!(rhoθ_hist, ρθ[]); push!(rhoV_hist, ρV[]); push!(rhoP_hist, ρP[]); push!(rhoQ_hist, ρQ[])
 
-        # Parada
-        if r_pri < ε_pri && s_tot < ε_du
+        if r_tot < ε_pri && s_tot < ε_du
             println("Stopping criterion met.")
             break
         end
 
-        # BUS: (θ, V)
-        if r_bus_sq > (μ_incr^2) * (s_bus^2) && s_bus > 0.0
-            ρθ *= τ_incr
-            ρV *= τ_incr
-        elseif s_bus^2 > (μ_decr^2) * r_bus_sq && r_bus_sq > 0.0
-            ρθ *= τ_decr
-            ρV *= τ_decr
-        end
-        # BRANCH: (P, Q)
-        if r_branch_sq > (μ_incr^2) * (s_branch^2) && s_branch > 0.0
-            ρP *= τ_incr
-            ρQ *= τ_incr
-        elseif s_branch^2 > (μ_decr^2) * r_branch_sq && r_branch_sq > 0.0
-            ρP *= τ_decr
-            ρQ *= τ_decr
-        end
+        # ρ adaptativo em blocos (mantendo tua lógica)
+        adaptive_rho!(ρθ, r_bus, s_bus)
+        adaptive_rho!(ρV, r_bus, s_bus)
+        adaptive_rho!(ρP, r_br,  s_br)
+        adaptive_rho!(ρQ, r_br,  s_br)
     end
 
     plot_admm_convergence(res_pri_hist, res_du_hist, eps_pri_hist, eps_du_hist,
         "plot_convergencia_admm_ac_hybrid.html")
 
-    PlotlyLight.save(
-        (
-            () -> begin
-                p = Plot()
-                p(;
-                    x = 1:length(rhoθ_hist),
-                    y = rhoθ_hist,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρθ",
-                )
-                p.layout.title = "Evolução de ρθ"
-                p.layout.xaxis.title = "Iterações"
-                p.layout.yaxis.title = "ρθ"
-                p.layout.yaxis.type = "log"
-                p
-            end
-        )(), "plot_rho_theta_ac_hybrid.html")
+    PlotlyLight.save( (()->(p=Plot(); p(;x=1:length(rhoθ_hist), y=rhoθ_hist, type=:scatter, mode="lines+markers", name="ρθ");
+        p.layout.title="Evolução de ρθ"; p.layout.xaxis.title="Iterações"; p.layout.yaxis.title="ρθ"; p.layout.yaxis.type="log"; p))(),
+        "plot_rho_theta_ac_hybrid.html")
+    PlotlyLight.save( (()->(p=Plot(); p(;x=1:length(rhoV_hist), y=rhoV_hist, type=:scatter, mode="lines+markers", name="ρV");
+        p.layout.title="Evolução de ρV"; p.layout.xaxis.title="Iterações"; p.layout.yaxis.title="ρV"; p.layout.yaxis.type="log"; p))(),
+        "plot_rho_v_ac_hybrid.html")
+    PlotlyLight.save( (()->(p=Plot(); p(;x=1:length(rhoP_hist), y=rhoP_hist, type=:scatter, mode="lines+markers", name="ρP");
+        p.layout.title="Evolução de ρP"; p.layout.xaxis.title="Iterações"; p.layout.yaxis.title="ρP"; p.layout.yaxis.type="log"; p))(),
+        "plot_rho_p_ac_hybrid.html")
+    PlotlyLight.save( (()->(p=Plot(); p(;x=1:length(rhoQ_hist), y=rhoQ_hist, type=:scatter, mode="lines+markers", name="ρQ");
+        p.layout.title="Evolução de ρQ"; p.layout.xaxis.title="Iterações"; p.layout.yaxis.title="ρQ"; p.layout.yaxis.type="log"; p))(),
+        "plot_rho_q_ac_hybrid.html")
 
-    PlotlyLight.save(
-        (
-            () -> begin
-                p = Plot()
-                p(;
-                    x = 1:length(rhoV_hist),
-                    y = rhoV_hist,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρV",
-                )
-                p.layout.title = "Evolução de ρV"
-                p.layout.xaxis.title = "Iterações"
-                p.layout.yaxis.title = "ρV"
-                p.layout.yaxis.type = "log"
-                p
-            end
-        )(), "plot_rho_v_ac_hybrid.html")
-
-    PlotlyLight.save(
-        (
-            () -> begin
-                p = Plot()
-                p(;
-                    x = 1:length(rhoP_hist),
-                    y = rhoP_hist,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρP",
-                )
-                p.layout.title = "Evolução de ρP"
-                p.layout.xaxis.title = "Iterações"
-                p.layout.yaxis.title = "ρP"
-                p.layout.yaxis.type = "log"
-                p
-            end
-        )(), "plot_rho_p_ac_hybrid.html")
-
-    PlotlyLight.save(
-        (
-            () -> begin
-                p = Plot()
-                p(;
-                    x = 1:length(rhoQ_hist),
-                    y = rhoQ_hist,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρQ",
-                )
-                p.layout.title = "Evolução de ρQ"
-                p.layout.xaxis.title = "Iterações"
-                p.layout.yaxis.title = "ρQ"
-                p.layout.yaxis.type = "log"
-                p
-            end
-        )(), "plot_rho_q_ac_hybrid.html")
-
-    plot_theta_avg_heatmap(θ̄_hist, "plot_theta_avg_heatmap_ac_hybrid.html")
+    plot_theta_avg_heatmap(θ_avg_hist, "plot_theta_avg_heatmap_ac_hybrid.html")
 
     total_real_cost = sum(p["real_generation_cost"] for p in values(partitions))
     total_expr_cost = sum(p["generation_cost_model_expr"] for p in values(partitions))
-
     println("\n[ADMM-AC-hybrid] Resumo:")
     println("→ Total (value(:generation_cost))     = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
-    println("ρθ_final = $ρθ | ρV_final = $ρV | ρP_final = $ρP | ρQ_final = $ρQ")
+    println("ρθ_final = $(ρθ[]) | ρV_final = $(ρV[]) | ρP_final = $(ρP[]) | ρQ_final = $(ρQ[])")
 
     return total_real_cost, partitions
 end
