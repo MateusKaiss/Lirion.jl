@@ -1,7 +1,4 @@
 # ================= SOCP Utils =================
-using JuMP
-using LinearAlgebra
-
 # ---- Otimizador (default SCS) ----
 function resolve_socp_optimizer(config)
     if hasproperty(config, :optimizer) && getproperty(config, :optimizer) !== nothing

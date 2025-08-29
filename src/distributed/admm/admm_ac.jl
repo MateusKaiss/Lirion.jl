@@ -1,6 +1,6 @@
 # ================= AC Utils =================
 # ---------- Solver ----------
-function resolve_optimizer(config)
+function resolve_optimizer_ac(config)
     if hasproperty(config, :optimizer) && getproperty(config, :optimizer) !== nothing
         return getproperty(config, :optimizer)
     else
@@ -8,37 +8,65 @@ function resolve_optimizer(config)
     end
 end
 
-function add_penalty_bus_ac!(m, subdata, shared_buses::Vector{Int},
-                             θ_avg::Dict{Int,Float64}, v_avg::Dict{Int,Float64},
-                             dualsθ_zone::Dict{Int,Float64}, dualsV_zone::Dict{Int,Float64},
-                             ρθ::Float64, ρV::Float64)
+# ---------- Penalidades (ADMM) ----------
+
+"Penalidade por BARRA no AC: θ (cópia local) vs θ̄ e V (cópia local) vs V̄.
+ Retorna AffExpr ANÔNIMO (não registra nome no modelo)."
+function add_penalty_bus_ac!(
+    m::JuMP.Model,
+    subdata::Dict{String,Any},
+    shared_buses::AbstractVector{<:Integer},
+    θ_avg::AbstractDict{<:Integer,<:Real},
+    v_avg::AbstractDict{<:Integer,<:Real},
+    dualsθ_zone::AbstractDict{<:Integer,<:Real},
+    dualsV_zone::AbstractDict{<:Integer,<:Real},
+    ρθ::Real,
+    ρV::Real,
+)
+    pen = @expression(m, 0.0)  # expressão anônima → sem colisão de nome
     bus_ids = subdata["bus"]["bus_i"]
-    @expression(m, admm_penalty, 0.0)
     for b in shared_buses
         if b in bus_ids
-            θ  = m[:theta][b,1]; θ̄ = get(θ_avg, b, 0.0); λθ = get(dualsθ_zone, b, 0.0)
-            V  = m[:v_magnitude][b,1]; V̄ = get(v_avg, b, 1.0); λV = get(dualsV_zone, b, 0.0)
-            admm_penalty += λθ*(θ - θ̄) + (ρθ/2)*(θ - θ̄)^2
-            admm_penalty += λV*(V - V̄) + (ρV/2)*(V - V̄)^2
+            θ   = m[:theta][b, 1]
+            θ̄  = Float64(get(θ_avg, b, 0.0))
+            λθ  = Float64(get(dualsθ_zone, b, 0.0))
+            pen += λθ * (θ - θ̄) + (float(ρθ) / 2) * (θ - θ̄)^2
+
+            V   = m[:v_magnitude][b, 1]
+            V̄  = Float64(get(v_avg, b, 1.0))
+            λV  = Float64(get(dualsV_zone, b, 0.0))
+            pen += λV * (V - V̄) + (float(ρV) / 2) * (V - V̄)^2
         end
     end
-    return admm_penalty
+    return pen
 end
 
-function add_penalty_branch_ac!(m, subdata, zone_edges::Vector{Int},
-                                zP::Dict{Int,Float64}, zQ::Dict{Int,Float64},
-                                dualsP_zone::Dict{Int,Float64}, dualsQ_zone::Dict{Int,Float64},
-                                ρP::Float64, ρQ::Float64)
-    @expression(m, admm_penalty, 0.0)
+"Penalidade por RAMO no AC: P_from/Q_from vs zP/zQ.
+ Retorna AffExpr ANÔNIMO."
+function add_penalty_branch_ac!(
+    m::JuMP.Model,
+    subdata::Dict{String,Any},
+    zone_edges::AbstractVector{<:Integer},
+    zP::AbstractDict{<:Integer,<:Real},
+    zQ::AbstractDict{<:Integer,<:Real},
+    dualsP_zone::AbstractDict{<:Integer,<:Real},
+    dualsQ_zone::AbstractDict{<:Integer,<:Real},
+    ρP::Real,
+    ρQ::Real,
+)
+    pen = @expression(m, 0.0)  # expressão anônima
     for e in zone_edges
         l_local = findfirst(==(e), subdata["branch_local_indices"])
         @assert l_local !== nothing "aresta global $e não encontrada na partição"
         P_loc, Q_loc = _ac_flow_from_exprs_existing(m, subdata, l_local)
-        λP = get(dualsP_zone, e, 0.0); λQ = get(dualsQ_zone, e, 0.0)
-        admm_penalty += λP*(P_loc - zP[e]) + (ρP/2)*(P_loc - zP[e])^2
-        admm_penalty += λQ*(Q_loc - zQ[e]) + (ρQ/2)*(Q_loc - zQ[e])^2
+        λP = Float64(get(dualsP_zone, e, 0.0))
+        λQ = Float64(get(dualsQ_zone, e, 0.0))
+        zPe = Float64(get(zP, e, 0.0))
+        zQe = Float64(get(zQ, e, 0.0))
+        pen += λP * (P_loc - zPe) + (float(ρP) / 2) * (P_loc - zPe)^2
+        pen += λQ * (Q_loc - zQe) + (float(ρQ) / 2) * (Q_loc - zQe)^2
     end
-    return admm_penalty
+    return pen
 end
 
 # ---------- Consensos ----------
@@ -156,7 +184,7 @@ function primal_residual_branch_ac(partitions, zP, zQ, cut_edges)
     return sqrt(acc)
 end
 
-function adaptive_rho!(ρ::Base.RefValue{Float64}, r::Float64, s::Float64;
+function adaptive_rho_ac!(ρ::Base.RefValue{Float64}, r::Float64, s::Float64;
                        μ_incr=2.0, μ_decr=2.0, τ_incr=1.05, τ_decr=0.98)
     if r > μ_incr*s
         ρ[] *= τ_incr
@@ -229,7 +257,7 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
     rhoθ_hist = Float64[]; rhoV_hist = Float64[]
     θ_avg_hist = Dict{Int, Vector{Float64}}()
 
-    optimizer_factory = resolve_optimizer(config)
+    optimizer_factory = resolve_optimizer_ac(config)
 
     for k in 1:config.max_iter
         println("\n[ADMM-AC] Iteração $k")
@@ -276,8 +304,8 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
             break
         end
 
-        adaptive_rho!(ρθ, r, s)
-        adaptive_rho!(ρV, r, s)
+        adaptive_rho_ac!(ρθ, r, s)
+        adaptive_rho_ac!(ρV, r, s)
     end
 
     save_ac_bus_plots(res_pri_hist, res_du_hist, eps_pri_hist, eps_du_hist, rhoθ_hist, rhoV_hist, θ_avg_hist; stem="admm_ac")
@@ -312,7 +340,7 @@ function run_admm_ac_branch(config::DistributedOPFModel, data::Dict{String, Any}
     eps_pri_hist = Float64[]; eps_du_hist = Float64[]
     rhoP_hist = Float64[]; rhoQ_hist = Float64[]
 
-    optimizer_factory = resolve_optimizer(config)
+    optimizer_factory = resolve_optimizer_ac(config)
 
     for k in 1:config.max_iter
         println("\n[ADMM-AC-branch] Iteração $k")
@@ -357,8 +385,8 @@ function run_admm_ac_branch(config::DistributedOPFModel, data::Dict{String, Any}
             break
         end
 
-        adaptive_rho!(ρP, r, s)
-        adaptive_rho!(ρQ, r, s)
+        adaptive_rho_ac!(ρP, r, s)
+        adaptive_rho_ac!(ρQ, r, s)
     end
 
     save_ac_branch_plots(res_pri_hist, res_du_hist, eps_pri_hist, eps_du_hist, rhoP_hist, rhoQ_hist; stem="admm_ac_branch")
@@ -400,7 +428,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
     rhoθ_hist = Float64[]; rhoV_hist = Float64[]; rhoP_hist = Float64[]; rhoQ_hist = Float64[]
     θ_avg_hist = Dict{Int, Vector{Float64}}()
 
-    optimizer_factory = resolve_optimizer(config)
+    optimizer_factory = resolve_optimizer_ac(config)
 
     for k in 1:config.max_iter
         println("\n[ADMM-AC-hybrid] Iteração $k")
@@ -474,10 +502,10 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
         end
 
         # ρ adaptativo em blocos (mantendo tua lógica)
-        adaptive_rho!(ρθ, r_bus, s_bus)
-        adaptive_rho!(ρV, r_bus, s_bus)
-        adaptive_rho!(ρP, r_br,  s_br)
-        adaptive_rho!(ρQ, r_br,  s_br)
+        adaptive_rho_ac!(ρθ, r_bus, s_bus)
+        adaptive_rho_ac!(ρV, r_bus, s_bus)
+        adaptive_rho_ac!(ρP, r_br,  s_br)
+        adaptive_rho_ac!(ρQ, r_br,  s_br)
     end
 
     plot_admm_convergence(res_pri_hist, res_du_hist, eps_pri_hist, eps_du_hist,

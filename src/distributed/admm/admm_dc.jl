@@ -1,6 +1,6 @@
 # =============== DC Utils ===============
 # ---------- Solver ----------
-function resolve_optimizer(config)
+function resolve_optimizer_dc(config)
     if hasproperty(config, :optimizer) && getproperty(config, :optimizer) !== nothing
         return getproperty(config, :optimizer)
     else
@@ -162,7 +162,7 @@ function eps_dual_branch_dc(z_flow::Dict{Int,Float64}, z_flow_prev::Dict{Int,Flo
 end
 
 # ---------- ρ adaptativo ----------
-function adaptive_rho!(ρ::Base.RefValue{Float64}, r::Float64, s::Float64;
+function adaptive_rho_dc!(ρ::Base.RefValue{Float64}, r::Float64, s::Float64;
                        μ_incr=2.0, μ_decr=2.0, τ_incr=1.05, τ_decr=0.98)
     if r > μ_incr*s
         ρ[] *= τ_incr
@@ -204,7 +204,7 @@ function run_admm(config::DistributedOPFModel, data)
     rho_vec = Float64[]; θ_avg_history = Dict{Int, Vector{Float64}}()
     θ_local_history = Dict{Int, Dict{Int, Vector{Float64}}}()
 
-    optimizer_factory = resolve_optimizer(config)
+    optimizer_factory = resolve_optimizer_dc(config)
 
     for k in 1:config.max_iter
         println("\nIteração $k (bus/DC)")
@@ -263,7 +263,7 @@ function run_admm(config::DistributedOPFModel, data)
         end
 
         # 6) ρ adaptativo
-        adaptive_rho!(ρ, res_primal, res_dual)
+        adaptive_rho_dc!(ρ, res_primal, res_dual)
     end
 
     # plots
@@ -298,7 +298,7 @@ function run_admm_branch(config::DistributedOPFModel, data::Dict{String, Any})
     eps_primal_vec = Float64[]; eps_dual_vec = Float64[]
     rho_vec = Float64[]
 
-    optimizer_factory = resolve_optimizer(config)
+    optimizer_factory = resolve_optimizer_dc(config)
 
     for k in 1:config.max_iter
         println("\n[ADMM-branch/DC] Iteração $k")
@@ -342,7 +342,7 @@ function run_admm_branch(config::DistributedOPFModel, data::Dict{String, Any})
             break
         end
 
-        adaptive_rho!(ρ, res_primal, res_dual)
+        adaptive_rho_dc!(ρ, res_primal, res_dual)
     end
 
     save_dc_branch_plots(res_primal_vec, res_dual_vec, eps_primal_vec, eps_dual_vec, rho_vec; stem="admm_branch")
@@ -381,7 +381,7 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     rhoθ_vec = Float64[]; rhoe_vec = Float64[]
     θ_avg_history = Dict{Int, Vector{Float64}}()
 
-    optimizer_factory = resolve_optimizer(config)
+    optimizer_factory = resolve_optimizer_dc(config)
 
     for k in 1:config.max_iter
         println("\n[ADMM-hybrid/DC] Iteração $k")
@@ -455,8 +455,8 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         end
 
         # Atualiza AMBOS os ρ para manter escalas parecidas
-        adaptive_rho!(ρθ, res_primal, res_dual)
-        adaptive_rho!(ρe, res_primal, res_dual)
+        adaptive_rho_dc!(ρθ, res_primal, res_dual)
+        adaptive_rho_dc!(ρe, res_primal, res_dual)
     end
 
     # Plots (reusa wrappers + dois gráficos separados de ρ)
