@@ -326,33 +326,69 @@ function run_admm_branch(config::DistributedOPFModel, data::Dict{String, Any})
     @assert config.base_model == DC "ADMM-branch/DC requer DC."
     cut_edges = _find_cut_edges(data)
 
+    # estado ADMM
     ρ = Ref(config.rho_flow)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
-    duals = Dict{Int, Dict{Int, Float64}}(z => Dict{Int,Float64}() for z in keys(partitions))
-    z_flow = Dict{Int,Float64}(e => 0.0 for e in cut_edges)
-    z_flow_prev = Dict{Int,Float64}()
 
+    duals  = Dict{Int, Dict{Int, Float64}}(z => Dict{Int,Float64}() for z in keys(partitions))
+    z_flow = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    z_flow_prev = Dict{Int, Float64}()
+
+    # históricos p/ plots
     res_primal_vec = Float64[]; res_dual_vec = Float64[]
     eps_primal_vec = Float64[]; eps_dual_vec = Float64[]
     rho_vec = Float64[]
 
     optimizer_factory = resolve_optimizer_dc(config)
 
+    # ---------- PRÉ-BUILD ----------
     for (zone_id, sub) in partitions
         m = build_model(sub, DC; optimizer = optimizer_factory)
-        sub["model"] = m
-        sub["obj_base"] = m[:generation_cost]
-        sub["theta_var"] = m[:theta]
-        sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
+        sub["model"]       = m
+        sub["obj_base"]    = m[:generation_cost]
+        sub["theta_var"]   = m[:theta]
+        sub["zone_edges"]  = _zone_cut_edges(sub, cut_edges)
         sub["has_solution"] = false
+
+        # bons starts
         @inbounds for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
         end
+
+        # GAUGE: ancora ângulos por partição (remove derivada do nulo DC)
+        @constraint(m, sum(m[:theta][b,1] for b in sub["bus"]["bus_i"]) == 0.0)
     end
 
+    # ---------- SEED INICIAL (sem penalidade) ----------
+    for (_, sub) in partitions
+        m = sub["model"]
+        @objective(m, Min, sub["obj_base"])
+        optimize!(m)
+        sub["has_solution"] = true
+    end
+    for e in cut_edges
+        s = 0.0; c = 0
+        for (_, sub) in partitions
+            l_local = _edge_local(sub, e)
+            if l_local !== nothing
+                s += value(_dc_flow_expr(sub["model"], sub, l_local))
+                c += 1
+            end
+        end
+        if c > 0
+            z_flow[e] = s / c
+        end
+    end
+
+    # parâmetros do ρ adaptativo (mesmo padrão das outras)
+    μ_incr, μ_decr = 2.0, 2.0
+    τ_incr, τ_decr = 1.05, 0.98
+
+    # ---------- LOOP ADMM ----------
     for k in 1:config.max_iter
         println("\n[ADMM-branch/DC] Iteração $k")
 
+        # 1) subproblemas locais
         for (zone_id, sub) in partitions
             m = sub["model"]
 
@@ -372,12 +408,46 @@ function run_admm_branch(config::DistributedOPFModel, data::Dict{String, Any})
             sub["real_generation_cost"] = compute_real_generation_cost(m, sub["objective_params"])
         end
 
-        z_flow_prev = isempty(z_flow) ? z_flow : deepcopy(z_flow)
-        compute_z_flow_consensus!(z_flow, partitions, cut_edges)
-        update_duals_flow!(duals, partitions, z_flow, cut_edges, ρ[])
+        # 2) consenso (pela MESMA expressão usada na penalidade)
+        z_flow_prev = deepcopy(z_flow)
+        for e in cut_edges
+            s = 0.0; c = 0
+            for (_, sub) in partitions
+                l_local = _edge_local(sub, e)
+                if l_local !== nothing
+                    s += value(_dc_flow_expr(sub["model"], sub, l_local))
+                    c += 1
+                end
+            end
+            if c > 0
+                z_flow[e] = s / c
+            end
+        end
 
-        res_primal = primal_residual_branch_dc(partitions, z_flow, cut_edges)
-        res_dual   = dual_residual_branch_dc(z_flow, z_flow_prev)
+        for (zone_id, sub) in partitions
+            for e in sub["zone_edges"]
+                l_local = _edge_local(sub, e)
+                if l_local !== nothing
+                    p_val = value(_dc_flow_expr(sub["model"], sub, l_local))
+                    duals[zone_id][e] = get(duals[zone_id], e, 0.0) + ρ[]*(p_val - z_flow[e])
+                end
+            end
+        end
+
+        res_primal = 0.0
+        for (_, sub) in partitions
+            for e in sub["zone_edges"]
+                l_local = _edge_local(sub, e)
+                if l_local !== nothing
+                    p_val = value(_dc_flow_expr(sub["model"], sub, l_local))
+                    res_primal += (p_val - z_flow[e])^2
+                end
+            end
+        end
+        res_primal = sqrt(res_primal)
+
+        res_dual = sqrt(sum((z_flow[e] - get(z_flow_prev, e, 0.0))^2 for e in cut_edges))
+
         push!(res_primal_vec, res_primal); push!(res_dual_vec, res_dual)
 
         ϵ_pri = eps_primal_branch_dc(partitions, z_flow, cut_edges, ϵ_abs, ϵ_rel)
@@ -394,14 +464,17 @@ function run_admm_branch(config::DistributedOPFModel, data::Dict{String, Any})
             break
         end
 
-        adaptive_rho_dc!(ρ, res_primal, res_dual)
+        if res_primal > μ_incr*res_dual
+            ρ[] *= τ_incr
+        elseif res_dual > μ_decr*res_primal
+            ρ[] *= τ_decr
+        end
     end
 
     save_dc_branch_plots(res_primal_vec, res_dual_vec, eps_primal_vec, eps_dual_vec, rho_vec; stem="admm_branch")
 
     total_real_cost = sum(p["real_generation_cost"] for p in values(partitions))
     total_expr_cost = sum(p["generation_cost_model_expr"] for p in values(partitions))
-
     println("\n[ADMM-branch/DC] Resumo:")
     println("→ Total (value(:generation_cost)) = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
