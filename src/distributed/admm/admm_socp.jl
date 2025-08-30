@@ -368,7 +368,6 @@ function save_socp_hybrid_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
     end
 end
 
-# ================= Runners (iguais aos seus; só garantem uso dos helpers acima) ==============
 function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
     @assert config.base_model == SOCP "ADMM-SOCP: base_model deve ser SOCP."
 
@@ -381,9 +380,16 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
     ρT  = Ref(config.rho_flow_q)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
 
-    duals_v2 = Dict{Int,Dict{Int,Float64}}(z=>Dict{Int,Float64}() for z in keys(partitions))
-    dualsR   = Dict{Int,Dict{Int,Float64}}(z=>Dict{Int,Float64}() for z in keys(partitions))
-    dualsT   = Dict{Int,Dict{Int,Float64}}(z=>Dict{Int,Float64}() for z in keys(partitions))
+    # --------- FIX: inicialização explícita dos duais ---------
+    duals_v2 = Dict{Int,Dict{Int,Float64}}()
+    dualsR   = Dict{Int,Dict{Int,Float64}}()
+    dualsT   = Dict{Int,Dict{Int,Float64}}()
+    for z in keys(partitions)
+        duals_v2[z] = Dict{Int,Float64}()
+        dualsR[z]   = Dict{Int,Float64}()
+        dualsT[z]   = Dict{Int,Float64}()
+    end
+    # ----------------------------------------------------------
 
     v2_avg = Dict{Int,Float64}(); v2_prev = Dict{Int,Float64}()
     zR = Dict{Int,Float64}(e=>0.0 for e in cut_edges); zR_prev = Dict{Int,Float64}()
@@ -396,25 +402,48 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
 
     optimizer_factory = resolve_socp_optimizer(config)
 
+    # PRÉ-BUILD das partições
+    for (zone_id, sub) in partitions
+        m = build_model(sub, SOCP; optimizer = optimizer_factory)
+        set_socp_defaults!(m; eps_abs=1e-6, eps_rel=1e-6, max_iters=200_000)
+
+        sub["model"]      = m
+        sub["obj_base"]   = m[:generation_cost]
+        sub["v2_var"]     = m[:v_magnitude_sq]
+        sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
+        sub["has_solution"] = false
+
+        # warm start simples para V²
+        @inbounds for I in keys(sub["v2_var"])
+            set_start_value(sub["v2_var"][I], 1.0)
+        end
+    end
+
     μ_incr, μ_decr = 2.0, 2.0
     τ_incr, τ_decr = 1.05, 0.98
 
     for k in 1:config.max_iter
         println("\n[ADMM-SOCP (V²+R,T)] Iteração $k")
 
-        # 1) resolve locais (SCS)
+        # 1) subproblemas locais
         for (zone_id, sub) in partitions
-            m = build_model(sub, SOCP; optimizer = optimizer_factory)
-            set_socp_defaults!(m; eps_abs=1e-6, eps_rel=1e-6, max_iters=200_000)
+            m = sub["model"]
 
-            admm_pen = @expression(m, 0.0)
-            admm_pen += add_penalty_bus_socp!(m, sub, shared_buses, v2_avg, duals_v2[zone_id], ρV2[])
-            zone_edges = _zone_cut_edges(sub, cut_edges)
-            admm_pen += add_penalty_branch_rt_socp!(m, sub, zone_edges, zR, zT, dualsR[zone_id], dualsT[zone_id], ρR[], ρT[])
-            @objective(m, Min, m[:generation_cost] + admm_pen)
+            # warm start com solução anterior (se houver)
+            if sub["has_solution"] === true
+                V2_old = JuMP.value.(sub["v2_var"])
+                @inbounds for I in keys(sub["v2_var"])
+                    set_start_value(sub["v2_var"][I], V2_old[I])
+                end
+            end
 
+            pen  = add_penalty_bus_socp!(m, sub, shared_buses, v2_avg, duals_v2[zone_id], ρV2[])
+            pen += add_penalty_branch_rt_socp!(m, sub, sub["zone_edges"], zR, zT,
+                                               dualsR[zone_id], dualsT[zone_id], ρR[], ρT[])
+            @objective(m, Min, sub["obj_base"] + pen)
             optimize!(m)
-            sub["model"] = m
+            sub["has_solution"] = true
+
             sub["generation_cost_model_expr"] = value(m[:generation_cost])
             sub["real_generation_cost"] = compute_real_generation_cost(m, sub["objective_params"])
         end
@@ -425,11 +454,11 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
         compute_v2_consensus!(v2_avg, partitions, shared_buses)
         compute_rt_consensus!(zR, zT, partitions, cut_edges)
 
-        # 3) duais
+        # 3) atualização dos duais
         update_duals_bus_socp!(duals_v2, partitions, v2_avg, shared_buses, ρV2[])
         update_duals_branch_rt_socp!(dualsR, dualsT, partitions, zR, zT, cut_edges, ρR[], ρT[])
 
-        # 4) resíduos + tolerâncias (agregado V² + R,T)
+        # 4) resíduos + tolerâncias (agregado)
         r_bus = primal_residual_bus_socp(partitions, v2_avg, shared_buses)
         r_rt  = primal_residual_branch_rt_socp(partitions, zR, zT, cut_edges)
         r     = sqrt(r_bus^2 + r_rt^2)
@@ -457,12 +486,13 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
 
         push!(rhoV2_hist, ρV2[]); push!(rhoR_hist, ρR[]); push!(rhoT_hist, ρT[])
 
+        # 5) critério de parada
         if r < ε_pri && s < ε_du
             println("Stopping criterion met.")
             break
         end
 
-        # 5) update ρ (mesma regra para os três)
+        # 6) atualização de ρ em bloco (V², R, T)
         if r > μ_incr*s
             ρV2[] *= τ_incr; ρR[] *= τ_incr; ρT[] *= τ_incr
         elseif s > μ_decr*r
@@ -488,47 +518,64 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, An
     partitions, _ = prepare_admm_partitions(data)
     cut_edges = _find_cut_edges(data)
 
-    ρP = Ref(config.rho_flow_p); ρQ = Ref(config.rho_flow_q)
+    # estado
+    ρP = Ref(config.rho_flow_p)
+    ρQ = Ref(config.rho_flow_q)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
 
-    dualsP = Dict{Int,Dict{Int,Float64}}(z=>Dict{Int,Float64}() for z in keys(partitions))
-    dualsQ = Dict{Int,Dict{Int,Float64}}(z=>Dict{Int,Float64}() for z in keys(partitions))
-    zP = Dict{Int,Float64}(e=>0.0 for e in cut_edges); zP_prev = Dict{Int,Float64}()
-    zQ = Dict{Int,Float64}(e=>0.0 for e in cut_edges); zQ_prev = Dict{Int,Float64}()
+    # duais + variáveis de consenso
+    dualsP = Dict{Int,Dict{Int,Float64}}(z => Dict{Int,Float64}() for z in keys(partitions))
+    dualsQ = Dict{Int,Dict{Int,Float64}}(z => Dict{Int,Float64}() for z in keys(partitions))
+    zP = Dict{Int,Float64}(e => 0.0 for e in cut_edges); zP_prev = Dict{Int,Float64}()
+    zQ = Dict{Int,Float64}(e => 0.0 for e in cut_edges); zQ_prev = Dict{Int,Float64}()
 
-    r_hist=Float64[]; s_hist=Float64[]
-    eps_r_hist=Float64[]; eps_s_hist=Float64[]
-    rhoP_hist=Float64[]; rhoQ_hist=Float64[]
+    # históricos
+    r_hist = Float64[]; s_hist = Float64[]
+    eps_r_hist = Float64[]; eps_s_hist = Float64[]
+    rhoP_hist = Float64[]; rhoQ_hist = Float64[]
 
     optimizer_factory = resolve_socp_optimizer(config)
 
-    μ_incr, μ_decr = 10.0, 10.0
-    τ_incr, τ_decr = 2.0, 0.5
+    # ---------- PRÉ-BUILD  ----------
+    for (zone_id, sub) in partitions
+        m = build_model(sub, SOCP; optimizer = optimizer_factory)
+        set_socp_defaults!(m; eps_abs=1e-5, eps_rel=1e-5, max_iters=150_000,
+                              acceleration_lookback=10, acceleration_interval=10,
+                              alpha=1.8, normalize=true, scale=1.0)
+        sub["model"]       = m
+        sub["obj_base"]    = m[:generation_cost]
+        sub["zone_edges"]  = _zone_cut_edges(sub, cut_edges)
+        sub["has_solution"] = false
+    end
+
+    μ_incr, μ_decr = 2.0, 2.0
+    τ_incr, τ_decr = 1.05, 0.98
 
     for k in 1:config.max_iter
         println("\n[ADMM-SOCP-branch (P,Q)] Iteração $k")
 
         for (zone_id, sub) in partitions
-            m = build_model(sub, SOCP; optimizer = optimizer_factory)
-            set_socp_defaults!(m; eps_abs=1e-5, eps_rel=1e-5, max_iters=150_000,
-                                  acceleration_lookback=10, acceleration_interval=10,
-                                  alpha=1.8, normalize=true, scale=1.0)
+            m = sub["model"]
 
-            zone_edges = _zone_cut_edges(sub, cut_edges)
-            admm_pen = add_penalty_branch_pq_socp!(m, sub, zone_edges, zP, zQ, dualsP[zone_id], dualsQ[zone_id], ρP[], ρQ[])
-            @objective(m, Min, m[:generation_cost] + admm_pen)
+            pen = add_penalty_branch_pq_socp!(m, sub, sub["zone_edges"],
+                                              zP, zQ, dualsP[zone_id], dualsQ[zone_id],
+                                              ρP[], ρQ[])
+            @objective(m, Min, sub["obj_base"] + pen)
             optimize!(m)
+            sub["has_solution"] = true
 
-            sub["model"] = m
             sub["generation_cost_model_expr"] = value(m[:generation_cost])
             sub["real_generation_cost"] = compute_real_generation_cost(m, sub["objective_params"])
         end
 
+        # 2) consenso
         zP_prev = deepcopy(zP); zQ_prev = deepcopy(zQ)
         compute_pq_consensus!(zP, zQ, partitions, cut_edges)
 
+        # 3) atualização dos duais
         update_duals_branch_pq_socp!(dualsP, dualsQ, partitions, zP, zQ, cut_edges, ρP[], ρQ[])
 
+        # 4) resíduos e tolerâncias
         r = primal_residual_branch_pq_socp(partitions, zP, zQ, cut_edges)
         s = dual_residual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges)
         push!(r_hist, r); push!(s_hist, s)
@@ -542,11 +589,13 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, An
 
         push!(rhoP_hist, ρP[]); push!(rhoQ_hist, ρQ[])
 
+        # 5) checagem de parada
         if r < ε_pri && s < ε_du
             println("Stopping criterion met.")
             break
         end
 
+        # 6) atualização de ρ (mesma regra das outras rotinas)
         if r > μ_incr*s
             ρP[] *= τ_incr; ρQ[] *= τ_incr
         elseif s > μ_decr*r
@@ -554,6 +603,7 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, An
         end
     end
 
+    # plots e resumo
     save_socp_branch_pq_plots(r_hist, s_hist, eps_r_hist, eps_s_hist, rhoP_hist, rhoQ_hist; stem="admm_socp_branch")
 
     total_real_cost = sum(p["real_generation_cost"] for p in values(partitions))
@@ -568,7 +618,6 @@ end
 
 function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     @assert config.base_model == SOCP "ADMM-SOCP-hybrid: base_model deve ser SOCP."
-
     partitions, shared_buses = prepare_admm_partitions(data)
     cut_edges = _find_cut_edges(data)
 
@@ -599,30 +648,39 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, An
 
     optimizer_factory = resolve_socp_optimizer(config)
 
-    μ_incr, μ_decr = 2.0, 2.0
-    τ_incr, τ_decr = 1.05, 0.98
+    # ---------- PRÉ-BUILD ----------
+    for (zone_id, sub) in partitions
+        m = build_model(sub, SOCP; optimizer = optimizer_factory)
+        set_socp_defaults!(m; eps_abs=1e-5, eps_rel=1e-5, max_iters=150_000,
+                              acceleration_lookback=10, acceleration_interval=10,
+                              alpha=1.8, normalize=true, scale=1.0)
+        sub["model"]      = m
+        sub["obj_base"]   = m[:generation_cost]
+        sub["v2_var"]     = m[:v_magnitude_sq]
+        sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
+        sub["has_solution"] = false
+        @inbounds for I in keys(sub["v2_var"])
+            set_start_value(sub["v2_var"][I], 1.0)
+        end
+    end
 
     for k in 1:config.max_iter
         println("\n[ADMM-SOCP-hybrid] Iteração $k")
 
         for (zone_id, sub) in partitions
-            m = build_model(sub, SOCP; optimizer = optimizer_factory)
-            set_socp_defaults!(m; eps_abs=1e-5, eps_rel=1e-5, max_iters=150_000,
-                                  acceleration_lookback=10, acceleration_interval=10,
-                                  alpha=1.8, normalize=true, scale=1.0)
+            m = sub["model"]
 
-            admm_pen = @expression(m, 0.0)
-            # BUS (V^2)
-            admm_pen += add_penalty_bus_socp!(m, sub, shared_buses, v2_avg, duals_v2[zone_id], ρV2[])
+            pen = @expression(m, 0.0)
+            # BUS (V²)
+            pen += add_penalty_bus_socp!(m, sub, shared_buses, v2_avg, duals_v2[zone_id], ρV2[])
             # BRANCH (P,Q,R,T)
-            zone_edges = _zone_cut_edges(sub, cut_edges)
-            admm_pen += add_penalty_branch_pq_socp!(m, sub, zone_edges, zP, zQ, dualsP[zone_id], dualsQ[zone_id], ρP[], ρQ[])
-            admm_pen += add_penalty_branch_rt_socp!(m, sub, zone_edges, zR, zT, dualsR[zone_id], dualsT[zone_id], ρR[], ρT[])
+            pen += add_penalty_branch_pq_socp!(m, sub, sub["zone_edges"], zP, zQ, dualsP[zone_id], dualsQ[zone_id], ρP[], ρQ[])
+            pen += add_penalty_branch_rt_socp!(m, sub, sub["zone_edges"], zR, zT, dualsR[zone_id], dualsT[zone_id], ρR[], ρT[])
 
-            @objective(m, Min, m[:generation_cost] + admm_pen)
+            @objective(m, Min, sub["obj_base"] + pen)
             optimize!(m)
+            sub["has_solution"] = true
 
-            sub["model"] = m
             sub["generation_cost_model_expr"] = value(m[:generation_cost])
             sub["real_generation_cost"] = compute_real_generation_cost(m, sub["objective_params"])
         end

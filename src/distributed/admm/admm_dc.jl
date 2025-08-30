@@ -1,5 +1,4 @@
 # =============== DC Utils  ===============
-
 # ---------- Solver ----------
 function resolve_optimizer_dc(config)
     if hasproperty(config, :optimizer) && getproperty(config, :optimizer) !== nothing
@@ -222,18 +221,16 @@ function save_dc_branch_plots(res_pri, res_du, eps_pri, eps_du, ρ_hist;
     plot_rho(ρ_hist, "plot_rho_$(stem).html")
 end
 
+
 function run_admm(config::DistributedOPFModel, data)
     partitions, shared_buses = prepare_admm_partitions(data)
-    base_model = config.base_model
-    base_model == DC || error("run_admm (bus-consensus) está implementado para DC.")
+    @assert config.base_model == DC "run_admm (bus/DC) requer DC."
 
-    # --- estado ADMM
     ρ = Ref(config.rho_theta)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
     duals = Dict{Int, Dict{Int, Float64}}(z => Dict{Int,Float64}() for z in keys(partitions))
     θ_avg = Dict{Int,Float64}(); θ_avg_prev = Dict{Int,Float64}()
 
-    # --- histórico
     res_primal_vec = Float64[]; res_dual_vec = Float64[]
     eps_primal_vec = Float64[]; eps_dual_vec = Float64[]
     rho_vec = Float64[]; θ_avg_history = Dict{Int, Vector{Float64}}()
@@ -241,43 +238,55 @@ function run_admm(config::DistributedOPFModel, data)
 
     optimizer_factory = resolve_optimizer_dc(config)
 
+    for (zone_id, sub) in partitions
+        m = build_model(sub, DC; optimizer = optimizer_factory)
+        sub["model"] = m
+        sub["obj_base"] = m[:generation_cost]
+        sub["theta_var"] = m[:theta]
+        sub["has_solution"] = false
+        @inbounds for I in keys(sub["theta_var"])
+            set_start_value(sub["theta_var"][I], 0.0)
+        end
+    end
+
     for k in 1:config.max_iter
         println("\nIteração $k (bus/DC)")
 
-        # 1) resolve subproblemas locais + penalidade
-        for (zone_id, subdata) in partitions
-            local_model = build_model(subdata, base_model; optimizer = optimizer_factory)
+        for (zone_id, sub) in partitions
+            m = sub["model"]
 
-            # penalidade por barra (θ)
-            admm_penalty = add_penalty_bus_dc!(local_model, subdata, shared_buses, θ_avg, duals[zone_id], ρ[])
-            @objective(local_model, Min, local_model[:generation_cost] + admm_penalty)
-            optimize!(local_model)
+            if sub["has_solution"] === true
+                θ_old = JuMP.value.(sub["theta_var"])
+                @inbounds for I in keys(sub["theta_var"])
+                    set_start_value(sub["theta_var"][I], θ_old[I])
+                end
+            end
 
-            subdata["model"] = local_model
-            subdata["generation_cost_model_expr"] = value(local_model[:generation_cost])
-            subdata["real_generation_cost"] = compute_real_generation_cost(local_model, subdata["objective_params"])
+            pen = add_penalty_bus_dc!(m, sub, shared_buses, θ_avg, duals[zone_id], ρ[])
+            @objective(m, Min, sub["obj_base"] + pen)
+            optimize!(m)
+            sub["has_solution"] = true
 
-            # histórico local de θ por barra compartilhada
-            θ_vals = value.(local_model[:theta])
+            sub["generation_cost_model_expr"] = value(m[:generation_cost])
+            sub["real_generation_cost"] = compute_real_generation_cost(m, sub["objective_params"])
+
+            θ_vals = value.(sub["theta_var"])
             for b in shared_buses
-                if b in subdata["bus"]["bus_i"]
+                if b in sub["bus"]["bus_i"]
                     push!(get!(get!(θ_local_history, zone_id, Dict{Int,Vector{Float64}}()), b, Float64[]),
                           θ_vals[b,1])
                 end
             end
         end
 
-        # 2) consenso
         θ_avg_prev = isempty(θ_avg) ? θ_avg : deepcopy(θ_avg)
         compute_theta_consensus!(θ_avg, partitions, shared_buses)
         for b in shared_buses
             push!(get!(θ_avg_history, b, Float64[]), θ_avg[b])
         end
 
-        # 3) duais
         update_duals_theta!(duals, partitions, θ_avg, shared_buses, ρ[])
 
-        # 4) resíduos + tolerâncias
         res_primal = primal_residual_bus_dc(partitions, θ_avg, shared_buses)
         res_dual   = dual_residual_bus_dc(θ_avg, θ_avg_prev)
         push!(res_primal_vec, res_primal); push!(res_dual_vec, res_dual)
@@ -291,17 +300,14 @@ function run_admm(config::DistributedOPFModel, data)
 
         push!(rho_vec, ρ[])
 
-        # 5) checagem de parada
         if res_primal < ϵ_pri && res_dual < ϵ_du
             println("Stopping criterion met.")
             break
         end
 
-        # 6) ρ adaptativo
         adaptive_rho_dc!(ρ, res_primal, res_dual)
     end
 
-    # plots
     save_dc_bus_plots(res_primal_vec, res_dual_vec, eps_primal_vec, eps_dual_vec, rho_vec, θ_avg_history; stem="admm")
 
     total_real_cost = sum(sub["real_generation_cost"] for sub in values(partitions))
@@ -317,48 +323,59 @@ end
 
 function run_admm_branch(config::DistributedOPFModel, data::Dict{String, Any})
     partitions, _ = prepare_admm_partitions(data)
-    base_model = config.base_model
-    base_model == DC || error("ADMM-branch está implementado aqui apenas para DC.")
+    @assert config.base_model == DC "ADMM-branch/DC requer DC."
     cut_edges = _find_cut_edges(data)
 
-    # estado ADMM
     ρ = Ref(config.rho_flow)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
     duals = Dict{Int, Dict{Int, Float64}}(z => Dict{Int,Float64}() for z in keys(partitions))
     z_flow = Dict{Int,Float64}(e => 0.0 for e in cut_edges)
     z_flow_prev = Dict{Int,Float64}()
 
-    # histórico
     res_primal_vec = Float64[]; res_dual_vec = Float64[]
     eps_primal_vec = Float64[]; eps_dual_vec = Float64[]
     rho_vec = Float64[]
 
     optimizer_factory = resolve_optimizer_dc(config)
 
+    for (zone_id, sub) in partitions
+        m = build_model(sub, DC; optimizer = optimizer_factory)
+        sub["model"] = m
+        sub["obj_base"] = m[:generation_cost]
+        sub["theta_var"] = m[:theta]
+        sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
+        sub["has_solution"] = false
+        @inbounds for I in keys(sub["theta_var"])
+            set_start_value(sub["theta_var"][I], 0.0)
+        end
+    end
+
     for k in 1:config.max_iter
         println("\n[ADMM-branch/DC] Iteração $k")
 
-        # 1) resolve locais + penalidade de fluxo
-        for (zone_id, subdata) in partitions
-            local_model = build_model(subdata, base_model; optimizer = optimizer_factory)
-            zone_edges = _zone_cut_edges(subdata, cut_edges)
-            admm_penalty = add_penalty_branch_dc!(local_model, subdata, zone_edges, z_flow, duals[zone_id], ρ[])
-            @objective(local_model, Min, local_model[:generation_cost] + admm_penalty)
-            optimize!(local_model)
+        for (zone_id, sub) in partitions
+            m = sub["model"]
 
-            subdata["model"] = local_model
-            subdata["generation_cost_model_expr"] = value(local_model[:generation_cost])
-            subdata["real_generation_cost"] = compute_real_generation_cost(local_model, subdata["objective_params"])
+            if sub["has_solution"] === true
+                θ_old = JuMP.value.(sub["theta_var"])
+                @inbounds for I in keys(sub["theta_var"])
+                    set_start_value(sub["theta_var"][I], θ_old[I])
+                end
+            end
+
+            pen = add_penalty_branch_dc!(m, sub, sub["zone_edges"], z_flow, duals[zone_id], ρ[])
+            @objective(m, Min, sub["obj_base"] + pen)
+            optimize!(m)
+            sub["has_solution"] = true
+
+            sub["generation_cost_model_expr"] = value(m[:generation_cost])
+            sub["real_generation_cost"] = compute_real_generation_cost(m, sub["objective_params"])
         end
 
-        # 2) consenso de fluxo
         z_flow_prev = isempty(z_flow) ? z_flow : deepcopy(z_flow)
         compute_z_flow_consensus!(z_flow, partitions, cut_edges)
-
-        # 3) duais
         update_duals_flow!(duals, partitions, z_flow, cut_edges, ρ[])
 
-        # 4) resíduos + tolerâncias
         res_primal = primal_residual_branch_dc(partitions, z_flow, cut_edges)
         res_dual   = dual_residual_branch_dc(z_flow, z_flow_prev)
         push!(res_primal_vec, res_primal); push!(res_dual_vec, res_dual)
@@ -394,12 +411,11 @@ function run_admm_branch(config::DistributedOPFModel, data::Dict{String, Any})
 end
 
 function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
-    @assert config.base_model == DC "Hybrid ADMM currently implemented for DC only."
+    @assert config.base_model == DC "Hybrid ADMM/DC requer DC."
 
     partitions, shared_buses = prepare_admm_partitions(data)
     cut_edges = _find_cut_edges(data)
 
-    # estado ADMM
     ρθ = Ref(config.rho_theta)
     ρe = Ref(config.rho_flow)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
@@ -410,7 +426,6 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     duals_theta = Dict{Int, Dict{Int, Float64}}(z => Dict{Int,Float64}() for z in keys(partitions))
     duals_flow  = Dict{Int, Dict{Int, Float64}}(z => Dict{Int,Float64}() for z in keys(partitions))
 
-    # histórico
     res_primal_vec = Float64[]; res_dual_vec = Float64[]
     eps_primal_vec = Float64[]; eps_dual_vec = Float64[]
     rhoθ_vec = Float64[]; rhoe_vec = Float64[]
@@ -418,32 +433,41 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
 
     optimizer_factory = resolve_optimizer_dc(config)
 
+    for (zone_id, sub) in partitions
+        m = build_model(sub, DC; optimizer = optimizer_factory)
+        sub["model"] = m
+        sub["obj_base"] = m[:generation_cost]
+        sub["theta_var"] = m[:theta]
+        sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
+        sub["has_solution"] = false
+        @inbounds for I in keys(sub["theta_var"])
+            set_start_value(sub["theta_var"][I], 0.0)
+        end
+    end
+
     for k in 1:config.max_iter
         println("\n[ADMM-hybrid/DC] Iteração $k")
 
-        # 1) resolve locais + penalidades (θ e fluxo)
-        # 1) resolve locais + penalidades (θ e fluxo)
-        for (zone_id, subdata) in partitions
-            local_model = build_model(subdata, DC; optimizer = optimizer_factory)
+        for (zone_id, sub) in partitions
+            m = sub["model"]
 
-            # monta penalidades como expressões anônimas
-            pen_bus    = add_penalty_bus_dc!(local_model, subdata, shared_buses,
-                                            θ_avg, duals_theta[zone_id], ρθ[])
-            zone_edges = _zone_cut_edges(subdata, cut_edges)
-            pen_flow   = add_penalty_branch_dc!(local_model, subdata, zone_edges,
-                                                z_flow, duals_flow[zone_id], ρe[])
-            pen_total  = pen_bus + pen_flow
+            if sub["has_solution"] === true
+                θ_old = JuMP.value.(sub["theta_var"])
+                @inbounds for I in keys(sub["theta_var"])
+                    set_start_value(sub["theta_var"][I], θ_old[I])
+                end
+            end
 
-            # objetivo = custo base + penalidades
-            @objective(local_model, Min, local_model[:generation_cost] + pen_total)
-            optimize!(local_model)
+            pen_bus  = add_penalty_bus_dc!(m, sub, shared_buses, θ_avg, duals_theta[zone_id], ρθ[])
+            pen_flow = add_penalty_branch_dc!(m, sub, sub["zone_edges"], z_flow, duals_flow[zone_id], ρe[])
+            @objective(m, Min, sub["obj_base"] + pen_bus + pen_flow)
+            optimize!(m)
+            sub["has_solution"] = true
 
-            subdata["model"] = local_model
-            subdata["generation_cost_model_expr"] = value(local_model[:generation_cost])
-            subdata["real_generation_cost"] = compute_real_generation_cost(local_model, subdata["objective_params"])
+            sub["generation_cost_model_expr"] = value(m[:generation_cost])
+            sub["real_generation_cost"] = compute_real_generation_cost(m, sub["objective_params"])
         end
 
-        # 2) consensos
         θ_avg_prev = isempty(θ_avg) ? θ_avg : deepcopy(θ_avg)
         z_flow_prev = deepcopy(z_flow)
 
@@ -453,11 +477,9 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         end
         compute_z_flow_consensus!(z_flow, partitions, cut_edges)
 
-        # 3) duais
         update_duals_theta!(duals_theta, partitions, θ_avg, shared_buses, ρθ[])
         update_duals_flow!(duals_flow, partitions, z_flow, cut_edges, ρe[])
 
-        # 4) resíduos + tolerâncias (agregados)
         res_pri_bus = primal_residual_bus_dc(partitions, θ_avg, shared_buses)
         res_pri_br  = primal_residual_branch_dc(partitions, z_flow, cut_edges)
         res_primal  = sqrt(res_pri_bus^2 + res_pri_br^2)
@@ -468,11 +490,9 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
 
         push!(res_primal_vec, res_primal); push!(res_dual_vec, res_dual)
 
-        # dimensões p/ eps_primal (soma das dimensões de bus e branch)
         ϵ_pri = begin
             ϵb = eps_primal_bus_dc(partitions, θ_avg, shared_buses, ϵ_abs, ϵ_rel)
             ϵe = eps_primal_branch_dc(partitions, z_flow, cut_edges, ϵ_abs, ϵ_rel)
-            # heurística simples: combina como norma euclidiana
             sqrt(ϵb^2 + ϵe^2)
         end
         ϵ_du = begin
@@ -492,18 +512,18 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
             break
         end
 
-        # Atualiza AMBOS os ρ para manter escalas parecidas
         adaptive_rho_dc!(ρθ, res_primal, res_dual)
         adaptive_rho_dc!(ρe, res_primal, res_dual)
     end
 
-    # Plots (reusa wrappers + dois gráficos separados de ρ)
     plot_admm_convergence(res_primal_vec, res_dual_vec, eps_primal_vec, eps_dual_vec,
         "plot_convergencia_admm_hybrid.html")
 
-    PlotlyLight.save( (()->(p=Plot(); p(;x=1:length(rhoθ_vec), y=rhoθ_vec, type=:scatter, mode="lines+markers", name="ρθ"); p.layout.title="Evolução de ρθ"; p.layout.xaxis.title="Iterações"; p.layout.yaxis.title="ρθ"; p.layout.yaxis.type="log"; p))(),
+    PlotlyLight.save( (()->(p=Plot(); p(;x=1:length(rhoθ_vec), y=rhoθ_vec, type=:scatter, mode="lines+markers", name="ρθ");
+        p.layout.title="Evolução de ρθ"; p.layout.xaxis.title="Iterações"; p.layout.yaxis.title="ρθ"; p.layout.yaxis.type="log"; p))(),
         "plot_rho_theta_hybrid.html")
-    PlotlyLight.save( (()->(p=Plot(); p(;x=1:length(rhoe_vec), y=rhoe_vec, type=:scatter, mode="lines+markers", name="ρe"); p.layout.title="Evolução de ρe"; p.layout.xaxis.title="Iterações"; p.layout.yaxis.title="ρe"; p.layout.yaxis.type="log"; p))(),
+    PlotlyLight.save( (()->(p=Plot(); p(;x=1:length(rhoe_vec), y=rhoe_vec, type=:scatter, mode="lines+markers", name="ρe");
+        p.layout.title="Evolução de ρe"; p.layout.xaxis.title="Iterações"; p.layout.yaxis.title="ρe"; p.layout.yaxis.type="log"; p))(),
         "plot_rho_flow_hybrid.html")
 
     plot_theta_avg_heatmap(θ_avg_history, "plot_theta_avg_heatmap_hybrid.html")

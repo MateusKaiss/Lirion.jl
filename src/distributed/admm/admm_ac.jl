@@ -330,17 +330,46 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
 
     optimizer_factory = resolve_optimizer_ac(config)
 
+    for (zone_id, sub) in partitions
+        m = build_model(sub, AC; optimizer = optimizer_factory)
+        sub["model"] = m
+        sub["obj_base"] = m[:generation_cost]          # AffExpr
+        sub["theta_var"] = m[:theta]                   # DenseAxisArray
+        sub["vmag_var"]  = m[:v_magnitude]             # DenseAxisArray
+        sub["has_solution"] = false
+        @inbounds for I in keys(sub["theta_var"])
+            set_start_value(sub["theta_var"][I], 0.0)
+        end
+        @inbounds for I in keys(sub["vmag_var"])
+            set_start_value(sub["vmag_var"][I], 1.0)
+        end
+    end
+
     for k in 1:config.max_iter
         println("\n[ADMM-AC] Iteração $k")
 
-        # 1) resolve locais com penalidade de BUS
         for (zone_id, sub) in partitions
-            m = build_model(sub, AC; optimizer = optimizer_factory)
-            admm_pen = add_penalty_bus_ac!(m, sub, shared_buses, θ_avg, v_avg, dualsθ[zone_id], dualsV[zone_id], ρθ[], ρV[])
-            @objective(m, Min, m[:generation_cost] + admm_pen)
-            optimize!(m)
+            m = sub["model"]
+            if sub["has_solution"] === true
+                θ_old = JuMP.value.(sub["theta_var"])
+                V_old = JuMP.value.(sub["vmag_var"])
+                @inbounds for I in keys(sub["theta_var"])
+                    set_start_value(sub["theta_var"][I], θ_old[I])
+                end
+                @inbounds for I in keys(sub["vmag_var"])
+                    set_start_value(sub["vmag_var"][I], V_old[I])
+                end
+            end
 
-            sub["model"] = m
+
+            pen_bus = add_penalty_bus_ac!(m, sub, shared_buses,
+                                          θ_avg, v_avg,
+                                          dualsθ[zone_id], dualsV[zone_id],
+                                          ρθ[], ρV[])
+            @objective(m, Min, sub["obj_base"] + pen_bus)
+            optimize!(m)
+            sub["has_solution"] = true
+
             sub["generation_cost_model_expr"] = value(m[:generation_cost])
             sub["real_generation_cost"] = compute_real_generation_cost(m, sub["objective_params"])
         end
@@ -349,8 +378,8 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
         θ_prev = isempty(θ_avg) ? θ_avg : deepcopy(θ_avg)
         v_prev = isempty(v_avg) ? v_avg : deepcopy(v_avg)
         compute_ac_bus_consensus!(θ_avg, v_avg, partitions, shared_buses)
-        for b in shared_buses
-            push!(get!(θ_avg_hist, b, Float64[]), θ_avg[b])
+        @inbounds for b in shared_buses
+            push!(get!(θ_avg_hist, b, Float64[]), get(θ_avg, b, 0.0))
         end
 
         # 3) duais
@@ -413,18 +442,47 @@ function run_admm_ac_branch(config::DistributedOPFModel, data::Dict{String, Any}
 
     optimizer_factory = resolve_optimizer_ac(config)
 
+    # -------- PRÉ-BUILD ----------
+    for (zone_id, sub) in partitions
+        m = build_model(sub, AC; optimizer = optimizer_factory)
+        sub["model"] = m
+        sub["obj_base"] = m[:generation_cost]
+        sub["theta_var"] = m[:theta]
+        sub["vmag_var"]  = m[:v_magnitude]
+        sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
+        sub["has_solution"] = false
+        @inbounds for I in keys(sub["theta_var"])
+            set_start_value(sub["theta_var"][I], 0.0)
+        end
+        @inbounds for I in keys(sub["vmag_var"])
+            set_start_value(sub["vmag_var"][I], 1.0)
+        end
+    end
+
     for k in 1:config.max_iter
         println("\n[ADMM-AC-branch] Iteração $k")
 
-        # 1) resolve locais com penalidade de BRANCH (P,Q)
+        # 1) locais sem rebuild (penalidade de fluxo P/Q)
         for (zone_id, sub) in partitions
-            m = build_model(sub, AC; optimizer = optimizer_factory)
-            zone_edges = _zone_cut_edges(sub, cut_edges)
-            admm_pen = add_penalty_branch_ac!(m, sub, zone_edges, zP, zQ, dualsP[zone_id], dualsQ[zone_id], ρP[], ρQ[])
-            @objective(m, Min, m[:generation_cost] + admm_pen)
-            optimize!(m)
+            m = sub["model"]
 
-            sub["model"] = m
+            if sub["has_solution"] === true
+                θ_old = JuMP.value.(sub["theta_var"])
+                V_old = JuMP.value.(sub["vmag_var"])
+                @inbounds for I in keys(sub["theta_var"])
+                    set_start_value(sub["theta_var"][I], θ_old[I])
+                end
+                @inbounds for I in keys(sub["vmag_var"])
+                    set_start_value(sub["vmag_var"][I], V_old[I])
+                end
+            end
+
+            pen = add_penalty_branch_ac!(m, sub, sub["zone_edges"],
+                                         zP, zQ, dualsP[zone_id], dualsQ[zone_id], ρP[], ρQ[])
+            @objective(m, Min, sub["obj_base"] + pen)
+            optimize!(m)
+            sub["has_solution"] = true
+
             sub["generation_cost_model_expr"] = value(m[:generation_cost])
             sub["real_generation_cost"] = compute_real_generation_cost(m, sub["objective_params"])
         end
@@ -501,24 +559,52 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
 
     optimizer_factory = resolve_optimizer_ac(config)
 
+    # -------- PRÉ-BUILD ----------
+    for (zone_id, sub) in partitions
+        m = build_model(sub, AC; optimizer = optimizer_factory)
+        sub["model"] = m
+        sub["obj_base"] = m[:generation_cost]
+        sub["theta_var"] = m[:theta]
+        sub["vmag_var"]  = m[:v_magnitude]
+        sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
+        sub["has_solution"] = false
+        @inbounds for I in keys(sub["theta_var"])
+            set_start_value(sub["theta_var"][I], 0.0)
+        end
+        @inbounds for I in keys(sub["vmag_var"])
+            set_start_value(sub["vmag_var"][I], 1.0)
+        end
+    end
+
     for k in 1:config.max_iter
         println("\n[ADMM-AC-hybrid] Iteração $k")
 
-        # 1) resolve locais com penalidades de BUS e BRANCH
+        # 1) locais sem rebuild: BUS + BRANCH
         for (zone_id, sub) in partitions
-            m = build_model(sub, AC; optimizer = optimizer_factory)
-            @expression(m, admm_penalty, 0.0)
+            m = sub["model"]
 
-            # BUS (θ, V)
-            admm_penalty += add_penalty_bus_ac!(m, sub, shared_buses, θ_avg, v_avg, dualsθ[zone_id], dualsV[zone_id], ρθ[], ρV[])
-            # BRANCH (P, Q)
-            zone_edges = _zone_cut_edges(sub, cut_edges)
-            admm_penalty += add_penalty_branch_ac!(m, sub, zone_edges, zP, zQ, dualsP[zone_id], dualsQ[zone_id], ρP[], ρQ[])
+            if sub["has_solution"] === true
+                θ_old = JuMP.value.(sub["theta_var"])
+                V_old = JuMP.value.(sub["vmag_var"])
+                @inbounds for I in keys(sub["theta_var"])
+                    set_start_value(sub["theta_var"][I], θ_old[I])
+                end
+                @inbounds for I in keys(sub["vmag_var"])
+                    set_start_value(sub["vmag_var"][I], V_old[I])
+                end
+            end
 
-            @objective(m, Min, m[:generation_cost] + admm_penalty)
+            pen_bus  = add_penalty_bus_ac!(m, sub, shared_buses,
+                                           θ_avg, v_avg,
+                                           dualsθ[zone_id], dualsV[zone_id],
+                                           ρθ[], ρV[])
+            pen_flow = add_penalty_branch_ac!(m, sub, sub["zone_edges"],
+                                              zP, zQ, dualsP[zone_id], dualsQ[zone_id],
+                                              ρP[], ρQ[])
+            @objective(m, Min, sub["obj_base"] + pen_bus + pen_flow)
             optimize!(m)
+            sub["has_solution"] = true
 
-            sub["model"] = m
             sub["generation_cost_model_expr"] = value(m[:generation_cost])
             sub["real_generation_cost"] = compute_real_generation_cost(m, sub["objective_params"])
         end
@@ -530,8 +616,8 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
         zQ_prev = isempty(zQ) ? zQ : deepcopy(zQ)
 
         compute_ac_bus_consensus!(θ_avg, v_avg, partitions, shared_buses)
-        for b in shared_buses
-            push!(get!(θ_avg_hist, b, Float64[]), θ_avg[b])
+        @inbounds for b in shared_buses
+            push!(get!(θ_avg_hist, b, Float64[]), get(θ_avg, b, 0.0))
         end
         compute_ac_branch_consensus!(zP, zQ, partitions, cut_edges)
 
@@ -572,7 +658,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
             break
         end
 
-        # ρ adaptativo em blocos (mantendo tua lógica)
+        # ρ adaptativo em blocos
         adaptive_rho_ac!(ρθ, r_bus, s_bus)
         adaptive_rho_ac!(ρV, r_bus, s_bus)
         adaptive_rho_ac!(ρP, r_br,  s_br)
