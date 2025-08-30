@@ -8,6 +8,21 @@ function resolve_optimizer_ac(config)
     end
 end
 
+# ---------- Helpers ----------
+@inline function _edge_local(sub::Dict{String,Any}, e::Int)
+    edgemap = get(sub, "edge_to_local", nothing)
+    return edgemap === nothing ? findfirst(==(e), sub["branch_local_indices"]) :
+                                 get(edgemap, e, nothing)
+end
+
+@inline function _bus_set(sub::Dict{String,Any})
+    get(sub, "bus_set", Set(Int[b for b in sub["bus"]["bus_i"]]))
+end
+
+@inline function _assert_nonzero(x::Real, msg::AbstractString)
+    @assert abs(x) > 1e-8 msg
+end
+
 # ---------- Penalidades (ADMM) ----------
 
 "Penalidade por BARRA no AC: θ (cópia local) vs θ̄ e V (cópia local) vs V̄.
@@ -23,10 +38,10 @@ function add_penalty_bus_ac!(
     ρθ::Real,
     ρV::Real,
 )
-    pen = @expression(m, 0.0)  # expressão anônima → sem colisão de nome
-    bus_ids = subdata["bus"]["bus_i"]
-    for b in shared_buses
-        if b in bus_ids
+    pen = @expression(m, 0.0)  # anônima → sem colisão de nome
+    busset = _bus_set(subdata)
+    @inbounds for b in shared_buses
+        if b in busset
             θ   = m[:theta][b, 1]
             θ̄  = Float64(get(θ_avg, b, 0.0))
             λθ  = Float64(get(dualsθ_zone, b, 0.0))
@@ -54,10 +69,11 @@ function add_penalty_branch_ac!(
     ρP::Real,
     ρQ::Real,
 )
-    pen = @expression(m, 0.0)  # expressão anônima
-    for e in zone_edges
-        l_local = findfirst(==(e), subdata["branch_local_indices"])
-        @assert l_local !== nothing "aresta global $e não encontrada na partição"
+    pen = @expression(m, 0.0)  # anônima
+    @inbounds for e in zone_edges
+        l_local = _edge_local(subdata, e)
+        @assert l_local !== nothing "aresta global $e não pertence a esta partição"
+        # usa função existente que retorna as EXPRESSÕES JuMP de P_from/Q_from
         P_loc, Q_loc = _ac_flow_from_exprs_existing(m, subdata, l_local)
         λP = Float64(get(dualsP_zone, e, 0.0))
         λQ = Float64(get(dualsQ_zone, e, 0.0))
@@ -72,36 +88,54 @@ end
 # ---------- Consensos ----------
 function compute_ac_bus_consensus!(θ_avg::Dict{Int,Float64}, v_avg::Dict{Int,Float64},
                                    partitions, shared_buses::Vector{Int})
-    for b in shared_buses
-        thetas = Float64[]; Vacc = 0.0; n = 0
-        for (_, sub) in partitions
-            if b in sub["bus"]["bus_i"]
-                m = sub["model"]
-                push!(thetas, value(m[:theta][b,1]))
-                Vacc += value(m[:v_magnitude][b,1])
-                n += 1
+    # cacheia value uma vez por modelo
+    thetas_map = Dict{Int,Vector{Float64}}()  # acumula θ por bus (para média circular)
+    Vacc = Dict{Int,Float64}()               # soma de V por bus
+    counts = Dict{Int,Int}()
+    for (_, sub) in partitions
+        m = sub["model"]
+        θvals = value.(m[:theta])
+        Vvals = value.(m[:v_magnitude])
+        busset = _bus_set(sub)
+        @inbounds for b in shared_buses
+            if b in busset
+                push!(get!(thetas_map, b, Float64[]), θvals[b,1])
+                Vacc[b] = get(Vacc,b,0.0) + Vvals[b,1]
+                counts[b] = get(counts,b,0) + 1
             end
         end
+    end
+    @inbounds for b in shared_buses
+        n = get(counts,b,0)
         if n > 0
-            θ_avg[b] = _circular_mean(thetas)
-            v_avg[b] = Vacc / n
+            θ_avg[b] = _circular_mean(get(thetas_map,b,Float64[]))
+            v_avg[b] = Vacc[b] / n
         end
     end
 end
 
 function compute_ac_branch_consensus!(zP::Dict{Int,Float64}, zQ::Dict{Int,Float64},
                                       partitions, cut_edges::Vector{Int})
-    for e in cut_edges
-        accP=0.0; accQ=0.0; n=0
-        for (_, sub) in partitions
-            l_local = findfirst(==(e), sub["branch_local_indices"])
+    sumsP = Dict{Int,Float64}(); sumsQ = Dict{Int,Float64}(); counts = Dict{Int,Int}()
+    for (_, sub) in partitions
+        m = sub["model"]
+        @inbounds for e in cut_edges
+            l_local = _edge_local(sub, e)
             if l_local !== nothing
-                P_loc, Q_loc = _ac_flow_from_exprs_existing(sub["model"], sub, l_local)
-                accP += value(P_loc); accQ += value(Q_loc); n += 1
+                P_loc, Q_loc = _ac_flow_from_exprs_existing(m, sub, l_local)
+                # value apenas aqui (1x)
+                p = value(P_loc); q = value(Q_loc)
+                sumsP[e] = get(sumsP,e,0.0) + p
+                sumsQ[e] = get(sumsQ,e,0.0) + q
+                counts[e] = get(counts,e,0) + 1
             end
         end
-        if n>0
-            zP[e] = accP/n; zQ[e] = accQ/n
+    end
+    @inbounds for e in cut_edges
+        n = get(counts,e,0)
+        if n > 0
+            zP[e] = sumsP[e] / n
+            zQ[e] = sumsQ[e] / n
         end
     end
 end
@@ -110,11 +144,14 @@ end
 "λθ_zb ← λθ_zb + ρθ * wrap(θ_zb - θ̄_b); λV_zb ← λV_zb + ρV (V_zb - V̄_b)."
 function update_duals_bus_ac!(dualsθ, dualsV, partitions, θ_avg, v_avg, shared_buses, ρθ, ρV)
     for (z, sub) in partitions
-        m = sub["model"]; bus_ids = sub["bus"]["bus_i"]
-        for b in shared_buses
-            if b in bus_ids
-                θloc = value(m[:theta][b,1]); Vloc = value(m[:v_magnitude][b,1])
-                dθ = _wrap_angle_diff(θloc - θ_avg[b]); dV = Vloc - v_avg[b]
+        m = sub["model"]
+        θvals = value.(m[:theta])
+        Vvals = value.(m[:v_magnitude])
+        busset = _bus_set(sub)
+        @inbounds for b in shared_buses
+            if b in busset
+                dθ = _wrap_angle_diff(θvals[b,1] - get(θ_avg,b,0.0))
+                dV = Vvals[b,1] - get(v_avg,b,0.0)
                 dualsθ[z][b] = get(dualsθ[z], b, 0.0) + ρθ*dθ
                 dualsV[z][b] = get(dualsV[z], b, 0.0) + ρV*dV
             end
@@ -125,11 +162,14 @@ end
 "λP_ze ← λP_ze + ρP (P_ze - zP_e); λQ_ze ← λQ_ze + ρQ (Q_ze - zQ_e)."
 function update_duals_branch_ac!(dualsP, dualsQ, partitions, zP, zQ, cut_edges, ρP, ρQ)
     for (z, sub) in partitions
-        for e in _zone_cut_edges(sub, cut_edges)
-            l_local = findfirst(==(e), sub["branch_local_indices"])
-            P_loc, Q_loc = _ac_flow_from_exprs_existing(sub["model"], sub, l_local)
-            dualsP[z][e] = get(dualsP[z], e, 0.0) + ρP*(value(P_loc) - zP[e])
-            dualsQ[z][e] = get(dualsQ[z], e, 0.0) + ρQ*(value(Q_loc) - zQ[e])
+        m = sub["model"]
+        @inbounds for e in cut_edges
+            l_local = _edge_local(sub, e)
+            if l_local !== nothing
+                P_loc, Q_loc = _ac_flow_from_exprs_existing(m, sub, l_local)
+                dualsP[z][e] = get(dualsP[z], e, 0.0) + ρP*(value(P_loc) - zP[e])
+                dualsQ[z][e] = get(dualsQ[z], e, 0.0) + ρQ*(value(Q_loc) - zQ[e])
+            end
         end
     end
 end
@@ -139,11 +179,14 @@ end
 function primal_residual_bus_ac(partitions, θ_avg, v_avg, shared_buses)
     acc = 0.0
     for (_, sub) in partitions
-        m = sub["model"]; bus_ids = sub["bus"]["bus_i"]
-        for b in shared_buses
-            if b in bus_ids
-                dθ = _wrap_angle_diff(value(m[:theta][b,1]) - θ_avg[b])
-                dV = value(m[:v_magnitude][b,1]) - v_avg[b]
+        m = sub["model"]
+        θvals = value.(m[:theta])
+        Vvals = value.(m[:v_magnitude])
+        busset = _bus_set(sub)
+        @inbounds for b in shared_buses
+            if b in busset
+                dθ = _wrap_angle_diff(θvals[b,1] - get(θ_avg,b,0.0))
+                dV = Vvals[b,1] - get(v_avg,b,0.0)
                 acc += dθ^2 + dV^2
             end
         end
@@ -153,65 +196,93 @@ end
 
 "‖s‖ (bus/AC) = sqrt(Σ_b wrap(θ̄_b-θ̄_b_prev)² + (V̄_b - V̄_b_prev)²)."
 function dual_residual_bus_ac(θ_avg, v_avg, θ_prev, v_prev, shared_buses)
-    sθ = sum(_wrap_angle_diff(θ_avg[b] - get(θ_prev, b, 0.0))^2 for b in shared_buses)
-    sV = sum((v_avg[b] - get(v_prev, b, 0.0))^2 for b in shared_buses)
+    sθ = 0.0; sV = 0.0
+    @inbounds for b in shared_buses
+        sθ += _wrap_angle_diff(get(θ_avg,b,0.0) - get(θ_prev,b,0.0))^2
+        sV += (get(v_avg,b,0.0) - get(v_prev,b,0.0))^2
+    end
     return sqrt(sθ + sV)
 end
 
 function eps_primal_bus_ac(partitions, θ_avg, v_avg, shared_buses, ϵ_abs, ϵ_rel)
-    dim = 2 * sum(b in partitions[z]["bus"]["bus_i"] for z in keys(partitions), b in shared_buses)
-    z_norm = sqrt(sum(θ_avg[b]^2 for b in shared_buses) + sum(v_avg[b]^2 for b in shared_buses))
-    return sqrt(max(1, dim))*ϵ_abs + ϵ_rel*max(z_norm, 1e-12)
+    # dim = 2 * número de cópias locais de buses compartilhadas
+    dim = 0
+    for (_, sub) in partitions
+        busset = _bus_set(sub)
+        @inbounds for b in shared_buses
+            dim += (b in busset) ? 2 : 0
+        end
+    end
+    # norma de z = concat(θ̄, V̄)
+    z_norm_sq = 0.0
+    @inbounds for b in shared_buses
+        z_norm_sq += get(θ_avg,b,0.0)^2 + get(v_avg,b,0.0)^2
+    end
+    return sqrt(max(1, dim))*ϵ_abs + ϵ_rel*max(sqrt(z_norm_sq), 1e-12)
 end
 
 function eps_dual_bus_ac(θ_avg, v_avg, θ_prev, v_prev, shared_buses, ϵ_abs, ϵ_rel)
-    dim = 2 * length(shared_buses)
-    sθ = sum(_wrap_angle_diff(θ_avg[b] - get(θ_prev, b, 0.0))^2 for b in shared_buses)
-    sV = sum((v_avg[b] - get(v_prev, b, 0.0))^2 for b in shared_buses)
-    return sqrt(max(1, dim))*ϵ_abs + ϵ_rel*sqrt(sθ + sV)
+    dim = 2 * max(1, length(shared_buses))
+    sθ = 0.0; sV = 0.0
+    @inbounds for b in shared_buses
+        sθ += _wrap_angle_diff(get(θ_avg,b,0.0) - get(θ_prev,b,0.0))^2
+        sV += (get(v_avg,b,0.0) - get(v_prev,b,0.0))^2
+    end
+    return sqrt(dim)*ϵ_abs + ϵ_rel*sqrt(sθ + sV)
 end
 
 "‖r‖ (branch/AC) = sqrt(Σ_z Σ_e [(P_ze - zP_e)² + (Q_ze - zQ_e)²])."
 function primal_residual_branch_ac(partitions, zP, zQ, cut_edges)
     acc = 0.0
     for (_, sub) in partitions
-        for e in _zone_cut_edges(sub, cut_edges)
-            l_local = findfirst(==(e), sub["branch_local_indices"])
-            P_loc, Q_loc = _ac_flow_from_exprs_existing(sub["model"], sub, l_local)
-            acc += (value(P_loc) - zP[e])^2 + (value(Q_loc) - zQ[e])^2
+        m = sub["model"]
+        @inbounds for e in cut_edges
+            l_local = _edge_local(sub, e)
+            if l_local !== nothing
+                P_loc, Q_loc = _ac_flow_from_exprs_existing(m, sub, l_local)
+                acc += (value(P_loc) - zP[e])^2 + (value(Q_loc) - zQ[e])^2
+            end
         end
     end
     return sqrt(acc)
 end
 
+function dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
+    sP = 0.0; sQ = 0.0
+    @inbounds for e in cut_edges
+        sP += (get(zP,e,0.0) - get(zP_prev,e,0.0))^2
+        sQ += (get(zQ,e,0.0) - get(zQ_prev,e,0.0))^2
+    end
+    return sqrt(sP + sQ)
+end
+
+function eps_primal_branch_ac(partitions, zP, zQ, cut_edges, ϵ_abs, ϵ_rel)
+    dim_pri = 0
+    for (_, sub) in partitions
+        dim_pri += 2 * length(_zone_cut_edges(sub, cut_edges))
+    end
+    z_norm_sq = 0.0
+    @inbounds for e in cut_edges
+        z_norm_sq += get(zP,e,0.0)^2 + get(zQ,e,0.0)^2
+    end
+    return sqrt(max(1, dim_pri))*ϵ_abs + ϵ_rel*max(sqrt(z_norm_sq), 1e-12)
+end
+
+function eps_dual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges, ϵ_abs, ϵ_rel)
+    dim_du = 2 * max(1, length(cut_edges))
+    s = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
+    return sqrt(dim_du)*ϵ_abs + ϵ_rel*s
+end
+
+# ---------- ρ adaptativo ----------
 function adaptive_rho_ac!(ρ::Base.RefValue{Float64}, r::Float64, s::Float64;
-                       μ_incr=2.0, μ_decr=2.0, τ_incr=1.05, τ_decr=0.98)
+                          μ_incr=2.0, μ_decr=2.0, τ_incr=1.05, τ_decr=0.98)
     if r > μ_incr*s
         ρ[] *= τ_incr
     elseif s > μ_decr*r
         ρ[] *= τ_decr
     end
 end
-
-"‖s‖ (branch/AC) = sqrt(Σ_e [(zP - zP_prev)² + (zQ - zQ_prev)²])."
-function dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
-    sP = sum((zP[e] - get(zP_prev, e, 0.0))^2 for e in cut_edges)
-    sQ = sum((zQ[e] - get(zQ_prev, e, 0.0))^2 for e in cut_edges)
-    return sqrt(sP + sQ)
-end
-
-function eps_primal_branch_ac(partitions, zP, zQ, cut_edges, ϵ_abs, ϵ_rel)
-    dim_pri = 2 * sum(length(_zone_cut_edges(sub, cut_edges)) for (_, sub) in partitions)
-    z_norm = sqrt(sum(zP[e]^2 + zQ[e]^2 for e in cut_edges))
-    return sqrt(max(1, dim_pri))*ϵ_abs + ϵ_rel*max(z_norm, 1e-12)
-end
-
-function eps_dual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges, ϵ_abs, ϵ_rel)
-    dim_du = 2 * length(cut_edges)
-    s = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
-    return sqrt(max(1, dim_du))*ϵ_abs + ϵ_rel*s
-end
-
 
 # ---------- Plots (wrappers) ----------
 function save_ac_bus_plots(res_pri, res_du, eps_pri, eps_du, rhoθ_hist, rhoV_hist, θ_avg_hist;
