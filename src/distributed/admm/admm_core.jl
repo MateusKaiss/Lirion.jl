@@ -97,7 +97,6 @@ function update_shared_variables_dc!(
     end
 end
 
-
 function plot_admm_convergence(
     res_primal::Vector{Float64},
     res_dual::Vector{Float64},
