@@ -393,142 +393,114 @@ function _zone_cut_edges(subdata::Dict{String, Any}, cut_edges::Vector{Int})
     return [ℓ for ℓ in cut_edges if ℓ in local_keep]
 end
 
-function run_admm_branch(config::DistributedOPFModel, data::Dict{String, Any})
-    partitions, _shared_buses_unused = prepare_admm_partitions(data)
-    base_model = config.base_model
-    base_model == DC || error("ADMM-branch está implementado aqui apenas para DC.")
-    cut_edges = _find_cut_edges_dc(data)
+function run_admm_branch(
+    config::DistributedOPFModel,
+    data::Dict{String, Any};
+    warm_start_theta::Bool = false,   
+    use_legacy_rho::Bool = false,  
+    μ_incr::Float64 = 2.0,
+    μ_decr::Float64 = 2.0,
+    τ_incr::Float64 = 1.05,
+    τ_decr::Float64 = 0.98,
+)
+    @assert config.base_model == DC "ADMM-branch/DC requer base_model == DC."
 
-    duals = Dict{Int, Dict{Int, Float64}}()
-    z_flow = Dict{Int, Float64}()
-    z_flow_prev = Dict{Int, Float64}()
+    partitions, _ = prepare_admm_partitions(data)
+    cut_edges = _find_cut_edges(data)
 
-    current_rho = config.rho_flow
-
-    for zone_id in keys(partitions)
-        duals[zone_id] = Dict{Int, Float64}()
-    end
-    for e in cut_edges
-        z_flow[e] = 0.0
-    end
-
-    res_primal_vec = Float64[]
-    res_dual_vec = Float64[]
-    eps_primal_vec = Float64[]
-    eps_dual_vec = Float64[]
-    rho_vec = Float64[]
-
-    μ_incr, μ_decr = 2.0, 2.0
-    τ_incr, τ_decr = 1.05, 0.98
+    ρ = Ref(config.rho_flow)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
 
-    for k in 1:config.max_iter
-        println("\n[ADMM-branch] Iteração $k")
-        for (zone_id, subdata) in partitions
-            local_model = build_model(subdata, base_model; optimizer = Ipopt.Optimizer)
+    z_flow      = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    z_flow_prev = Dict{Int, Float64}()
+    duals       = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in keys(partitions))
 
-            zone_edges = _zone_cut_edges(subdata, cut_edges)
-            @expression(local_model, admm_penalty, 0.0)
-            for e in zone_edges
-                l_local = findfirst(==(e), subdata["branch_local_indices"])
-                p_loc = _dc_flow_expr(local_model, subdata, l_local)
-                λ = get(duals[zone_id], e, 0.0)
-                z = z_flow[e]
-                admm_penalty += λ * (p_loc - z) + (current_rho / 2) * (p_loc - z)^2
+    res_primal_vec = Float64[]
+    res_dual_vec   = Float64[]
+    eps_primal_vec = Float64[]
+    eps_dual_vec   = Float64[]
+    rho_vec        = Float64[]
+
+    optimizer_factory = resolve_optimizer_dc(config)
+    for (zone_id, sub) in partitions
+        m = build_model(sub, DC; optimizer = optimizer_factory)
+        sub["model"]        = m
+        sub["obj_base"]     = m[:generation_cost]
+        sub["theta_var"]    = m[:theta]
+        sub["zone_edges"]   = _zone_cut_edges(sub, cut_edges)  # <<< importante
+        sub["has_solution"] = false
+
+        @inbounds for I in keys(sub["theta_var"])
+            set_start_value(sub["theta_var"][I], 0.0)
+        end
+    end
+
+    for k in 1:config.max_iter
+        println("\n[ADMM-branch/DC] Iteração $k")
+
+        for (zone_id, sub) in partitions
+            m = sub["model"]
+
+            if warm_start_theta && sub["has_solution"] === true
+                θ_old = JuMP.value.(sub["theta_var"])
+                @inbounds for I in keys(sub["theta_var"])
+                    set_start_value(sub["theta_var"][I], θ_old[I])
+                end
             end
 
-            @objective(local_model, Min, local_model[:generation_cost] + admm_penalty)
+            pen = add_penalty_branch_dc!(m, sub, sub["zone_edges"], z_flow, duals[zone_id], ρ[])
+            @objective(m, Min, sub["obj_base"] + pen)
+            optimize!(m)
+            sub["has_solution"] = true
 
-            optimize!(local_model)
-            subdata["model"] = local_model
-            subdata["generation_cost_model_expr"] = value(local_model[:generation_cost])
-            subdata["real_generation_cost"] =
-                compute_real_generation_cost(local_model, subdata["objective_params"])
+            sub["generation_cost_model_expr"] = value(m[:generation_cost])
+            sub["real_generation_cost"] = compute_real_generation_cost(m, sub["objective_params"])
         end
 
         z_flow_prev = deepcopy(z_flow)
+        compute_z_flow_consensus!(z_flow, partitions, cut_edges)
+        update_duals_flow!(duals, partitions, z_flow, cut_edges, ρ[])
 
-        for e in cut_edges
-            num = 0
-            acc = 0.0
-            for (_, subdata) in partitions
-                local_idx = findfirst(==(e), subdata["branch_local_indices"])
-                if local_idx !== nothing
-                    m = subdata["model"]
-                    p_val = value(_dc_flow_expr(m, subdata, local_idx))
-                    acc += p_val
-                    num += 1
-                end
-            end
-            z_flow[e] = (num > 0) ? acc / num : 0.0
-        end
-
-        for (zone_id, subdata) in partitions
-            for e in _zone_cut_edges(subdata, cut_edges)
-                l_local = findfirst(==(e), subdata["branch_local_indices"])
-                m = subdata["model"]
-                p_val = value(_dc_flow_expr(m, subdata, l_local))
-                λ = get(duals[zone_id], e, 0.0)
-                duals[zone_id][e] = λ + current_rho * (p_val - z_flow[e])
-            end
-        end
-
-        res_primal = 0.0
-        for (_, subdata) in partitions
-            for e in _zone_cut_edges(subdata, cut_edges)
-                l_local = findfirst(==(e), subdata["branch_local_indices"])
-                m = subdata["model"]
-                p_val = value(_dc_flow_expr(m, subdata, l_local))
-                res_primal += (p_val - z_flow[e])^2
-            end
-        end
-        res_primal = sqrt(res_primal)
-
-        res_dual = sqrt(sum((z_flow[e] - get(z_flow_prev, e, 0.0))^2 for e in cut_edges))
-
+        res_primal = primal_residual_branch_dc(partitions, z_flow, cut_edges)
+        res_dual   = dual_residual_branch_dc(z_flow, z_flow_prev)
         push!(res_primal_vec, res_primal)
-        push!(res_dual_vec, res_dual)
-        dim_pri = sum(length(_zone_cut_edges(sub, cut_edges)) for (_, sub) in partitions)
-        dim_du = length(cut_edges)
+        push!(res_dual_vec,   res_dual)
 
-        ϵ_primal =
-            sqrt(max(1, dim_pri)) * ϵ_abs +
-            ϵ_rel * max(sqrt(sum(z_flow[e]^2 for e in cut_edges)), 1e-12)
-        ϵ_dual =
-            sqrt(max(1, dim_du)) * ϵ_abs +
-            ϵ_rel * sqrt(sum((z_flow[e] - get(z_flow_prev, e, 0.0))^2 for e in cut_edges))
+        ϵ_pri = eps_primal_branch_dc(partitions, z_flow, cut_edges, ϵ_abs, ϵ_rel)
+        ϵ_du  = eps_dual_branch_dc(z_flow, z_flow_prev, ϵ_abs, ϵ_rel)
+        push!(eps_primal_vec, ϵ_pri)
+        push!(eps_dual_vec,   ϵ_du)
 
-        push!(eps_primal_vec, ϵ_primal)
-        push!(eps_dual_vec, ϵ_dual)
+        println("‖r‖ = $res_primal | ε_pri = $ϵ_pri")
+        println("‖s‖ = $res_dual   | ε_dual = $ϵ_du")
 
-        println("‖r‖ = $res_primal | ε_pri = $ϵ_primal")
-        println("‖s‖ = $res_dual   | ε_dual = $ϵ_dual")
+        push!(rho_vec, ρ[])
 
-        push!(rho_vec, current_rho)
-
-        if res_primal < ϵ_primal && res_dual < ϵ_dual
+        if res_primal < ϵ_pri && res_dual < ϵ_du
             println("Stopping criterion met.")
             break
         end
 
-        if res_primal > μ_incr * res_dual
-            current_rho *= τ_incr
-        elseif res_dual > μ_decr * res_primal
-            current_rho *= τ_decr
+        if use_legacy_rho
+            if res_primal > μ_incr * res_dual
+                ρ[] *= τ_incr
+            elseif res_dual > μ_decr * res_primal
+                ρ[] *= τ_decr
+            end
+        else
+            adaptive_rho_dc!(ρ, res_primal, res_dual; μ_incr=μ_incr, μ_decr=μ_decr, τ_incr=τ_incr, τ_decr=τ_decr)
         end
     end
 
-    plot_admm_convergence(res_primal_vec, res_dual_vec, eps_primal_vec, eps_dual_vec,
-        "plot_convergencia_admm_branch.html")
-    plot_rho(rho_vec, "plot_rho_admm_branch.html")
+    save_dc_branch_plots(res_primal_vec, res_dual_vec, eps_primal_vec, eps_dual_vec, rho_vec; stem = "admm_branch")
 
-    total_real_cost = sum(p["real_generation_cost"] for p in values(partitions))
-    total_expr_cost = sum(p["generation_cost_model_expr"] for p in values(partitions))
+    total_real_cost = sum(sub["real_generation_cost"] for sub in values(partitions))
+    total_expr_cost = sum(sub["generation_cost_model_expr"] for sub in values(partitions))
 
-    println("\n[ADMM-branch] Resumo:")
-    println("→ Total (value(:generation_cost)) = $total_expr_cost")
+    println("\n[ADMM-branch/DC] Resumo:")
+    println("→ Total (value(:generation_cost))     = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
-    println("ρe inicial: $(config.rho_flow) | ρe final: $current_rho")
+    println("ρe_final = $(ρ[])")
 
     return total_real_cost, partitions
 end
