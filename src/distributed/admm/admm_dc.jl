@@ -19,34 +19,52 @@ end
     return get(sub, "bus_set", Set(Int[b for b in sub["bus"]["bus_i"]]))
 end
 
-@inline function _dc_flow_val(θ_vals, sub::Dict{String, Any}, l_local::Int; t::Int = 1)
+@inline function _dc_flow_val_model(
+    m::Model,
+    sub::Dict{String, Any},
+    l_local::Int;
+    t::Int = 1,
+)
     l_global = sub["branch_local_indices"][l_local]
     f = sub["branch_full"]["f_bus"][l_global]
     tb = sub["branch_full"]["t_bus"][l_global]
     x = sub["branch_full"]["br_x"][l_global]
     @assert abs(x) > 1e-8 "br_x≈0 no ramo $l_global (DC)."
-    return (θ_vals[f, t] - θ_vals[tb, t]) / x
+    return (value(m[:theta][f, t]) - value(m[:theta][tb, t])) / x
+end
+
+@inline function _dc_flow_expr(
+    model::Model,
+    subdata::Dict{String, Any},
+    l_local::Int;
+    t::Int = 1,
+)
+    l_global = subdata["branch_local_indices"][l_local]
+    f = subdata["branch_full"]["f_bus"][l_global]
+    tbus = subdata["branch_full"]["t_bus"][l_global]
+    x = subdata["branch_full"]["br_x"][l_global]
+    θf = model[:theta][f, t]
+    θt = model[:theta][tbus, t]
+    return (θf - θt) / x
 end
 
 # ---------- Penalidades ----------
 function add_penalty_bus_dc!(m, subdata, shared_buses::Vector{Int},
     θ_avg::Dict{Int, Float64}, duals_zone::Dict{Int, Float64}, ρ::Float64)
-    busset = get(subdata, "bus_set", Set(Int[b for b in subdata["bus"]["bus_i"]]))
-    pen = @expression(m, 0.0)  # <<< expressão anônima (sem nome fixo)
-    @inbounds for b in shared_buses
-        if b in busset
-            θ = m[:theta][b, 1]
-            θ̄ = get(θ_avg, b, 0.0)
-            λ = get(duals_zone, b, 0.0)
-            pen += λ * (θ - θ̄) + (ρ / 2) * (θ - θ̄)^2
-        end
+    local_shared = get(subdata, "shared_buses_local", shared_buses)
+    pen = @expression(m, 0.0)
+    @inbounds for b in local_shared
+        θ = m[:theta][b, 1]
+        θ̄ = get(θ_avg, b, 0.0)
+        λ = get(duals_zone, b, 0.0)
+        pen += λ * (θ - θ̄) + (ρ / 2) * (θ - θ̄)^2
     end
     return pen
 end
 
 function add_penalty_branch_dc!(m, subdata, zone_edges::Vector{Int},
     z_flow::Dict{Int, Float64}, duals_zone::Dict{Int, Float64}, ρ::Float64)
-    pen = @expression(m, 0.0)  # <<< expressão anônima
+    pen = @expression(m, 0.0)
     @inbounds for e in zone_edges
         l_local = get(subdata["edge_to_local"], e, nothing)
         @assert l_local !== nothing "aresta global $e não pertence a esta partição"
@@ -58,27 +76,23 @@ function add_penalty_branch_dc!(m, subdata, zone_edges::Vector{Int},
     return pen
 end
 
-# ---------- Consensos ----------
-function compute_theta_consensus!(
-    θ_avg::Dict{Int, Float64},
-    partitions,
-    shared_buses::Vector{Int},
-)
+# ---------- Consensos (2 + 3) ----------
+function compute_theta_consensus!(θ_avg, partitions, shared_buses)
     sums = Dict{Int, Float64}()
     cnts = Dict{Int, Int}()
-    for (_, subdata) in partitions
-        θvals = value.(subdata["model"][:theta])
-        busset = _bus_set(subdata)
-        @inbounds for b in shared_buses
-            if b in busset
-                sums[b] = get(sums, b, 0.0) + θvals[b, 1]
-                cnts[b] = get(cnts, b, 0) + 1
-            end
+    for (_, sub) in partitions
+        m = sub["model"]
+        @inbounds for b in sub["shared_buses_local"]
+            θb = value(m[:theta][b, 1])
+            sums[b] = get(sums, b, 0.0) + θb
+            cnts[b] = get(cnts, b, 0) + 1
         end
     end
     @inbounds for b in shared_buses
         n = get(cnts, b, 0)
-        θ_avg[b] = n > 0 ? (sums[b] / n) : get(θ_avg, b, 0.0)
+        if n > 0
+            θ_avg[b] = sums[b] / n
+        end
     end
 end
 
@@ -89,12 +103,12 @@ function compute_z_flow_consensus!(
 )
     sums = Dict{Int, Float64}()
     cnts = Dict{Int, Int}()
-    for (_, subdata) in partitions
-        θvals = value.(subdata["model"][:theta])
+    for (_, sub) in partitions
+        m = sub["model"]
         @inbounds for e in cut_edges
-            l_local = _edge_local(subdata, e)
+            l_local = get(sub["edge_to_local"], e, nothing)
             if l_local !== nothing
-                p = _dc_flow_val(θvals, subdata, l_local)
+                p = _dc_flow_val_model(m, sub, l_local)
                 sums[e] = get(sums, e, 0.0) + p
                 cnts[e] = get(cnts, e, 0) + 1
             end
@@ -102,52 +116,48 @@ function compute_z_flow_consensus!(
     end
     @inbounds for e in cut_edges
         n = get(cnts, e, 0)
-        z_flow[e] = n > 0 ? (sums[e] / n) : get(z_flow, e, 0.0)
+        if n > 0
+            z_flow[e] = sums[e] / n
+        end
     end
 end
 
-# ---------- Duais ----------
+# ---------- Duais (2 + 3) ----------
 function update_duals_theta!(duals::Dict{Int, Dict{Int, Float64}}, partitions,
-    θ_avg::Dict{Int, Float64}, shared_buses::Vector{Int}, ρ::Float64)
-    for (z, subdata) in partitions
-        θvals = value.(subdata["model"][:theta])
-        busset = _bus_set(subdata)
-        @inbounds for b in shared_buses
-            if b in busset
-                duals[z][b] = get(duals[z], b, 0.0) + ρ * (θvals[b, 1] - get(θ_avg, b, 0.0))
-            end
+    θ_avg::Dict{Int, Float64}, _shared_buses::Vector{Int}, ρ::Float64)
+    for (z, sub) in partitions
+        m = sub["model"]
+        @inbounds for b in sub["shared_buses_local"]
+            duals[z][b] = get(duals[z], b, 0.0) + ρ * (value(m[:theta][b, 1]) - θ_avg[b])
         end
     end
 end
 
 function update_duals_flow!(duals::Dict{Int, Dict{Int, Float64}}, partitions,
     z_flow::Dict{Int, Float64}, cut_edges::Vector{Int}, ρ::Float64)
-    for (z, subdata) in partitions
-        θvals = value.(subdata["model"][:theta])
+    for (z, sub) in partitions
+        m = sub["model"]
         @inbounds for e in cut_edges
-            l_local = _edge_local(subdata, e)
+            l_local = get(sub["edge_to_local"], e, nothing)
             if l_local !== nothing
-                p_val = _dc_flow_val(θvals, subdata, l_local)
+                p_val = _dc_flow_val_model(m, sub, l_local)
                 duals[z][e] = get(duals[z], e, 0.0) + ρ * (p_val - z_flow[e])
             end
         end
     end
 end
 
-# ---------- Resíduos ----------
+# ---------- Resíduos (2 + 3) ----------
 function primal_residual_bus_dc(
     partitions,
     θ_avg::Dict{Int, Float64},
-    shared_buses::Vector{Int},
+    _shared_buses::Vector{Int},
 )
     acc = 0.0
-    for (_, subdata) in partitions
-        θvals = value.(subdata["model"][:theta])
-        busset = _bus_set(subdata)
-        @inbounds for b in shared_buses
-            if b in busset
-                acc += (θvals[b, 1] - get(θ_avg, b, 0.0))^2
-            end
+    for (_, sub) in partitions
+        m = sub["model"]
+        @inbounds for b in sub["shared_buses_local"]
+            acc += (value(m[:theta][b, 1]) - get(θ_avg, b, 0.0))^2
         end
     end
     return sqrt(acc)
@@ -160,13 +170,10 @@ function eps_primal_bus_dc(partitions, θ_avg::Dict{Int, Float64}, shared_buses:
     ϵ_abs::Float64, ϵ_rel::Float64)
     N = max(1, length(shared_buses))
     norm_x_sq = 0.0
-    for (_, subdata) in partitions
-        θvals = value.(subdata["model"][:theta])
-        busset = _bus_set(subdata)
-        @inbounds for b in shared_buses
-            if b in busset
-                norm_x_sq += (θvals[b, 1])^2
-            end
+    for (_, sub) in partitions
+        m = sub["model"]
+        @inbounds for b in sub["shared_buses_local"]
+            norm_x_sq += (value(m[:theta][b, 1]))^2
         end
     end
     norm_z_sq = sum((get(θ_avg, b, 0.0))^2 for b in shared_buses)
@@ -186,12 +193,12 @@ function primal_residual_branch_dc(
     cut_edges::Vector{Int},
 )
     acc = 0.0
-    for (_, subdata) in partitions
-        θvals = value.(subdata["model"][:theta])
+    for (_, sub) in partitions
+        m = sub["model"]
         @inbounds for e in cut_edges
-            l_local = _edge_local(subdata, e)
+            l_local = get(sub["edge_to_local"], e, nothing)
             if l_local !== nothing
-                acc += (_dc_flow_val(θvals, subdata, l_local) - z_flow[e])^2
+                acc += (_dc_flow_val_model(m, sub, l_local) - z_flow[e])^2
             end
         end
     end
@@ -202,8 +209,7 @@ dual_residual_branch_dc(z_flow::Dict{Int, Float64}, z_flow_prev::Dict{Int, Float
     sqrt(sum((z_flow[e] - get(z_flow_prev, e, 0.0))^2 for e in keys(z_flow)))
 
 function eps_primal_branch_dc(partitions, z_flow::Dict{Int, Float64},
-    cut_edges::Vector{Int},
-    ϵ_abs::Float64, ϵ_rel::Float64)
+    cut_edges::Vector{Int}, ϵ_abs::Float64, ϵ_rel::Float64)
     dim_pri = sum(length(_zone_cut_edges(sub, cut_edges)) for (_, sub) in partitions)
     return sqrt(max(1, dim_pri)) * ϵ_abs +
            ϵ_rel * max(sqrt(sum(z_flow[e]^2 for e in cut_edges)), 1e-12)
@@ -227,21 +233,86 @@ function adaptive_rho_dc!(ρ::Base.RefValue{Float64}, r::Float64, s::Float64;
 end
 
 # ---------- Plots (wrappers) ----------
-function save_dc_bus_plots(res_pri, res_du, eps_pri, eps_du, ρ_hist, θ_avg_history;
-    stem::String = "admm")
-    plot_admm_convergence(res_pri, res_du, eps_pri, eps_du,
-        "plot_convergencia_$(stem)_dc.html")
+function save_dc_bus_plots(
+    res_pri,
+    res_du,
+    eps_pri,
+    eps_du,
+    ρ_hist,
+    θ_avg_history;
+    stem::String = "admm",
+)
+    plot_admm_convergence(
+        res_pri,
+        res_du,
+        eps_pri,
+        eps_du,
+        "plot_convergencia_$(stem)_dc.html",
+    )
     plot_rho(ρ_hist, "plot_rho_$(stem)_dc.html")
     return plot_theta_avg_heatmap(θ_avg_history, "plot_theta_avg_heatmap_$(stem)_dc.html")
 end
 
-function save_dc_branch_plots(res_pri, res_du, eps_pri, eps_du, ρ_hist;
-    stem::String = "admm_branch")
-    plot_admm_convergence(res_pri, res_du, eps_pri, eps_du,
-        "plot_convergencia_$(stem).html")
+function save_dc_branch_plots(
+    res_pri,
+    res_du,
+    eps_pri,
+    eps_du,
+    ρ_hist;
+    stem::String = "admm_branch",
+)
+    plot_admm_convergence(
+        res_pri,
+        res_du,
+        eps_pri,
+        eps_du,
+        "plot_convergencia_$(stem).html",
+    )
     return plot_rho(ρ_hist, "plot_rho_$(stem).html")
 end
 
+# ---------- Cortes de arestas entre zonas ----------
+function _find_cut_edges(full::Dict{String, Any})
+    zones = full["bus"]["zone"]
+    bus_ids = full["bus"]["bus_i"]
+    bus2zone = Dict(bus_ids[i] => zones[i] for i in eachindex(bus_ids))
+    f_bus = full["branch"]["f_bus"]
+    t_bus = full["branch"]["t_bus"]
+    cut = Int[]
+    for i in eachindex(f_bus)
+        if bus2zone[f_bus[i]] != bus2zone[t_bus[i]]
+            push!(cut, i)
+        end
+    end
+    return cut
+end
+
+function _zone_cut_edges(subdata::Dict{String, Any}, cut_edges::Vector{Int})
+    local_keep = Set(subdata["branch_local_indices"])
+    return [ℓ for ℓ in cut_edges if ℓ in local_keep]
+end
+
+# ---------- Custo real ----------
+function compute_real_generation_cost(model, params)
+    T = get(model.ext, :time_periods, 1)
+    active_generators = findall(params.generator_status .== 1)
+    total_cost = 0.0
+    for t in 1:T, g in active_generators
+        if haskey(params.generator_costs, t) && haskey(params.generator_costs[t], g)
+            pgen = value(model[:p_generation][g, t]) * params.sbase
+            coefs = params.generator_costs[t][g]
+            # Horner
+            acc = 0.0
+            @inbounds for c in coefs
+                acc = acc * pgen + c
+            end
+            total_cost += acc
+        end
+    end
+    return total_cost
+end
+
+# ---------- ADMM: BUS ----------
 function run_admm(config::DistributedOPFModel, data)
     partitions, shared_buses = prepare_admm_partitions(data)
     @assert config.base_model == DC "run_admm (bus/DC) requer DC."
@@ -269,6 +340,7 @@ function run_admm(config::DistributedOPFModel, data)
         sub["obj_base"] = m[:generation_cost]
         sub["theta_var"] = m[:theta]
         sub["has_solution"] = false
+        _set_model_silent!(m)   # (5)
         @inbounds for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
         end
@@ -280,12 +352,11 @@ function run_admm(config::DistributedOPFModel, data)
         for (zone_id, sub) in partitions
             m = sub["model"]
 
-            if sub["has_solution"] === true
-                θ_old = JuMP.value.(sub["theta_var"])
-                @inbounds for I in keys(sub["theta_var"])
-                    set_start_value(sub["theta_var"][I], θ_old[I])
-                end
-            end
+            # if sub["has_solution"] === true
+            #     @inbounds for I in keys(sub["theta_var"])
+            #         set_start_value(sub["theta_var"][I], value(sub["theta_var"][I]))
+            #     end
+            # end
 
             pen = add_penalty_bus_dc!(m, sub, shared_buses, θ_avg, duals[zone_id], ρ[])
             @objective(m, Min, sub["obj_base"] + pen)
@@ -296,24 +367,23 @@ function run_admm(config::DistributedOPFModel, data)
             sub["real_generation_cost"] =
                 compute_real_generation_cost(m, sub["objective_params"])
 
-            θ_vals = value.(sub["theta_var"])
-            for b in shared_buses
-                if b in sub["bus"]["bus_i"]
-                    push!(
-                        get!(
-                            get!(θ_local_history, zone_id, Dict{Int, Vector{Float64}}()),
-                            b,
-                            Float64[],
-                        ),
-                        θ_vals[b, 1])
-                end
+            # histórico local só para compartilhadas (2 + 3)
+            @inbounds for b in sub["shared_buses_local"]
+                push!(
+                    get!(
+                        get!(θ_local_history, zone_id, Dict{Int, Vector{Float64}}()),
+                        b,
+                        Float64[],
+                    ),
+                    value(sub["theta_var"][b, 1]),
+                )
             end
         end
 
-        θ_avg_prev = isempty(θ_avg) ? θ_avg : deepcopy(θ_avg)
+        θ_avg_prev = isempty(θ_avg) ? θ_avg : copy(θ_avg)
         compute_theta_consensus!(θ_avg, partitions, shared_buses)
         for b in shared_buses
-            push!(get!(θ_avg_history, b, Float64[]), θ_avg[b])
+            push!(get!(θ_avg_history, b, Float64[]), get(θ_avg, b, 0.0))
         end
 
         update_duals_theta!(duals, partitions, θ_avg, shared_buses, ρ[])
@@ -362,42 +432,12 @@ function run_admm(config::DistributedOPFModel, data)
     return total_real_cost, partitions
 end
 
-function _dc_flow_expr(model::Model, subdata::Dict{String, Any}, l_local::Int; t::Int = 1)
-    l_global = subdata["branch_local_indices"][l_local]
-    f = subdata["branch_full"]["f_bus"][l_global]
-    tbus = subdata["branch_full"]["t_bus"][l_global]
-    x = subdata["branch_full"]["br_x"][l_global]
-
-    θf = model[:theta][f, t]
-    θt = model[:theta][tbus, t]
-    return (θf - θt) / x
-end
-
-function _find_cut_edges_dc(full::Dict{String, Any})
-    zones = full["bus"]["zone"]
-    bus_ids = full["bus"]["bus_i"]
-    bus2zone = Dict(bus_ids[i] => zones[i] for i in eachindex(bus_ids))
-    f_bus = full["branch"]["f_bus"]
-    t_bus = full["branch"]["t_bus"]
-    cut = Int[]
-    for i in eachindex(f_bus)
-        if bus2zone[f_bus[i]] != bus2zone[t_bus[i]]
-            push!(cut, i)
-        end
-    end
-    return cut
-end
-
-function _zone_cut_edges(subdata::Dict{String, Any}, cut_edges::Vector{Int})
-    local_keep = Set(subdata["branch_local_indices"])
-    return [ℓ for ℓ in cut_edges if ℓ in local_keep]
-end
-
+# ---------- ADMM: BRANCH ----------
 function run_admm_branch(
     config::DistributedOPFModel,
     data::Dict{String, Any};
-    warm_start_theta::Bool = false,   
-    use_legacy_rho::Bool = false,  
+    warm_start_theta::Bool = false,
+    use_legacy_rho::Bool = false,
     μ_incr::Float64 = 2.0,
     μ_decr::Float64 = 2.0,
     τ_incr::Float64 = 1.05,
@@ -411,25 +451,26 @@ function run_admm_branch(
     ρ = Ref(config.rho_flow)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
 
-    z_flow      = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    z_flow = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     z_flow_prev = Dict{Int, Float64}()
-    duals       = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in keys(partitions))
+    duals =
+        Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in keys(partitions))
 
     res_primal_vec = Float64[]
-    res_dual_vec   = Float64[]
+    res_dual_vec = Float64[]
     eps_primal_vec = Float64[]
-    eps_dual_vec   = Float64[]
-    rho_vec        = Float64[]
+    eps_dual_vec = Float64[]
+    rho_vec = Float64[]
 
     optimizer_factory = resolve_optimizer_dc(config)
     for (zone_id, sub) in partitions
         m = build_model(sub, DC; optimizer = optimizer_factory)
-        sub["model"]        = m
-        sub["obj_base"]     = m[:generation_cost]
-        sub["theta_var"]    = m[:theta]
-        sub["zone_edges"]   = _zone_cut_edges(sub, cut_edges)  # <<< importante
+        sub["model"] = m
+        sub["obj_base"] = m[:generation_cost]
+        sub["theta_var"] = m[:theta]
+        sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
         sub["has_solution"] = false
-
+        _set_model_silent!(m)   # (5)
         @inbounds for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
         end
@@ -442,34 +483,41 @@ function run_admm_branch(
             m = sub["model"]
 
             if warm_start_theta && sub["has_solution"] === true
-                θ_old = JuMP.value.(sub["theta_var"])
                 @inbounds for I in keys(sub["theta_var"])
-                    set_start_value(sub["theta_var"][I], θ_old[I])
+                    set_start_value(sub["theta_var"][I], value(sub["theta_var"][I]))
                 end
             end
 
-            pen = add_penalty_branch_dc!(m, sub, sub["zone_edges"], z_flow, duals[zone_id], ρ[])
+            pen = add_penalty_branch_dc!(
+                m,
+                sub,
+                sub["zone_edges"],
+                z_flow,
+                duals[zone_id],
+                ρ[],
+            )
             @objective(m, Min, sub["obj_base"] + pen)
             optimize!(m)
             sub["has_solution"] = true
 
             sub["generation_cost_model_expr"] = value(m[:generation_cost])
-            sub["real_generation_cost"] = compute_real_generation_cost(m, sub["objective_params"])
+            sub["real_generation_cost"] =
+                compute_real_generation_cost(m, sub["objective_params"])
         end
 
-        z_flow_prev = deepcopy(z_flow)
+        z_flow_prev = copy(z_flow)
         compute_z_flow_consensus!(z_flow, partitions, cut_edges)
         update_duals_flow!(duals, partitions, z_flow, cut_edges, ρ[])
 
         res_primal = primal_residual_branch_dc(partitions, z_flow, cut_edges)
-        res_dual   = dual_residual_branch_dc(z_flow, z_flow_prev)
+        res_dual = dual_residual_branch_dc(z_flow, z_flow_prev)
         push!(res_primal_vec, res_primal)
-        push!(res_dual_vec,   res_dual)
+        push!(res_dual_vec, res_dual)
 
         ϵ_pri = eps_primal_branch_dc(partitions, z_flow, cut_edges, ϵ_abs, ϵ_rel)
-        ϵ_du  = eps_dual_branch_dc(z_flow, z_flow_prev, ϵ_abs, ϵ_rel)
+        ϵ_du = eps_dual_branch_dc(z_flow, z_flow_prev, ϵ_abs, ϵ_rel)
         push!(eps_primal_vec, ϵ_pri)
-        push!(eps_dual_vec,   ϵ_du)
+        push!(eps_dual_vec, ϵ_du)
 
         println("‖r‖ = $res_primal | ε_pri = $ϵ_pri")
         println("‖s‖ = $res_dual   | ε_dual = $ϵ_du")
@@ -488,11 +536,26 @@ function run_admm_branch(
                 ρ[] *= τ_decr
             end
         else
-            adaptive_rho_dc!(ρ, res_primal, res_dual; μ_incr=μ_incr, μ_decr=μ_decr, τ_incr=τ_incr, τ_decr=τ_decr)
+            adaptive_rho_dc!(
+                ρ,
+                res_primal,
+                res_dual;
+                μ_incr = μ_incr,
+                μ_decr = μ_decr,
+                τ_incr = τ_incr,
+                τ_decr = τ_decr,
+            )
         end
     end
 
-    save_dc_branch_plots(res_primal_vec, res_dual_vec, eps_primal_vec, eps_dual_vec, rho_vec; stem = "admm_branch")
+    save_dc_branch_plots(
+        res_primal_vec,
+        res_dual_vec,
+        eps_primal_vec,
+        eps_dual_vec,
+        rho_vec;
+        stem = "admm_branch",
+    )
 
     total_real_cost = sum(sub["real_generation_cost"] for sub in values(partitions))
     total_expr_cost = sum(sub["generation_cost_model_expr"] for sub in values(partitions))
@@ -505,6 +568,7 @@ function run_admm_branch(
     return total_real_cost, partitions
 end
 
+# ---------- ADMM: HÍBRIDO ----------
 function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     @assert config.base_model == DC "Hybrid ADMM/DC requer DC."
 
@@ -542,6 +606,7 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         sub["theta_var"] = m[:theta]
         sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
         sub["has_solution"] = false
+        _set_model_silent!(m)   # (5)
         @inbounds for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
         end
@@ -553,12 +618,11 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         for (zone_id, sub) in partitions
             m = sub["model"]
 
-            if sub["has_solution"] === true
-                θ_old = JuMP.value.(sub["theta_var"])
-                @inbounds for I in keys(sub["theta_var"])
-                    set_start_value(sub["theta_var"][I], θ_old[I])
-                end
-            end
+            # if sub["has_solution"] === true
+            #     @inbounds for I in keys(sub["theta_var"])
+            #         set_start_value(sub["theta_var"][I], value(sub["theta_var"][I]))
+            #     end
+            # end
 
             pen_bus =
                 add_penalty_bus_dc!(m, sub, shared_buses, θ_avg, duals_theta[zone_id], ρθ[])
@@ -579,12 +643,12 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
                 compute_real_generation_cost(m, sub["objective_params"])
         end
 
-        θ_avg_prev = isempty(θ_avg) ? θ_avg : deepcopy(θ_avg)
-        z_flow_prev = deepcopy(z_flow)
+        θ_avg_prev = isempty(θ_avg) ? θ_avg : copy(θ_avg)
+        z_flow_prev = copy(z_flow)
 
         compute_theta_consensus!(θ_avg, partitions, shared_buses)
         for b in shared_buses
-            push!(get!(θ_avg_history, b, Float64[]), θ_avg[b])
+            push!(get!(θ_avg_history, b, Float64[]), get(θ_avg, b, 0.0))
         end
         compute_z_flow_consensus!(z_flow, partitions, cut_edges)
 
@@ -630,8 +694,13 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         adaptive_rho_dc!(ρe, res_primal, res_dual)
     end
 
-    plot_admm_convergence(res_primal_vec, res_dual_vec, eps_primal_vec, eps_dual_vec,
-        "plot_convergencia_admm_hybrid.html")
+    plot_admm_convergence(
+        res_primal_vec,
+        res_dual_vec,
+        eps_primal_vec,
+        eps_dual_vec,
+        "plot_convergencia_admm_hybrid.html",
+    )
 
     PlotlyLight.save(
         (
@@ -651,7 +720,8 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
                 p
             )
         )(),
-        "plot_rho_theta_hybrid.html")
+        "plot_rho_theta_hybrid.html",
+    )
     PlotlyLight.save(
         (
             () -> (
@@ -670,7 +740,8 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
                 p
             )
         )(),
-        "plot_rho_flow_hybrid.html")
+        "plot_rho_flow_hybrid.html",
+    )
 
     plot_theta_avg_heatmap(θ_avg_history, "plot_theta_avg_heatmap_hybrid.html")
 

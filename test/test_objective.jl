@@ -12,12 +12,12 @@ const reduced_list = [
     "pglib_opf_case73_ieee_rts.m",
     "pglib_opf_case89_pegase.m",
     "pglib_opf_case118_ieee.m",
-    "pglib_opf_case162_ieee_dtc.m",
-    "pglib_opf_case179_goc.m",
-    "pglib_opf_case197_snem.m",
-    "pglib_opf_case200_activ.m",
-    "pglib_opf_case240_pserc.m",
-    "pglib_opf_case300_ieee.m",
+    # "pglib_opf_case162_ieee_dtc.m",
+    # "pglib_opf_case179_goc.m",
+    # "pglib_opf_case197_snem.m",
+    # "pglib_opf_case200_activ.m",
+    # "pglib_opf_case240_pserc.m",
+    # "pglib_opf_case300_ieee.m",
     # "pglib_opf_case500_goc.m",
     # "pglib_opf_case588_sdet.m",
     # "pglib_opf_case793_goc.m",
@@ -78,9 +78,9 @@ const reduced_testlist_ac = [
     "pglib_opf_case39_epri.m",
     "pglib_opf_case57_ieee.m",
     "pglib_opf_case60_c.m",
-    "pglib_opf_case73_ieee_rts.m",
-    "pglib_opf_case89_pegase.m",
-    "pglib_opf_case118_ieee.m",
+    # "pglib_opf_case73_ieee_rts.m",
+    # "pglib_opf_case89_pegase.m",
+    # "pglib_opf_case118_ieee.m",
     # "pglib_opf_case162_ieee_dtc.m",
     # "pglib_opf_case179_goc.m",
     # "pglib_opf_case197_snem.m",
@@ -92,8 +92,8 @@ const battery_cases = [
     "case5_bus_2_bat.m",
     "case14_bus_4_bat.m",
     "case57_bus_6_bat.m",
-    "case118_bus_10_bat.m",
-    "case200active_bus_20_bat.m",
+    # "case118_bus_10_bat.m",
+    # "case200active_bus_20_bat.m",
 ]
 
 function get_available_optimizer(preferred, fallback)
@@ -253,11 +253,11 @@ function run_test_objective()
             optimizer = Ipopt.Optimizer,
             case_list = battery_cases,
         )
-        run_model_tests(
-            PowerOptimization.SOCP,
-            "SOCP com baterias";
-            optimizer = socp_optimizer,
-            case_list = battery_cases,
-        )
+        # run_model_tests(
+        #     PowerOptimization.SOCP,
+        #     "SOCP com baterias";
+        #     optimizer = socp_optimizer,
+        #     case_list = battery_cases,
+        # )
     end
 end

@@ -23,10 +23,86 @@ end
     @assert abs(x) > 1e-8 msg
 end
 
-# ---------- Penalidades (ADMM) ----------
+# Silenciar solver (JuMP/MOI/IPOPT) – reduz IO
+function _set_model_silent!(m::JuMP.Model)
+    try
+        set_silent(m)
+    catch
+    end
+    try
+        MOI = JuMP.MOI
+        MOI.set(m, MOI.Silent(), true)
+    catch
+    end
+    return nothing
+end
 
-"Penalidade por BARRA no AC: θ (cópia local) vs θ̄ e V (cópia local) vs V̄.
- Retorna AffExpr ANÔNIMO (não registra nome no modelo)."
+# Wrap/estatística circular (já usadas no DC)
+@inline function _wrap_angle_diff(Δ::Float64)
+    return atan(sin(Δ), cos(Δ))
+end
+
+@inline function _circular_mean(θs::AbstractVector{<:Real})
+    sum_sin = 0.0
+    sum_cos = 0.0
+    @inbounds @simd for θ in θs
+        sum_sin += sin(θ)
+        sum_cos += cos(θ)
+    end
+    return atan(sum_sin, sum_cos)
+end
+
+# Expressões de fluxo AC já existentes (garantia de compatibilidade)
+@inline function _ac_flow_from_exprs_existing(
+    model::Model,
+    _subdata::Dict{String, Any},
+    l_local::Int; t::Int = 1,
+)
+    return model[:p_flow_branches][l_local, t], model[:q_flow_branches][l_local, t]
+end
+
+# ---------- Cortes de arestas entre zonas ----------
+function _find_cut_edges(full::Dict{String, Any})
+    zones = full["bus"]["zone"]
+    bus_ids = full["bus"]["bus_i"]
+    bus2zone = Dict(bus_ids[i] => zones[i] for i in eachindex(bus_ids))
+    f_bus = full["branch"]["f_bus"]
+    t_bus = full["branch"]["t_bus"]
+    cut = Int[]
+    @inbounds for i in eachindex(f_bus)
+        if bus2zone[f_bus[i]] != bus2zone[t_bus[i]]
+            push!(cut, i)
+        end
+    end
+    return cut
+end
+
+function _zone_cut_edges(subdata::Dict{String, Any}, cut_edges::Vector{Int})
+    local_keep = Set(subdata["branch_local_indices"])
+    return [ℓ for ℓ in cut_edges if ℓ in local_keep]
+end
+
+# ---------- Custo real (Horner) ----------
+function compute_real_generation_cost(model, params)
+    T = get(model.ext, :time_periods, 1)
+    active_generators = findall(params.generator_status .== 1)
+    total_cost = 0.0
+    for t in 1:T, g in active_generators
+        if haskey(params.generator_costs, t) && haskey(params.generator_costs[t], g)
+            pgen = value(model[:p_generation][g, t]) * params.sbase
+            coefs = params.generator_costs[t][g]
+            acc = 0.0
+            @inbounds for c in coefs
+                acc = acc * pgen + c
+            end
+            total_cost += acc
+        end
+    end
+    return total_cost
+end
+
+# ---------- Penalidades (ADMM) ----------
+"Penalidade por BARRA no AC: θ (local) vs θ̄ e V (local) vs V̄."
 function add_penalty_bus_ac!(
     m::JuMP.Model,
     subdata::Dict{String, Any},
@@ -38,26 +114,23 @@ function add_penalty_bus_ac!(
     ρθ::Real,
     ρV::Real,
 )
-    pen = @expression(m, 0.0)  # anônima → sem colisão de nome
-    busset = _bus_set(subdata)
-    @inbounds for b in shared_buses
-        if b in busset
-            θ = m[:theta][b, 1]
-            θ̄ = Float64(get(θ_avg, b, 0.0))
-            λθ = Float64(get(dualsθ_zone, b, 0.0))
-            pen += λθ * (θ - θ̄) + (float(ρθ) / 2) * (θ - θ̄)^2
+    pen = @expression(m, 0.0)  # anônima (sem nome fixo)
+    local_shared = get(subdata, "shared_buses_local", shared_buses)
+    @inbounds for b in local_shared
+        θ = m[:theta][b, 1]
+        θ̄ = Float64(get(θ_avg, b, 0.0))
+        λθ = Float64(get(dualsθ_zone, b, 0.0))
+        pen += λθ * (θ - θ̄) + (float(ρθ) / 2) * (θ - θ̄)^2
 
-            V = m[:v_magnitude][b, 1]
-            V̄ = Float64(get(v_avg, b, 1.0))
-            λV = Float64(get(dualsV_zone, b, 0.0))
-            pen += λV * (V - V̄) + (float(ρV) / 2) * (V - V̄)^2
-        end
+        V = m[:v_magnitude][b, 1]
+        V̄ = Float64(get(v_avg, b, 1.0))
+        λV = Float64(get(dualsV_zone, b, 0.0))
+        pen += λV * (V - V̄) + (float(ρV) / 2) * (V - V̄)^2
     end
     return pen
 end
 
-"Penalidade por RAMO no AC: P_from/Q_from vs zP/zQ.
- Retorna AffExpr ANÔNIMO."
+"Penalidade por RAMO no AC: P_from/Q_from vs zP/zQ."
 function add_penalty_branch_ac!(
     m::JuMP.Model,
     subdata::Dict{String, Any},
@@ -73,7 +146,6 @@ function add_penalty_branch_ac!(
     @inbounds for e in zone_edges
         l_local = _edge_local(subdata, e)
         @assert l_local !== nothing "aresta global $e não pertence a esta partição"
-        # usa função existente que retorna as EXPRESSÕES JuMP de P_from/Q_from
         P_loc, Q_loc = _ac_flow_from_exprs_existing(m, subdata, l_local)
         λP = Float64(get(dualsP_zone, e, 0.0))
         λQ = Float64(get(dualsQ_zone, e, 0.0))
@@ -85,30 +157,29 @@ function add_penalty_branch_ac!(
     return pen
 end
 
-# ---------- Consensos ----------
+# ---------- Consensos (sem value.(...): acumulação pontual) ----------
 function compute_ac_bus_consensus!(θ_avg::Dict{Int, Float64}, v_avg::Dict{Int, Float64},
     partitions, shared_buses::Vector{Int})
-    # cacheia value uma vez por modelo
-    thetas_map = Dict{Int, Vector{Float64}}()  # acumula θ por bus (para média circular)
-    Vacc = Dict{Int, Float64}()               # soma de V por bus
-    counts = Dict{Int, Int}()
+    sum_sin = Dict{Int, Float64}()
+    sum_cos = Dict{Int, Float64}()
+    Vacc = Dict{Int, Float64}()
+    cnts = Dict{Int, Int}()
     for (_, sub) in partitions
         m = sub["model"]
-        θvals = value.(m[:theta])
-        Vvals = value.(m[:v_magnitude])
-        busset = _bus_set(sub)
-        @inbounds for b in shared_buses
-            if b in busset
-                push!(get!(thetas_map, b, Float64[]), θvals[b, 1])
-                Vacc[b] = get(Vacc, b, 0.0) + Vvals[b, 1]
-                counts[b] = get(counts, b, 0) + 1
-            end
+        local_shared = get(sub, "shared_buses_local", shared_buses)
+        @inbounds for b in local_shared
+            θb = value(m[:theta][b, 1])
+            Vb = value(m[:v_magnitude][b, 1])
+            sum_sin[b] = get(sum_sin, b, 0.0) + sin(θb)
+            sum_cos[b] = get(sum_cos, b, 0.0) + cos(θb)
+            Vacc[b] = get(Vacc, b, 0.0) + Vb
+            cnts[b] = get(cnts, b, 0) + 1
         end
     end
     @inbounds for b in shared_buses
-        n = get(counts, b, 0)
+        n = get(cnts, b, 0)
         if n > 0
-            θ_avg[b] = _circular_mean(get(thetas_map, b, Float64[]))
+            θ_avg[b] = atan(get(sum_sin, b, 0.0), get(sum_cos, b, 0.0))
             v_avg[b] = Vacc[b] / n
         end
     end
@@ -125,7 +196,6 @@ function compute_ac_branch_consensus!(zP::Dict{Int, Float64}, zQ::Dict{Int, Floa
             l_local = _edge_local(sub, e)
             if l_local !== nothing
                 P_loc, Q_loc = _ac_flow_from_exprs_existing(m, sub, l_local)
-                # value apenas aqui (1x)
                 p = value(P_loc)
                 q = value(Q_loc)
                 sumsP[e] = get(sumsP, e, 0.0) + p
@@ -143,8 +213,7 @@ function compute_ac_branch_consensus!(zP::Dict{Int, Float64}, zQ::Dict{Int, Floa
     end
 end
 
-# ---------- Atualização de duais ----------
-"λθ_zb ← λθ_zb + ρθ * wrap(θ_zb - θ̄_b); λV_zb ← λV_zb + ρV (V_zb - V̄_b)."
+# ---------- Atualização de duais (pontual, sem matrizes inteiras) ----------
 function update_duals_bus_ac!(
     dualsθ,
     dualsV,
@@ -157,21 +226,16 @@ function update_duals_bus_ac!(
 )
     for (z, sub) in partitions
         m = sub["model"]
-        θvals = value.(m[:theta])
-        Vvals = value.(m[:v_magnitude])
-        busset = _bus_set(sub)
-        @inbounds for b in shared_buses
-            if b in busset
-                dθ = _wrap_angle_diff(θvals[b, 1] - get(θ_avg, b, 0.0))
-                dV = Vvals[b, 1] - get(v_avg, b, 0.0)
-                dualsθ[z][b] = get(dualsθ[z], b, 0.0) + ρθ * dθ
-                dualsV[z][b] = get(dualsV[z], b, 0.0) + ρV * dV
-            end
+        local_shared = get(sub, "shared_buses_local", shared_buses)
+        @inbounds for b in local_shared
+            dθ = _wrap_angle_diff(value(m[:theta][b, 1]) - get(θ_avg, b, 0.0))
+            dV = value(m[:v_magnitude][b, 1]) - get(v_avg, b, 0.0)
+            dualsθ[z][b] = get(dualsθ[z], b, 0.0) + ρθ * dθ
+            dualsV[z][b] = get(dualsV[z], b, 0.0) + ρV * dV
         end
     end
 end
 
-"λP_ze ← λP_ze + ρP (P_ze - zP_e); λQ_ze ← λQ_ze + ρQ (Q_ze - zQ_e)."
 function update_duals_branch_ac!(dualsP, dualsQ, partitions, zP, zQ, cut_edges, ρP, ρQ)
     for (z, sub) in partitions
         m = sub["model"]
@@ -186,27 +250,21 @@ function update_duals_branch_ac!(dualsP, dualsQ, partitions, zP, zQ, cut_edges, 
     end
 end
 
-# ---------- Resíduos ----------
-"‖r‖ (bus/AC) = sqrt(Σ_z Σ_b [wrap(θ_zb-θ̄_b)]² + (V_zb-V̄_b)²)."
+# ---------- Resíduos (sem value.(...)) ----------
 function primal_residual_bus_ac(partitions, θ_avg, v_avg, shared_buses)
     acc = 0.0
     for (_, sub) in partitions
         m = sub["model"]
-        θvals = value.(m[:theta])
-        Vvals = value.(m[:v_magnitude])
-        busset = _bus_set(sub)
-        @inbounds for b in shared_buses
-            if b in busset
-                dθ = _wrap_angle_diff(θvals[b, 1] - get(θ_avg, b, 0.0))
-                dV = Vvals[b, 1] - get(v_avg, b, 0.0)
-                acc += dθ^2 + dV^2
-            end
+        local_shared = get(sub, "shared_buses_local", shared_buses)
+        @inbounds for b in local_shared
+            dθ = _wrap_angle_diff(value(m[:theta][b, 1]) - get(θ_avg, b, 0.0))
+            dV = value(m[:v_magnitude][b, 1]) - get(v_avg, b, 0.0)
+            acc += dθ^2 + dV^2
         end
     end
     return sqrt(acc)
 end
 
-"‖s‖ (bus/AC) = sqrt(Σ_b wrap(θ̄_b-θ̄_b_prev)² + (V̄_b - V̄_b_prev)²)."
 function dual_residual_bus_ac(θ_avg, v_avg, θ_prev, v_prev, shared_buses)
     sθ = 0.0
     sV = 0.0
@@ -218,15 +276,11 @@ function dual_residual_bus_ac(θ_avg, v_avg, θ_prev, v_prev, shared_buses)
 end
 
 function eps_primal_bus_ac(partitions, θ_avg, v_avg, shared_buses, ϵ_abs, ϵ_rel)
-    # dim = 2 * número de cópias locais de buses compartilhadas
     dim = 0
     for (_, sub) in partitions
-        busset = _bus_set(sub)
-        @inbounds for b in shared_buses
-            dim += (b in busset) ? 2 : 0
-        end
+        local_shared = get(sub, "shared_buses_local", shared_buses)
+        dim += 2 * length(local_shared)
     end
-    # norma de z = concat(θ̄, V̄)
     z_norm_sq = 0.0
     @inbounds for b in shared_buses
         z_norm_sq += get(θ_avg, b, 0.0)^2 + get(v_avg, b, 0.0)^2
@@ -245,7 +299,6 @@ function eps_dual_bus_ac(θ_avg, v_avg, θ_prev, v_prev, shared_buses, ϵ_abs, �
     return sqrt(dim) * ϵ_abs + ϵ_rel * sqrt(sθ + sV)
 end
 
-"‖r‖ (branch/AC) = sqrt(Σ_z Σ_e [(P_ze - zP_e)² + (Q_ze - zQ_e)²])."
 function primal_residual_branch_ac(partitions, zP, zQ, cut_edges)
     acc = 0.0
     for (_, sub) in partitions
@@ -314,13 +367,8 @@ function save_ac_bus_plots(res_pri, res_du, eps_pri, eps_du, rhoθ_hist, rhoV_hi
         (
             () -> (
                 p = Plot();
-                p(;
-                    x = 1:length(rhoθ_hist),
-                    y = rhoθ_hist,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρθ",
-                );
+                p(; x = 1:length(rhoθ_hist), y = rhoθ_hist, type = :scatter,
+                    mode = "lines+markers", name = "ρθ");
                 p.layout.title = "Evolução de ρθ";
                 p.layout.xaxis.title = "Iterações";
                 p.layout.yaxis.title = "ρθ";
@@ -333,13 +381,8 @@ function save_ac_bus_plots(res_pri, res_du, eps_pri, eps_du, rhoθ_hist, rhoV_hi
         (
             () -> (
                 p = Plot();
-                p(;
-                    x = 1:length(rhoV_hist),
-                    y = rhoV_hist,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρV",
-                );
+                p(; x = 1:length(rhoV_hist), y = rhoV_hist, type = :scatter,
+                    mode = "lines+markers", name = "ρV");
                 p.layout.title = "Evolução de ρV";
                 p.layout.xaxis.title = "Iterações";
                 p.layout.yaxis.title = "ρV";
@@ -364,13 +407,8 @@ function save_ac_branch_plots(res_pri, res_du, eps_pri, eps_du, rhoP_hist, rhoQ_
         (
             () -> (
                 p = Plot();
-                p(;
-                    x = 1:length(rhoP_hist),
-                    y = rhoP_hist,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρP",
-                );
+                p(; x = 1:length(rhoP_hist), y = rhoP_hist, type = :scatter,
+                    mode = "lines+markers", name = "ρP");
                 p.layout.title = "Evolução de ρP";
                 p.layout.xaxis.title = "Iterações";
                 p.layout.yaxis.title = "ρP";
@@ -383,13 +421,8 @@ function save_ac_branch_plots(res_pri, res_du, eps_pri, eps_du, rhoP_hist, rhoQ_
         (
             () -> (
                 p = Plot();
-                p(;
-                    x = 1:length(rhoQ_hist),
-                    y = rhoQ_hist,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρQ",
-                );
+                p(; x = 1:length(rhoQ_hist), y = rhoQ_hist, type = :scatter,
+                    mode = "lines+markers", name = "ρQ");
                 p.layout.title = "Evolução de ρQ";
                 p.layout.xaxis.title = "Iterações";
                 p.layout.yaxis.title = "ρQ";
@@ -400,11 +433,11 @@ function save_ac_branch_plots(res_pri, res_du, eps_pri, eps_du, rhoP_hist, rhoQ_
         "plot_rhoQ_$(stem).html")
 end
 
+# ---------- ADMM: BUS (AC) ----------
 function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
     @assert config.base_model == AC "ADMM-AC: base_model deve ser AC."
     partitions, shared_buses = prepare_admm_partitions(data)
 
-    # estado
     ρθ = Ref(config.rho_theta)
     ρV = Ref(config.rho_v)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
@@ -418,7 +451,6 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
     θ_prev = Dict{Int, Float64}()
     v_prev = Dict{Int, Float64}()
 
-    # histórico
     res_pri_hist = Float64[]
     res_du_hist = Float64[]
     eps_pri_hist = Float64[]
@@ -429,13 +461,21 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
 
     optimizer_factory = resolve_optimizer_ac(config)
 
+    # build + cache locais
     for (zone_id, sub) in partitions
         m = build_model(sub, AC; optimizer = optimizer_factory)
         sub["model"] = m
-        sub["obj_base"] = m[:generation_cost]          # AffExpr
-        sub["theta_var"] = m[:theta]                   # DenseAxisArray
-        sub["vmag_var"] = m[:v_magnitude]             # DenseAxisArray
+        sub["obj_base"] = m[:generation_cost]
+        sub["theta_var"] = m[:theta]
+        sub["vmag_var"] = m[:v_magnitude]
         sub["has_solution"] = false
+        _set_model_silent!(m)    # (5)
+
+        # shared_buses_local (3)
+        busset = _bus_set(sub)
+        sub["shared_buses_local"] = [b for b in shared_buses if b in busset]
+
+        # starts (opcional)
         @inbounds for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
         end
@@ -447,23 +487,22 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
     for k in 1:config.max_iter
         println("\n[ADMM-AC] Iteração $k")
 
+        # locais (sem rebuild do modelo)
         for (zone_id, sub) in partitions
             m = sub["model"]
-            if sub["has_solution"] === true
-                θ_old = JuMP.value.(sub["theta_var"])
-                V_old = JuMP.value.(sub["vmag_var"])
-                @inbounds for I in keys(sub["theta_var"])
-                    set_start_value(sub["theta_var"][I], θ_old[I])
-                end
-                @inbounds for I in keys(sub["vmag_var"])
-                    set_start_value(sub["vmag_var"][I], V_old[I])
-                end
-            end
+
+            # warm-start leve, sem alocar matrizes inteiras
+            # if sub["has_solution"] === true
+            #     @inbounds for I in keys(sub["theta_var"])
+            #         set_start_value(sub["theta_var"][I], value(sub["theta_var"][I]))
+            #     end
+            #     @inbounds for I in keys(sub["vmag_var"])
+            #         set_start_value(sub["vmag_var"][I], value(sub["vmag_var"][I]))
+            #     end
+            # end
 
             pen_bus = add_penalty_bus_ac!(m, sub, shared_buses,
-                θ_avg, v_avg,
-                dualsθ[zone_id], dualsV[zone_id],
-                ρθ[], ρV[])
+                θ_avg, v_avg, dualsθ[zone_id], dualsV[zone_id], ρθ[], ρV[])
             @objective(m, Min, sub["obj_base"] + pen_bus)
             optimize!(m)
             sub["has_solution"] = true
@@ -473,15 +512,15 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
                 compute_real_generation_cost(m, sub["objective_params"])
         end
 
-        # 2) consensos
-        θ_prev = isempty(θ_avg) ? θ_avg : deepcopy(θ_avg)
-        v_prev = isempty(v_avg) ? v_avg : deepcopy(v_avg)
+        # consensos
+        θ_prev = isempty(θ_avg) ? θ_avg : copy(θ_avg)
+        v_prev = isempty(v_avg) ? v_avg : copy(v_avg)
         compute_ac_bus_consensus!(θ_avg, v_avg, partitions, shared_buses)
         @inbounds for b in shared_buses
             push!(get!(θ_avg_hist, b, Float64[]), get(θ_avg, b, 0.0))
         end
 
-        # 3) duais
+        # duais
         update_duals_bus_ac!(
             dualsθ,
             dualsV,
@@ -493,7 +532,7 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
             ρV[],
         )
 
-        # 4) resíduos + tolerâncias
+        # resíduos + tolerâncias
         r = primal_residual_bus_ac(partitions, θ_avg, v_avg, shared_buses)
         s = dual_residual_bus_ac(θ_avg, v_avg, θ_prev, v_prev, shared_buses)
         push!(res_pri_hist, r)
@@ -540,12 +579,12 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
     return total_real_cost, partitions
 end
 
+# ---------- ADMM: BRANCH (AC) ----------
 function run_admm_ac_branch(config::DistributedOPFModel, data::Dict{String, Any})
     @assert config.base_model == AC "ADMM-AC-branch: base_model deve ser AC."
     partitions, _ = prepare_admm_partitions(data)
     cut_edges = _find_cut_edges(data)
 
-    # estado
     ρP = Ref(config.rho_flow_p)
     ρQ = Ref(config.rho_flow_q)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
@@ -559,7 +598,6 @@ function run_admm_ac_branch(config::DistributedOPFModel, data::Dict{String, Any}
     zP_prev = Dict{Int, Float64}()
     zQ_prev = Dict{Int, Float64}()
 
-    # histórico
     res_pri_hist = Float64[]
     res_du_hist = Float64[]
     eps_pri_hist = Float64[]
@@ -569,7 +607,6 @@ function run_admm_ac_branch(config::DistributedOPFModel, data::Dict{String, Any}
 
     optimizer_factory = resolve_optimizer_ac(config)
 
-    # -------- PRÉ-BUILD ----------
     for (zone_id, sub) in partitions
         m = build_model(sub, AC; optimizer = optimizer_factory)
         sub["model"] = m
@@ -578,6 +615,9 @@ function run_admm_ac_branch(config::DistributedOPFModel, data::Dict{String, Any}
         sub["vmag_var"] = m[:v_magnitude]
         sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
         sub["has_solution"] = false
+        _set_model_silent!(m)    # (5)
+
+        # starts
         @inbounds for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
         end
@@ -589,20 +629,17 @@ function run_admm_ac_branch(config::DistributedOPFModel, data::Dict{String, Any}
     for k in 1:config.max_iter
         println("\n[ADMM-AC-branch] Iteração $k")
 
-        # 1) locais sem rebuild (penalidade de fluxo P/Q)
         for (zone_id, sub) in partitions
             m = sub["model"]
 
-            if sub["has_solution"] === true
-                θ_old = JuMP.value.(sub["theta_var"])
-                V_old = JuMP.value.(sub["vmag_var"])
-                @inbounds for I in keys(sub["theta_var"])
-                    set_start_value(sub["theta_var"][I], θ_old[I])
-                end
-                @inbounds for I in keys(sub["vmag_var"])
-                    set_start_value(sub["vmag_var"][I], V_old[I])
-                end
-            end
+            # if sub["has_solution"] === true
+            #     @inbounds for I in keys(sub["theta_var"])
+            #         set_start_value(sub["theta_var"][I], value(sub["theta_var"][I]))
+            #     end
+            #     @inbounds for I in keys(sub["vmag_var"])
+            #         set_start_value(sub["vmag_var"][I], value(sub["vmag_var"][I]))
+            #     end
+            # end
 
             pen = add_penalty_branch_ac!(m, sub, sub["zone_edges"],
                 zP, zQ, dualsP[zone_id], dualsQ[zone_id], ρP[], ρQ[])
@@ -615,15 +652,11 @@ function run_admm_ac_branch(config::DistributedOPFModel, data::Dict{String, Any}
                 compute_real_generation_cost(m, sub["objective_params"])
         end
 
-        # 2) consensos (P,Q)
-        zP_prev = isempty(zP) ? zP : deepcopy(zP)
-        zQ_prev = isempty(zQ) ? zQ : deepcopy(zQ)
+        zP_prev = copy(zP)
+        zQ_prev = copy(zQ)
         compute_ac_branch_consensus!(zP, zQ, partitions, cut_edges)
-
-        # 3) duais
         update_duals_branch_ac!(dualsP, dualsQ, partitions, zP, zQ, cut_edges, ρP[], ρQ[])
 
-        # 4) resíduos + tolerâncias
         r = primal_residual_branch_ac(partitions, zP, zQ, cut_edges)
         s = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
         push!(res_pri_hist, r)
@@ -669,12 +702,12 @@ function run_admm_ac_branch(config::DistributedOPFModel, data::Dict{String, Any}
     return total_real_cost, partitions
 end
 
+# ---------- ADMM: HÍBRIDO (AC) ----------
 function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     @assert config.base_model == AC "Hybrid AC: base_model deve ser AC."
     partitions, shared_buses = prepare_admm_partitions(data)
     cut_edges = _find_cut_edges(data)
 
-    # estado
     ρθ = Ref(config.rho_theta)
     ρV = Ref(config.rho_v)
     ρP = Ref(config.rho_flow_p)
@@ -699,7 +732,6 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
     zP_prev = Dict{Int, Float64}()
     zQ_prev = Dict{Int, Float64}()
 
-    # histórico
     res_pri_hist = Float64[]
     res_du_hist = Float64[]
     eps_pri_hist = Float64[]
@@ -712,7 +744,6 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
 
     optimizer_factory = resolve_optimizer_ac(config)
 
-    # -------- PRÉ-BUILD ----------
     for (zone_id, sub) in partitions
         m = build_model(sub, AC; optimizer = optimizer_factory)
         sub["model"] = m
@@ -721,6 +752,13 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
         sub["vmag_var"] = m[:v_magnitude]
         sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
         sub["has_solution"] = false
+        _set_model_silent!(m)    # (5)
+
+        # shared_buses_local (3)
+        busset = _bus_set(sub)
+        sub["shared_buses_local"] = [b for b in shared_buses if b in busset]
+
+        # starts
         @inbounds for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
         end
@@ -732,28 +770,22 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
     for k in 1:config.max_iter
         println("\n[ADMM-AC-hybrid] Iteração $k")
 
-        # 1) locais sem rebuild: BUS + BRANCH
         for (zone_id, sub) in partitions
             m = sub["model"]
 
-            if sub["has_solution"] === true
-                θ_old = JuMP.value.(sub["theta_var"])
-                V_old = JuMP.value.(sub["vmag_var"])
-                @inbounds for I in keys(sub["theta_var"])
-                    set_start_value(sub["theta_var"][I], θ_old[I])
-                end
-                @inbounds for I in keys(sub["vmag_var"])
-                    set_start_value(sub["vmag_var"][I], V_old[I])
-                end
-            end
+            # if sub["has_solution"] === true
+            #     @inbounds for I in keys(sub["theta_var"])
+            #         set_start_value(sub["theta_var"][I], value(sub["theta_var"][I]))
+            #     end
+            #     @inbounds for I in keys(sub["vmag_var"])
+            #         set_start_value(sub["vmag_var"][I], value(sub["vmag_var"][I]))
+            #     end
+            # end
 
             pen_bus = add_penalty_bus_ac!(m, sub, shared_buses,
-                θ_avg, v_avg,
-                dualsθ[zone_id], dualsV[zone_id],
-                ρθ[], ρV[])
+                θ_avg, v_avg, dualsθ[zone_id], dualsV[zone_id], ρθ[], ρV[])
             pen_flow = add_penalty_branch_ac!(m, sub, sub["zone_edges"],
-                zP, zQ, dualsP[zone_id], dualsQ[zone_id],
-                ρP[], ρQ[])
+                zP, zQ, dualsP[zone_id], dualsQ[zone_id], ρP[], ρQ[])
             @objective(m, Min, sub["obj_base"] + pen_bus + pen_flow)
             optimize!(m)
             sub["has_solution"] = true
@@ -763,11 +795,10 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
                 compute_real_generation_cost(m, sub["objective_params"])
         end
 
-        # 2) consensos
-        θ_prev = isempty(θ_avg) ? θ_avg : deepcopy(θ_avg)
-        v_prev = isempty(v_avg) ? v_avg : deepcopy(v_avg)
-        zP_prev = isempty(zP) ? zP : deepcopy(zP)
-        zQ_prev = isempty(zQ) ? zQ : deepcopy(zQ)
+        θ_prev = isempty(θ_avg) ? θ_avg : copy(θ_avg)
+        v_prev = isempty(v_avg) ? v_avg : copy(v_avg)
+        zP_prev = copy(zP)
+        zQ_prev = copy(zQ)
 
         compute_ac_bus_consensus!(θ_avg, v_avg, partitions, shared_buses)
         @inbounds for b in shared_buses
@@ -775,7 +806,6 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
         end
         compute_ac_branch_consensus!(zP, zQ, partitions, cut_edges)
 
-        # 3) duais
         update_duals_bus_ac!(
             dualsθ,
             dualsV,
@@ -788,7 +818,6 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
         )
         update_duals_branch_ac!(dualsP, dualsQ, partitions, zP, zQ, cut_edges, ρP[], ρQ[])
 
-        # 4) resíduos + tolerâncias (agregados)
         r_bus = primal_residual_bus_ac(partitions, θ_avg, v_avg, shared_buses)
         r_br = primal_residual_branch_ac(partitions, zP, zQ, cut_edges)
         r_tot = sqrt(r_bus^2 + r_br^2)
@@ -826,7 +855,6 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
             break
         end
 
-        # ρ adaptativo em blocos
         adaptive_rho_ac!(ρθ, r_bus, s_bus)
         adaptive_rho_ac!(ρV, r_bus, s_bus)
         adaptive_rho_ac!(ρP, r_br, s_br)
@@ -835,18 +863,12 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
 
     plot_admm_convergence(res_pri_hist, res_du_hist, eps_pri_hist, eps_du_hist,
         "plot_convergencia_admm_ac_hybrid.html")
-
     PlotlyLight.save(
         (
             () -> (
                 p = Plot();
-                p(;
-                    x = 1:length(rhoθ_hist),
-                    y = rhoθ_hist,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρθ",
-                );
+                p(; x = 1:length(rhoθ_hist), y = rhoθ_hist, type = :scatter,
+                    mode = "lines+markers", name = "ρθ");
                 p.layout.title = "Evolução de ρθ";
                 p.layout.xaxis.title = "Iterações";
                 p.layout.yaxis.title = "ρθ";
@@ -859,13 +881,8 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
         (
             () -> (
                 p = Plot();
-                p(;
-                    x = 1:length(rhoV_hist),
-                    y = rhoV_hist,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρV",
-                );
+                p(; x = 1:length(rhoV_hist), y = rhoV_hist, type = :scatter,
+                    mode = "lines+markers", name = "ρV");
                 p.layout.title = "Evolução de ρV";
                 p.layout.xaxis.title = "Iterações";
                 p.layout.yaxis.title = "ρV";
@@ -878,13 +895,8 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
         (
             () -> (
                 p = Plot();
-                p(;
-                    x = 1:length(rhoP_hist),
-                    y = rhoP_hist,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρP",
-                );
+                p(; x = 1:length(rhoP_hist), y = rhoP_hist, type = :scatter,
+                    mode = "lines+markers", name = "ρP");
                 p.layout.title = "Evolução de ρP";
                 p.layout.xaxis.title = "Iterações";
                 p.layout.yaxis.title = "ρP";
@@ -897,13 +909,8 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
         (
             () -> (
                 p = Plot();
-                p(;
-                    x = 1:length(rhoQ_hist),
-                    y = rhoQ_hist,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρQ",
-                );
+                p(; x = 1:length(rhoQ_hist), y = rhoQ_hist, type = :scatter,
+                    mode = "lines+markers", name = "ρQ");
                 p.layout.title = "Evolução de ρQ";
                 p.layout.xaxis.title = "Iterações";
                 p.layout.yaxis.title = "ρQ";

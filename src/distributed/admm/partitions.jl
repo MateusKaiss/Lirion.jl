@@ -1,7 +1,7 @@
 function prepare_admm_partitions(data::Dict{String, Any})
     bus = data["bus"]
-    zones = bus["zone"]
     bus_ids = bus["bus_i"]
+    zones = bus["zone"]
     unique_zones = unique(zones)
 
     partitions = Dict{Int, Dict{String, Any}}()
@@ -9,41 +9,47 @@ function prepare_admm_partitions(data::Dict{String, Any})
 
     for zone in unique_zones
         zone_mask = findall(==(zone), zones)
-        zone_bus_ids = bus_ids[zone_mask]
+        zone_bus_ids = @views bus_ids[zone_mask]
+        zone_bus_set = Set(zone_bus_ids)               # O(1) membership
 
+        # --- extra (barras virtuais) com XOR sem "in" em vetor ---
         extra = Set{Int}()
         if haskey(data, "branch")
             f_bus = data["branch"]["f_bus"]
             t_bus = data["branch"]["t_bus"]
             @inbounds for i in eachindex(f_bus)
-                if (f_bus[i] in zone_bus_ids) ⊻ (t_bus[i] in zone_bus_ids)
-                    push!(extra, (f_bus[i] in zone_bus_ids) ? t_bus[i] : f_bus[i])
+                f_in = in(f_bus[i], zone_bus_set)
+                t_in = in(t_bus[i], zone_bus_set)
+                if f_in ⊻ t_in
+                    push!(extra, f_in ? t_bus[i] : f_bus[i])
                 end
             end
         end
         extra_bus_ids = collect(extra)
-        all_bus_ids = union(zone_bus_ids, extra_bus_ids)
-        bus_mask = findall(b -> b in all_bus_ids, bus_ids)
+        all_bus_set = union(zone_bus_set, extra)       # ambos Set
+        bus_mask = findall(b -> in(b, all_bus_set), bus_ids)
 
         sub = Dict{String, Any}()
         sub["baseMVA"] = data["baseMVA"]
         sub["T"] = get(data, "T", 1)
         sub["source_type"] = get(data, "source_type", "matpower")
         sub["source_version"] = get(data, "source_version", "")
-        sub["name"] = "$(get(data, "name", "case"))_zone_$zone"
+        sub["name"] = "$(get(data,"name","case"))_zone_$zone"
         sub["bus"] =
             Dict(k => v[bus_mask] for (k, v) in data["bus"] if length(v) == length(bus_ids))
 
-        is_virtual = [b ∈ extra for b in sub["bus"]["bus_i"]]
+        # flag virtual + poda de cargas em virtuais
+        is_virtual = [!in(b, zone_bus_set) for b in sub["bus"]["bus_i"]]
         sub["bus"]["is_virtual"] = is_virtual
-        for (i, b) in enumerate(sub["bus"]["bus_i"])
-            if !(b in zone_bus_ids)
+        @inbounds for (i, b) in enumerate(sub["bus"]["bus_i"])
+            if is_virtual[i]
                 sub["bus"]["pd"][i] = 0.0
                 sub["bus"]["qd"][i] = 0.0
                 sub["bus"]["bus_type"][i] = 1
             end
         end
 
+        # tabelas ancoradas em "bus"/"gen_bus"/"storage_bus": use zone_bus_set
         for key in ("gen", "prosumer", "consumer", "storage")
             if haskey(data, key)
                 tbl = data[key]
@@ -53,7 +59,7 @@ function prepare_admm_partitions(data::Dict{String, Any})
                     haskey(tbl, "storage_bus") ? "storage_bus" : nothing
                 if bus_key !== nothing
                     keep = findall(
-                        i -> tbl[bus_key][i] in zone_bus_ids,
+                        i -> in(tbl[bus_key][i], zone_bus_set),
                         eachindex(tbl[bus_key]),
                     )
                     sub[key] =
@@ -69,56 +75,54 @@ function prepare_admm_partitions(data::Dict{String, Any})
             end
         end
 
+        # ramos (guarde mapas prontos)
         if haskey(data, "branch")
             f_bus = data["branch"]["f_bus"]
             t_bus = data["branch"]["t_bus"]
-            keep = findall(i -> (f_bus[i] in zone_bus_ids) || (t_bus[i] in zone_bus_ids),
-                eachindex(f_bus))
-
+            keep = findall(
+                i -> in(f_bus[i], zone_bus_set) || in(t_bus[i], zone_bus_set),
+                eachindex(f_bus),
+            )
             sub["branch"] = Dict(
                 k => v[keep] for (k, v) in data["branch"] if length(v) == length(f_bus)
             )
             sub["branch_full"] = data["branch"]
             sub["branch_local_indices"] = keep
-            edge_to_local = Dict{Int, Int}()
-            @inbounds for (local_idx, global_idx) in enumerate(keep)
-                edge_to_local[global_idx] = local_idx
+            edge_to_local = Dict{Int, Int}()  # global->local
+            @inbounds for (loc, glob) in enumerate(keep)
+                edge_to_local[glob] = loc
             end
             sub["edge_to_local"] = edge_to_local
         end
 
+        # timeseries por bus
         for key in ("bus_timeseries", "prosumer_timeseries", "consumer_timeseries")
             if haskey(data, key)
                 ts = data[key]
-                keep = findall(i -> ts["bus"][i] in zone_bus_ids, eachindex(ts["bus"]))
+                keep = findall(i -> in(ts["bus"][i], zone_bus_set), eachindex(ts["bus"]))
                 sub[key] =
                     Dict(k => v[keep] for (k, v) in ts if length(v) == length(ts["bus"]))
             end
         end
 
+        # gencost / gencost_timeseries (use zone_bus_set)
         if haskey(data, "gen")
             if haskey(data, "gencost")
-                gen = sub["gen"]
-                bus_key = haskey(data["gen"], "bus") ? "bus" : "gen_bus"
-                keep = findall(
-                    i -> data["gen"][bus_key][i] in zone_bus_ids,
-                    eachindex(data["gen"][bus_key]),
-                )
+                gtbl = data["gen"]
+                bkey = haskey(gtbl, "bus") ? "bus" : "gen_bus"
+                keep = findall(i -> in(gtbl[bkey][i], zone_bus_set), eachindex(gtbl[bkey]))
                 sub["gencost"] = Dict(
-                    k => v[keep] for (k, v) in data["gencost"] if
-                    length(v) == length(data["gen"][bus_key])
+                    k => v[keep] for
+                    (k, v) in data["gencost"] if length(v) == length(gtbl[bkey])
                 )
             end
             if haskey(data, "gencost_timeseries")
-                gen = sub["gen"]
-                bus_key = haskey(data["gen"], "bus") ? "bus" : "gen_bus"
-                keep = findall(
-                    i -> data["gen"][bus_key][i] in zone_bus_ids,
-                    eachindex(data["gen"][bus_key]),
-                )
+                gtbl = data["gen"]
+                bkey = haskey(gtbl, "bus") ? "bus" : "gen_bus"
+                keep = findall(i -> in(gtbl[bkey][i], zone_bus_set), eachindex(gtbl[bkey]))
                 sub["gencost_timeseries"] = Dict(
                     k => v[keep] for (k, v) in data["gencost_timeseries"] if
-                    length(v) == length(data["gen"][bus_key])
+                    length(v) == length(gtbl[bkey])
                 )
             end
         else
@@ -134,27 +138,49 @@ function prepare_admm_partitions(data::Dict{String, Any})
         sub["power_balance_params"] = get_power_balance_parameters(sub)
         sub["reactive_balance_params"] = get_reactive_power_parameters(sub)
         sub["objective_params"] = merge(
-            get_objective_parameters(sub, sub["gen"], get(sub, "storage", Dict()),
-                get(sub, "gencost", Dict()), get(sub, "prosumer", Dict()),
-                get(sub, "gencost_timeseries", nothing)),
+            get_objective_parameters(
+                sub,
+                sub["gen"],
+                get(sub, "storage", Dict()),
+                get(sub, "gencost", Dict()),
+                get(sub, "prosumer", Dict()),
+                get(sub, "gencost_timeseries", nothing),
+            ),
             (; sbase = sub["baseMVA"]),
         )
 
+        # Set pronto para O(1) e lista local de compartilhadas (evita "b in busset" depois)
         sub["bus_set"] = Set(sub["bus"]["bus_i"])
 
         partitions[zone] = sub
     end
+
+    # mapeie compartilhadas uma vez
     bus_zone_appearance = Dict{Int, Set{Int}}()
-    for (zone_id, sub) in partitions
-        for b in sub["bus"]["bus_i"]
-            push!(get!(bus_zone_appearance, b, Set{Int}()), zone_id)
-        end
+    for (zone_id, sub) in partitions, b in sub["bus"]["bus_i"]
+        push!(get!(bus_zone_appearance, b, Set{Int}()), zone_id)
     end
     shared_buses = [b for (b, zs) in bus_zone_appearance if length(zs) > 1]
+    shared_set = Set(shared_buses)
     for (_, sub) in partitions
-        sub["shared_buses"] = [b for b in shared_buses if b in sub["bus_set"]]
+        local_b = sub["bus"]["bus_i"]
+        sub["shared_buses_local"] = [b for b in local_b if in(b, shared_set)]
     end
     return partitions, shared_buses
+end
+
+# Silenciar solver (JuMP ≥ 1.11 tem set_silent; fallback pra atributo MOI)
+function _set_model_silent!(m)
+    try
+        set_silent(m)              # JuMP helper se disponível
+    catch
+        MOI = JuMP.MOI
+        try
+            set_optimizer_attribute(m, MOI.Silent(), true)
+        catch
+        end
+    end
+    return nothing
 end
 
 function _find_cut_edges(full::Dict{String, Any})

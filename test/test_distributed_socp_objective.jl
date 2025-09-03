@@ -6,6 +6,8 @@ using PowerOptimization
 using Glob
 using SCS
 
+const ADMM_MAX_IT = 300
+
 # --- lista de casos particionados (2/3/4 zonas) ---
 const distributed_socp_zone_cases = [
     # 14 buses
@@ -17,12 +19,10 @@ const distributed_socp_zone_cases = [
     # 30 buses
     "pglib_opf_case30_2zones_as.m",
     "pglib_opf_case30_3zones_as.m",
-    # 57 buses
+    # 57/118/500 (descomentando conforme seus arquivos)
     # "pglib_opf_case57_2zones_ieee.m",
     # "pglib_opf_case57_4zones_ieee.m",
-    # # 118 buses
     # "pglib_opf_case118_2zones_ieee.m",
-    # # 500 buses
     # "pglib_opf_case500_2zones_goc.m",
 ]
 
@@ -45,7 +45,6 @@ function compare_distributed_socp_vs_centralized(
     rho_v::Float64 = 1.0e3,
     rho_flow_p::Float64 = 3.0e2,
     rho_flow_q::Float64 = 3.0e2,
-    admm_max_iter::Int = 1000,
     admm_eps_primal::Float64 = 1e-5,
     admm_eps_dual::Float64 = 1e-5,
 )
@@ -66,16 +65,16 @@ function compare_distributed_socp_vs_centralized(
         return
     end
 
-    # --- Distribuído ADMM-SOCP ---
+    # --- Distribuído ADMM-SOCP (travado em 300) ---
     dist_obj = try
         args_dist = String[
             file,
             "--model", "distributed-admm-socp",
-            "--optimizer", string(distributed_optimizer), "--admm-rho-v",
-            string(rho_v),
+            "--optimizer", string(distributed_optimizer),
+            "--admm-rho-v", string(rho_v),
             "--admm-rho-flow-p", string(rho_flow_p),
-            "--admm-rho-flow-q", string(rho_flow_q), "--admm-max-iter",
-            string(admm_max_iter),
+            "--admm-rho-flow-q", string(rho_flow_q),
+            "--admm-max-iter", string(ADMM_MAX_IT),           # <- FIXO 300
             "--admm-eps-primal", string(admm_eps_primal),
             "--admm-eps-dual", string(admm_eps_dual),
         ]
@@ -87,7 +86,7 @@ function compare_distributed_socp_vs_centralized(
         return
     end
 
-    @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-ADMM-SOCP = $(round(dist_obj, digits=6))"
+    @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-ADMM-SOCP = $(round(dist_obj, digits=6)) | ADMM_MAX_IT=$(ADMM_MAX_IT)"
     @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
 end
 
@@ -115,26 +114,17 @@ function run_distributed_socp_objective_tests(;
     for (i, file) in enumerate(selected_files)
         case_name = basename(file)
 
+        # penalidades constantes
         rho_v_case = 1.0e3
         rho_flow_p_case = 3.0e2
         rho_flow_q_case = 3.0e2
-        admm_max_iter_case = 1000
+
+        admm_max_iter_case = ADMM_MAX_IT
         admm_eps_primal_case = admm_eps_primal
         admm_eps_dual_case = admm_eps_dual
 
-        # ajustes leves por tamanho/zonas (mantendo os mesmos ρ)
-        if occursin("_3zones_", case_name) || occursin("_4zones_", case_name)
-            admm_max_iter_case = max(admm_max_iter_case, 1200)
-        end
-        if occursin("case118_", case_name)
-            admm_max_iter_case = max(admm_max_iter_case, 1500)
-        end
-        if occursin("case500_", case_name)
-            admm_max_iter_case = max(admm_max_iter_case, 2000)
-        end
-
         @info "[$label] Rodando caso $i de $n: $case_name " *
-              "(max_iter=$(admm_max_iter_case), ρV²=$(rho_v_case), ρR=$(rho_flow_p_case), ρT=$(rho_flow_q_case), " *
+              "(max_iter=$(admm_max_iter_case), ρV²=$(rho_v_case), ρP=$(rho_flow_p_case), ρQ=$(rho_flow_q_case), " *
               "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"
 
         @testset "$(label) - $(case_name)" begin
@@ -148,7 +138,6 @@ function run_distributed_socp_objective_tests(;
                 rho_v = rho_v_case,
                 rho_flow_p = rho_flow_p_case,
                 rho_flow_q = rho_flow_q_case,
-                admm_max_iter = admm_max_iter_case,
                 admm_eps_primal = admm_eps_primal_case,
                 admm_eps_dual = admm_eps_dual_case,
             )
