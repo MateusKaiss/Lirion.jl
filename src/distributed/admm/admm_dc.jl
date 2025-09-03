@@ -8,17 +8,6 @@ function resolve_optimizer_dc(config)
     end
 end
 
-# ---------- Helpers ----------
-@inline function _edge_local(sub::Dict{String, Any}, e::Int)
-    edgemap = get(sub, "edge_to_local", nothing)
-    return edgemap === nothing ? findfirst(==(e), sub["branch_local_indices"]) :
-           get(edgemap, e, nothing)
-end
-
-@inline function _bus_set(sub::Dict{String, Any})
-    return get(sub, "bus_set", Set(Int[b for b in sub["bus"]["bus_i"]]))
-end
-
 @inline function _dc_flow_val_model(
     m::Model,
     sub::Dict{String, Any},
@@ -31,21 +20,6 @@ end
     x = sub["branch_full"]["br_x"][l_global]
     @assert abs(x) > 1e-8 "br_x≈0 no ramo $l_global (DC)."
     return (value(m[:theta][f, t]) - value(m[:theta][tb, t])) / x
-end
-
-@inline function _dc_flow_expr(
-    model::Model,
-    subdata::Dict{String, Any},
-    l_local::Int;
-    t::Int = 1,
-)
-    l_global = subdata["branch_local_indices"][l_local]
-    f = subdata["branch_full"]["f_bus"][l_global]
-    tbus = subdata["branch_full"]["t_bus"][l_global]
-    x = subdata["branch_full"]["br_x"][l_global]
-    θf = model[:theta][f, t]
-    θt = model[:theta][tbus, t]
-    return (θf - θt) / x
 end
 
 # ---------- Penalidades ----------
@@ -269,47 +243,6 @@ function save_dc_branch_plots(
         "plot_convergencia_$(stem).html",
     )
     return plot_rho(ρ_hist, "plot_rho_$(stem).html")
-end
-
-# ---------- Cortes de arestas entre zonas ----------
-function _find_cut_edges(full::Dict{String, Any})
-    zones = full["bus"]["zone"]
-    bus_ids = full["bus"]["bus_i"]
-    bus2zone = Dict(bus_ids[i] => zones[i] for i in eachindex(bus_ids))
-    f_bus = full["branch"]["f_bus"]
-    t_bus = full["branch"]["t_bus"]
-    cut = Int[]
-    for i in eachindex(f_bus)
-        if bus2zone[f_bus[i]] != bus2zone[t_bus[i]]
-            push!(cut, i)
-        end
-    end
-    return cut
-end
-
-function _zone_cut_edges(subdata::Dict{String, Any}, cut_edges::Vector{Int})
-    local_keep = Set(subdata["branch_local_indices"])
-    return [ℓ for ℓ in cut_edges if ℓ in local_keep]
-end
-
-# ---------- Custo real ----------
-function compute_real_generation_cost(model, params)
-    T = get(model.ext, :time_periods, 1)
-    active_generators = findall(params.generator_status .== 1)
-    total_cost = 0.0
-    for t in 1:T, g in active_generators
-        if haskey(params.generator_costs, t) && haskey(params.generator_costs[t], g)
-            pgen = value(model[:p_generation][g, t]) * params.sbase
-            coefs = params.generator_costs[t][g]
-            # Horner
-            acc = 0.0
-            @inbounds for c in coefs
-                acc = acc * pgen + c
-            end
-            total_cost += acc
-        end
-    end
-    return total_cost
 end
 
 # ---------- ADMM: BUS ----------

@@ -169,17 +169,25 @@ function prepare_admm_partitions(data::Dict{String, Any})
     return partitions, shared_buses
 end
 
-# Silenciar solver (JuMP ≥ 1.11 tem set_silent; fallback pra atributo MOI)
-function _set_model_silent!(m)
+# Silenciar solver (JuMP/MOI/solvers) – robusto
+function _set_model_silent!(m::JuMP.Model)
     try
-        set_silent(m)              # JuMP helper se disponível
+        set_silent(m)
     catch
+    end
+    try
         MOI = JuMP.MOI
+        set_optimizer_attribute(m, MOI.Silent(), true)
+    catch
+    end
+
+    for (k, v) in [("verbose", 0), ("output_flag", 0), ("print_level", 0)]
         try
-            set_optimizer_attribute(m, MOI.Silent(), true)
+            set_optimizer_attribute(m, k, v)
         catch
         end
     end
+
     return nothing
 end
 
@@ -201,4 +209,15 @@ end
 function _zone_cut_edges(subdata::Dict{String, Any}, cut_edges::Vector{Int})
     local_keep = Set(subdata["branch_local_indices"])
     return [ℓ for ℓ in cut_edges if ℓ in local_keep]
+end
+
+# ---------- Helpers ----------
+@inline function _edge_local(sub::Dict{String, Any}, e::Int)
+    edgemap = get(sub, "edge_to_local", nothing)
+    return edgemap === nothing ? findfirst(==(e), sub["branch_local_indices"]) :
+           get(edgemap, e, nothing)
+end
+
+@inline function _bus_set(sub::Dict{String, Any})
+    return get(sub, "bus_set", Set(Int[b for b in sub["bus"]["bus_i"]]))
 end

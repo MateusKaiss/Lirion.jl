@@ -37,44 +37,12 @@ function set_socp_defaults!(m; eps_abs = 1e-6, eps_rel = 1e-6, max_iters = 200_0
     return nothing
 end
 
-# ---- Helpers ----
-@inline function _edge_local(sub::Dict{String, Any}, e::Int)
-    edgemap = get(sub, "edge_to_local", nothing)
-    return edgemap === nothing ? findfirst(==(e), sub["branch_local_indices"]) :
-           get(edgemap, e, nothing)
-end
-
-@inline function _bus_set(sub::Dict{String, Any})
-    return get(sub, "bus_set", Set(Int[b for b in sub["bus"]["bus_i"]]))
-end
-
-# ---------- Cortes/particionamento ----------
-function _find_cut_edges(full::Dict{String, Any})
-    zones = full["bus"]["zone"]
-    bus_ids = full["bus"]["bus_i"]
-    bus2zone = Dict(bus_ids[i] => zones[i] for i in eachindex(bus_ids))
-    f_bus = full["branch"]["f_bus"]; t_bus = full["branch"]["t_bus"]
-    cut = Int[]
-    for i in eachindex(f_bus)
-        if bus2zone[f_bus[i]] != bus2zone[t_bus[i]]
-            push!(cut, i)
-        end
-    end
-    return cut
-end
-
-function _zone_cut_edges(subdata::Dict{String, Any}, cut_edges::Vector{Int})
-    local_keep = Set(subdata["branch_local_indices"])
-    return [ℓ for ℓ in cut_edges if ℓ in local_keep]
-end
-
 # ---- Penalidades ADMM ----
 # BUS (V^2)
 function add_penalty_bus_socp!(m, sub, shared_buses::Vector{Int},
     v2_avg::Dict{Int, Float64}, duals_v2_zone::Dict{Int, Float64},
     ρV2::Float64)
-    pen = @expression(m, 0.0)   # anônima
-    # (★) usar a lista local pré-filtrada se existir
+    pen = @expression(m, 0.0)
     local_shared = get(sub, "shared_buses_local", shared_buses)
     @inbounds for b in local_shared
         V2  = m[:v_magnitude_sq][b, 1]
@@ -92,7 +60,6 @@ function add_penalty_branch_rt_socp!(m, sub, zone_edges::Vector{Int},
     ρR::Float64, ρT::Float64)
     pen = @expression(m, 0.0)
     @inbounds for e in zone_edges
-        # (★) usar mapa direto - evita findfirst
         l_local = get(sub["edge_to_local"], e, nothing)
         @assert l_local !== nothing "edge $e não está na partição"
         Rloc, Tloc = _rt_from_exprs_socp(m, l_local)
@@ -416,7 +383,7 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
         sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
         sub["has_solution"] = false
 
-        # (★) cache local de compartilhadas
+
         busset = _bus_set(sub)
         sub["shared_buses_local"] = [b for b in shared_buses if b in busset]
 
