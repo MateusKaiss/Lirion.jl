@@ -13,6 +13,7 @@ using InfrastructureModels
 using Logging
 using ArgParse
 using SCS
+using OSQP
 
 include("types.jl")
 include("args/args.jl")

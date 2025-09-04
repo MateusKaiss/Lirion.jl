@@ -25,7 +25,7 @@ struct Args
             required = true
 
             "--optimizer"
-            help = "Optimizer function, e.g., Ipopt.Optimizer or SCS.Optimizer or Gurobi.Optimizer (default: Ipopt.Optimizer)"
+            help = "Optimizer function, e.g., OSQP.Optimizer (default if omitted), or Ipopt.Optimizer / SCS.Optimizer / Gurobi.Optimizer, etc."
             arg_type = String
 
             "--plot-outputs"
@@ -80,6 +80,10 @@ struct Args
             help = "Dual tolerance ε_dual"
             arg_type = Float64
             default = 1e-7
+
+            "--admm-alpha"
+            help = "Over-relaxation α (use only if 1<α<2). If omitted, over-relaxation is disabled."
+            arg_type = Float64
         end
 
         parsed = parse_args(raw_args, s)
@@ -113,6 +117,13 @@ struct Args
         rho_flow_q_val =
             isnothing(rho_flow_q_) ? (isnothing(rho_flow_) ? rho_base : rho_flow_) :
             rho_flow_q_
+
+        # ===== alpha (over-relaxation) =====
+        alpha_ = get(parsed, "admm-alpha", nothing)
+        if alpha_ !== nothing && !(1.0 < alpha_ < 2.0)
+            @warn "Ignoring --admm-alpha=$(alpha_) because it must satisfy 1<α<2."
+            alpha_ = nothing
+        end
 
         # avisos de flags irrelevantes/ignoradas
         local function _warn_irrelevant_rhos(
@@ -206,6 +217,7 @@ struct Args
                     rho_flow_q = rho_flow_q_val,   # em SOCP-hybrid vale para Q e T
                     ε_primal = parsed["admm-eps-primal"],
                     ε_dual = parsed["admm-eps-dual"],
+                    alpha_overrelax = alpha_,        # << usa α se fornecido
                 )
             else
                 haskey(base_map, model_key) || error("Invalid model: $model_key")
@@ -213,15 +225,17 @@ struct Args
             end
         end
 
+        # Otimizador: se usuário forneceu, usa; senão, deixe nothing e
+        # resolve_optimizer_dc fará o default para OSQP.
         optimizer = if haskey(parsed, "optimizer") && !isnothing(parsed["optimizer"])
             try
                 eval(Meta.parse(parsed["optimizer"]))
             catch
-                @warn "Invalid optimizer: $(parsed["optimizer"]). Defaulting to Ipopt.Optimizer"
-                Ipopt.Optimizer
+                @warn "Invalid optimizer: $(parsed["optimizer"]). Falling back to default (OSQP) via resolve_optimizer_dc."
+                nothing
             end
         else
-            Ipopt.Optimizer
+            nothing
         end
 
         return new(

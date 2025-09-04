@@ -1,11 +1,36 @@
 # =============== DC Utils  ===============
 # ---------- Solver ----------
+
 function resolve_optimizer_dc(config)
-    if hasproperty(config, :optimizer) && getproperty(config, :optimizer) !== nothing
-        return getproperty(config, :optimizer)
-    else
-        return Ipopt.Optimizer
+    opt = try
+        getfield(config, :optimizer)
+    catch
+        nothing
     end
+    if opt !== nothing
+        return opt
+    end
+
+    eps_abs = try
+        getfield(config, Symbol("ε_primal"))
+    catch
+        1e-6
+    end
+    eps_rel = try
+        getfield(config, Symbol("ε_dual"))
+    catch
+        1e-6
+    end
+
+    return optimizer_with_attributes(OSQP.Optimizer,
+        "eps_abs" => eps_abs,
+        "eps_rel" => eps_rel,
+        "max_iter" => 50_000,
+        "verbose" => false,
+        "warm_start" => true,
+        "adaptive_rho" => true,
+        "linsys_solver" => "qdldl",
+    )
 end
 
 @inline function _dc_flow_val_model(
@@ -42,7 +67,7 @@ function add_penalty_branch_dc!(m, subdata, zone_edges::Vector{Int},
     @inbounds for e in zone_edges
         l_local = get(subdata["edge_to_local"], e, nothing)
         @assert l_local !== nothing "aresta global $e não pertence a esta partição"
-        p_loc = _dc_flow_expr(m, subdata, l_local)
+        p_loc = _dc_flow_expr(m, subdata, l_local)   # assumido definido noutro arquivo
         λ = get(duals_zone, e, 0.0)
         z = z_flow[e]
         pen += λ * (p_loc - z) + (ρ / 2) * (p_loc - z)^2
@@ -96,26 +121,45 @@ function compute_z_flow_consensus!(
     end
 end
 
-# ---------- Duais (2 + 3) ----------
-function update_duals_theta!(duals::Dict{Int, Dict{Int, Float64}}, partitions,
-    θ_avg::Dict{Int, Float64}, _shared_buses::Vector{Int}, ρ::Float64)
+# ---------- Duais com over-relaxation opcional ----------
+function update_duals_theta!(
+    duals::Dict{Int, Dict{Int, Float64}}, partitions,
+    θ_avg::Dict{Int, Float64}, θ_avg_prev::Dict{Int, Float64},
+    _shared_buses::Vector{Int}, ρ::Float64, α::Union{Nothing, Float64},
+)
     for (z, sub) in partitions
         m = sub["model"]
         @inbounds for b in sub["shared_buses_local"]
-            duals[z][b] = get(duals[z], b, 0.0) + ρ * (value(m[:theta][b, 1]) - θ_avg[b])
+            θb = value(m[:theta][b, 1])
+            if isnothing(α)
+                duals[z][b] = get(duals[z], b, 0.0) + ρ * (θb - θ_avg[b])
+            else
+                θ_prev̄ = get(θ_avg_prev, b, get(θ_avg, b, 0.0))
+                θ_rel = α * θb + (1 - α) * θ_prev̄
+                duals[z][b] = get(duals[z], b, 0.0) + ρ * (θ_rel - θ_avg[b])
+            end
         end
     end
 end
 
-function update_duals_flow!(duals::Dict{Int, Dict{Int, Float64}}, partitions,
-    z_flow::Dict{Int, Float64}, cut_edges::Vector{Int}, ρ::Float64)
+function update_duals_flow!(
+    duals::Dict{Int, Dict{Int, Float64}}, partitions,
+    z_flow::Dict{Int, Float64}, z_flow_prev::Dict{Int, Float64},
+    cut_edges::Vector{Int}, ρ::Float64, α::Union{Nothing, Float64},
+)
     for (z, sub) in partitions
         m = sub["model"]
         @inbounds for e in cut_edges
             l_local = get(sub["edge_to_local"], e, nothing)
             if l_local !== nothing
                 p_val = _dc_flow_val_model(m, sub, l_local)
-                duals[z][e] = get(duals[z], e, 0.0) + ρ * (p_val - z_flow[e])
+                if isnothing(α)
+                    duals[z][e] = get(duals[z], e, 0.0) + ρ * (p_val - z_flow[e])
+                else
+                    z_prev = get(z_flow_prev, e, z_flow[e])
+                    p_rel = α * p_val + (1 - α) * z_prev
+                    duals[z][e] = get(duals[z], e, 0.0) + ρ * (p_rel - z_flow[e])
+                end
             end
         end
     end
@@ -273,7 +317,7 @@ function run_admm(config::DistributedOPFModel, data)
         sub["obj_base"] = m[:generation_cost]
         sub["theta_var"] = m[:theta]
         sub["has_solution"] = false
-        _set_model_silent!(m)   # (5)
+        _set_model_silent!(m)
         @inbounds for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
         end
@@ -285,12 +329,6 @@ function run_admm(config::DistributedOPFModel, data)
         for (zone_id, sub) in partitions
             m = sub["model"]
 
-            # if sub["has_solution"] === true
-            #     @inbounds for I in keys(sub["theta_var"])
-            #         set_start_value(sub["theta_var"][I], value(sub["theta_var"][I]))
-            #     end
-            # end
-
             pen = add_penalty_bus_dc!(m, sub, shared_buses, θ_avg, duals[zone_id], ρ[])
             @objective(m, Min, sub["obj_base"] + pen)
             optimize!(m)
@@ -300,7 +338,6 @@ function run_admm(config::DistributedOPFModel, data)
             sub["real_generation_cost"] =
                 compute_real_generation_cost(m, sub["objective_params"])
 
-            # histórico local só para compartilhadas (2 + 3)
             @inbounds for b in sub["shared_buses_local"]
                 push!(
                     get!(
@@ -308,8 +345,7 @@ function run_admm(config::DistributedOPFModel, data)
                         b,
                         Float64[],
                     ),
-                    value(sub["theta_var"][b, 1]),
-                )
+                    value(sub["theta_var"][b, 1]))
             end
         end
 
@@ -319,7 +355,15 @@ function run_admm(config::DistributedOPFModel, data)
             push!(get!(θ_avg_history, b, Float64[]), get(θ_avg, b, 0.0))
         end
 
-        update_duals_theta!(duals, partitions, θ_avg, shared_buses, ρ[])
+        update_duals_theta!(
+            duals,
+            partitions,
+            θ_avg,
+            θ_avg_prev,
+            shared_buses,
+            ρ[],
+            config.alpha_overrelax,
+        )
 
         res_primal = primal_residual_bus_dc(partitions, θ_avg, shared_buses)
         res_dual = dual_residual_bus_dc(θ_avg, θ_avg_prev)
@@ -403,7 +447,7 @@ function run_admm_branch(
         sub["theta_var"] = m[:theta]
         sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
         sub["has_solution"] = false
-        _set_model_silent!(m)   # (5)
+        _set_model_silent!(m)
         @inbounds for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
         end
@@ -415,11 +459,11 @@ function run_admm_branch(
         for (zone_id, sub) in partitions
             m = sub["model"]
 
-            if warm_start_theta && sub["has_solution"] === true
-                @inbounds for I in keys(sub["theta_var"])
-                    set_start_value(sub["theta_var"][I], value(sub["theta_var"][I]))
-                end
-            end
+            # if warm_start_theta && sub["has_solution"] === true
+            #     @inbounds for I in keys(sub["theta_var"])
+            #         set_start_value(sub["theta_var"][I], value(sub["theta_var"][I]))
+            #     end
+            # end
 
             pen = add_penalty_branch_dc!(
                 m,
@@ -440,7 +484,15 @@ function run_admm_branch(
 
         z_flow_prev = copy(z_flow)
         compute_z_flow_consensus!(z_flow, partitions, cut_edges)
-        update_duals_flow!(duals, partitions, z_flow, cut_edges, ρ[])
+        update_duals_flow!(
+            duals,
+            partitions,
+            z_flow,
+            z_flow_prev,
+            cut_edges,
+            ρ[],
+            config.alpha_overrelax,
+        )
 
         res_primal = primal_residual_branch_dc(partitions, z_flow, cut_edges)
         res_dual = dual_residual_branch_dc(z_flow, z_flow_prev)
@@ -539,7 +591,7 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         sub["theta_var"] = m[:theta]
         sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
         sub["has_solution"] = false
-        _set_model_silent!(m)   # (5)
+        _set_model_silent!(m)
         @inbounds for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
         end
@@ -550,12 +602,6 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
 
         for (zone_id, sub) in partitions
             m = sub["model"]
-
-            # if sub["has_solution"] === true
-            #     @inbounds for I in keys(sub["theta_var"])
-            #         set_start_value(sub["theta_var"][I], value(sub["theta_var"][I]))
-            #     end
-            # end
 
             pen_bus =
                 add_penalty_bus_dc!(m, sub, shared_buses, θ_avg, duals_theta[zone_id], ρθ[])
@@ -585,8 +631,24 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         end
         compute_z_flow_consensus!(z_flow, partitions, cut_edges)
 
-        update_duals_theta!(duals_theta, partitions, θ_avg, shared_buses, ρθ[])
-        update_duals_flow!(duals_flow, partitions, z_flow, cut_edges, ρe[])
+        update_duals_theta!(
+            duals_theta,
+            partitions,
+            θ_avg,
+            θ_avg_prev,
+            shared_buses,
+            ρθ[],
+            config.alpha_overrelax,
+        )
+        update_duals_flow!(
+            duals_flow,
+            partitions,
+            z_flow,
+            z_flow_prev,
+            cut_edges,
+            ρe[],
+            config.alpha_overrelax,
+        )
 
         res_pri_bus = primal_residual_bus_dc(partitions, θ_avg, shared_buses)
         res_pri_br = primal_residual_branch_dc(partitions, z_flow, cut_edges)
@@ -651,8 +713,7 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
                 p.layout.yaxis.title = "ρθ";
                 p.layout.yaxis.type = "log";
                 p
-            )
-        )(),
+            ))(),
         "plot_rho_theta_hybrid.html",
     )
     PlotlyLight.save(
@@ -671,8 +732,7 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
                 p.layout.yaxis.title = "ρe";
                 p.layout.yaxis.type = "log";
                 p
-            )
-        )(),
+            ))(),
         "plot_rho_flow_hybrid.html",
     )
 

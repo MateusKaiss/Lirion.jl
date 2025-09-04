@@ -13,6 +13,7 @@ mutable struct DistributedOPFModel
     rho_flow_q::Float64    # ρQ  (consenso de Q_flow)    [branch]
     ε_primal::Float64
     ε_dual::Float64
+    alpha_overrelax::Union{Nothing, Float64}
 
     function DistributedOPFModel(
         base_model::Type{<:OPFModel},
@@ -23,7 +24,8 @@ mutable struct DistributedOPFModel
         rho_flow_p::Real,
         rho_flow_q::Real,
         ε_primal::Real,
-        ε_dual::Real,
+        ε_dual::Real;
+        alpha_overrelax::Union{Nothing, Real} = nothing,
     )
         max_iter > 0 || throw(ArgumentError("max_iter must be > 0"))
         rho_theta > 0 || throw(ArgumentError("rho_theta must be > 0"))
@@ -32,10 +34,11 @@ mutable struct DistributedOPFModel
         rho_flow_q > 0 || throw(ArgumentError("rho_flow_q must be > 0"))
         ε_primal ≥ 0 || throw(ArgumentError("ε_primal must be ≥ 0"))
         ε_dual ≥ 0 || throw(ArgumentError("ε_dual must be ≥ 0"))
+        α = isnothing(alpha_overrelax) ? nothing : Float64(alpha_overrelax)
         return new(base_model, method, Int(max_iter),
             Float64(rho_theta), Float64(rho_v),
             Float64(rho_flow_p), Float64(rho_flow_q),
-            Float64(ε_primal), Float64(ε_dual))
+            Float64(ε_primal), Float64(ε_dual), α)
     end
 end
 
@@ -45,8 +48,10 @@ DistributedOPFModel(
     max_iter::Int,
     rho::Float64,
     ε_primal::Float64,
-    ε_dual::Float64,
-) = DistributedOPFModel(base_model, method, max_iter, rho, rho, rho, rho, ε_primal, ε_dual)
+    ε_dual::Float64;
+    alpha_overrelax::Union{Nothing, Float64} = nothing,
+) = DistributedOPFModel(base_model, method, max_iter, rho, rho, rho, rho, ε_primal, ε_dual;
+    alpha_overrelax = alpha_overrelax)
 
 DistributedOPFModel(
     base_model::Type{<:OPFModel},
@@ -60,16 +65,18 @@ DistributedOPFModel(
     rho_flow_q::Union{Nothing, Float64} = nothing,
     ε_primal::Float64 = 1e-7,
     ε_dual::Float64 = 1e-7,
+    alpha_overrelax::Union{Nothing, Float64} = nothing,
 ) = DistributedOPFModel(
     base_model, method, max_iter,
     coalesce(rho_theta, rho),
     coalesce(rho_v, rho),
     coalesce(rho_flow_p, rho_flow, rho),
     coalesce(rho_flow_q, rho_flow, rho),
-    ε_primal, ε_dual,
+    ε_primal, ε_dual;
+    alpha_overrelax = alpha_overrelax,
 )
 
-# ---------- SHIM  ----------
+# ---------- SHIM ----------
 rho(c::DistributedOPFModel) = c.rho_theta
 const ρ = rho
 
@@ -87,7 +94,6 @@ Base.propertynames(c::DistributedOPFModel, private::Bool = false) =
     (propertynames(typeof(c), private)..., :rho, :rho_flow)
 
 abstract type SubproblemAction end
-
 struct SubproblemBuild <: SubproblemAction end
 struct SubproblemUpdate <: SubproblemAction end
 struct SubproblemGetResult <: SubproblemAction end
