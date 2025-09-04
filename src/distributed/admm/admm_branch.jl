@@ -1,34 +1,3 @@
-function _dc_flow_expr(model::Model, subdata::Dict{String, Any}, l_local::Int; t::Int = 1)
-    l_global = subdata["branch_local_indices"][l_local]
-    f = subdata["branch_full"]["f_bus"][l_global]
-    tbus = subdata["branch_full"]["t_bus"][l_global]
-    x = subdata["branch_full"]["br_x"][l_global]
-
-    θf = model[:theta][f, t]
-    θt = model[:theta][tbus, t]
-    return (θf - θt) / x
-end
-
-function _find_cut_edges(full::Dict{String, Any})
-    zones = full["bus"]["zone"]
-    bus_ids = full["bus"]["bus_i"]
-    bus2zone = Dict(bus_ids[i] => zones[i] for i in eachindex(bus_ids))
-    f_bus = full["branch"]["f_bus"]
-    t_bus = full["branch"]["t_bus"]
-    cut = Int[]
-    for i in eachindex(f_bus)
-        if bus2zone[f_bus[i]] != bus2zone[t_bus[i]]
-            push!(cut, i)
-        end
-    end
-    return cut
-end
-
-function _zone_cut_edges(subdata::Dict{String, Any}, cut_edges::Vector{Int})
-    local_keep = Set(subdata["branch_local_indices"])
-    return [ℓ for ℓ in cut_edges if ℓ in local_keep]
-end
-
 function run_admm_branch(config::DistributedOPFModel, data::Dict{String, Any})
     partitions, _shared_buses_unused = prepare_admm_partitions(data)
     base_model = config.base_model
