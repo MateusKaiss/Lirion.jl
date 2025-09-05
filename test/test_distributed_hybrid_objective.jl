@@ -10,12 +10,8 @@ const distributed_hybrid_zone_cases = [
     "pglib_opf_case30_2zones_as.m",
     "pglib_opf_case30_3zones_as.m",
     # 57 buses
-    # "pglib_opf_case57_2zones_ieee.m",
-    # "pglib_opf_case57_4zones_ieee.m",
-    # # # 118 buses
-    # "pglib_opf_case118_2zones_ieee.m",
-    # # # 500 buses
-    # "pglib_opf_case500_2zones_goc.m",
+    "pglib_opf_case57_2zones_ieee.m",
+    "pglib_opf_case57_4zones_ieee.m",
 ]
 
 function track_failure_hybrid(label::String, origin::String, case_name::String)
@@ -29,14 +25,17 @@ end
 function compare_distributed_hybrid_vs_centralized(
     file::String;
     label::String,
-    central_optimizer = Ipopt.Optimizer,
-    distributed_optimizer = Ipopt.Optimizer,
+    central_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer),
+    # Deixe como `nothing` para usar o OSQP default (com warm-start e tolerâncias) do resolve_optimizer_dc
+    distributed_optimizer::Union{Nothing,Function} = nothing,
     rtol = 0.05,
     atol = 1e-6,
     admm_rho = 1_000.0,
     admm_max_iter = 350,
     admm_eps_primal = 1e-6,
     admm_eps_dual = 1e-6,
+    # α=1.0 -> inativo
+    admm_alpha::Float64 = 1.0,
 )
     case_name = basename(file)
 
@@ -60,12 +59,15 @@ function compare_distributed_hybrid_vs_centralized(
         args_dist = String[
             file,
             "--model", "distributed-admm-hybrid-dc",
-            "--optimizer", string(distributed_optimizer),
             "--admm-rho", string(admm_rho),
             "--admm-max-iter", string(admm_max_iter),
             "--admm-eps-primal", string(admm_eps_primal),
             "--admm-eps-dual", string(admm_eps_dual),
+            "--admm-alpha", string(admm_alpha),
         ]
+        if !isnothing(distributed_optimizer)
+            push!(args_dist, "--optimizer"); push!(args_dist, string(distributed_optimizer))
+        end
         obj, _ = PowerOptimization.main(args_dist)
         obj
     catch e
@@ -82,9 +84,12 @@ function run_distributed_hybrid_objective_tests(;
     case_list = distributed_hybrid_zone_cases,
     label = "ADMM-Hybrid-DC vs DC",
     central_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer),
-    distributed_optimizer = Ipopt.Optimizer,
+    # `nothing` => usa OSQP default do resolve_optimizer_dc (recomendado)
+    distributed_optimizer::Union{Nothing,Function} = nothing,
     rtol = 0.05, atol = 1e-6,
     admm_eps_primal = 1e-6, admm_eps_dual = 1e-6,
+    # α fixo em 1.0 (over-relaxation inativo)
+    admm_alpha::Float64 = 1.0,
 )
     if isempty(case_list)
         @info "Empty hybrid case list. No tests will be run."
@@ -112,23 +117,22 @@ function run_distributed_hybrid_objective_tests(;
             end
 
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case = admm_eps_dual
+        admm_eps_dual_case   = admm_eps_dual
 
-        # Overrides
         if occursin("case500_", case_name)
             admm_max_iter_case = 600
             admm_rho_case = 1_000_000.0
             admm_eps_primal_case = 1e-7
-            admm_eps_dual_case = 1e-7
+            admm_eps_dual_case   = 1e-7
         end
         if occursin("case118_", case_name)
             admm_max_iter_case = 350
             admm_rho_case = 1_000_000.0
             admm_eps_primal_case = 1e-7
-            admm_eps_dual_case = 1e-7
+            admm_eps_dual_case   = 1e-7
         end
 
-        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"
+        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha))"
         @testset "$(label) - $(case_name)" begin
             compare_distributed_hybrid_vs_centralized(
                 file;
@@ -141,6 +145,7 @@ function run_distributed_hybrid_objective_tests(;
                 admm_max_iter = admm_max_iter_case,
                 admm_eps_primal = admm_eps_primal_case,
                 admm_eps_dual = admm_eps_dual_case,
+                admm_alpha = admm_alpha,
             )
         end
     end

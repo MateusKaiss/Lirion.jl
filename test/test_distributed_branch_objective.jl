@@ -7,19 +7,15 @@ const distributed_branch_zone_cases = [
     # 14 buses
     "pglib_opf_case14_2zones_ieee.m",
     "pglib_opf_case14_3zones_ieee.m",
-    # # 24 buses
+    # 24 buses
     "pglib_opf_case24_2zones_ieee_rts.m",
     "pglib_opf_case24_3zones_ieee_rts.m",
-    # # 30 buses
+    # 30 buses
     "pglib_opf_case30_2zones_as.m",
     "pglib_opf_case30_3zones_as.m",
-    # 57 buses
-    # "pglib_opf_case57_2zones_ieee.m",
-    # ########"pglib_opf_case57_4zones_ieee.m", #####problem
-    # # # 118 buses
-    # "pglib_opf_case118_2zones_ieee.m",
-    # # # 500 buses
-    # "pglib_opf_case500_2zones_goc.m",
+    # 57 / 118 / 500 (descomentando conforme necessário)
+    "pglib_opf_case57_2zones_ieee.m",
+    "pglib_opf_case57_4zones_ieee.m",
 ]
 
 function track_failure_branch(label::String, origin::String, case_name::String)
@@ -36,14 +32,17 @@ Compara objetivo Centralizado DC vs Distribuído ADMM-Branch-DC no mesmo caso.
 function compare_distributed_branch_vs_centralized(
     file::String;
     label::String,
-    central_optimizer = Ipopt.Optimizer,
-    distributed_optimizer = Ipopt.Optimizer,
+    central_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer),
+    # `nothing` => usa OSQP default do resolve_optimizer_dc
+    distributed_optimizer::Union{Nothing,Function} = nothing,
     rtol = 0.05,
     atol = 1e-6,
     admm_rho = 1_000.0,
     admm_max_iter = 350,
     admm_eps_primal = 1e-6,
     admm_eps_dual = 1e-6,
+    # α=1.0 -> inativo (branch também suporta over-relaxation no update_duals_flow!)
+    admm_alpha::Float64 = 1.0,
 )
     case_name = basename(file)
 
@@ -67,12 +66,15 @@ function compare_distributed_branch_vs_centralized(
         args_dist = String[
             file,
             "--model", "distributed-admm-branch-dc",
-            "--optimizer", string(distributed_optimizer),
             "--admm-rho", string(admm_rho),
             "--admm-max-iter", string(admm_max_iter),
             "--admm-eps-primal", string(admm_eps_primal),
             "--admm-eps-dual", string(admm_eps_dual),
+            "--admm-alpha", string(admm_alpha),
         ]
+        if !isnothing(distributed_optimizer)
+            push!(args_dist, "--optimizer"); push!(args_dist, string(distributed_optimizer))
+        end
         obj, _ = PowerOptimization.main(args_dist)
         obj
     catch e
@@ -92,9 +94,11 @@ function run_distributed_branch_objective_tests(;
     case_list = distributed_branch_zone_cases,
     label = "ADMM-Branch-DC vs DC",
     central_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer),
-    distributed_optimizer = Ipopt.Optimizer,
+    # `nothing` => usa OSQP default do resolve_optimizer_dc
+    distributed_optimizer::Union{Nothing,Function} = nothing,
     rtol = 0.05, atol = 1e-6,
     admm_eps_primal = 1e-6, admm_eps_dual = 1e-6,
+    admm_alpha::Float64 = 1.0,
 )
     if isempty(case_list)
         @info "Empty distributed (branch) case list. No tests will be run."
@@ -122,16 +126,16 @@ function run_distributed_branch_objective_tests(;
             end
 
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case = admm_eps_dual
+        admm_eps_dual_case   = admm_eps_dual
 
         if occursin("case500_", case_name)
             admm_max_iter_case = 600
             admm_rho_case = 1_000_000.0
             admm_eps_primal_case = 1e-7
-            admm_eps_dual_case = 1e-7
+            admm_eps_dual_case   = 1e-7
         end
 
-        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"
+        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha))"
         @testset "$(label) - $(case_name)" begin
             compare_distributed_branch_vs_centralized(
                 file;
@@ -144,6 +148,7 @@ function run_distributed_branch_objective_tests(;
                 admm_max_iter = admm_max_iter_case,
                 admm_eps_primal = admm_eps_primal_case,
                 admm_eps_dual = admm_eps_dual_case,
+                admm_alpha = admm_alpha,
             )
         end
     end
