@@ -477,7 +477,7 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
 
     # PRÉ-BUILD (★: preparar shared_buses_local, zone_edges, silent)
     for (zone_id, sub) in partitions
-        m = build_model(sub, SOCP; optimizer = optimizer_factory)
+        m = build_model(sub, SOCP; optimizer = optimizer_factory, build_only=true)
         _set_model_silent!(m)
         set_socp_defaults!(m; eps_abs = 1e-6, eps_rel = 1e-6, max_iters = 200_000)
 
@@ -660,7 +660,7 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, An
     optimizer_factory = resolve_socp_optimizer(config)
 
     for (zone_id, sub) in partitions
-        m = build_model(sub, SOCP; optimizer = optimizer_factory)
+        m = build_model(sub, SOCP; optimizer = optimizer_factory, build_only=true)
         _set_model_silent!(m)
         set_socp_defaults!(m; eps_abs = 1e-5, eps_rel = 1e-5, max_iters = 150_000,
             acceleration_lookback = 10, acceleration_interval = 10,
@@ -811,7 +811,7 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, An
 
     # PRÉ-BUILD (★)
     for (zone_id, sub) in partitions
-        m = build_model(sub, SOCP; optimizer = optimizer_factory)
+        m = build_model(sub, SOCP; optimizer = optimizer_factory, build_only=true)
         _set_model_silent!(m)
         set_socp_defaults!(m; eps_abs = 1e-5, eps_rel = 1e-5, max_iters = 150_000,
             acceleration_lookback = 10, acceleration_interval = 10,

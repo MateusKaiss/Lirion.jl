@@ -312,7 +312,7 @@ function run_admm(config::DistributedOPFModel, data)
     optimizer_factory = resolve_optimizer_dc(config)
 
     for (zone_id, sub) in partitions
-        m = build_model(sub, DC; optimizer = optimizer_factory)
+        m = build_model(sub, DC; optimizer = optimizer_factory, build_only=true)
         sub["model"] = m
         sub["obj_base"] = m[:generation_cost]
         sub["theta_var"] = m[:theta]
@@ -441,7 +441,7 @@ function run_admm_branch(
 
     optimizer_factory = resolve_optimizer_dc(config)
     for (zone_id, sub) in partitions
-        m = build_model(sub, DC; optimizer = optimizer_factory)
+        m = build_model(sub, DC; optimizer = optimizer_factory, build_only=true)
         sub["model"] = m
         sub["obj_base"] = m[:generation_cost]
         sub["theta_var"] = m[:theta]
@@ -585,7 +585,7 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     optimizer_factory = resolve_optimizer_dc(config)
 
     for (zone_id, sub) in partitions
-        m = build_model(sub, DC; optimizer = optimizer_factory)
+        m = build_model(sub, DC; optimizer = optimizer_factory, build_only=true)
         sub["model"] = m
         sub["obj_base"] = m[:generation_cost]
         sub["theta_var"] = m[:theta]
