@@ -20,6 +20,9 @@ const distributed_branch_zone_cases = [
     "pglib_opf_case118_2zones_ieee.m",
     "pglib_opf_case118_3zones_ieee.m",
     "pglib_opf_case118_5zones_ieee.m",
+    # 500 buses
+    "pglib_opf_case500_3zones_goc.m",
+    "pglib_opf_case500_4zones_goc.m",
 ]
 
 function track_failure_branch(label::String, origin::String, case_name::String)
