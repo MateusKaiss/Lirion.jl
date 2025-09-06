@@ -242,7 +242,7 @@ end
 
 # ---------- ρ adaptativo ----------
 function adaptive_rho_dc!(ρ::Base.RefValue{Float64}, r::Float64, s::Float64;
-    μ_incr = 2.0, μ_decr = 2.0, τ_incr = 1.05, τ_decr = 0.98)
+    μ_incr = 3.0, μ_decr = 3.0, τ_incr = 1.05, τ_decr = 0.98)
     if r > μ_incr * s
         ρ[] *= τ_incr
     elseif s > μ_decr * r
