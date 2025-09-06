@@ -1,11 +1,16 @@
 # =========================
 # BUILD ENTRYPOINT
 # =========================
-function build_model(data, model_type; optimizer, build_only::Bool=false)
+function build_model(data, model_type; optimizer, build_only::Bool = false)
     if model_type == SOCP
-        return try_with_fallback_scale(data, model_type; optimizer, build_only=build_only)
+        return try_with_fallback_scale(data, model_type; optimizer, build_only = build_only)
     else
-        return build_and_optimize_model(data, model_type; optimizer, build_only=build_only)
+        return build_and_optimize_model(
+            data,
+            model_type;
+            optimizer,
+            build_only = build_only,
+        )
     end
 end
 
@@ -16,17 +21,17 @@ function build_and_optimize_model(
     matpower_data,
     model_type::Type{<:OPFModel};
     optimizer = Ipopt.Optimizer,
-    build_only::Bool=false,
+    build_only::Bool = false,
 )
     optimizer === nothing && (optimizer = Ipopt.Optimizer)
     times = get_model_times(matpower_data)
     if length(unique(times)) > 1
         return build_and_optimize_multiperiod_model(
-            matpower_data, model_type; optimizer, times = times, build_only=build_only
+            matpower_data, model_type; optimizer, times = times, build_only = build_only,
         )
     else
         return build_and_optimize_singleperiod_model(
-            matpower_data, model_type; optimizer, build_only=build_only
+            matpower_data, model_type; optimizer, build_only = build_only,
         )
     end
 end
@@ -45,13 +50,17 @@ function try_with_fallback_scale(
     matpower_data::Dict,
     model_type::Type{<:OPFModel};
     optimizer = Ipopt.Optimizer,
-    build_only::Bool=false,
+    build_only::Bool = false,
 )
-    # Se for apenas construir (para ADMM), não faz tentativas nem optimize!.
     if build_only
         matpower_data_once = deepcopy(matpower_data)
         matpower_data_once["selected_scale"] = get(matpower_data, "selected_scale", nothing)
-        return build_and_optimize_model(matpower_data_once, model_type; optimizer, build_only=true)
+        return build_and_optimize_model(
+            matpower_data_once,
+            model_type;
+            optimizer,
+            build_only = true,
+        )
     end
 
     # 1) escala selecionada a partir dos buses
@@ -93,7 +102,8 @@ function try_with_fallback_scale(
         @warn "Model still failed with scale=300 (status: $status). Trying scale=500 (final attempt)..."
         matpower_data_extreme_attempt = deepcopy(matpower_data)
         matpower_data_extreme_attempt["selected_scale"] = 500
-        model = build_and_optimize_model(matpower_data_extreme_attempt, model_type; optimizer)
+        model =
+            build_and_optimize_model(matpower_data_extreme_attempt, model_type; optimizer)
     end
 
     return model
@@ -106,7 +116,7 @@ function build_and_optimize_singleperiod_model(
     matpower_data,
     model_type::Type{<:OPFModel};
     optimizer = Ipopt.Optimizer,
-    build_only::Bool=false,
+    build_only::Bool = false,
 )
     model = JuMP.Model(optimizer)
     model.ext[:time_periods] = 1
@@ -140,7 +150,7 @@ function build_and_optimize_multiperiod_model(
     model_type::Type{<:OPFModel};
     optimizer = Ipopt.Optimizer,
     times::AbstractVector,
-    build_only::Bool=false,
+    build_only::Bool = false,
 )
     model = JuMP.Model(optimizer)
     model.ext[:time_periods] = length(times)

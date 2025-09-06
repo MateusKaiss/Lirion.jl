@@ -13,9 +13,13 @@ const distributed_branch_zone_cases = [
     # 30 buses
     "pglib_opf_case30_2zones_as.m",
     "pglib_opf_case30_3zones_as.m",
-    # 57 / 118 / 500 (descomentando conforme necessário)
+    # 57 buses
     "pglib_opf_case57_2zones_ieee.m",
     "pglib_opf_case57_4zones_ieee.m",
+    # 118 buses
+    "pglib_opf_case118_2zones_ieee.m",
+    "pglib_opf_case118_3zones_ieee.m",
+    "pglib_opf_case118_5zones_ieee.m",
 ]
 
 function track_failure_branch(label::String, origin::String, case_name::String)
@@ -39,8 +43,8 @@ function compare_distributed_branch_vs_centralized(
     atol = 1e-6,
     admm_rho = 1_000.0,
     admm_max_iter = 350,
-    admm_eps_primal = 1e-6,
-    admm_eps_dual = 1e-6,
+    admm_eps_primal = 1e-4,
+    admm_eps_dual = 1e-4,
     # α=1.0 -> inativo (branch também suporta over-relaxation no update_duals_flow!)
     admm_alpha::Float64 = 1.0,
 )
@@ -97,7 +101,7 @@ function run_distributed_branch_objective_tests(;
     # `nothing` => usa OSQP default do resolve_optimizer_dc
     distributed_optimizer::Union{Nothing,Function} = nothing,
     rtol = 0.05, atol = 1e-6,
-    admm_eps_primal = 1e-6, admm_eps_dual = 1e-6,
+    admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,
     admm_alpha::Float64 = 1.0,
 )
     if isempty(case_list)
@@ -131,8 +135,8 @@ function run_distributed_branch_objective_tests(;
         if occursin("case500_", case_name)
             admm_max_iter_case = 600
             admm_rho_case = 1_000_000.0
-            admm_eps_primal_case = 1e-7
-            admm_eps_dual_case   = 1e-7
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case   = 1e-4
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha))"

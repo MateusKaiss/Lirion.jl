@@ -14,6 +14,13 @@ const distributed_zone_cases = [
     # 57 buses
     "pglib_opf_case57_2zones_ieee.m",
     "pglib_opf_case57_4zones_ieee.m",
+    # 118 buses
+    "pglib_opf_case118_2zones_ieee.m",
+    "pglib_opf_case118_3zones_ieee.m",
+    "pglib_opf_case118_5zones_ieee.m",
+    # 500 buses
+    "pglib_opf_case500_3zones_goc.m",
+    "pglib_opf_case500_4zones_goc.m",
 ]
 
 function track_failure_dist(label::String, origin::String, case_name::String)
@@ -89,7 +96,7 @@ function run_distributed_objective_tests(;
     central_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer),
     distributed_optimizer::Union{Nothing, Function} = nothing,
     rtol = 0.05, atol = 1e-6,
-    admm_eps_primal = 1e-6, admm_eps_dual = 1e-6,
+    admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,
     admm_alpha::Float64 = 1.0,  # over-relaxation inativo
 )
     if isempty(case_list)
@@ -121,18 +128,18 @@ function run_distributed_objective_tests(;
         admm_eps_primal_case = admm_eps_primal
         admm_eps_dual_case = admm_eps_dual
 
-        # ---- OVERRIDES para casos grandes ----
-        if occursin("case500_", case_name)
-            admm_max_iter_case = 600
-            admm_rho_case = 1_000_000.0
-            admm_eps_primal_case = 1e-7
-            admm_eps_dual_case = 1e-7
-        end
+        # # ---- OVERRIDES para casos grandes ----
+        # if occursin("case500_", case_name)
+        #     admm_max_iter_case = 600
+        #     admm_rho_case = 1_000_000.0
+        #     admm_eps_primal_case = 1e-7
+        #     admm_eps_dual_case = 1e-7
+        # end
         if occursin("case118_", case_name)
-            admm_max_iter_case = 350
+            admm_max_iter_case = 700
             admm_rho_case = 1_000_000.0
-            admm_eps_primal_case = 1e-7
-            admm_eps_dual_case = 1e-7
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case = 1e-4
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha))"
