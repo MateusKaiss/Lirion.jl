@@ -349,26 +349,38 @@ function save_socp_v2rt_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
     PlotlyLight.save(
         (
             () -> (
-                p = Plot(); p(;
+                p = Plot();
+                p(;
                     x = 1:length(rhoR_hist),
                     y = rhoR_hist,
                     type = :scatter,
                     mode = "lines+markers",
                     name = "ρR",
-                ); p.layout.title = "Evolução de ρR"; p.layout.xaxis.title = "Iterações"; p.layout.yaxis.title = "ρR"; p.layout.yaxis.type = "log"; p
+                );
+                p.layout.title = "Evolução de ρR";
+                p.layout.xaxis.title = "Iterações";
+                p.layout.yaxis.title = "ρR";
+                p.layout.yaxis.type = "log";
+                p
             )
         )(),
         "plot_rhoR_$(stem).html")
     return PlotlyLight.save(
         (
             () -> (
-                p = Plot(); p(;
+                p = Plot();
+                p(;
                     x = 1:length(rhoT_hist),
                     y = rhoT_hist,
                     type = :scatter,
                     mode = "lines+markers",
                     name = "ρT",
-                ); p.layout.title = "Evolução de ρT"; p.layout.xaxis.title = "Iterações"; p.layout.yaxis.title = "ρT"; p.layout.yaxis.type = "log"; p
+                );
+                p.layout.title = "Evolução de ρT";
+                p.layout.xaxis.title = "Iterações";
+                p.layout.yaxis.title = "ρT";
+                p.layout.yaxis.type = "log";
+                p
             )
         )(),
         "plot_rhoT_$(stem).html")
@@ -381,26 +393,38 @@ function save_socp_branch_pq_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
     PlotlyLight.save(
         (
             () -> (
-                p = Plot(); p(;
+                p = Plot();
+                p(;
                     x = 1:length(rhoP_hist),
                     y = rhoP_hist,
                     type = :scatter,
                     mode = "lines+markers",
                     name = "ρP",
-                ); p.layout.title = "Evolução de ρP"; p.layout.xaxis.title = "Iterações"; p.layout.yaxis.title = "ρP"; p.layout.yaxis.type = "log"; p
+                );
+                p.layout.title = "Evolução de ρP";
+                p.layout.xaxis.title = "Iterações";
+                p.layout.yaxis.title = "ρP";
+                p.layout.yaxis.type = "log";
+                p
             )
         )(),
         "plot_rhoP_$(stem).html")
     return PlotlyLight.save(
         (
             () -> (
-                p = Plot(); p(;
+                p = Plot();
+                p(;
                     x = 1:length(rhoQ_hist),
                     y = rhoQ_hist,
                     type = :scatter,
                     mode = "lines+markers",
                     name = "ρQ",
-                ); p.layout.title = "Evolução de ρQ"; p.layout.xaxis.title = "Iterações"; p.layout.yaxis.title = "ρQ"; p.layout.yaxis.type = "log"; p
+                );
+                p.layout.title = "Evolução de ρQ";
+                p.layout.xaxis.title = "Iterações";
+                p.layout.yaxis.title = "ρQ";
+                p.layout.yaxis.type = "log";
+                p
             )
         )(),
         "plot_rhoQ_$(stem).html")
@@ -422,14 +446,20 @@ function save_socp_hybrid_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
         PlotlyLight.save(
             (
                 () -> (
-                    p = Plot(); p(;
+                    p = Plot();
+                    p(;
                         x = 1:length(hist),
                         y = hist,
                         type = :scatter,
                         mode = "lines+markers",
                         name = lab,
-                    ); p.layout.title = "Evolução de $(lab)"; p.layout.xaxis.title = "Iterações"; p.layout.yaxis.title =
-                        lab; p.layout.yaxis.type = "log"; p
+                    );
+                    p.layout.title = "Evolução de $(lab)";
+                    p.layout.xaxis.title = "Iterações";
+                    p.layout.yaxis.title =
+                        lab;
+                    p.layout.yaxis.type = "log";
+                    p
                 )
             )(),
             "plot_$(fname)_$(stem).html")
@@ -477,7 +507,7 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
 
     # PRÉ-BUILD (★: preparar shared_buses_local, zone_edges, silent)
     for (zone_id, sub) in partitions
-        m = build_model(sub, SOCP; optimizer = optimizer_factory, build_only=true)
+        m = build_model(sub, SOCP; optimizer = optimizer_factory, build_only = true)
         _set_model_silent!(m)
         set_socp_defaults!(m; eps_abs = 1e-6, eps_rel = 1e-6, max_iters = 200_000)
 
@@ -660,7 +690,7 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, An
     optimizer_factory = resolve_socp_optimizer(config)
 
     for (zone_id, sub) in partitions
-        m = build_model(sub, SOCP; optimizer = optimizer_factory, build_only=true)
+        m = build_model(sub, SOCP; optimizer = optimizer_factory, build_only = true)
         _set_model_silent!(m)
         set_socp_defaults!(m; eps_abs = 1e-5, eps_rel = 1e-5, max_iters = 150_000,
             acceleration_lookback = 10, acceleration_interval = 10,
@@ -811,7 +841,7 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, An
 
     # PRÉ-BUILD (★)
     for (zone_id, sub) in partitions
-        m = build_model(sub, SOCP; optimizer = optimizer_factory, build_only=true)
+        m = build_model(sub, SOCP; optimizer = optimizer_factory, build_only = true)
         _set_model_silent!(m)
         set_socp_defaults!(m; eps_abs = 1e-5, eps_rel = 1e-5, max_iters = 150_000,
             acceleration_lookback = 10, acceleration_interval = 10,

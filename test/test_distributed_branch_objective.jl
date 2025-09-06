@@ -41,7 +41,7 @@ function compare_distributed_branch_vs_centralized(
     label::String,
     central_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer),
     # `nothing` => usa OSQP default do resolve_optimizer_dc
-    distributed_optimizer::Union{Nothing,Function} = nothing,
+    distributed_optimizer::Union{Nothing, Function} = nothing,
     rtol = 0.05,
     atol = 1e-6,
     admm_rho = 1_000.0,
@@ -80,7 +80,8 @@ function compare_distributed_branch_vs_centralized(
             "--admm-alpha", string(admm_alpha),
         ]
         if !isnothing(distributed_optimizer)
-            push!(args_dist, "--optimizer"); push!(args_dist, string(distributed_optimizer))
+            push!(args_dist, "--optimizer")
+            push!(args_dist, string(distributed_optimizer))
         end
         obj, _ = PowerOptimization.main(args_dist)
         obj
@@ -102,7 +103,7 @@ function run_distributed_branch_objective_tests(;
     label = "ADMM-Branch-DC vs DC",
     central_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer),
     # `nothing` => usa OSQP default do resolve_optimizer_dc
-    distributed_optimizer::Union{Nothing,Function} = nothing,
+    distributed_optimizer::Union{Nothing, Function} = nothing,
     rtol = 0.05, atol = 1e-6,
     admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,
     admm_alpha::Float64 = 1.0,
@@ -133,13 +134,13 @@ function run_distributed_branch_objective_tests(;
             end
 
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case   = admm_eps_dual
+        admm_eps_dual_case = admm_eps_dual
 
         if occursin("case500_", case_name)
             admm_max_iter_case = 600
             admm_rho_case = 1_000_000.0
             admm_eps_primal_case = 1e-4
-            admm_eps_dual_case   = 1e-4
+            admm_eps_dual_case = 1e-4
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha))"

@@ -1,6 +1,5 @@
 # =============== DC Utils  ===============
 # ---------- Solver ----------
-
 function resolve_optimizer_dc(config)
     opt = try
         getfield(config, :optimizer)
@@ -73,6 +72,46 @@ function add_penalty_branch_dc!(m, subdata, zone_edges::Vector{Int},
         pen += λ * (p_loc - z) + (ρ / 2) * (p_loc - z)^2
     end
     return pen
+end
+
+# ---------- Solvers por zona (para Threads) ----------
+function _solve_zone_bus!(sub::Dict{String, Any}, shared_buses::Vector{Int},
+    θ_avg::Dict{Int, Float64}, duals_zone::Dict{Int, Float64}, ρ::Float64)
+    m = sub["model"]
+    pen = add_penalty_bus_dc!(m, sub, shared_buses, θ_avg, duals_zone, ρ)
+    @objective(m, Min, sub["obj_base"] + pen)
+    optimize!(m)
+    gen_cost_expr = value(m[:generation_cost])
+    real_cost = compute_real_generation_cost(m, sub["objective_params"])
+    θsnap = Dict{Int, Float64}()
+    @inbounds for b in sub["shared_buses_local"]
+        θsnap[b] = value(m[:theta][b, 1])
+    end
+    return (gen_cost_expr = gen_cost_expr, real_cost = real_cost, θsnap = θsnap)
+end
+
+function _solve_zone_branch!(sub::Dict{String, Any}, z_flow::Dict{Int, Float64},
+    duals_zone::Dict{Int, Float64}, ρ::Float64)
+    m = sub["model"]
+    pen = add_penalty_branch_dc!(m, sub, sub["zone_edges"], z_flow, duals_zone, ρ)
+    @objective(m, Min, sub["obj_base"] + pen)
+    optimize!(m)
+    gen_cost_expr = value(m[:generation_cost])
+    real_cost = compute_real_generation_cost(m, sub["objective_params"])
+    return (gen_cost_expr = gen_cost_expr, real_cost = real_cost)
+end
+
+function _solve_zone_hybrid!(sub::Dict{String, Any}, shared_buses::Vector{Int},
+    θ_avg::Dict{Int, Float64}, dualsθ::Dict{Int, Float64}, ρθ::Float64,
+    z_flow::Dict{Int, Float64}, dualse::Dict{Int, Float64}, ρe::Float64)
+    m = sub["model"]
+    pen_bus = add_penalty_bus_dc!(m, sub, shared_buses, θ_avg, dualsθ, ρθ)
+    pen_flow = add_penalty_branch_dc!(m, sub, sub["zone_edges"], z_flow, dualse, ρe)
+    @objective(m, Min, sub["obj_base"] + pen_bus + pen_flow)
+    optimize!(m)
+    gen_cost_expr = value(m[:generation_cost])
+    real_cost = compute_real_generation_cost(m, sub["objective_params"])
+    return (gen_cost_expr = gen_cost_expr, real_cost = real_cost)
 end
 
 # ---------- Consensos (2 + 3) ----------
@@ -312,7 +351,7 @@ function run_admm(config::DistributedOPFModel, data)
     optimizer_factory = resolve_optimizer_dc(config)
 
     for (zone_id, sub) in partitions
-        m = build_model(sub, DC; optimizer = optimizer_factory, build_only=true)
+        m = build_model(sub, DC; optimizer = optimizer_factory, build_only = true)
         sub["model"] = m
         sub["obj_base"] = m[:generation_cost]
         sub["theta_var"] = m[:theta]
@@ -323,29 +362,36 @@ function run_admm(config::DistributedOPFModel, data)
         end
     end
 
+    zone_ids = collect(keys(partitions))
+
     for k in 1:config.max_iter
         println("\nIteração $k (bus/DC)")
 
-        for (zone_id, sub) in partitions
-            m = sub["model"]
+        # ---------- resolve zonas em paralelo ----------
+        nz = length(zone_ids)
+        results = Vector{Any}(undef, nz)
+        @threads for i in 1:nz
+            z = zone_ids[i]
+            sub = partitions[z]
+            results[i] = _solve_zone_bus!(sub, shared_buses, θ_avg, duals[z], ρ[])
+        end
 
-            pen = add_penalty_bus_dc!(m, sub, shared_buses, θ_avg, duals[zone_id], ρ[])
-            @objective(m, Min, sub["obj_base"] + pen)
-            optimize!(m)
+        # ---------- aplica resultados (sequencial) ----------
+        for (i, z) in enumerate(zone_ids)
+            sub = partitions[z]
+            out = results[i]
             sub["has_solution"] = true
-
-            sub["generation_cost_model_expr"] = value(m[:generation_cost])
-            sub["real_generation_cost"] =
-                compute_real_generation_cost(m, sub["objective_params"])
-
-            @inbounds for b in sub["shared_buses_local"]
+            sub["generation_cost_model_expr"] = out.gen_cost_expr
+            sub["real_generation_cost"] = out.real_cost
+            @inbounds for (b, θb) in out.θsnap
                 push!(
                     get!(
-                        get!(θ_local_history, zone_id, Dict{Int, Vector{Float64}}()),
+                        get!(θ_local_history, z, Dict{Int, Vector{Float64}}()),
                         b,
                         Float64[],
                     ),
-                    value(sub["theta_var"][b, 1]))
+                    θb,
+                )
             end
         end
 
@@ -441,7 +487,7 @@ function run_admm_branch(
 
     optimizer_factory = resolve_optimizer_dc(config)
     for (zone_id, sub) in partitions
-        m = build_model(sub, DC; optimizer = optimizer_factory, build_only=true)
+        m = build_model(sub, DC; optimizer = optimizer_factory, build_only = true)
         sub["model"] = m
         sub["obj_base"] = m[:generation_cost]
         sub["theta_var"] = m[:theta]
@@ -453,33 +499,27 @@ function run_admm_branch(
         end
     end
 
+    zone_ids = collect(keys(partitions))
+
     for k in 1:config.max_iter
         println("\n[ADMM-branch/DC] Iteração $k")
 
-        for (zone_id, sub) in partitions
-            m = sub["model"]
+        # ---------- resolve zonas em paralelo ----------
+        nz = length(zone_ids)
+        results = Vector{Any}(undef, nz)
+        @threads for i in 1:nz
+            z = zone_ids[i]
+            sub = partitions[z]
+            results[i] = _solve_zone_branch!(sub, z_flow, duals[z], ρ[])
+        end
 
-            # if warm_start_theta && sub["has_solution"] === true
-            #     @inbounds for I in keys(sub["theta_var"])
-            #         set_start_value(sub["theta_var"][I], value(sub["theta_var"][I]))
-            #     end
-            # end
-
-            pen = add_penalty_branch_dc!(
-                m,
-                sub,
-                sub["zone_edges"],
-                z_flow,
-                duals[zone_id],
-                ρ[],
-            )
-            @objective(m, Min, sub["obj_base"] + pen)
-            optimize!(m)
+        # ---------- aplica resultados (sequencial) ----------
+        for (i, z) in enumerate(zone_ids)
+            sub = partitions[z]
+            out = results[i]
             sub["has_solution"] = true
-
-            sub["generation_cost_model_expr"] = value(m[:generation_cost])
-            sub["real_generation_cost"] =
-                compute_real_generation_cost(m, sub["objective_params"])
+            sub["generation_cost_model_expr"] = out.gen_cost_expr
+            sub["real_generation_cost"] = out.real_cost
         end
 
         z_flow_prev = copy(z_flow)
@@ -585,7 +625,7 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     optimizer_factory = resolve_optimizer_dc(config)
 
     for (zone_id, sub) in partitions
-        m = build_model(sub, DC; optimizer = optimizer_factory, build_only=true)
+        m = build_model(sub, DC; optimizer = optimizer_factory, build_only = true)
         sub["model"] = m
         sub["obj_base"] = m[:generation_cost]
         sub["theta_var"] = m[:theta]
@@ -597,29 +637,29 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         end
     end
 
+    zone_ids = collect(keys(partitions))
+
     for k in 1:config.max_iter
         println("\n[ADMM-hybrid/DC] Iteração $k")
 
-        for (zone_id, sub) in partitions
-            m = sub["model"]
+        # ---------- resolve zonas em paralelo ----------
+        nz = length(zone_ids)
+        results = Vector{Any}(undef, nz)
+        @threads for i in 1:nz
+            z = zone_ids[i]
+            sub = partitions[z]
+            results[i] =
+                _solve_zone_hybrid!(sub, shared_buses, θ_avg, duals_theta[z], ρθ[],
+                    z_flow, duals_flow[z], ρe[])
+        end
 
-            pen_bus =
-                add_penalty_bus_dc!(m, sub, shared_buses, θ_avg, duals_theta[zone_id], ρθ[])
-            pen_flow = add_penalty_branch_dc!(
-                m,
-                sub,
-                sub["zone_edges"],
-                z_flow,
-                duals_flow[zone_id],
-                ρe[],
-            )
-            @objective(m, Min, sub["obj_base"] + pen_bus + pen_flow)
-            optimize!(m)
+        # ---------- aplica resultados (sequencial) ----------
+        for (i, z) in enumerate(zone_ids)
+            sub = partitions[z]
+            out = results[i]
             sub["has_solution"] = true
-
-            sub["generation_cost_model_expr"] = value(m[:generation_cost])
-            sub["real_generation_cost"] =
-                compute_real_generation_cost(m, sub["objective_params"])
+            sub["generation_cost_model_expr"] = out.gen_cost_expr
+            sub["real_generation_cost"] = out.real_cost
         end
 
         θ_avg_prev = isempty(θ_avg) ? θ_avg : copy(θ_avg)

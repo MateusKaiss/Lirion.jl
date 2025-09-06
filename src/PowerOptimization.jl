@@ -14,6 +14,7 @@ using Logging
 using ArgParse
 using SCS
 using OSQP
+using Base.Threads
 
 include("types.jl")
 include("args/args.jl")
