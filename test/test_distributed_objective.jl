@@ -34,7 +34,7 @@ end
 function compare_distributed_vs_centralized(
     file::String;
     label::String,
-    central_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer),
+    central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
     distributed_optimizer::Union{Nothing, Function} = nothing,
     rtol = 0.05,
     atol = 1e-6,
@@ -93,7 +93,7 @@ end
 function run_distributed_objective_tests(;
     case_list = distributed_zone_cases,
     label = "ADMM-DC (bus) vs DC",
-    central_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer),
+    central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
     distributed_optimizer::Union{Nothing, Function} = nothing,
     rtol = 0.05, atol = 1e-6,
     admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,

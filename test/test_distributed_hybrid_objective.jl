@@ -32,7 +32,7 @@ end
 function compare_distributed_hybrid_vs_centralized(
     file::String;
     label::String,
-    central_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer),
+    central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
     # Deixe como `nothing` para usar o OSQP default (com warm-start e tolerâncias) do resolve_optimizer_dc
     distributed_optimizer::Union{Nothing, Function} = nothing,
     rtol = 0.05,
@@ -91,7 +91,7 @@ end
 function run_distributed_hybrid_objective_tests(;
     case_list = distributed_hybrid_zone_cases,
     label = "ADMM-Hybrid-DC vs DC",
-    central_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer),
+    central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
     # `nothing` => usa OSQP default do resolve_optimizer_dc (recomendado)
     distributed_optimizer::Union{Nothing, Function} = nothing,
     rtol = 0.05, atol = 1e-6,

@@ -39,7 +39,7 @@ Compara objetivo Centralizado DC vs Distribuído ADMM-Branch-DC no mesmo caso.
 function compare_distributed_branch_vs_centralized(
     file::String;
     label::String,
-    central_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer),
+    central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
     # `nothing` => usa OSQP default do resolve_optimizer_dc
     distributed_optimizer::Union{Nothing, Function} = nothing,
     rtol = 0.05,
@@ -101,7 +101,7 @@ Roda a suíte de testes para ADMM-Branch-DC vs DC nos casos de zonas.
 function run_distributed_branch_objective_tests(;
     case_list = distributed_branch_zone_cases,
     label = "ADMM-Branch-DC vs DC",
-    central_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer),
+    central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
     # `nothing` => usa OSQP default do resolve_optimizer_dc
     distributed_optimizer::Union{Nothing, Function} = nothing,
     rtol = 0.05, atol = 1e-6,
