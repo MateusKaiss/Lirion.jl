@@ -4,8 +4,6 @@
 # (1.2) Penalidade construída de forma compacta e vetorial (sem lookups caros)
 # (1.3) Consenso e duais com vetores densos
 
-using LinearAlgebra
-const _FAST_USE_LOGS = false
 
 # ---------- Solver ----------
 function resolve_optimizer_dc(config)

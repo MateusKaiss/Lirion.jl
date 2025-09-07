@@ -16,6 +16,8 @@ using SCS
 using OSQP
 using Base.Threads
 
+const _FAST_USE_LOGS = true
+
 include("types.jl")
 include("args/args.jl")
 
