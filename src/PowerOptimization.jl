@@ -18,8 +18,7 @@ using Base.Threads
 using MathOptInterface
 
 const MOI = MathOptInterface
-const _FAST_USE_LOGS = true
-
+const _FAST_USE_LOGS = false
 function __init__()
     # Setar variáveis de ambiente se não estiverem definidas
     for k in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
