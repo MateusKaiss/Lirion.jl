@@ -38,7 +38,7 @@ function resolve_optimizer_dc(config)
     )
 end
 
-# --------- Helper de formatação de tempo (adicionado) ----------
+# --------- Helper de formatação de tempo ----------
 @inline function _pretty_time(sec::Real)
     if sec < 60
         return "$(round(sec; digits=3)) s"
@@ -66,7 +66,9 @@ function prepare_hotpaths!(sub::Dict{String, Any})
         shared_pos_local[k] = bus_local_index[b]
     end
     sub["shared_pos_local"] = shared_pos_local
+
     sub["theta_buf"] = zeros(Float64, length(bus_ids))
+    sub["theta_shared_buf"] = zeros(Float64, length(shared_pos_local))
     return nothing
 end
 
@@ -76,6 +78,18 @@ end
     bus_ids = sub["bus"]["bus_i"]
     @inbounds for i in eachindex(bus_ids)
         buf[i] = value(θ[bus_ids[i], 1])
+    end
+    return buf
+end
+
+@inline function snapshot_theta_shared!(sub::Dict{String, Any})
+    θ = sub["model"][:theta]
+    buf = sub["theta_shared_buf"]
+    pos = sub["shared_pos_local"]
+    bus_ids = sub["bus"]["bus_i"]
+    @inbounds for i in eachindex(pos)
+        bidx = pos[i]
+        buf[i] = value(θ[bus_ids[bidx], 1])
     end
     return buf
 end
@@ -98,12 +112,8 @@ end
 end
 
 # =======================================================
-# OBJETIVO PERSISTENTE — JuMP puro (1.2 + 1.4)
-#  - Cache da parte QUADRÁTICA; reconstruída apenas quando ρ muda
-#  - Parte LINEAR atualizada a cada iteração
+# OBJETIVO PERSISTENTE (1.2 + 1.4)
 # =======================================================
-
-# BUS: constrói e cacheia PARTE QUADRÁTICA fixa: (ρ/2)*θ_b^2
 function _build_quad_bus_expr!(sub::Dict{String, Any}, ρ::Float64)
     m = sub["model"]
     θ = m[:theta]
@@ -116,7 +126,6 @@ function _build_quad_bus_expr!(sub::Dict{String, Any}, ρ::Float64)
     return q
 end
 
-# BRANCH: constrói e cacheia PARTE QUADRÁTICA fixa: (ρ/2)*((θf-θt)/x)^2
 function _build_quad_branch_expr!(
     sub::Dict{String, Any},
     ρ::Float64,
@@ -141,7 +150,6 @@ function _build_quad_branch_expr!(
     return q
 end
 
-# BUS: parte LINEAR por iteração: ∑ (λ - ρ*θ̄) * θ_b
 function _build_linear_bus_expr(sub::Dict{String, Any},
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
@@ -158,7 +166,6 @@ function _build_linear_bus_expr(sub::Dict{String, Any},
     return lin
 end
 
-# BRANCH: parte LINEAR por iteração: ∑ (λe - ρ*z_e) * ((θf-θt)/x)
 function _build_linear_branch_expr(sub::Dict{String, Any},
     zone_edges::Vector{Int},
     z_flow::Dict{Int, Float64},
@@ -190,6 +197,7 @@ function prepare_dense_maps(shared_buses::Vector{Int})
     return shared_buses_sorted, b2pos
 end
 
+# ---- usa snapshot só de compartilhadas (correção 3) ----
 function compute_theta_consensus_vec!(θ̄_vec::Vector{Float64},
     partitions::Dict{Int, Dict{String, Any}},
     shared_buses_sorted::Vector{Int},
@@ -197,11 +205,11 @@ function compute_theta_consensus_vec!(θ̄_vec::Vector{Float64},
     fill!(θ̄_vec, 0.0)
     counts = zeros(Int, length(shared_buses_sorted))
     for (_, sub) in partitions
-        θbuf = snapshot_theta!(sub)
-        pos = sub["bus_local_index"]
-        @inbounds for b in sub["shared_buses_local"]
-            j = b2pos[b]
-            θ̄_vec[j] += θbuf[pos[b]]
+        θs = snapshot_theta_shared!(sub)
+        lbs = sub["shared_buses_local"]
+        @inbounds for i in eachindex(lbs)
+            j = b2pos[lbs[i]]
+            θ̄_vec[j] += θs[i]
             counts[j] += 1
         end
     end
@@ -242,18 +250,18 @@ end
     α::Union{Nothing, Float64},
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int})
-    θbuf = snapshot_theta!(sub)
-    pos = sub["bus_local_index"]
+    θs = snapshot_theta_shared!(sub)
+    lbs = sub["shared_buses_local"]
     if isnothing(α)
-        @inbounds for b in sub["shared_buses_local"]
-            j = b2pos[b]
-            dual_vec_zone[j] += ρ * (θbuf[pos[b]] - θ̄_vec[j])
+        @inbounds for i in eachindex(lbs)
+            j = b2pos[lbs[i]]
+            dual_vec_zone[j] += ρ * (θs[i] - θ̄_vec[j])
         end
     else
         αv = something(α, 1.0)
-        @inbounds for b in sub["shared_buses_local"]
-            j = b2pos[b]
-            θrel = αv * θbuf[pos[b]] + (1 - αv) * θ̄_prev_vec[j]
+        @inbounds for i in eachindex(lbs)
+            j = b2pos[lbs[i]]
+            θrel = αv * θs[i] + (1 - αv) * θ̄_prev_vec[j]
             dual_vec_zone[j] += ρ * (θrel - θ̄_vec[j])
         end
     end
@@ -266,7 +274,7 @@ end
 end
 
 # =======================================================
-# RESÍDUOS / TOLERÂNCIAS
+# RESÍDUOS / TOLERÂNCIAS  (mantidos como estavam)
 # =======================================================
 function primal_residual_bus_dc(
     partitions::Dict{Int, Dict{String, Any}},
@@ -515,10 +523,11 @@ function run_admm(config::DistributedOPFModel, data)
             gen_cost_expr = value(m[:generation_cost])
             real_cost = compute_real_generation_cost(m, sub["objective_params"])
 
-            θbuf = snapshot_theta!(sub)
+            θs = snapshot_theta_shared!(sub)  # já no formato reduzido
             θsnap = Dict{Int, Float64}()
-            @inbounds for b in sub["shared_buses_local"]
-                θsnap[b] = θbuf[sub["bus_local_index"][b]]
+            lbs = sub["shared_buses_local"]
+            @inbounds for i in eachindex(lbs)
+                θsnap[lbs[i]] = θs[i]
             end
             results[i] =
                 (gen_cost_expr = gen_cost_expr, real_cost = real_cost, θsnap = θsnap)
@@ -772,7 +781,7 @@ function run_admm_branch(
 end
 
 # =======================================================
-# ADMM: HÍBRIDO (bus + branch) — objetivo persistente
+# ADMM: HÍBRIDO (bus + branch)
 # =======================================================
 function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     # --- cronômetro (adicionado)
@@ -843,7 +852,6 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     for k in 1:config.max_iter
         _FAST_USE_LOGS && println("\n[ADMM-hybrid/DC] Iteração $k")
 
-        # Reinstala quadráticas se rhos mudaram
         if ρθ[] != prev_ρθ
             for (_, sub) in partitions
                 _build_quad_bus_expr!(sub, ρθ[])

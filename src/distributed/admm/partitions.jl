@@ -149,7 +149,6 @@ function prepare_admm_partitions(data::Dict{String, Any})
             (; sbase = sub["baseMVA"]),
         )
 
-        # Set pronto para O(1) e lista local de compartilhadas (evita "b in busset" depois)
         sub["bus_set"] = Set(sub["bus"]["bus_i"])
 
         partitions[zone] = sub
