@@ -38,6 +38,17 @@ function resolve_optimizer_dc(config)
     )
 end
 
+# --------- Helper de formatação de tempo (adicionado) ----------
+@inline function _pretty_time(sec::Real)
+    if sec < 60
+        return "$(round(sec; digits=3)) s"
+    elseif sec < 3600
+        return "$(round(sec/60; digits=2)) min"
+    else
+        return "$(round(sec/3600; digits=2)) h"
+    end
+end
+
 # =======================================================
 # HOTPATHS & SNAPSHOTS (1.1)
 # =======================================================
@@ -422,6 +433,10 @@ end
 # ADMM: BUS (com objetivo persistente)
 # =======================================================
 function run_admm(config::DistributedOPFModel, data)
+    # --- cronômetro (adicionado)
+    t0_ns = time_ns()
+    iter_done = 0
+
     partitions, shared_buses = prepare_admm_partitions(data)
     @assert config.base_model == DC "run_admm (bus/DC) requer DC."
 
@@ -555,6 +570,7 @@ function run_admm(config::DistributedOPFModel, data)
 
         push!(rho_vec, ρ[])
 
+        iter_done = k
         if res_primal < ϵ_pri && res_dual < ϵ_du
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
@@ -580,6 +596,10 @@ function run_admm(config::DistributedOPFModel, data)
     println("→ Total (value(:generation_cost)) = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
     println("ρθ inicial: $(config.rho_theta) | ρθ final: $(ρ[])")
+    # --- tempo total (adicionado)
+    elapsed_s = (time_ns() - t0_ns) / 1e9
+    println("Iterações realizadas: $iter_done")
+    println("Tempo ADMM (bus/DC): $(_pretty_time(elapsed_s))")
 
     return total_real_cost, partitions
 end
@@ -597,6 +617,10 @@ function run_admm_branch(
     τ_incr::Float64 = 1.05,
     τ_decr::Float64 = 0.98,
 )
+    # --- cronômetro (adicionado)
+    t0_ns = time_ns()
+    iter_done = 0
+
     @assert config.base_model == DC "ADMM-branch/DC requer base_model == DC."
 
     partitions, _ = prepare_admm_partitions(data)
@@ -698,6 +722,7 @@ function run_admm_branch(
 
         push!(rho_vec, ρ[])
 
+        iter_done = k
         if res_primal < ϵ_pri && res_dual < ϵ_du
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
@@ -738,6 +763,10 @@ function run_admm_branch(
     println("→ Total (value(:generation_cost))     = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
     println("ρe_final = $(ρ[])")
+    # --- tempo total (adicionado)
+    elapsed_s = (time_ns() - t0_ns) / 1e9
+    println("Iterações realizadas: $iter_done")
+    println("Tempo ADMM (branch/DC): $(_pretty_time(elapsed_s))")
 
     return total_real_cost, partitions
 end
@@ -746,6 +775,10 @@ end
 # ADMM: HÍBRIDO (bus + branch) — objetivo persistente
 # =======================================================
 function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
+    # --- cronômetro (adicionado)
+    t0_ns = time_ns()
+    iter_done = 0
+
     @assert config.base_model == DC "Hybrid ADMM/DC requer DC."
 
     partitions, shared_buses = prepare_admm_partitions(data)
@@ -928,6 +961,7 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         push!(rhoθ_vec, ρθ[])
         push!(rhoe_vec, ρe[])
 
+        iter_done = k
         if res_primal < ϵ_pri && res_dual < ϵ_du
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
@@ -995,6 +1029,10 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     println("→ Total (value(:generation_cost))     = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
     println("ρθ_final = $(ρθ[]) | ρe_final = $(ρe[])")
+    # --- tempo total (adicionado)
+    elapsed_s = (time_ns() - t0_ns) / 1e9
+    println("Iterações realizadas: $iter_done")
+    println("Tempo ADMM (hybrid/DC): $(_pretty_time(elapsed_s))")
 
     return total_real_cost, partitions
 end
