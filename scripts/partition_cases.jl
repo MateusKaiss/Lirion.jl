@@ -165,8 +165,37 @@ function build_bus_graph(case::Dict{String,Any}; edge_weight::Symbol=:susceptanc
     return g, ew, vw, present, posmap
 end
 
+# --- pesos de corte: punir cortar trafo/phase shifter/linhas fortes ---
+function _build_cut_weights(case::Dict{String,Any}, g::SimpleGraph)
+    f = case["branch"]["f_bus"]; t = case["branch"]["t_bus"]
+    x = case["branch"]["br_x"];  r = case["branch"]["br_r"]
+    on = case["branch"]["br_status"]
+    tap   = get(case["branch"], "tap",   fill(1.0, length(f)))
+    shift = get(case["branch"], "shift", fill(0.0, length(f)))
+    ratea = get(case["branch"], "rate_a", fill(0.0, length(f)))
+
+    cutw = Dict{Tuple{Int,Int},Float64}()
+    for i in eachindex(f)
+        on[i]==1 || continue
+        u, v = f[i], t[i]
+        has_edge(g, u, v) || continue
+        w = (abs(x[i]) > 1e-10) ? 1/abs(x[i]) : 1e6      # forte = caro cortar
+        if abs(tap[i]-1.0) > 1e-6 || abs(shift[i]) > 1e-6
+            w *= 100.0                                   # trafo/phase shifter MUITO caro cortar
+        end
+        if ratea[i] > 0
+            w *= (1 + 0.01*ratea[i])                     # capacidade alta => mais caro
+        end
+        key = u < v ? (u,v) : (v,u)
+        cutw[key] = get(cutw, key, 0.0) + w
+    end
+    return cutw
+end
+
+_edge_key(u::Int,v::Int) = u < v ? (u,v) : (v,u)
+
 # --------------------------------------------
-# Particionamento espectral balanceado
+# Particionamento orientado a ADMM (min-cut ponderado + mínimo de 15%)
 # --------------------------------------------
 
 # Fiedler seguro
@@ -211,56 +240,69 @@ function _laplacian_of_induced(g::SimpleGraph, nodes::Vector{Int})
 end
 
 """
-    _balanced_bisection!(g, nodes, target_size; balance_tol=0.10)
+    _balanced_bisection_cut!(g, nodes, cutw; min_zone_ratio=0.15)
 
-Divide `nodes` em (left, right) com tamanho próximo a target_size/2 (±balance_tol).
-Retorna vetores de nós absolutos.
+Divide `nodes` em (left, right) minimizando custo de corte ponderado (`cutw`)
+e garantindo que ambas as partes tenham ao menos `min_zone_ratio * length(nodes)`.
+Retorna (left, right). Se não houver split viável, retorna (nodes, Int[]).
 """
-function _balanced_bisection!(g::SimpleGraph, nodes::Vector{Int}, target_size::Int; balance_tol::Float64=0.10)
+function _balanced_bisection_cut!(g::SimpleGraph, nodes::Vector{Int}, cutw::Dict{Tuple{Int,Int},Float64};
+                                  min_zone_ratio::Float64=0.15)
     n = length(nodes)
-    ideal = max(1, fld(target_size, 2))
-    minL = max(1, round(Int, ideal*(1 - balance_tol)))
-    maxL = min(n-1, round(Int, ideal*(1 + balance_tol)))
+    min_size = max(1, ceil(Int, n * min_zone_ratio))
+    if n < 2*min_size
+        return nodes, Int[]
+    end
 
+    # ordenação por Fiedler quando possível (fallback: grau)
     L = _laplacian_of_induced(g, nodes)
     f = _fiedler_vector(L)
-
     order = if f === nothing || all(abs.(f .- f[1]) .< 1e-12)
-        # fallback: ordena por grau desc
         degs = [degree(g, u) for u in nodes]
         sortperm(degs; rev=true)
     else
-        sortperm(f)   # crescente
+        sortperm(f)
     end
 
-    split_idx = clamp(ideal, minL, maxL)
-    best_idx = split_idx
-    best_cut = typemax(Int)
-    for s in max(1, split_idx-8):min(n-1, split_idx+8)
+    s_lo = min_size
+    s_hi = n - min_size
+    step = max(1, fld(n, 100))  # ~100 amostras
+    best_s = 0
+    best_cost = Inf
+
+    function cut_cost(s::Int)
         leftset = Set(nodes[order[1:s]])
-        cut = 0
-        for i in (s+1):n
+        cost = 0.0
+        @inbounds for i in (s+1):n
             u = nodes[order[i]]
             for v in neighbors(g, u)
                 if v in leftset
-                    cut += 1
+                    cost += get(cutw, _edge_key(u,v), 1.0)
                 end
             end
         end
-        if s >= minL && s <= maxL && cut < best_cut
-            best_cut = cut
-            best_idx = s
+        return cost
+    end
+
+    for s in s_lo:step:s_hi
+        c = cut_cost(s)
+        if c < best_cost
+            best_cost = c; best_s = s
+        end
+    end
+    if best_s == 0
+        return nodes, Int[]
+    end
+    # refino local fino
+    for s in max(s_lo, best_s-20):min(s_hi, best_s+20)
+        c = cut_cost(s)
+        if c < best_cost
+            best_cost = c; best_s = s
         end
     end
 
-    s = best_idx
-    left  = [nodes[order[i]] for i in 1:s]
-    right = [nodes[order[i]] for i in (s+1):n]
-    if isempty(left) || isempty(right)
-        s = max(1, min(n-1, fld(n,2)))
-        left  = nodes[order[1:s]]
-        right = nodes[order[s+1:end]]
-    end
+    left  = [nodes[order[i]] for i in 1:best_s]
+    right = [nodes[order[i]] for i in (best_s+1):n]
     return left, right
 end
 
@@ -319,42 +361,50 @@ function _rebalance_by_size!(g::SimpleGraph, labels::Dict{Int,Int}, k::Int; bala
 end
 
 """
-    partition_spectral(case, g, k, present, posmap; balance_tol=0.10)
+    partition_spectral(case, g, k, present, posmap;
+                       min_zone_ratio=0.15, balance_tol=0.10)
 
-Particionamento k-way por bissecção espectral recursiva balanceada.
+Particionamento k-way orientado a **minimizar corte ponderado** e garantindo
+tamanho mínimo por zona de `min_zone_ratio` do tamanho do bloco no momento da divisão.
 """
 function partition_spectral(case, g::SimpleGraph, k::Int, present::BitVector, posmap::Dict{Int,Int};
-                            balance_tol::Float64=0.10)
+                            min_zone_ratio::Float64=0.15, balance_tol::Float64=0.10)
     all_buses = sort(collect(keys(posmap)))
-    n = length(all_buses)
-    target = round(Int, n / k)
+    # pesos de corte vindos do case
+    cutw = _build_cut_weights(case, g)
 
-    queue = [(all_buses, n)]
+    # fila de blocos a dividir (sempre dividimos o MAIOR bloco)
+    queue = [all_buses]
     buckets = Vector{Vector{Int}}()
 
     while length(buckets) + length(queue) < k
-        idx = argmax([length(nodes) for (nodes, _) in queue])
-        nodes, targ = queue[idx]
+        idx = argmax(length.(queue))
+        nodes = queue[idx]
         deleteat!(queue, idx)
-        if length(nodes) <= 2
+
+        left, right = _balanced_bisection_cut!(g, nodes, cutw; min_zone_ratio=min_zone_ratio)
+        if isempty(right)
+            # não dá pra dividir mantendo mínimo -> fixa
             push!(buckets, nodes)
-            continue
+        else
+            # empurra o MAIOR de volta para continuar quebrando
+            if length(left) >= length(right)
+                push!(queue, left); push!(buckets, right)
+            else
+                push!(queue, right); push!(buckets, left)
+            end
         end
-        left, right = _balanced_bisection!(g, nodes, targ; balance_tol=balance_tol)
-        tL = max(1, round(Int, targ/2))
-        tR = max(1, targ - tL)
-        push!(queue, (left,  tL))
-        push!(queue, (right, tR))
     end
 
-    append!(buckets, first.(queue))
+    # completa buckets até k
+    append!(buckets, queue)
     while length(buckets) > k
         sort!(buckets, by=length)
-        a = popfirst!(buckets)
-        b = popfirst!(buckets)
+        a = popfirst!(buckets); b = popfirst!(buckets)
         push!(buckets, vcat(a,b))
     end
 
+    # rotula
     label_of = Dict{Int,Int}()
     for (z, nodes) in enumerate(buckets)
         for u in nodes
@@ -362,20 +412,14 @@ function partition_spectral(case, g::SimpleGraph, k::Int, present::BitVector, po
         end
     end
 
+    # rebalance leve (mantém espírito do balance, sem violar splits)
     _rebalance_by_size!(g, label_of, k; balance_tol=balance_tol)
 
+    # monta vetor zone alinhado ao case
     buses = case["bus"]["bus_i"]
     zone = fill(1, length(buses))
     for (i,b) in enumerate(buses)
-        if haskey(label_of, b)
-            zone[i] = label_of[b]
-        else
-            counts = zeros(Int, k)
-            for v in values(label_of); counts[v] += 1; end
-            zmin = argmin(counts)
-            zone[i] = zmin
-            label_of[b] = zmin
-        end
+        zone[i] = get(label_of, b, 1)
     end
 
     fix_connectivity_and_slack!(case, zone, k)
@@ -524,7 +568,8 @@ function partition_cases(indir::AbstractString=DEFAULT_DIR;
     seed::Integer = 42,
     glob::AbstractString = "*.m",
     overwrite::Bool = false,
-    balance_tol::Float64 = 0.10
+    balance_tol::Float64 = 0.10,
+    min_zone_ratio::Float64 = 0.15,
 )
     require_poweroptimization()
 
@@ -559,7 +604,9 @@ function partition_cases(indir::AbstractString=DEFAULT_DIR;
 
             Random.seed!(seed)
             g, _, _, present, posmap = build_bus_graph(case)
-            z = partition_spectral(case, g, k, present, posmap; balance_tol=balance_tol)
+            z = partition_spectral(case, g, k, present, posmap;
+                                   min_zone_ratio=min_zone_ratio,
+                                   balance_tol=balance_tol)
             apply_zones!(case, z)
 
             # resumo de tamanhos
@@ -592,6 +639,7 @@ function parse_args()
     args["--glob"] = "*.m"
     args["--overwrite"] = false
     args["--balance_tol"] = 0.10
+    args["--min_zone_ratio"] = 0.15
 
     i = 1
     while i <= length(ARGS)
@@ -607,6 +655,7 @@ function parse_args()
         elseif a == "--glob";   i+=1; args["--glob"] = ARGS[i]
         elseif a == "--overwrite"; args["--overwrite"] = true
         elseif a == "--balance_tol"; i+=1; args["--balance_tol"] = parse(Float64, ARGS[i])
+        elseif a == "--min_zone_ratio"; i+=1; args["--min_zone_ratio"] = parse(Float64, ARGS[i])
         else
             @warn "Argumento desconhecido: $a"
         end
@@ -624,6 +673,7 @@ function main()
         glob = String(a["--glob"]),
         overwrite = Bool(a["--overwrite"]),
         balance_tol = Float64(a["--balance_tol"]),
+        min_zone_ratio = Float64(a["--min_zone_ratio"]),
     )
 end
 
@@ -634,5 +684,6 @@ partition_cases(
     seed=42,
     glob="*.m",
     overwrite=false,
-    balance_tol=0.10,   # ajuste para deixar mais/menos rígido
+    balance_tol=0.10,
+    min_zone_ratio=0.15,   # nenhuma zona < 15% do total
 )
