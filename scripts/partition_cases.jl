@@ -9,6 +9,7 @@ using PowerOptimization
 using Statistics
 
 const DEFAULT_DIR = normpath(@__DIR__, "..", "test", "matpower_cases")
+
 function require_poweroptimization()
     try
         @eval using PowerOptimization
@@ -97,7 +98,7 @@ function write_matpower_with_zones(path_out::String, case::Dict{String,Any})
 end
 
 # --------------------------------------------
-# Construção do grafo e particionamento (espectral)
+# Construção do grafo
 # --------------------------------------------
 "Retorna (g, edge_weights, vertex_weights, present, posmap)."
 function build_bus_graph(case::Dict{String,Any}; edge_weight::Symbol=:susceptance)
@@ -164,19 +165,22 @@ function build_bus_graph(case::Dict{String,Any}; edge_weight::Symbol=:susceptanc
     return g, ew, vw, present, posmap
 end
 
-# ---------- helpers espectrais seguros ----------
-function fiedler_vector(L::AbstractMatrix{<:Real})
-    Lf = SparseMatrixCSC{Float64,Int}(L)
-    n = size(Lf,1)
+# --------------------------------------------
+# Particionamento espectral balanceado
+# --------------------------------------------
+
+# Fiedler seguro
+function _fiedler_vector(L::SparseMatrixCSC{Float64,Int})
+    n = size(L,1)
     if n <= 2
         return nothing
     end
     if n <= 200
-        vals, vecs = eigen(Symmetric(Matrix(Lf)))
+        vals, vecs = eigen(Symmetric(Matrix(L)))
         return length(vals) >= 2 ? vecs[:,2] : nothing
     else
         try
-            vals, vecs = Arpack.eigs(Lf; nev=2, which=:SR)
+            vals, vecs = Arpack.eigs(L; nev=2, which=:SR)
             return size(vecs,2) >= 2 ? vecs[:,2] : nothing
         catch
             return nothing
@@ -184,56 +188,203 @@ function fiedler_vector(L::AbstractMatrix{<:Real})
     end
 end
 
-function partition_spectral(case, g::SimpleGraph, k::Int, present::BitVector, posmap::Dict{Int,Int})
-    buses = collect(keys(posmap)) |> sort
-    zone = fill(1, length(buses))
-    bucket = Dict(1 => collect(eachindex(buses)))
-    nextlabel = 2
-
-    while length(bucket) < k
-        sizes = Dict(z => length(v) for (z, v) in bucket)
-        zkey = argmax(sizes)    
-        idxs = bucket[zkey]
-        sub_nodes = buses[idxs]
-        if length(sub_nodes) <= 2
-            break
-        end
-
-        sg, mapping = induced_subgraph(g, sub_nodes)
-        if nv(sg) <= 2
-            break
-        end
-
-        L = SparseMatrixCSC{Float64,Int}(laplacian_matrix(sg))
-        f = fiedler_vector(L)
-        f === nothing && break
-
-        thresh = median(f)
-        left  = findall(<(thresh), f)
-        right = findall(>=(thresh), f)
-        if isempty(left) || isempty(right)
-            break
-        end
-
-        for (side, list) in enumerate((left, right))
-            for vh in list
-                b = mapping[vh]   
-                pos = posmap[b]      
-                zone[pos] = (side == 1 ? zkey : nextlabel)
+# Laplaciano do subgrafo induzido por "nodes" (IDs absolutos)
+function _laplacian_of_induced(g::SimpleGraph, nodes::Vector{Int})
+    mappos = Dict(nodes[i]=>i for i in eachindex(nodes))
+    n = length(nodes)
+    I = Int[]; J = Int[]; V = Float64[]
+    deg = zeros(Float64, n)
+    for (i, u) in enumerate(nodes)
+        for v in neighbors(g, u)
+            haskey(mappos, v) || continue
+            j = mappos[v]
+            if i != j
+                push!(I, i); push!(J, j); push!(V, -1.0)
+                deg[i] += 1.0
             end
         end
+    end
+    for i in 1:n
+        push!(I, i); push!(J, i); push!(V, deg[i])
+    end
+    return sparse(I, J, V, n, n)
+end
 
-        bucket[zkey]      = [i for i in eachindex(zone) if zone[i]==zkey]
-        bucket[nextlabel] = [i for i in eachindex(zone) if zone[i]==nextlabel]
-        nextlabel += 1
-        if nextlabel > k
-            break
+"""
+    _balanced_bisection!(g, nodes, target_size; balance_tol=0.10)
+
+Divide `nodes` em (left, right) com tamanho próximo a target_size/2 (±balance_tol).
+Retorna vetores de nós absolutos.
+"""
+function _balanced_bisection!(g::SimpleGraph, nodes::Vector{Int}, target_size::Int; balance_tol::Float64=0.10)
+    n = length(nodes)
+    ideal = max(1, fld(target_size, 2))
+    minL = max(1, round(Int, ideal*(1 - balance_tol)))
+    maxL = min(n-1, round(Int, ideal*(1 + balance_tol)))
+
+    L = _laplacian_of_induced(g, nodes)
+    f = _fiedler_vector(L)
+
+    order = if f === nothing || all(abs.(f .- f[1]) .< 1e-12)
+        # fallback: ordena por grau desc
+        degs = [degree(g, u) for u in nodes]
+        sortperm(degs; rev=true)
+    else
+        sortperm(f)   # crescente
+    end
+
+    split_idx = clamp(ideal, minL, maxL)
+    best_idx = split_idx
+    best_cut = typemax(Int)
+    for s in max(1, split_idx-8):min(n-1, split_idx+8)
+        leftset = Set(nodes[order[1:s]])
+        cut = 0
+        for i in (s+1):n
+            u = nodes[order[i]]
+            for v in neighbors(g, u)
+                if v in leftset
+                    cut += 1
+                end
+            end
+        end
+        if s >= minL && s <= maxL && cut < best_cut
+            best_cut = cut
+            best_idx = s
         end
     end
+
+    s = best_idx
+    left  = [nodes[order[i]] for i in 1:s]
+    right = [nodes[order[i]] for i in (s+1):n]
+    if isempty(left) || isempty(right)
+        s = max(1, min(n-1, fld(n,2)))
+        left  = nodes[order[1:s]]
+        right = nodes[order[s+1:end]]
+    end
+    return left, right
+end
+
+# Rebalance leve por tamanho (move nós de fronteira)
+function _rebalance_by_size!(g::SimpleGraph, labels::Dict{Int,Int}, k::Int; balance_tol::Float64=0.10)
+    nodes = collect(keys(labels))
+    n = length(nodes)
+    target = round(Int, n / k)
+    minZ = max(1, round(Int, target*(1 - balance_tol)))
+    maxZ = round(Int, target*(1 + balance_tol))
+
+    zones = Dict(z=>Int[] for z in 1:k)
+    for u in nodes
+        push!(zones[labels[u]], u)
+    end
+
+    over = [z for z in 1:k if length(zones[z]) > maxZ]
+    under = [z for z in 1:k if length(zones[z]) < minZ]
+    if isempty(over) && isempty(under)
+        return
+    end
+
+    for zbig in over
+        while length(zones[zbig]) > maxZ
+            moved = false
+            for u in zones[zbig]
+                nbr = neighbors(g, u)
+                nbrzones = unique([labels[v] for v in nbr])
+                for zsmall in under
+                    if zsmall in nbrzones && length(zones[zsmall]) < minZ
+                        labels[u] = zsmall
+                        push!(zones[zsmall], u)
+                        filter!(x -> x != u, zones[zbig])
+                        moved = true
+                        break
+                    end
+                end
+                if moved; break; end
+            end
+            if !moved
+                degs = [(degree(g,u),u) for u in zones[zbig]]
+                sort!(degs)            # menor grau primeiro
+                u = last(first(degs))  # nó de menor grau
+                idx_small = findfirst(z -> length(zones[z]) < minZ, under)
+                idx_small === nothing && break
+                zsmall = under[idx_small]
+                labels[u] = zsmall
+                push!(zones[zsmall], u)
+                filter!(x -> x != u, zones[zbig])
+            end
+            over  = [z for z in 1:k if length(zones[z]) > maxZ]
+            under = [z for z in 1:k if length(zones[z]) < minZ]
+            isempty(over) && break
+        end
+    end
+end
+
+"""
+    partition_spectral(case, g, k, present, posmap; balance_tol=0.10)
+
+Particionamento k-way por bissecção espectral recursiva balanceada.
+"""
+function partition_spectral(case, g::SimpleGraph, k::Int, present::BitVector, posmap::Dict{Int,Int};
+                            balance_tol::Float64=0.10)
+    all_buses = sort(collect(keys(posmap)))
+    n = length(all_buses)
+    target = round(Int, n / k)
+
+    queue = [(all_buses, n)]
+    buckets = Vector{Vector{Int}}()
+
+    while length(buckets) + length(queue) < k
+        idx = argmax([length(nodes) for (nodes, _) in queue])
+        nodes, targ = queue[idx]
+        deleteat!(queue, idx)
+        if length(nodes) <= 2
+            push!(buckets, nodes)
+            continue
+        end
+        left, right = _balanced_bisection!(g, nodes, targ; balance_tol=balance_tol)
+        tL = max(1, round(Int, targ/2))
+        tR = max(1, targ - tL)
+        push!(queue, (left,  tL))
+        push!(queue, (right, tR))
+    end
+
+    append!(buckets, first.(queue))
+    while length(buckets) > k
+        sort!(buckets, by=length)
+        a = popfirst!(buckets)
+        b = popfirst!(buckets)
+        push!(buckets, vcat(a,b))
+    end
+
+    label_of = Dict{Int,Int}()
+    for (z, nodes) in enumerate(buckets)
+        for u in nodes
+            label_of[u] = z
+        end
+    end
+
+    _rebalance_by_size!(g, label_of, k; balance_tol=balance_tol)
+
+    buses = case["bus"]["bus_i"]
+    zone = fill(1, length(buses))
+    for (i,b) in enumerate(buses)
+        if haskey(label_of, b)
+            zone[i] = label_of[b]
+        else
+            counts = zeros(Int, k)
+            for v in values(label_of); counts[v] += 1; end
+            zmin = argmin(counts)
+            zone[i] = zmin
+            label_of[b] = zmin
+        end
+    end
+
     fix_connectivity_and_slack!(case, zone, k)
     return zone
 end
 
+# --------------------------------------------
+# Pós-processos (conectividade + geração/slack)
+# --------------------------------------------
 function fix_connectivity_and_slack!(case::Dict{String,Any}, zone::Vector{Int}, k::Int)
     buses = case["bus"]["bus_i"]
     f = case["branch"]["f_bus"]; t = case["branch"]["t_bus"]; on = case["branch"]["br_status"]
@@ -368,9 +519,13 @@ end
 # --------------------------------------------
 # Batch runner (função pública)
 # --------------------------------------------
-function partition_cases(indir::AbstractString=DEFAULT_DIR; ks::Vector{Int}=[2,3,4,5],
-    seed::Integer=42, glob::AbstractString="*.m", overwrite::Bool=false)
-
+function partition_cases(indir::AbstractString=DEFAULT_DIR;
+    ks::Vector{Int} = [2,3,4,5],
+    seed::Integer = 42,
+    glob::AbstractString = "*.m",
+    overwrite::Bool = false,
+    balance_tol::Float64 = 0.10
+)
     require_poweroptimization()
 
     files = sort(Glob.glob(glob, indir))
@@ -404,8 +559,20 @@ function partition_cases(indir::AbstractString=DEFAULT_DIR; ks::Vector{Int}=[2,3
 
             Random.seed!(seed)
             g, _, _, present, posmap = build_bus_graph(case)
-            z = partition_spectral(case, g, k, present, posmap)
+            z = partition_spectral(case, g, k, present, posmap; balance_tol=balance_tol)
             apply_zones!(case, z)
+
+            # resumo de tamanhos
+            counts = Dict{Int,Int}()
+            for zz in z
+                counts[zz] = get(counts, zz, 0) + 1
+            end
+            total_buses = length(z)
+            @info "Resumo zonas ($base): total_buses = $total_buses"
+            for zz in sort(collect(keys(counts)))
+                @info "  zone $zz: $(counts[zz]) buses"
+            end
+
             write_matpower_with_zones(outpath, case)
             @info "OK: $(base) → $(outpath)"
         end
@@ -424,6 +591,7 @@ function parse_args()
     args["--seed"] = 42
     args["--glob"] = "*.m"
     args["--overwrite"] = false
+    args["--balance_tol"] = 0.10
 
     i = 1
     while i <= length(ARGS)
@@ -438,6 +606,7 @@ function parse_args()
         elseif a == "--seed";   i+=1; args["--seed"] = parse(Int, ARGS[i])
         elseif a == "--glob";   i+=1; args["--glob"] = ARGS[i]
         elseif a == "--overwrite"; args["--overwrite"] = true
+        elseif a == "--balance_tol"; i+=1; args["--balance_tol"] = parse(Float64, ARGS[i])
         else
             @warn "Argumento desconhecido: $a"
         end
@@ -454,6 +623,7 @@ function main()
         seed = Int(a["--seed"]),
         glob = String(a["--glob"]),
         overwrite = Bool(a["--overwrite"]),
+        balance_tol = Float64(a["--balance_tol"]),
     )
 end
 
@@ -463,5 +633,6 @@ partition_cases(
     ks=[2,3,4,5],
     seed=42,
     glob="*.m",
-    overwrite=false
+    overwrite=false,
+    balance_tol=0.10,   # ajuste para deixar mais/menos rígido
 )
