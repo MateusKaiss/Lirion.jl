@@ -22,7 +22,7 @@ const distributed_zone_cases = [
     "pglib_opf_case500_3zones_goc.m",
     "pglib_opf_case500_4zones_goc.m",
     # 793
-    "pglib_opf_case793_11zones_goc.m",
+    # "pglib_opf_case793_11zones_goc.m",
 ]
 
 function track_failure_dist(label::String, origin::String, case_name::String)

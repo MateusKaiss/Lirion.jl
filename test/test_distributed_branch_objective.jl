@@ -25,6 +25,9 @@ const distributed_branch_zone_cases = [
     "pglib_opf_case500_4zones_goc.m",
     # 793
     # "pglib_opf_case793_11zones_goc.m",
+
+    # 2000
+    "pglib_opf_case2000_5zones_goc.m",
 ]
 
 function track_failure_branch(label::String, origin::String, case_name::String)
@@ -143,6 +146,12 @@ function run_distributed_branch_objective_tests(;
             admm_rho_case = 1_000_000.0
             admm_eps_primal_case = 1e-4
             admm_eps_dual_case = 1e-4
+        elseif occursin("case2000_", case_name)
+            admm_max_iter_case = 600
+            admm_rho_case = 700.0
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case = 1e-4
+            admm_alpha = 1.6
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha))"
