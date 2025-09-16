@@ -369,25 +369,27 @@ tamanho mínimo por zona de `min_zone_ratio` do tamanho do bloco no momento da d
 """
 function partition_spectral(case, g::SimpleGraph, k::Int, present::BitVector, posmap::Dict{Int,Int};
                             min_zone_ratio::Float64=0.15, balance_tol::Float64=0.10)
+
     all_buses = sort(collect(keys(posmap)))
-    # pesos de corte vindos do case
     cutw = _build_cut_weights(case, g)
 
-    # fila de blocos a dividir (sempre dividimos o MAIOR bloco)
+    # fila começa com um único bloco (todas as barras)
     queue = [all_buses]
     buckets = Vector{Vector{Int}}()
 
-    while length(buckets) + length(queue) < k
+    # --- LOOP ROBUSTO: não tente argmax em fila vazia
+    while (length(buckets) + length(queue) < k) && !isempty(queue)
+        # escolha o maior bloco remanescente para tentar dividir
         idx = argmax(length.(queue))
         nodes = queue[idx]
         deleteat!(queue, idx)
 
         left, right = _balanced_bisection_cut!(g, nodes, cutw; min_zone_ratio=min_zone_ratio)
         if isempty(right)
-            # não dá pra dividir mantendo mínimo -> fixa
+            # não dá pra dividir respeitando o mínimo -> fixa em buckets
             push!(buckets, nodes)
         else
-            # empurra o MAIOR de volta para continuar quebrando
+            # continua quebrando o MAIOR pedaço primeiro
             if length(left) >= length(right)
                 push!(queue, left); push!(buckets, right)
             else
@@ -396,15 +398,61 @@ function partition_spectral(case, g::SimpleGraph, k::Int, present::BitVector, po
         end
     end
 
-    # completa buckets até k
+    # Se ainda não atingiu k e a fila acabou, aplica "force-split" seguro
+    # (relaxa o min_zone_ratio de forma adaptativa e aceita singletons se precisar)
+    while length(buckets) + length(queue) < k
+        isempty(buckets) && break
+        # pega o maior bucket para fatiar
+        big_idx = argmax(length.(buckets))
+        nodes = splice!(buckets, big_idx)
+
+        n = length(nodes)
+        if n <= 1
+            # já é singleton, reempilha e sai do laço se só restam singletons
+            push!(buckets, nodes)
+            # se todos os buckets são tamanho 1, não há mais o que fazer
+            all_singletons = all(length(b) == 1 for b in buckets)
+            all_singletons && break
+            continue
+        end
+
+        # relaxa a razão mínima conforme o bloco encolhe
+        # (quanto menor o bloco, menor a exigência mínima)
+        local_min_ratio = max(0.0, min(min_zone_ratio, 0.5*sqrt(1/n)))
+
+        left, right = _balanced_bisection_cut!(g, nodes, cutw; min_zone_ratio=local_min_ratio)
+        if isempty(right)
+            # split falhou mesmo relaxando -> faz um split trivial 1 | (n-1)
+            # preservando conectividade quando possível (move um nó de menor grau)
+            if n >= 2
+                degs = [(degree(g,u), u) for u in nodes]
+                sort!(degs)                 # menor grau primeiro
+                u = last(first(degs))       # nó de menor grau
+                left = [u]
+                right = [v for v in nodes if v != u]
+            else
+                push!(buckets, nodes)
+                break
+            end
+        end
+
+        # empurrar de volta: continuar quebrando o maior
+        if length(left) >= length(right)
+            push!(queue, left); push!(buckets, right)
+        else
+            push!(queue, right); push!(buckets, left)
+        end
+    end
+
+    # Junta fila e buckets e, se passou de k por arredondamentos, combina menores
     append!(buckets, queue)
     while length(buckets) > k
-        sort!(buckets, by=length)
+        sort!(buckets, by=length)           # dois menores
         a = popfirst!(buckets); b = popfirst!(buckets)
         push!(buckets, vcat(a,b))
     end
 
-    # rotula
+    # Rotulagem
     label_of = Dict{Int,Int}()
     for (z, nodes) in enumerate(buckets)
         for u in nodes
@@ -412,16 +460,17 @@ function partition_spectral(case, g::SimpleGraph, k::Int, present::BitVector, po
         end
     end
 
-    # rebalance leve (mantém espírito do balance, sem violar splits)
+    # Rebalance leve
     _rebalance_by_size!(g, label_of, k; balance_tol=balance_tol)
 
-    # monta vetor zone alinhado ao case
+    # Monta vetor zone alinhado ao case
     buses = case["bus"]["bus_i"]
     zone = fill(1, length(buses))
     for (i,b) in enumerate(buses)
         zone[i] = get(label_of, b, 1)
     end
 
+    # Conectividade + garantir geração/slack por zona
     fix_connectivity_and_slack!(case, zone, k)
     return zone
 end
@@ -680,7 +729,7 @@ end
 # Para rodar direto via include:
 partition_cases(
     raw"C:\Users\franc\PowerOptimization.jl\test\zones";
-    ks=[2,3,4,5],
+    ks=[2,3,4,5,25,50,100,150,200,300],
     seed=42,
     glob="*.m",
     overwrite=false,
