@@ -2,7 +2,7 @@
 # ADMM-Branch-DC vs DC (objetivo) – testes
 # ==============================================
 
-# Casos particionados (2/3/4 zonas) — mesmos do teste por barramento
+# Casos particionados (2/3/4 zonas)
 const distributed_branch_zone_cases = [
     # 14 buses
     "pglib_opf_case14_2zones_ieee.m",
@@ -32,7 +32,9 @@ const distributed_branch_zone_cases = [
     # 10000
     "pglib_opf_case10000_50zones_goc.m",
     # 20758
-    "pglib_opf_case20758_42zones_epigrids.m"
+    "pglib_opf_case20758_42zones_epigrids.m",
+    # 30000
+    "pglib_opf_case30000_20zones_goc.m"
 ]
 
 function track_failure_branch(label::String, origin::String, case_name::String)
@@ -50,7 +52,6 @@ function compare_distributed_branch_vs_centralized(
     file::String;
     label::String,
     central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
-    # `nothing` => usa OSQP default do resolve_optimizer_dc
     distributed_optimizer::Union{Nothing, Function} = nothing,
     rtol = 0.05,
     atol = 1e-6,
@@ -58,8 +59,8 @@ function compare_distributed_branch_vs_centralized(
     admm_max_iter = 350,
     admm_eps_primal = 1e-4,
     admm_eps_dual = 1e-4,
-    # α=1.0 -> inativo (branch também suporta over-relaxation no update_duals_flow!)
     admm_alpha::Float64 = 1.0,
+    admm_warm_start::Bool = false,
 )
     case_name = basename(file)
 
@@ -83,12 +84,15 @@ function compare_distributed_branch_vs_centralized(
         args_dist = String[
             file,
             "--model", "distributed-admm-branch-dc",
-            "--admm-rho", string(admm_rho),
-            "--admm-max-iter", string(admm_max_iter),
+            "--admm-rho",        string(admm_rho),
+            "--admm-max-iter",   string(admm_max_iter),
             "--admm-eps-primal", string(admm_eps_primal),
-            "--admm-eps-dual", string(admm_eps_dual),
-            "--admm-alpha", string(admm_alpha),
+            "--admm-eps-dual",   string(admm_eps_dual),
+            "--admm-alpha",      string(admm_alpha),
         ]
+        if admm_warm_start   
+            push!(args_dist, "--admm-warm-start")
+        end
         if !isnothing(distributed_optimizer)
             push!(args_dist, "--optimizer")
             push!(args_dist, string(distributed_optimizer))
@@ -146,8 +150,8 @@ function run_distributed_branch_objective_tests(;
         admm_eps_dual_case   = admm_eps_dual
         admm_alpha_case      = admm_alpha
         distributed_optimizer_case = distributed_optimizer
+        admm_warm_start_case = false                
 
-        # ajustes por tamanho
         if occursin("case500_", case_name)
             admm_max_iter_case = 600
             admm_rho_case = 1_000_000.0
@@ -164,23 +168,32 @@ function run_distributed_branch_objective_tests(;
             admm_max_iter_case = 600
             admm_rho_case = 1_000.0
             admm_eps_primal_case = 1e-4
-            admm_eps_dual_case   = 1e-4
-            admm_alpha_case          = 1.4
+            admm_eps_dual_case = 1e-4
+            admm_alpha_case = 1.4
         end
         if occursin("case10000_50zones_", case_name)
-            admm_max_iter_case = 800 
-            admm_rho_case      = 200.0
+            admm_max_iter_case = 800
+            admm_rho_case = 200.0
             admm_eps_primal_case = 1e-4
-            admm_eps_dual_case   = 1e-4
-            admm_alpha_case           = 1.2
+            admm_eps_dual_case = 1e-4
+            admm_alpha_case = 1.2
         end
 
         if occursin("case20758_42zones_", case_name)
-            admm_max_iter_case   = 1000 
-            admm_rho_case        = 750.0
+            admm_max_iter_case = 1000
+            admm_rho_case = 750.0
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case = 1e-4
+            admm_alpha_case = 1.1
+        end
+
+        if occursin("case30000_20zones_", case_name)
+            admm_max_iter_case   = 1000
+            admm_rho_case        = 500.0
             admm_eps_primal_case = 1e-4
             admm_eps_dual_case   = 1e-4
-            admm_alpha_case      = 1.1
+            admm_alpha_case      = 1.2
+            admm_warm_start_case = true
         end
         @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha_case), optimizer=$(distributed_optimizer_case === nothing ? "default" : string(distributed_optimizer_case)))"
         @testset "$(label) - $(case_name)" begin
@@ -196,6 +209,7 @@ function run_distributed_branch_objective_tests(;
                 admm_eps_primal = admm_eps_primal_case,
                 admm_eps_dual = admm_eps_dual_case,
                 admm_alpha = admm_alpha_case,
+                admm_warm_start = admm_warm_start_case,            # <-- passa o warm start
             )
         end
     end

@@ -227,7 +227,7 @@ struct Args
                         ε_primal = parsed["admm-eps-primal"],
                         ε_dual = parsed["admm-eps-dual"],
                         alpha_overrelax = alpha_,
-                        warm_start = warm_start_flag, 
+                        warm_start = warm_start_flag,
                     )
                 catch err
                     @warn "Esta versão de DistributedOPFModel não aceita :warm_start (atualize a struct/constructors). Prosseguindo sem warm start." err

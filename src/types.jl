@@ -75,7 +75,7 @@ DistributedOPFModel(
     ε_primal::Float64 = 1e-7,
     ε_dual::Float64 = 1e-7,
     alpha_overrelax::Union{Nothing, Float64} = nothing,
-    warm_start::Bool = false, 
+    warm_start::Bool = false,
 ) = DistributedOPFModel(
     base_model, method, max_iter,
     coalesce(rho_theta, rho),
