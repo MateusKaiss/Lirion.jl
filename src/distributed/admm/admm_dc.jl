@@ -49,6 +49,30 @@ end
     end
 end
 
+function _warm_start_theta_base!(sub::Dict{String,Any})
+    m = sub["model"]
+    θ = sub["theta_var"]
+
+    @objective(m, Min, sub["obj_base"])
+    optimize!(m)
+
+    if !(JuMP.has_values(m))
+        @warn "Warm start ignorado: optimize! não retornou valores (status=$(JuMP.termination_status(m)))."
+        return
+    end
+
+    vals = Dict{Any,Float64}()
+    for I in keys(θ)
+        vals[I] = JuMP.value(θ[I])
+    end
+
+    for (I, v) in vals
+        set_start_value(θ[I], v)
+    end
+
+    return nothing
+end
+
 # =======================================================
 # HOTPATHS & SNAPSHOTS (1.1)
 # =======================================================
@@ -473,6 +497,12 @@ function run_admm(config::DistributedOPFModel, data)
 
     optimizer_factory = resolve_optimizer_dc(config)
 
+    warm = try
+        getfield(config, :warm_start)
+    catch
+        false
+    end
+
     # build + cache quadrático (bus)
     for (zone_id, sub) in partitions
         m = build_model(sub, DC; optimizer = optimizer_factory, build_only = true)
@@ -484,6 +514,11 @@ function run_admm(config::DistributedOPFModel, data)
         for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
         end
+
+        if warm
+            _warm_start_theta_base!(sub)
+        end
+
         _build_quad_bus_expr!(sub, ρ[])
         # objetivo inicial = base + quad_bus (linear = 0)
         @objective(m, Min, sub["obj_base"] + sub["quad_bus_expr"])
@@ -619,7 +654,7 @@ end
 function run_admm_branch(
     config::DistributedOPFModel,
     data::Dict{String, Any};
-    warm_start_theta::Bool = false,
+    warm_start_theta::Bool = false, # compat: flag antiga ainda aceita
     use_legacy_rho::Bool = false,
     μ_incr::Float64 = 2.0,
     μ_decr::Float64 = 2.0,
@@ -655,6 +690,14 @@ function run_admm_branch(
     rho_vec = Float64[]
 
     optimizer_factory = resolve_optimizer_dc(config)
+
+    warm = try
+        getfield(config, :warm_start)
+    catch
+        false
+    end
+    warm = warm || warm_start_theta
+
     for (zone_id, sub) in partitions
         m = build_model(sub, DC; optimizer = optimizer_factory, build_only = true)
         sub["model"] = m
@@ -665,6 +708,11 @@ function run_admm_branch(
         for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
         end
+
+        if warm
+            _warm_start_theta_base!(sub)
+        end
+
         _build_quad_branch_expr!(sub, ρ[], sub["zone_edges"])
         @objective(m, Min, sub["obj_base"] + sub["quad_branch_expr"])
     end
@@ -826,6 +874,13 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
 
     optimizer_factory = resolve_optimizer_dc(config)
 
+    # flag warm-start (fallback se não existir)
+    warm = try
+        getfield(config, :warm_start)
+    catch
+        false
+    end
+
     for (zone_id, sub) in partitions
         m = build_model(sub, DC; optimizer = optimizer_factory, build_only = true)
         sub["model"] = m
@@ -836,6 +891,11 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
         end
+
+        if warm
+            _warm_start_theta_base!(sub)
+        end
+
         _build_quad_bus_expr!(sub, ρθ[])
         _build_quad_branch_expr!(sub, ρe[], sub["zone_edges"])
         @objective(m, Min, sub["obj_base"] + sub["quad_bus_expr"] + sub["quad_branch_expr"])
