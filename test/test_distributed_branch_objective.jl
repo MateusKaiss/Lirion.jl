@@ -165,14 +165,14 @@ function run_distributed_branch_objective_tests(;
             admm_rho_case = 1_000.0
             admm_eps_primal_case = 1e-4
             admm_eps_dual_case   = 1e-4
-            admm_alpha           = 1.4
+            admm_alpha_case          = 1.4
         end
         if occursin("case10000_50zones_", case_name)
             admm_max_iter_case = 800 
             admm_rho_case      = 200.0
             admm_eps_primal_case = 1e-4
             admm_eps_dual_case   = 1e-4
-            admm_alpha           = 1.2
+            admm_alpha_case           = 1.2
         end
 
         if occursin("case20758_42zones_", case_name)
@@ -195,7 +195,7 @@ function run_distributed_branch_objective_tests(;
                 admm_max_iter = admm_max_iter_case,
                 admm_eps_primal = admm_eps_primal_case,
                 admm_eps_dual = admm_eps_dual_case,
-                admm_alpha = admm_alpha,
+                admm_alpha = admm_alpha_case,
             )
         end
     end
