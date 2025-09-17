@@ -30,7 +30,9 @@ const distributed_branch_zone_cases = [
     #3970
     "pglib_opf_case3970_25zones_goc.m",
     # 10000
-    "pglib_opf_case10000_50zones_goc.m"
+    "pglib_opf_case10000_50zones_goc.m",
+    # 20758
+    "pglib_opf_case20758_42zones_epigrids.m"
 ]
 
 function track_failure_branch(label::String, origin::String, case_name::String)
@@ -173,6 +175,13 @@ function run_distributed_branch_objective_tests(;
             admm_alpha           = 1.2
         end
 
+        if occursin("case20758_42zones_", case_name)
+            admm_max_iter_case   = 1000 
+            admm_rho_case        = 750.0
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case   = 1e-4
+            admm_alpha_case      = 1.1
+        end
         @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha_case), optimizer=$(distributed_optimizer_case === nothing ? "default" : string(distributed_optimizer_case)))"
         @testset "$(label) - $(case_name)" begin
             compare_distributed_branch_vs_centralized(
