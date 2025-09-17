@@ -1,15 +1,16 @@
-using Printf
-using LinearAlgebra
-using SparseArrays
-using Graphs
-using Random
-using Arpack
-using Glob 
-using PowerOptimization
-using Statistics
+############################################################
+# Particionador por METIS (edge-cut balanceado) — drop-in
+############################################################
+using Printf, LinearAlgebra, SparseArrays, Graphs, Random, Glob
+using PowerOptimization, Statistics
+using Metis   # pacote Metis.jl (módulo Metis)
 
+using SimpleWeightedGraphs  # <- garanta que está no topo do arquivo
 const DEFAULT_DIR = normpath(@__DIR__, "..", "test", "matpower_cases")
 
+# ---------------------------
+# utilidades já existentes
+# ---------------------------
 function require_poweroptimization()
     try
         @eval using PowerOptimization
@@ -97,76 +98,10 @@ function write_matpower_with_zones(path_out::String, case::Dict{String,Any})
     return path_out
 end
 
-# --------------------------------------------
-# Construção do grafo
-# --------------------------------------------
-"Retorna (g, edge_weights, vertex_weights, present, posmap)."
-function build_bus_graph(case::Dict{String,Any}; edge_weight::Symbol=:susceptance)
-    f = case["branch"]["f_bus"]; t = case["branch"]["t_bus"]
-    x = case["branch"]["br_x"];  r = case["branch"]["br_r"]
-    on = case["branch"]["br_status"]
-    tap = get(case["branch"], "tap", fill(1.0, length(f)))
-    shift = get(case["branch"], "shift", fill(0.0, length(f)))
-    ratea = get(case["branch"], "rate_a", fill(0.0, length(f)))
-
-    buses = case["bus"]["bus_i"]
-    maxbus = maximum(buses)
-    present = falses(maxbus)
-    for b in buses; present[b] = true; end
-
-    g = SimpleGraph(maxbus)
-    raw_w = Float64[]
-    for i in eachindex(f)
-        on[i] == 1 || continue
-        u, v = f[i], t[i]
-        present[u] && present[v] || continue
-        add_edge!(g, u, v)
-
-        w = edge_weight === :susceptance ? (abs(x[i]) > 1e-10 ? 1/abs(x[i]) : 1e6) :
-            edge_weight === :impedance   ? 1/(x[i]^2 + r[i]^2 + 1e-12) :
-            1.0
-
-        if abs(tap[i] - 1.0) > 1e-6 || abs(shift[i]) > 1e-6
-            w *= 50.0
-        end
-        if ratea[i] > 0
-            w *= (1 + ratea[i])
-        end
-
-        push!(raw_w, w)
-    end
-    isempty(raw_w) && (raw_w = [1.0])
-    maxw = maximum(raw_w)
-    ew = round.(Int, 1 .+ 10_000 .* (raw_w ./ maxw))
-
-    vw = ones(Float64, maxbus)
-    pd_by_id = Dict{Int,Float64}()
-    if haskey(case["bus"], "pd")
-        for i in eachindex(buses)
-            pd_by_id[buses[i]] = max(case["bus"]["pd"][i], 0.0)
-        end
-    end
-    gen = get(case, "gen", Dict{String,Any}())
-    if !isempty(gen)
-        for i in eachindex(gen["gen_bus"])
-            b = gen["gen_bus"][i]
-            vw[b] += max(gen["pmax"][i], 0.0)
-        end
-    end
-    for (b,pd) in pd_by_id
-        vw[b] += pd
-    end
-    for b in 1:maxbus
-        present[b] || (vw[b] = 0)
-    end
-    sum(vw) == 0 && (vw[present] .= 1)
-
-    posmap = Dict(buses[i]=>i for i in eachindex(buses))
-    return g, ew, vw, present, posmap
-end
-
-# --- pesos de corte: punir cortar trafo/phase shifter/linhas fortes ---
-function _build_cut_weights(case::Dict{String,Any}, g::SimpleGraph)
+# ------------------------------------------------------------------
+# 1) Grafo + pesos (iguais aos seus) em estrutura para o METIS
+# ------------------------------------------------------------------
+function build_metis_inputs(case::Dict{String,Any})
     f = case["branch"]["f_bus"]; t = case["branch"]["t_bus"]
     x = case["branch"]["br_x"];  r = case["branch"]["br_r"]
     on = case["branch"]["br_status"]
@@ -174,313 +109,115 @@ function _build_cut_weights(case::Dict{String,Any}, g::SimpleGraph)
     shift = get(case["branch"], "shift", fill(0.0, length(f)))
     ratea = get(case["branch"], "rate_a", fill(0.0, length(f)))
 
-    cutw = Dict{Tuple{Int,Int},Float64}()
+    buses = case["bus"]["bus_i"]
+    maxbus = maximum(buses)
+    present = falses(maxbus)
+    for b in buses; present[b] = true; end
+    posmap = Dict(buses[i]=>i for i in eachindex(buses))
+
+    g = SimpleGraph(maxbus)
+    adj_dict = Dict{Tuple{Int,Int}, Int32}()
+
+    raw = Float64[]
     for i in eachindex(f)
         on[i]==1 || continue
         u, v = f[i], t[i]
-        has_edge(g, u, v) || continue
-        w = (abs(x[i]) > 1e-10) ? 1/abs(x[i]) : 1e6      # forte = caro cortar
+        present[u] && present[v] || continue
+        add_edge!(g, u, v)
+
+        w = (abs(x[i]) > 1e-10 ? 1/abs(x[i]) : 1e6)
         if abs(tap[i]-1.0) > 1e-6 || abs(shift[i]) > 1e-6
-            w *= 100.0                                   # trafo/phase shifter MUITO caro cortar
+            w *= 50.0
         end
         if ratea[i] > 0
-            w *= (1 + 0.01*ratea[i])                     # capacidade alta => mais caro
+            w *= (1 + ratea[i])
         end
+        push!(raw, w)
+    end
+    isempty(raw) && (raw = [1.0])
+    maxw = maximum(raw)
+
+    for i in eachindex(f)
+        on[i]==1 || continue
+        u, v = f[i], t[i]
+        present[u] && present[v] || continue
+        wfloat = (abs(x[i]) > 1e-10 ? 1/abs(x[i]) : 1e6)
+        if abs(tap[i]-1.0) > 1e-6 || abs(shift[i]) > 1e-6
+            wfloat *= 50.0
+        end
+        if ratea[i] > 0
+            wfloat *= (1 + ratea[i])
+        end
+        w = Int32(round(1 + 10_000 * (wfloat / maxw)))
         key = u < v ? (u,v) : (v,u)
-        cutw[key] = get(cutw, key, 0.0) + w
+        adj_dict[key] = get(adj_dict, key, 0) + w
     end
-    return cutw
+
+    vw = zeros(Float64, maxbus)
+    if haskey(case["bus"], "pd")
+        for i in eachindex(buses)
+            vw[buses[i]] += max(case["bus"]["pd"][i], 0.0)
+        end
+    end
+    if haskey(case, "gen") && !isempty(case["gen"])
+        gtbl = case["gen"]
+        for i in eachindex(gtbl["gen_bus"])
+            vw[gtbl["gen_bus"][i]] += max(gtbl["pmax"][i], 0.0)
+        end
+    end
+    for b in 1:maxbus
+        present[b] || (vw[b] = 0)
+        vw[b] = vw[b] <= 0 ? 1.0 : vw[b]
+    end
+    vmax = maximum(vw[present])
+    vwgt = Int32.(round.(1 .+ 1000 .* vw ./ vmax))
+
+    return g, vwgt, adj_dict, present, posmap
 end
 
-_edge_key(u::Int,v::Int) = u < v ? (u,v) : (v,u)
+# ------------------------------------------------------------------
+# 3) Métrica de qualidade: edge-cut ratio e tamanhos
+# ------------------------------------------------------------------
+function edge_cut_ratio(case::Dict{String,Any}, zone::Vector{Int})
+    f = case["branch"]["f_bus"]; t = case["branch"]["t_bus"]
+    x = case["branch"]["br_x"]; on = case["branch"]["br_status"]
+    tap = get(case["branch"], "tap", fill(1.0, length(f)))
+    shift = get(case["branch"], "shift", fill(0.0, length(f)))
+    ratea = get(case["branch"], "rate_a", fill(0.0, length(f)))
 
-# --------------------------------------------
-# Particionamento orientado a ADMM (min-cut ponderado + mínimo de 15%)
-# --------------------------------------------
+    buses = case["bus"]["bus_i"]; pos = Dict(buses[i]=>i for i in eachindex(buses))
 
-# Fiedler seguro
-function _fiedler_vector(L::SparseMatrixCSC{Float64,Int})
-    n = size(L,1)
-    if n <= 2
-        return nothing
+    w_tot = 0.0; w_cut = 0.0
+    for i in eachindex(f)
+        on[i]==1 || continue
+        u, v = f[i], t[i]
+        zu = zone[pos[u]]; zv = zone[pos[v]]
+        w = (abs(x[i]) > 1e-10 ? 1/abs(x[i]) : 1e6)
+        if abs(tap[i]-1.0) > 1e-6 || abs(shift[i]) > 1e-6; w *= 50.0; end
+        if ratea[i] > 0; w *= (1 + ratea[i]); end
+        w_tot += w
+        if zu != zv; w_cut += w; end
     end
-    if n <= 200
-        vals, vecs = eigen(Symmetric(Matrix(L)))
-        return length(vals) >= 2 ? vecs[:,2] : nothing
-    else
-        try
-            vals, vecs = Arpack.eigs(L; nev=2, which=:SR)
-            return size(vecs,2) >= 2 ? vecs[:,2] : nothing
-        catch
-            return nothing
-        end
-    end
+    return w_cut / max(w_tot, eps())
 end
 
-# Laplaciano do subgrafo induzido por "nodes" (IDs absolutos)
-function _laplacian_of_induced(g::SimpleGraph, nodes::Vector{Int})
-    mappos = Dict(nodes[i]=>i for i in eachindex(nodes))
-    n = length(nodes)
-    I = Int[]; J = Int[]; V = Float64[]
-    deg = zeros(Float64, n)
-    for (i, u) in enumerate(nodes)
-        for v in neighbors(g, u)
-            haskey(mappos, v) || continue
-            j = mappos[v]
-            if i != j
-                push!(I, i); push!(J, j); push!(V, -1.0)
-                deg[i] += 1.0
-            end
-        end
-    end
-    for i in 1:n
-        push!(I, i); push!(J, i); push!(V, deg[i])
-    end
-    return sparse(I, J, V, n, n)
-end
-
-"""
-    _balanced_bisection_cut!(g, nodes, cutw; min_zone_ratio=0.15)
-
-Divide `nodes` em (left, right) minimizando custo de corte ponderado (`cutw`)
-e garantindo que ambas as partes tenham ao menos `min_zone_ratio * length(nodes)`.
-Retorna (left, right). Se não houver split viável, retorna (nodes, Int[]).
-"""
-function _balanced_bisection_cut!(g::SimpleGraph, nodes::Vector{Int}, cutw::Dict{Tuple{Int,Int},Float64};
-                                  min_zone_ratio::Float64=0.15)
-    n = length(nodes)
-    min_size = max(1, ceil(Int, n * min_zone_ratio))
-    if n < 2*min_size
-        return nodes, Int[]
-    end
-
-    # ordenação por Fiedler quando possível (fallback: grau)
-    L = _laplacian_of_induced(g, nodes)
-    f = _fiedler_vector(L)
-    order = if f === nothing || all(abs.(f .- f[1]) .< 1e-12)
-        degs = [degree(g, u) for u in nodes]
-        sortperm(degs; rev=true)
-    else
-        sortperm(f)
-    end
-
-    s_lo = min_size
-    s_hi = n - min_size
-    step = max(1, fld(n, 100))  # ~100 amostras
-    best_s = 0
-    best_cost = Inf
-
-    function cut_cost(s::Int)
-        leftset = Set(nodes[order[1:s]])
-        cost = 0.0
-        @inbounds for i in (s+1):n
-            u = nodes[order[i]]
-            for v in neighbors(g, u)
-                if v in leftset
-                    cost += get(cutw, _edge_key(u,v), 1.0)
-                end
-            end
-        end
-        return cost
-    end
-
-    for s in s_lo:step:s_hi
-        c = cut_cost(s)
-        if c < best_cost
-            best_cost = c; best_s = s
-        end
-    end
-    if best_s == 0
-        return nodes, Int[]
-    end
-    # refino local fino
-    for s in max(s_lo, best_s-20):min(s_hi, best_s+20)
-        c = cut_cost(s)
-        if c < best_cost
-            best_cost = c; best_s = s
-        end
-    end
-
-    left  = [nodes[order[i]] for i in 1:best_s]
-    right = [nodes[order[i]] for i in (best_s+1):n]
-    return left, right
-end
-
-# Rebalance leve por tamanho (move nós de fronteira)
-function _rebalance_by_size!(g::SimpleGraph, labels::Dict{Int,Int}, k::Int; balance_tol::Float64=0.10)
-    nodes = collect(keys(labels))
-    n = length(nodes)
-    target = round(Int, n / k)
-    minZ = max(1, round(Int, target*(1 - balance_tol)))
-    maxZ = round(Int, target*(1 + balance_tol))
-
-    zones = Dict(z=>Int[] for z in 1:k)
-    for u in nodes
-        push!(zones[labels[u]], u)
-    end
-
-    over = [z for z in 1:k if length(zones[z]) > maxZ]
-    under = [z for z in 1:k if length(zones[z]) < minZ]
-    if isempty(over) && isempty(under)
-        return
-    end
-
-    for zbig in over
-        while length(zones[zbig]) > maxZ
-            moved = false
-            for u in zones[zbig]
-                nbr = neighbors(g, u)
-                nbrzones = unique([labels[v] for v in nbr])
-                for zsmall in under
-                    if zsmall in nbrzones && length(zones[zsmall]) < minZ
-                        labels[u] = zsmall
-                        push!(zones[zsmall], u)
-                        filter!(x -> x != u, zones[zbig])
-                        moved = true
-                        break
-                    end
-                end
-                if moved; break; end
-            end
-            if !moved
-                degs = [(degree(g,u),u) for u in zones[zbig]]
-                sort!(degs)            # menor grau primeiro
-                u = last(first(degs))  # nó de menor grau
-                idx_small = findfirst(z -> length(zones[z]) < minZ, under)
-                idx_small === nothing && break
-                zsmall = under[idx_small]
-                labels[u] = zsmall
-                push!(zones[zsmall], u)
-                filter!(x -> x != u, zones[zbig])
-            end
-            over  = [z for z in 1:k if length(zones[z]) > maxZ]
-            under = [z for z in 1:k if length(zones[z]) < minZ]
-            isempty(over) && break
-        end
-    end
-end
-
-"""
-    partition_spectral(case, g, k, present, posmap;
-                       min_zone_ratio=0.15, balance_tol=0.10)
-
-Particionamento k-way orientado a **minimizar corte ponderado** e garantindo
-tamanho mínimo por zona de `min_zone_ratio` do tamanho do bloco no momento da divisão.
-"""
-function partition_spectral(case, g::SimpleGraph, k::Int, present::BitVector, posmap::Dict{Int,Int};
-                            min_zone_ratio::Float64=0.15, balance_tol::Float64=0.10)
-
-    all_buses = sort(collect(keys(posmap)))
-    cutw = _build_cut_weights(case, g)
-
-    # fila começa com um único bloco (todas as barras)
-    queue = [all_buses]
-    buckets = Vector{Vector{Int}}()
-
-    # --- LOOP ROBUSTO: não tente argmax em fila vazia
-    while (length(buckets) + length(queue) < k) && !isempty(queue)
-        # escolha o maior bloco remanescente para tentar dividir
-        idx = argmax(length.(queue))
-        nodes = queue[idx]
-        deleteat!(queue, idx)
-
-        left, right = _balanced_bisection_cut!(g, nodes, cutw; min_zone_ratio=min_zone_ratio)
-        if isempty(right)
-            # não dá pra dividir respeitando o mínimo -> fixa em buckets
-            push!(buckets, nodes)
-        else
-            # continua quebrando o MAIOR pedaço primeiro
-            if length(left) >= length(right)
-                push!(queue, left); push!(buckets, right)
-            else
-                push!(queue, right); push!(buckets, left)
-            end
-        end
-    end
-
-    # Se ainda não atingiu k e a fila acabou, aplica "force-split" seguro
-    # (relaxa o min_zone_ratio de forma adaptativa e aceita singletons se precisar)
-    while length(buckets) + length(queue) < k
-        isempty(buckets) && break
-        # pega o maior bucket para fatiar
-        big_idx = argmax(length.(buckets))
-        nodes = splice!(buckets, big_idx)
-
-        n = length(nodes)
-        if n <= 1
-            # já é singleton, reempilha e sai do laço se só restam singletons
-            push!(buckets, nodes)
-            # se todos os buckets são tamanho 1, não há mais o que fazer
-            all_singletons = all(length(b) == 1 for b in buckets)
-            all_singletons && break
-            continue
-        end
-
-        # relaxa a razão mínima conforme o bloco encolhe
-        # (quanto menor o bloco, menor a exigência mínima)
-        local_min_ratio = max(0.0, min(min_zone_ratio, 0.5*sqrt(1/n)))
-
-        left, right = _balanced_bisection_cut!(g, nodes, cutw; min_zone_ratio=local_min_ratio)
-        if isempty(right)
-            # split falhou mesmo relaxando -> faz um split trivial 1 | (n-1)
-            # preservando conectividade quando possível (move um nó de menor grau)
-            if n >= 2
-                degs = [(degree(g,u), u) for u in nodes]
-                sort!(degs)                 # menor grau primeiro
-                u = last(first(degs))       # nó de menor grau
-                left = [u]
-                right = [v for v in nodes if v != u]
-            else
-                push!(buckets, nodes)
-                break
-            end
-        end
-
-        # empurrar de volta: continuar quebrando o maior
-        if length(left) >= length(right)
-            push!(queue, left); push!(buckets, right)
-        else
-            push!(queue, right); push!(buckets, left)
-        end
-    end
-
-    # Junta fila e buckets e, se passou de k por arredondamentos, combina menores
-    append!(buckets, queue)
-    while length(buckets) > k
-        sort!(buckets, by=length)           # dois menores
-        a = popfirst!(buckets); b = popfirst!(buckets)
-        push!(buckets, vcat(a,b))
-    end
-
-    # Rotulagem
-    label_of = Dict{Int,Int}()
-    for (z, nodes) in enumerate(buckets)
-        for u in nodes
-            label_of[u] = z
-        end
-    end
-
-    # Rebalance leve
-    _rebalance_by_size!(g, label_of, k; balance_tol=balance_tol)
-
-    # Monta vetor zone alinhado ao case
-    buses = case["bus"]["bus_i"]
-    zone = fill(1, length(buses))
-    for (i,b) in enumerate(buses)
-        zone[i] = get(label_of, b, 1)
-    end
-
-    # Conectividade + garantir geração/slack por zona
-    fix_connectivity_and_slack!(case, zone, k)
-    return zone
+# ------------------------------------------------------------------
+# 4) Política de escolha de k (auto)
+# ------------------------------------------------------------------
+function choose_k(case; max_zone::Int=5000, kmin::Int=2, kmax::Int=2000)
+    n = length(case["bus"]["bus_i"])
+    k = max(kmin, ceil(Int, n / max_zone))
+    return min(max(k, kmin), kmax)
 end
 
 # --------------------------------------------
-# Pós-processos (conectividade + geração/slack)
+# Pós-processos: conectividade + geração/slack
 # --------------------------------------------
 function fix_connectivity_and_slack!(case::Dict{String,Any}, zone::Vector{Int}, k::Int)
     buses = case["bus"]["bus_i"]
     f = case["branch"]["f_bus"]; t = case["branch"]["t_bus"]; on = case["branch"]["br_status"]
+
+    # vizinhança por bus (apenas ramos ativos)
     neigh = Dict{Int,Vector{Int}}()
     for i in eachindex(f)
         on[i]==1 || continue
@@ -489,6 +226,9 @@ function fix_connectivity_and_slack!(case::Dict{String,Any}, zone::Vector{Int}, 
     end
     pos = Dict(buses[i]=>i for i in eachindex(buses))
 
+    # 1) garantir conectividade por zona: se houver componentes desconexas
+    #    numa mesma zona, "puxa" cada componente menor para a zona mais
+    #    incidente na borda dessa componente.
     for z in 1:k
         nodes = [buses[i] for i in eachindex(buses) if zone[i]==z]
         isempty(nodes) && continue
@@ -496,8 +236,7 @@ function fix_connectivity_and_slack!(case::Dict{String,Any}, zone::Vector{Int}, 
         comps = Vector{Vector{Int}}()
         for u in nodes
             u in seen && continue
-            comp = Int[]
-            Q = [u]; push!(seen,u)
+            comp = Int[]; Q = [u]; push!(seen,u)
             while !isempty(Q)
                 w = popfirst!(Q); push!(comp, w)
                 for v in get(neigh, w, Int[])
@@ -509,92 +248,91 @@ function fix_connectivity_and_slack!(case::Dict{String,Any}, zone::Vector{Int}, 
             push!(comps, comp)
         end
         length(comps) <= 1 && continue
-        sort!(comps, by=length, rev=true)
+        sort!(comps, by=length, rev=true)  # primeira é a maior (fica)
         for comp in comps[2:end]
+            # zona mais "conectada" à fronteira dessa componente
             border = [(u,v) for u in comp for v in get(neigh,u,Int[]) if zone[pos[v]] != z]
-            if isempty(border)
-                continue
-            else
-                counts = Dict{Int,Int}()
-                for (_,v) in border
-                    counts[zone[pos[v]]] = get(counts, zone[pos[v]], 0) + 1
-                end
-                zbest = let ks = collect(keys(counts)); ks[argmax(collect(values(counts)))] end
-                for u in comp
-                    zone[pos[u]] = zbest
-                end
+            isempty(border) && continue
+            counts = Dict{Int,Int}()
+            for (_,v) in border
+                zv = zone[pos[v]]
+                counts[zv] = get(counts, zv, 0) + 1
+            end
+            zbest = let ks = collect(keys(counts)); ks[argmax(collect(values(counts)))] end
+            for u in comp
+                zone[pos[u]] = zbest
             end
         end
     end
 
+    # 2) garantir pelo menos uma barra com geração (>0 pmax) por zona.
     gen = get(case, "gen", Dict{String,Any}())
-    if !isempty(gen)
-        genbus = gen["gen_bus"]
-        status = gen["gen_status"]
-        pmax   = gen["pmax"]
-        pos = Dict(case["bus"]["bus_i"][i]=>i for i in eachindex(case["bus"]["bus_i"]))
+    isempty(gen) && return zone
 
-        pmax_by_zone = Dict(z=>0.0 for z in 1:k)
-        for i in eachindex(genbus)
-            status[i]==1 || continue
-            b  = genbus[i]
-            z  = zone[pos[b]]
-            pM = max(pmax[i], 0.0)
-            pmax_by_zone[z] = get(pmax_by_zone, z, 0.0) + pM
+    genbus = gen["gen_bus"]; status = gen["gen_status"]; pmax = gen["pmax"]
+    pos = Dict(case["bus"]["bus_i"][i]=>i for i in eachindex(case["bus"]["bus_i"]))
+
+    # pmax por zona
+    pmax_by_zone = Dict(z=>0.0 for z in 1:k)
+    for i in eachindex(genbus)
+        status[i]==1 || continue
+        b  = genbus[i]
+        z  = zone[pos[b]]
+        pM = max(pmax[i], 0.0)
+        pmax_by_zone[z] = get(pmax_by_zone, z, 0.0) + pM
+    end
+
+    # grafo entre zonas (arestas de corte)
+    neighZ = Dict{Int,Set{Int}}()
+    for i in eachindex(f)
+        on[i]==1 || continue
+        zf = zone[pos[f[i]]]; zt = zone[pos[t[i]]]
+        if zf != zt
+            push!(get!(neighZ, zf, Set{Int}()), zt)
+            push!(get!(neighZ, zt, Set{Int}()), zf)
         end
+    end
 
-        f = case["branch"]["f_bus"]; t = case["branch"]["t_bus"]; on = case["branch"]["br_status"]
-        neigh = Dict{Int,Set{Int}}()
-        for i in eachindex(f)
-            on[i]==1 || continue
-            zf = zone[pos[f[i]]]; zt = zone[pos[t[i]]]
-            if zf != zt
-                push!(get!(neigh, zf, Set{Int}()), zt)
-                push!(get!(neigh, zt, Set{Int}()), zf)
+    # lista de geradores "movíveis" por zona (pmax>0)
+    gens_in_zone = Dict(z=>Int[] for z in 1:k)
+    for i in eachindex(genbus)
+        status[i]==1 || continue
+        if pmax[i] > 1e-6
+            bz = zone[pos[genbus[i]]]
+            push!(gens_in_zone[bz], i)
+        end
+    end
+
+    # para cada zona sem pmax, "puxa" um gerador de uma zona vizinha (ou qualquer outra)
+    for z in 1:k
+        if get(pmax_by_zone, z, 0.0) > 1e-9
+            continue
+        end
+        moved = false
+        for zv in sort(collect(get(neighZ, z, Set{Int}())))  # preferir vizinhas
+            if !isempty(get(gens_in_zone, zv, Int[]))
+                gi = pop!(gens_in_zone[zv])
+                b  = genbus[gi]
+                zone[pos[b]] = z
+                pmax_by_zone[z]  = get(pmax_by_zone, z, 0.0) + max(pmax[gi],0.0)
+                pmax_by_zone[zv] = max(get(pmax_by_zone, zv, 0.0) - max(pmax[gi],0.0), 0.0)
+                push!(gens_in_zone[z], gi)
+                moved = true
+                break
             end
         end
-
-        gens_in_zone = Dict(z=>Int[] for z in 1:k)
-        for i in eachindex(genbus)
-            status[i]==1 || continue
-            if pmax[i] > 1e-6
-                bz = zone[pos[genbus[i]]]
-                push!(gens_in_zone[bz], i)
-            end
-        end
-
-        for z in 1:k
-            if get(pmax_by_zone, z, 0.0) > 1e-9
-                continue  # já tem pmax
-            end
-
-            moved = false
-            for zv in sort(collect(get(neigh, z, Set{Int}())))
-                if !isempty(get(gens_in_zone, zv, Int[]))
-                    gi = pop!(gens_in_zone[zv]) 
+        if !moved
+            # pega de qualquer outra zona
+            for zz in 1:k
+                zz == z && continue
+                if !isempty(get(gens_in_zone, zz, Int[]))
+                    gi = pop!(gens_in_zone[zz])
                     b  = genbus[gi]
-                    zone[pos[b]] = z                
-                    pmax_by_zone[z]  = get(pmax_by_zone, z, 0.0) + max(pmax[gi],0.0)
-                    pmax_by_zone[zv] = max(get(pmax_by_zone, zv, 0.0) - max(pmax[gi],0.0), 0.0)
+                    zone[pos[b]] = z
+                    pmax_by_zone[z]  += max(pmax[gi],0.0)
+                    pmax_by_zone[zz]  = max(pmax_by_zone[zz] - max(pmax[gi],0.0), 0.0)
                     push!(gens_in_zone[z], gi)
-                    moved = true
                     break
-                end
-            end
-
-            if !moved
-                for zz in 1:k
-                    zz == z && continue
-                    if !isempty(get(gens_in_zone, zz, Int[]))
-                        gi = pop!(gens_in_zone[zz])
-                        b  = genbus[gi]
-                        zone[pos[b]] = z
-                        pmax_by_zone[z]  += max(pmax[gi],0.0)
-                        pmax_by_zone[zz]  = max(pmax_by_zone[zz] - max(pmax[gi],0.0), 0.0)
-                        push!(gens_in_zone[z], gi)
-                        moved = true
-                        break
-                    end
                 end
             end
         end
@@ -609,130 +347,108 @@ function apply_zones!(case::Dict{String,Any}, zone::Vector{Int})
     return case
 end
 
-# --------------------------------------------
-# Batch runner (função pública)
-# --------------------------------------------
-function partition_cases(indir::AbstractString=DEFAULT_DIR;
-    ks::Vector{Int} = [2,3,4,5],
-    seed::Integer = 42,
-    glob::AbstractString = "*.m",
-    overwrite::Bool = false,
-    balance_tol::Float64 = 0.10,
-    min_zone_ratio::Float64 = 0.15,
-)
-    require_poweroptimization()
 
-    files = sort(Glob.glob(glob, indir))
-    isempty(files) && @info "Nenhum arquivo $glob encontrado em $indir."
+# ------------------------------------------------------------------
+# 5) Pipeline em lote usando METIS
+# ------------------------------------------------------------------
+using SimpleWeightedGraphs  # <- garanta que está no topo do arquivo
 
-    for k in ks
-        outdir = joinpath(indir, "case $(k) zones")
-        isdir(outdir) || mkpath(outdir)
-        @info "==== k=$k → salvando em $(outdir)"
-        for f in files
-            base = basename(f)
-            outpath = joinpath(outdir, base)
+function metis_partition(case::Dict{String,Any}; k::Int, balance_tol::Float64=0.10)
+    @assert k >= 1 "k deve ser ≥ 1"
+    @assert haskey(case, "bus") && haskey(case, "branch") "case incompleto"
 
-            case = try
-                load_case(f)
-            catch e
-                @warn "Falha ao carregar $base: $e"
-                continue
-            end
+    # --- coleta dados básicos
+    buses  = case["bus"]["bus_i"]
+    present = Set(buses)
+    posmap = Dict(buses[i] => i for i in eachindex(buses))
 
-            # pular fontes que já têm >1 zona
-            if has_multiple_zones(case)
-                @info "PULANDO (fonte já tem >1 zona): $(base)"
-                continue
-            end
+    f   = case["branch"]["f_bus"]
+    t   = case["branch"]["t_bus"]
+    x   = case["branch"]["br_x"]
+    r   = case["branch"]["br_r"]
+    on  = case["branch"]["br_status"]
+    tap   = get(case["branch"], "tap",   fill(1.0, length(f)))
+    shift = get(case["branch"], "shift", fill(0.0, length(f)))
+    ratea = get(case["branch"], "rate_a", fill(0.0, length(f)))
 
-            if isfile(outpath) && !overwrite
-                @info "PULANDO (destino já existe): $(outpath)"
-                continue
-            end
-
-            Random.seed!(seed)
-            g, _, _, present, posmap = build_bus_graph(case)
-            z = partition_spectral(case, g, k, present, posmap;
-                                   min_zone_ratio=min_zone_ratio,
-                                   balance_tol=balance_tol)
-            apply_zones!(case, z)
-
-            # resumo de tamanhos
-            counts = Dict{Int,Int}()
-            for zz in z
-                counts[zz] = get(counts, zz, 0) + 1
-            end
-            total_buses = length(z)
-            @info "Resumo zonas ($base): total_buses = $total_buses"
-            for zz in sort(collect(keys(counts)))
-                @info "  zone $zz: $(counts[zz]) buses"
-            end
-
-            write_matpower_with_zones(outpath, case)
-            @info "OK: $(base) → $(outpath)"
-        end
+    # --- mapeia bus_id (globais) -> 1..n (locais)
+    glob2loc = Dict{Int,Int}()
+    loc2glob = Vector{Int}(undef, length(buses))
+    for (i,b) in enumerate(buses)
+        glob2loc[b] = i
+        loc2glob[i] = b
     end
-    @info "Concluído."
-    return nothing
-end
+    n = length(loc2glob)
 
-# --------------------------------------------
-# CLI opcional
-# --------------------------------------------
-function parse_args()
-    args = Dict{String,Any}()
-    args["--in"] = DEFAULT_DIR
-    args["--zones"] = Int[2]
-    args["--seed"] = 42
-    args["--glob"] = "*.m"
-    args["--overwrite"] = false
-    args["--balance_tol"] = 0.10
-    args["--min_zone_ratio"] = 0.15
-
-    i = 1
-    while i <= length(ARGS)
-        a = ARGS[i]
-        if a == "--in";       i+=1; args["--in"] = ARGS[i]
-        elseif a == "--zones"
-            z = Int[]; i+=1
-            while i <= length(ARGS) && !startswith(ARGS[i], "--")
-                push!(z, parse(Int, ARGS[i])); i+=1
-            end
-            i-=1; args["--zones"] = z
-        elseif a == "--seed";   i+=1; args["--seed"] = parse(Int, ARGS[i])
-        elseif a == "--glob";   i+=1; args["--glob"] = ARGS[i]
-        elseif a == "--overwrite"; args["--overwrite"] = true
-        elseif a == "--balance_tol"; i+=1; args["--balance_tol"] = parse(Float64, ARGS[i])
-        elseif a == "--min_zone_ratio"; i+=1; args["--min_zone_ratio"] = parse(Float64, ARGS[i])
-        else
-            @warn "Argumento desconhecido: $a"
+    # --- 1) calcula pesos brutos para normalizar
+    raw_w = Float64[]
+    for i in eachindex(f)
+        on[i]==1 || continue
+        u, v = f[i], t[i]
+        (u in present && v in present) || continue
+        w = (abs(x[i]) > 1e-10 ? 1/abs(x[i]) : 1e6)
+        if abs(tap[i]-1.0) > 1e-6 || abs(shift[i]) > 1e-6
+            w *= 50.0
         end
-        i+=1
+        if ratea[i] > 0
+            w *= (1 + ratea[i])
+        end
+        push!(raw_w, w)
     end
-    return args
+    isempty(raw_w) && (raw_w = [1.0])
+    maxw = maximum(raw_w)
+
+    # --- 2) acumula pesos por aresta (sem duplicar/atualizar no grafo)
+    wdict = Dict{Tuple{Int,Int}, Int}()  # pesos inteiros para o Metis
+    for i in eachindex(f)
+        on[i]==1 || continue
+        ug, vg = f[i], t[i]
+        (ug in present && vg in present) || continue
+
+        wfloat = (abs(x[i]) > 1e-10 ? 1/abs(x[i]) : 1e6)
+        if abs(tap[i]-1.0) > 1e-6 || abs(shift[i]) > 1e-6
+            wfloat *= 50.0
+        end
+        if ratea[i] > 0
+            wfloat *= (1 + ratea[i])
+        end
+        w = max(1, Int(round(1 + 10_000 * (wfloat / maxw))))
+
+        u = glob2loc[ug]; v = glob2loc[vg]
+        key = u < v ? (u,v) : (v,u)
+        wdict[key] = get(wdict, key, 0) + w
+    end
+
+    # --- 3) constrói grafo ponderado uma única vez
+    G = SimpleWeightedGraph(n)
+    for ((u,v), w) in wdict
+        add_edge!(G, u, v, w)
+    end
+
+    # --- 4) chama METIS (alto nível); retorna partições 1..k
+    parts = Metis.partition(G, k; alg = :KWAY)
+
+    # --- 5) monta vetor zone alinhado ao case + pós-processo
+    Z = fill(1, length(buses))
+    @inbounds for (i, bid) in enumerate(buses)
+        Z[i] = parts[glob2loc[bid]]
+    end
+
+    fix_connectivity_and_slack!(case, Z, k)
+    return Z
 end
 
-function main()
-    a = parse_args()
-    partition_cases(
-        String(a["--in"]);
-        ks = Vector{Int}(a["--zones"]),
-        seed = Int(a["--seed"]),
-        glob = String(a["--glob"]),
-        overwrite = Bool(a["--overwrite"]),
-        balance_tol = Float64(a["--balance_tol"]),
-        min_zone_ratio = Float64(a["--min_zone_ratio"]),
-    )
-end
 
-# Para rodar direto via include:
-partition_cases(
+
+# --------------------------------------------
+# Execução direta (edite os caminhos/flags se quiser)
+# --------------------------------------------
+partition_cases_metis(
     raw"C:\Users\franc\PowerOptimization.jl\test\zones";
-    ks=[2,3,4,5,25,50,100,150,200,300],
-    seed=42,
-    glob="*.m",
-    overwrite=false,
-    balance_tol=0.10,
-    min_zone_ratio=0.15,   # nenhuma zona < 15% do total
+    ks = :auto,                 # ou ks=[25,50,100]
+    max_zone_size = 350,       # “3k–5k”
+    target_edgecut = 0.02,      # 2%
+    balance_tol = 0.10,         # ±10%
+    glob = "*.m",
+    overwrite = false,
 )
