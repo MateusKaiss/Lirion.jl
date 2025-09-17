@@ -2,7 +2,7 @@
 
 julia_version = "1.9.4"
 manifest_format = "2.0"
-project_hash = "1e24ed57e45f8e66f64535f0008643a682d675ae"
+project_hash = "9b6e6c06580535633a72f2586814ba7c82303ba9"
 
 [[deps.ASL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -76,11 +76,6 @@ deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "1b96ea4a01afe0ea4090c5c8039690672dd13f2e"
 uuid = "6e34b625-4abd-537c-b88f-471c36dfa7a0"
 version = "1.0.9+0"
-
-[[deps.CEnum]]
-git-tree-sha1 = "389ad5c84de1ae7cf0e28e381131c98ea87d54fc"
-uuid = "fa961155-64e5-5f13-b03f-caf6b980ea82"
-version = "0.5.0"
 
 [[deps.CSV]]
 deps = ["CodecZlib", "Dates", "FilePathsBase", "InlineStrings", "Mmap", "Parsers", "PooledArrays", "PrecompileTools", "SentinelArrays", "Tables", "Unicode", "WeakRefStrings", "WorkerUtilities"]
@@ -490,22 +485,6 @@ git-tree-sha1 = "bb2e8f4d9f400f6e90d57b34860f6abdc51398e5"
 uuid = "f28f55f0-a522-5efc-85c2-fe41dfb9b2d9"
 version = "1.4.1"
 
-[[deps.Metis]]
-deps = ["CEnum", "LinearAlgebra", "METIS_jll", "SparseArrays"]
-git-tree-sha1 = "54aca4fd53d39dcd2c3f1bef367b6921e8178628"
-uuid = "2679e427-3c69-5b7f-982b-ece356f1e94b"
-version = "1.5.0"
-
-    [deps.Metis.extensions]
-    MetisGraphs = "Graphs"
-    MetisLightGraphs = "LightGraphs"
-    MetisSimpleWeightedGraphs = ["SimpleWeightedGraphs", "Graphs"]
-
-    [deps.Metis.weakdeps]
-    Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
-    LightGraphs = "093fc24a-ae57-5d10-9952-331d41423f4d"
-    SimpleWeightedGraphs = "47aef6b3-ad0c-573a-a1e2-d07658019622"
-
 [[deps.Missings]]
 deps = ["DataAPI"]
 git-tree-sha1 = "ec4f7fbeab05d7747bdf98eb74d130a2a2ed298d"
@@ -726,12 +705,6 @@ deps = ["InteractiveUtils", "MacroTools"]
 git-tree-sha1 = "be8eeac05ec97d379347584fa9fe2f5f76795bcb"
 uuid = "699a6c99-e7fa-54fc-8d76-47d257e15c1d"
 version = "0.9.5"
-
-[[deps.SimpleWeightedGraphs]]
-deps = ["Graphs", "LinearAlgebra", "Markdown", "SparseArrays"]
-git-tree-sha1 = "3e5f165e58b18204aed03158664c4982d691f454"
-uuid = "47aef6b3-ad0c-573a-a1e2-d07658019622"
-version = "1.5.0"
 
 [[deps.Sockets]]
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"

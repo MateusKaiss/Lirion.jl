@@ -3,13 +3,12 @@
 ############################################################
 using Printf, LinearAlgebra, SparseArrays, Graphs, Random, Glob
 using PowerOptimization, Statistics
-using Metis   # pacote Metis.jl (módulo Metis)
-
-using SimpleWeightedGraphs  # <- garanta que está no topo do arquivo
+using Metis                    # Metis.jl (módulo Metis)
+using SimpleWeightedGraphs     # grafos ponderados para Metis.partition
 const DEFAULT_DIR = normpath(@__DIR__, "..", "test", "matpower_cases")
 
 # ---------------------------
-# utilidades já existentes
+# utilidades
 # ---------------------------
 function require_poweroptimization()
     try
@@ -29,8 +28,7 @@ load_case(path::String) = PowerOptimization.load_input_data(path)
 
 function has_multiple_zones(case::Dict{String,Any})
     if haskey(case, "bus") && haskey(case["bus"], "zone")
-        z = case["bus"]["zone"]
-        return length(unique(z)) > 1
+        z = case["bus"]["zone"]; return length(unique(z)) > 1
     end
     return false
 end
@@ -67,7 +65,7 @@ function write_matpower_with_zones(path_out::String, case::Dict{String,Any})
         end
         println(io, "];")
 
-        # BRANCH  (angmin/angmax → GRAUS!)
+        # BRANCH  (angmin/angmax → graus)
         println(io, "mpc.branch = [")
         br = case["branch"]
         for i in eachindex(br["f_bus"])
@@ -99,84 +97,7 @@ function write_matpower_with_zones(path_out::String, case::Dict{String,Any})
 end
 
 # ------------------------------------------------------------------
-# 1) Grafo + pesos (iguais aos seus) em estrutura para o METIS
-# ------------------------------------------------------------------
-function build_metis_inputs(case::Dict{String,Any})
-    f = case["branch"]["f_bus"]; t = case["branch"]["t_bus"]
-    x = case["branch"]["br_x"];  r = case["branch"]["br_r"]
-    on = case["branch"]["br_status"]
-    tap   = get(case["branch"], "tap",   fill(1.0, length(f)))
-    shift = get(case["branch"], "shift", fill(0.0, length(f)))
-    ratea = get(case["branch"], "rate_a", fill(0.0, length(f)))
-
-    buses = case["bus"]["bus_i"]
-    maxbus = maximum(buses)
-    present = falses(maxbus)
-    for b in buses; present[b] = true; end
-    posmap = Dict(buses[i]=>i for i in eachindex(buses))
-
-    g = SimpleGraph(maxbus)
-    adj_dict = Dict{Tuple{Int,Int}, Int32}()
-
-    raw = Float64[]
-    for i in eachindex(f)
-        on[i]==1 || continue
-        u, v = f[i], t[i]
-        present[u] && present[v] || continue
-        add_edge!(g, u, v)
-
-        w = (abs(x[i]) > 1e-10 ? 1/abs(x[i]) : 1e6)
-        if abs(tap[i]-1.0) > 1e-6 || abs(shift[i]) > 1e-6
-            w *= 50.0
-        end
-        if ratea[i] > 0
-            w *= (1 + ratea[i])
-        end
-        push!(raw, w)
-    end
-    isempty(raw) && (raw = [1.0])
-    maxw = maximum(raw)
-
-    for i in eachindex(f)
-        on[i]==1 || continue
-        u, v = f[i], t[i]
-        present[u] && present[v] || continue
-        wfloat = (abs(x[i]) > 1e-10 ? 1/abs(x[i]) : 1e6)
-        if abs(tap[i]-1.0) > 1e-6 || abs(shift[i]) > 1e-6
-            wfloat *= 50.0
-        end
-        if ratea[i] > 0
-            wfloat *= (1 + ratea[i])
-        end
-        w = Int32(round(1 + 10_000 * (wfloat / maxw)))
-        key = u < v ? (u,v) : (v,u)
-        adj_dict[key] = get(adj_dict, key, 0) + w
-    end
-
-    vw = zeros(Float64, maxbus)
-    if haskey(case["bus"], "pd")
-        for i in eachindex(buses)
-            vw[buses[i]] += max(case["bus"]["pd"][i], 0.0)
-        end
-    end
-    if haskey(case, "gen") && !isempty(case["gen"])
-        gtbl = case["gen"]
-        for i in eachindex(gtbl["gen_bus"])
-            vw[gtbl["gen_bus"][i]] += max(gtbl["pmax"][i], 0.0)
-        end
-    end
-    for b in 1:maxbus
-        present[b] || (vw[b] = 0)
-        vw[b] = vw[b] <= 0 ? 1.0 : vw[b]
-    end
-    vmax = maximum(vw[present])
-    vwgt = Int32.(round.(1 .+ 1000 .* vw ./ vmax))
-
-    return g, vwgt, adj_dict, present, posmap
-end
-
-# ------------------------------------------------------------------
-# 3) Métrica de qualidade: edge-cut ratio e tamanhos
+# Pesos e métrica
 # ------------------------------------------------------------------
 function edge_cut_ratio(case::Dict{String,Any}, zone::Vector{Int})
     f = case["branch"]["f_bus"]; t = case["branch"]["t_bus"]
@@ -201,23 +122,19 @@ function edge_cut_ratio(case::Dict{String,Any}, zone::Vector{Int})
     return w_cut / max(w_tot, eps())
 end
 
-# ------------------------------------------------------------------
-# 4) Política de escolha de k (auto)
-# ------------------------------------------------------------------
 function choose_k(case; max_zone::Int=5000, kmin::Int=2, kmax::Int=2000)
     n = length(case["bus"]["bus_i"])
     k = max(kmin, ceil(Int, n / max_zone))
     return min(max(k, kmin), kmax)
 end
 
-# --------------------------------------------
+# ------------------------------------------------------------------
 # Pós-processos: conectividade + geração/slack
-# --------------------------------------------
+# ------------------------------------------------------------------
 function fix_connectivity_and_slack!(case::Dict{String,Any}, zone::Vector{Int}, k::Int)
     buses = case["bus"]["bus_i"]
     f = case["branch"]["f_bus"]; t = case["branch"]["t_bus"]; on = case["branch"]["br_status"]
 
-    # vizinhança por bus (apenas ramos ativos)
     neigh = Dict{Int,Vector{Int}}()
     for i in eachindex(f)
         on[i]==1 || continue
@@ -226,14 +143,11 @@ function fix_connectivity_and_slack!(case::Dict{String,Any}, zone::Vector{Int}, 
     end
     pos = Dict(buses[i]=>i for i in eachindex(buses))
 
-    # 1) garantir conectividade por zona: se houver componentes desconexas
-    #    numa mesma zona, "puxa" cada componente menor para a zona mais
-    #    incidente na borda dessa componente.
+    # conectividade por zona
     for z in 1:k
         nodes = [buses[i] for i in eachindex(buses) if zone[i]==z]
         isempty(nodes) && continue
-        seen = Set{Int}()
-        comps = Vector{Vector{Int}}()
+        seen = Set{Int}(); comps = Vector{Vector{Int}}()
         for u in nodes
             u in seen && continue
             comp = Int[]; Q = [u]; push!(seen,u)
@@ -248,9 +162,8 @@ function fix_connectivity_and_slack!(case::Dict{String,Any}, zone::Vector{Int}, 
             push!(comps, comp)
         end
         length(comps) <= 1 && continue
-        sort!(comps, by=length, rev=true)  # primeira é a maior (fica)
+        sort!(comps, by=length, rev=true)
         for comp in comps[2:end]
-            # zona mais "conectada" à fronteira dessa componente
             border = [(u,v) for u in comp for v in get(neigh,u,Int[]) if zone[pos[v]] != z]
             isempty(border) && continue
             counts = Dict{Int,Int}()
@@ -265,24 +178,20 @@ function fix_connectivity_and_slack!(case::Dict{String,Any}, zone::Vector{Int}, 
         end
     end
 
-    # 2) garantir pelo menos uma barra com geração (>0 pmax) por zona.
+    # ao menos um gerador por zona (pmax>0)
     gen = get(case, "gen", Dict{String,Any}())
     isempty(gen) && return zone
 
     genbus = gen["gen_bus"]; status = gen["gen_status"]; pmax = gen["pmax"]
-    pos = Dict(case["bus"]["bus_i"][i]=>i for i in eachindex(case["bus"]["bus_i"]))
+    pos2 = Dict(case["bus"]["bus_i"][i]=>i for i in eachindex(case["bus"]["bus_i"]))
 
-    # pmax por zona
     pmax_by_zone = Dict(z=>0.0 for z in 1:k)
     for i in eachindex(genbus)
         status[i]==1 || continue
-        b  = genbus[i]
-        z  = zone[pos[b]]
-        pM = max(pmax[i], 0.0)
-        pmax_by_zone[z] = get(pmax_by_zone, z, 0.0) + pM
+        b = genbus[i]; z = zone[pos2[b]]
+        pmax_by_zone[z] = get(pmax_by_zone, z, 0.0) + max(pmax[i],0.0)
     end
 
-    # grafo entre zonas (arestas de corte)
     neighZ = Dict{Int,Set{Int}}()
     for i in eachindex(f)
         on[i]==1 || continue
@@ -293,27 +202,22 @@ function fix_connectivity_and_slack!(case::Dict{String,Any}, zone::Vector{Int}, 
         end
     end
 
-    # lista de geradores "movíveis" por zona (pmax>0)
     gens_in_zone = Dict(z=>Int[] for z in 1:k)
     for i in eachindex(genbus)
         status[i]==1 || continue
         if pmax[i] > 1e-6
-            bz = zone[pos[genbus[i]]]
+            bz = zone[pos2[genbus[i]]]
             push!(gens_in_zone[bz], i)
         end
     end
 
-    # para cada zona sem pmax, "puxa" um gerador de uma zona vizinha (ou qualquer outra)
     for z in 1:k
-        if get(pmax_by_zone, z, 0.0) > 1e-9
-            continue
-        end
+        get(pmax_by_zone, z, 0.0) > 1e-9 && continue
         moved = false
-        for zv in sort(collect(get(neighZ, z, Set{Int}())))  # preferir vizinhas
+        for zv in sort(collect(get(neighZ, z, Set{Int}())))
             if !isempty(get(gens_in_zone, zv, Int[]))
-                gi = pop!(gens_in_zone[zv])
-                b  = genbus[gi]
-                zone[pos[b]] = z
+                gi = pop!(gens_in_zone[zv]); b = genbus[gi]
+                zone[pos2[b]] = z
                 pmax_by_zone[z]  = get(pmax_by_zone, z, 0.0) + max(pmax[gi],0.0)
                 pmax_by_zone[zv] = max(get(pmax_by_zone, zv, 0.0) - max(pmax[gi],0.0), 0.0)
                 push!(gens_in_zone[z], gi)
@@ -321,19 +225,16 @@ function fix_connectivity_and_slack!(case::Dict{String,Any}, zone::Vector{Int}, 
                 break
             end
         end
-        if !moved
-            # pega de qualquer outra zona
-            for zz in 1:k
-                zz == z && continue
-                if !isempty(get(gens_in_zone, zz, Int[]))
-                    gi = pop!(gens_in_zone[zz])
-                    b  = genbus[gi]
-                    zone[pos[b]] = z
-                    pmax_by_zone[z]  += max(pmax[gi],0.0)
-                    pmax_by_zone[zz]  = max(pmax_by_zone[zz] - max(pmax[gi],0.0), 0.0)
-                    push!(gens_in_zone[z], gi)
-                    break
-                end
+        moved && continue
+        for zz in 1:k
+            zz == z && continue
+            if !isempty(get(gens_in_zone, zz, Int[]))
+                gi = pop!(gens_in_zone[zz]); b = genbus[gi]
+                zone[pos2[b]] = z
+                pmax_by_zone[z]  += max(pmax[gi],0.0)
+                pmax_by_zone[zz]  = max(pmax_by_zone[zz] - max(pmax[gi],0.0), 0.0)
+                push!(gens_in_zone[z], gi)
+                break
             end
         end
     end
@@ -347,88 +248,58 @@ function apply_zones!(case::Dict{String,Any}, zone::Vector{Int})
     return case
 end
 
-
 # ------------------------------------------------------------------
-# 5) Pipeline em lote usando METIS
+# Particionamento com METIS (k-way)
 # ------------------------------------------------------------------
-using SimpleWeightedGraphs  # <- garanta que está no topo do arquivo
-
 function metis_partition(case::Dict{String,Any}; k::Int, balance_tol::Float64=0.10)
-    @assert k >= 1 "k deve ser ≥ 1"
-    @assert haskey(case, "bus") && haskey(case, "branch") "case incompleto"
+    @assert k >= 1
+    @assert haskey(case, "bus") && haskey(case, "branch")
 
-    # --- coleta dados básicos
     buses  = case["bus"]["bus_i"]
     present = Set(buses)
-    posmap = Dict(buses[i] => i for i in eachindex(buses))
-
-    f   = case["branch"]["f_bus"]
-    t   = case["branch"]["t_bus"]
-    x   = case["branch"]["br_x"]
-    r   = case["branch"]["br_r"]
-    on  = case["branch"]["br_status"]
+    f   = case["branch"]["f_bus"]; t = case["branch"]["t_bus"]
+    x   = case["branch"]["br_x"];  on  = case["branch"]["br_status"]
     tap   = get(case["branch"], "tap",   fill(1.0, length(f)))
     shift = get(case["branch"], "shift", fill(0.0, length(f)))
     ratea = get(case["branch"], "rate_a", fill(0.0, length(f)))
 
-    # --- mapeia bus_id (globais) -> 1..n (locais)
-    glob2loc = Dict{Int,Int}()
-    loc2glob = Vector{Int}(undef, length(buses))
-    for (i,b) in enumerate(buses)
-        glob2loc[b] = i
-        loc2glob[i] = b
-    end
-    n = length(loc2glob)
+    glob2loc = Dict{Int,Int}(); n = length(buses)
+    for (i,b) in enumerate(buses) glob2loc[b] = i end
 
-    # --- 1) calcula pesos brutos para normalizar
+    # pesos normalizados por aresta (acumulando paralelas)
     raw_w = Float64[]
     for i in eachindex(f)
         on[i]==1 || continue
-        u, v = f[i], t[i]
-        (u in present && v in present) || continue
+        (f[i] in present && t[i] in present) || continue
         w = (abs(x[i]) > 1e-10 ? 1/abs(x[i]) : 1e6)
-        if abs(tap[i]-1.0) > 1e-6 || abs(shift[i]) > 1e-6
-            w *= 50.0
-        end
-        if ratea[i] > 0
-            w *= (1 + ratea[i])
-        end
+        if abs(tap[i]-1.0) > 1e-6 || abs(shift[i]) > 1e-6; w *= 50.0; end
+        if ratea[i] > 0; w *= (1 + ratea[i]); end
         push!(raw_w, w)
     end
     isempty(raw_w) && (raw_w = [1.0])
     maxw = maximum(raw_w)
 
-    # --- 2) acumula pesos por aresta (sem duplicar/atualizar no grafo)
-    wdict = Dict{Tuple{Int,Int}, Int}()  # pesos inteiros para o Metis
+    wdict = Dict{Tuple{Int,Int}, Int}()
     for i in eachindex(f)
         on[i]==1 || continue
         ug, vg = f[i], t[i]
         (ug in present && vg in present) || continue
-
         wfloat = (abs(x[i]) > 1e-10 ? 1/abs(x[i]) : 1e6)
-        if abs(tap[i]-1.0) > 1e-6 || abs(shift[i]) > 1e-6
-            wfloat *= 50.0
-        end
-        if ratea[i] > 0
-            wfloat *= (1 + ratea[i])
-        end
+        if abs(tap[i]-1.0) > 1e-6 || abs(shift[i]) > 1e-6; wfloat *= 50.0; end
+        if ratea[i] > 0; wfloat *= (1 + ratea[i]); end
         w = max(1, Int(round(1 + 10_000 * (wfloat / maxw))))
-
         u = glob2loc[ug]; v = glob2loc[vg]
         key = u < v ? (u,v) : (v,u)
         wdict[key] = get(wdict, key, 0) + w
     end
 
-    # --- 3) constrói grafo ponderado uma única vez
     G = SimpleWeightedGraph(n)
     for ((u,v), w) in wdict
         add_edge!(G, u, v, w)
     end
 
-    # --- 4) chama METIS (alto nível); retorna partições 1..k
-    parts = Metis.partition(G, k; alg = :KWAY)
+    parts = Metis.partition(G, k; alg = :KWAY)   # retorna rótulos em 1..k
 
-    # --- 5) monta vetor zone alinhado ao case + pós-processo
     Z = fill(1, length(buses))
     @inbounds for (i, bid) in enumerate(buses)
         Z[i] = parts[glob2loc[bid]]
@@ -438,16 +309,95 @@ function metis_partition(case::Dict{String,Any}; k::Int, balance_tol::Float64=0.
     return Z
 end
 
+# ------------------------------------------------------------------
+# Batch com reforço do teto e edge-cut
+# ------------------------------------------------------------------
+function partition_cases_metis(indir::AbstractString=DEFAULT_DIR;
+    ks::Union{Vector{Int},Symbol} = :auto,
+    seed::Integer = 42,
+    glob::AbstractString = "*.m",
+    overwrite::Bool = false,
+    balance_tol::Float64 = 0.10,
+    max_zone_size::Int = 5000,
+    target_edgecut::Float64 = 0.02,
+)
+    require_poweroptimization()
+    Random.seed!(seed)
 
+    files = sort(Glob.glob(glob, indir))
+    isempty(files) && @info "Nenhum arquivo $glob encontrado em $indir."
+
+    for f in files
+        base = basename(f)
+        case = try
+            load_case(f)
+        catch e
+            @warn "Falha ao carregar $base: $e"; continue
+        end
+        has_multiple_zones(case) && (@info "PULANDO (já tem >1 zona): $base"; continue)
+
+        # — decidir k(s)
+        local ks_list::Vector{Int}
+        if ks === :auto
+            ks_list = Int[ choose_k(case; max_zone=max_zone_size) ]
+        else
+            ks_list = collect(Int, ks)
+        end
+
+        for k in ks_list
+            outdir = joinpath(indir, "case $(k) zones (metis)")
+            isdir(outdir) || mkpath(outdir)
+            outpath = joinpath(outdir, base)
+            if isfile(outpath) && !overwrite
+                @info "PULANDO (destino existe): $outpath"; continue
+            end
+
+            # particiona
+            z = metis_partition(case; k=k, balance_tol=balance_tol)
+            apply_zones!(case, z)
+
+            # métricas
+            counts = Dict{Int,Int}(); for zz in z; counts[zz] = get(counts, zz, 0) + 1; end
+            ecr = edge_cut_ratio(case, z)
+            total_buses = length(z)
+            max_block = maximum(values(counts))
+
+            @info "Resumo zonas (METIS) $base — k=$k, total=$total_buses"
+            for zz in sort(collect(keys(counts)))
+                @info "  zone $zz: $(counts[zz]) buses"
+            end
+            @info @sprintf("  edge-cut ratio ≈ %.3f (alvo ≤ %.3f)", ecr, target_edgecut)
+
+            # — reforço do teto e do edge-cut (aumenta k enquanto precisar)
+            tries = 0
+            while ks === :auto && (max_block > max_zone_size || ecr > target_edgecut) && tries < 8
+                k = max(k + 1, ceil(Int, total_buses / max_zone_size))
+                @info "→ Repetindo com k=$k para tentar ≤ $max_zone_size e edge-cut ≤ $(target_edgecut)"
+                z = metis_partition(case; k=k, balance_tol=balance_tol)
+                apply_zones!(case, z)
+                counts = Dict{Int,Int}(); for zz in z; counts[zz] = get(counts, zz, 0) + 1; end
+                ecr = edge_cut_ratio(case, z)
+                max_block = maximum(values(counts))
+                @info "Novo edge-cut ≈ $(round(ecr, digits=3)) | maior bloco = $max_block"
+                tries += 1
+            end
+
+            write_matpower_with_zones(outpath, case)
+            @info "OK: $(base) → $(outpath)"
+        end
+    end
+    @info "Concluído (METIS)."
+    return nothing
+end
 
 # --------------------------------------------
 # Execução direta (edite os caminhos/flags se quiser)
 # --------------------------------------------
 partition_cases_metis(
-    raw"C:\Users\franc\PowerOptimization.jl\test\zones";
+    raw"C:\\Users\\franc\\PowerOptimization.jl\\test\\zones";
     ks = :auto,                 # ou ks=[25,50,100]
-    max_zone_size = 350,       # “3k–5k”
-    target_edgecut = 0.02,      # 2%
+    max_zone_size = 1500,        # teto desejado por zona
+    target_edgecut = 0.02,      # 2% (suba para 0.03–0.05 se ficar difícil)
     balance_tol = 0.10,         # ±10%
     glob = "*.m",
     overwrite = false,
