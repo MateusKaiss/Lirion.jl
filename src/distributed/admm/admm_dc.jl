@@ -410,6 +410,23 @@ function adaptive_rho_dc!(ρ::Base.RefValue{Float64}, r::Float64, s::Float64;
     end
 end
 
+# ---------- ρ adaptativo ----------
+# function adaptive_rho_dc!(
+#     θ::Base.RefValue{Float64}, r::Float64, s::Float64;
+#     μ_incr::Float64 = 3.0,
+#     μ_decr::Float64 = 3.0,
+#     τ_incr::Float64 = 1.5,
+#     τ_decr::Float64 = 1.98,
+# )
+#     if r > μ_incr * s
+#         θ[] *= (1 + τ_incr)
+#     elseif s > μ_decr * r
+#         θ[] *= 1 / (1 + τ_decr)
+#     end
+#     return nothing
+# end
+
+
 # ---------- Duais (flow) ----------
 function update_duals_flow!(
     duals::Dict{Int, Dict{Int, Float64}},
