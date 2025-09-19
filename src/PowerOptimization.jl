@@ -1,4 +1,15 @@
 module PowerOptimization
+for k in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
+    if !haskey(ENV, k)
+        ENV[k] = "1"
+    end
+end
+
+using LinearAlgebra
+try
+    LinearAlgebra.BLAS.set_num_threads(1)
+catch
+end
 
 using PlotlyLight
 using JuMP
@@ -7,7 +18,6 @@ using Gurobi
 using DataFrames
 using CSV
 using Dates
-using LinearAlgebra
 using Statistics
 using InfrastructureModels
 using Logging
@@ -16,23 +26,15 @@ using SCS
 using OSQP
 using Base.Threads
 using MathOptInterface
+using COSMO
 
 const MOI = MathOptInterface
-const _FAST_USE_LOGS = false
+const _FAST_USE_LOGS = true
+
 function __init__()
-    # Setar variáveis de ambiente se não estiverem definidas
-    for k in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
-        if !haskey(ENV, k)
-            ENV[k] = "1"
-        end
-    end
-    try
-        BLAS.set_num_threads(1)
-    catch
-    end
     if _FAST_USE_LOGS
         try
-            @info "[PowerOptimization] Threads: Julia=$(nthreads()) | BLAS=$(BLAS.get_num_threads())"
+            @info "[PowerOptimization] Threads: Julia=$(nthreads()) | BLAS=$(LinearAlgebra.BLAS.get_num_threads())"
         catch
         end
     end

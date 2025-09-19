@@ -1,14 +1,21 @@
-# ---------- Solver ----------
 function resolve_optimizer_dc(config)
-    opt = try
-        getfield(config, :optimizer)
-    catch
-        nothing
-    end
+    opt = try getfield(config, :optimizer) catch; nothing end
     if opt !== nothing
-        return opt
+        if opt == COSMO.Optimizer
+            return optimizer_with_attributes(COSMO.Optimizer,
+                "eps_abs" => 1e-6,
+                "eps_rel" => 1e-6,
+                "max_iter" => 10_000,
+                "verbose" => false,
+                "decompose" => true,
+                "warm_start" => true,
+            )
+        else
+            return opt
+        end
     end
 
+    
     eps_abs = try
         getfield(config, Symbol("ε_primal"))
     catch
