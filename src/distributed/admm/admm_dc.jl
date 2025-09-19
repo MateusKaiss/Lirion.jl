@@ -402,30 +402,13 @@ end
 
 # ---------- ρ adaptativo ----------
 function adaptive_rho_dc!(ρ::Base.RefValue{Float64}, r::Float64, s::Float64;
-    μ_incr = 3.0, μ_decr = 3.0, τ_incr = 1.05, τ_decr = 0.98)
+    μ_incr = 3.0, μ_decr = 3.0, τ_incr = 1.5, τ_decr = 0.8)
     if r > μ_incr * s
         ρ[] *= τ_incr
     elseif s > μ_decr * r
         ρ[] *= τ_decr
     end
 end
-
-# ---------- ρ adaptativo ----------
-# function adaptive_rho_dc!(
-#     θ::Base.RefValue{Float64}, r::Float64, s::Float64;
-#     μ_incr::Float64 = 3.0,
-#     μ_decr::Float64 = 3.0,
-#     τ_incr::Float64 = 1.5,
-#     τ_decr::Float64 = 1.98,
-# )
-#     if r > μ_incr * s
-#         θ[] *= (1 + τ_incr)
-#     elseif s > μ_decr * r
-#         θ[] *= 1 / (1 + τ_decr)
-#     end
-#     return nothing
-# end
-
 
 # ---------- Duais (flow) ----------
 function update_duals_flow!(
@@ -897,6 +880,11 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
 
     ρθ = Ref(config.rho_theta)
     ρe = Ref(config.rho_flow)
+    
+    # Suggested initial values for better convergence:
+    # ρθ = 1000-10000 (bus angles, smaller scale)
+    # ρe = 10000-100000 (flows, larger scale due to p.u. values)
+    _FAST_USE_LOGS && println("Initial ρ values: ρθ = $(ρθ[]), ρe = $(ρe[])")
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
 
     θ̄_vec = zeros(Float64, length(shared_buses_sorted))
@@ -1072,38 +1060,108 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         push!(res_primal_vec, res_primal)
         push!(res_dual_vec, res_dual)
 
+        ## TODO: Review if equivalent to using the norm of the total residual, whether this piecewise approach is equivalent or not
         ϵb = eps_primal_bus_dc(partitions, θ̄_vec, shared_buses_sorted, b2pos, ϵ_abs, ϵ_rel)
         ϵe = eps_primal_branch_dc(partitions, z_flow, cut_edges, ϵ_abs, ϵ_rel)
-        push!(eps_primal_vec, sqrt(ϵb^2 + ϵe^2))
+        ϵ_pri = sqrt(ϵb^2 + ϵe^2)
+        push!(eps_primal_vec, ϵ_pri)
 
         ϵb = eps_dual_bus_dc(θ̄_vec, θ̄_prev_vec, ϵ_abs, ϵ_rel)
         ϵe = eps_dual_branch_dc(z_flow, z_flow_prev, ϵ_abs, ϵ_rel)
-        push!(eps_dual_vec, sqrt(ϵb^2 + ϵe^2))
+        ϵ_du = sqrt(ϵb^2 + ϵe^2)
+        push!(eps_dual_vec, ϵ_du)
 
-        _FAST_USE_LOGS &&
-            println("‖r‖ = $(last(res_primal_vec)) | ε_pri = $(last(eps_primal_vec))")
-        _FAST_USE_LOGS &&
-            println("‖s‖ = $(last(res_dual_vec))   | ε_dual = $(last(eps_dual_vec))")
-
+        
         push!(rhoθ_vec, ρθ[])
         push!(rhoe_vec, ρe[])
-
+        
         iter_done = k
         if res_primal < last(eps_primal_vec) && res_dual < last(eps_dual_vec)
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
         end
-
-        adaptive_rho_dc!(ρθ, res_primal, res_dual)
-        adaptive_rho_dc!(ρe, res_primal, res_dual)
+        
+        _FAST_USE_LOGS && println("DEBUG: Reached ρ update section at iteration $k")
+        
+        ## Baseline: update ρ based on total residual
+        # adaptive_rho_dc!(ρθ, res_primal, res_dual)
+        # adaptive_rho_dc!(ρe, res_primal, res_dual)
+        
+        ## Variable-dependent ρ updates: different update frequencies for different variable types
+        # adaptive_rho_dc!(ρθ, res_pri_bus, res_du_bus)
+        # adaptive_rho_dc!(ρe, res_pri_br, res_du_br)
+        
+        # Variable-dependent and frequency-based ρ updates: different update frequencies for different variable types
+        # This approach allows each ρ to adapt at its optimal rate using inverse frequency logic
+        
+        # Calculate residual dominance ratio
+        residual_ratio = res_pri_bus / (res_pri_br + 1e-10)
+        
+        # Determine update frequencies based on dominance
+        if residual_ratio > 2.0
+            # θ residual dominates: θ updates every 4 iterations, flows every 2 iterations
+            theta_freq = 4
+            flow_freq = 2
+        elseif residual_ratio < 0.5
+            # Flow residual dominates: θ updates every 2 iterations, flows every 4 iterations
+            theta_freq = 2
+            flow_freq = 4
+        else
+            # Balanced (0.5 ≤ ratio ≤ 2.0): θ updates every 2 iterations, flows every 2 iterations
+            theta_freq = 2
+            flow_freq = 2
+        end
+        
+        # Calculate adaptive τ values based on residual dominance
+        # τ ranges from 1.5 (default) to 5.0 (maximum) based on how much one residual dominates
+        if residual_ratio > 10.0
+            # θ heavily dominates - use aggressive τ for flows
+            τ_theta = 1.5  # Conservative for θ
+            τ_flow = 5.0   # Aggressive for flows
+        elseif residual_ratio < 0.1
+            # Flow heavily dominates - use aggressive τ for θ
+            τ_theta = 5.0  # Aggressive for θ
+            τ_flow = 1.5   # Conservative for flows
+        elseif residual_ratio > 2.0
+            # θ moderately dominates
+            τ_theta = 1.5 + (residual_ratio - 2.0) * 0.5  # 1.5 to 2.5
+            τ_flow = 1.5 + (residual_ratio - 2.0) * 1.0   # 1.5 to 3.5
+        elseif residual_ratio < 0.5
+            # Flow moderately dominates
+            τ_theta = 1.5 + (0.5 - residual_ratio) * 1.0  # 1.5 to 3.5
+            τ_flow = 1.5 + (0.5 - residual_ratio) * 0.5   # 1.5 to 2.5
+        else
+            # Balanced residuals
+            τ_theta = 1.5
+            τ_flow = 1.5
+        end
+        
+        # Update θ based on frequency with adaptive τ
+        if k % theta_freq == 0
+            adaptive_rho_dc!(ρθ, res_pri_bus, res_du_bus; τ_incr=τ_theta, τ_decr=1.0/τ_theta)
+            _FAST_USE_LOGS && println("Updated ρθ (iteration $k, freq=$theta_freq, τ=$τ_theta)")
+        end
+        
+        # Update flows based on frequency with adaptive τ
+        if (k + 1) % flow_freq == 0
+            adaptive_rho_dc!(ρe, res_pri_br, res_du_br; τ_incr=τ_flow, τ_decr=1.0/τ_flow)
+            _FAST_USE_LOGS && println("Updated ρe (iteration $k, freq=$flow_freq, τ=$τ_flow)")
+        end
+        
+        # Log residual ratio and ρ values for analysis
+        _FAST_USE_LOGS && println("Residual ratio: $residual_ratio | ρθ = $(ρθ[]) | ρe = $(ρe[])")
+        _FAST_USE_LOGS && println("‖r‖_bus = $res_pri_bus | ‖r‖_br = $res_pri_br | ‖r‖_total = $res_primal | ε_pri = $ϵ_pri")
+        _FAST_USE_LOGS && println("‖s‖_bus = $res_du_bus | ‖s‖_br = $res_du_br | ‖s‖_total = $res_dual | ε_dual = $ϵ_du")
     end
-
+    
+    # Generate unique filename with timestamp
+    timestamp = Dates.format(now(), "yyyy-mm-dd_HH-MM-SS")
     plot_admm_convergence(
         res_primal_vec,
         res_dual_vec,
         eps_primal_vec,
         eps_dual_vec,
-        "plot_convergencia_admm_hybrid.html",
+        "plot_convergencia_admm_hybrid_$(timestamp).html",
     )
 
     PlotlyLight.save(
@@ -1122,7 +1180,7 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
                 p.layout.yaxis.title = "ρθ";
                 p.layout.yaxis.type = "log";
                 p
-            ))(), "plot_rho_theta_hybrid.html")
+            ))(), "plot_rho_theta_hybrid_$(timestamp).html")
     PlotlyLight.save(
         (
             () -> (
@@ -1139,9 +1197,9 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
                 p.layout.yaxis.title = "ρe";
                 p.layout.yaxis.type = "log";
                 p
-            ))(), "plot_rho_flow_hybrid.html")
+            ))(), "plot_rho_flow_hybrid_$(timestamp).html")
 
-    plot_theta_avg_heatmap(θ_avg_history, "plot_theta_avg_heatmap_hybrid.html")
+    plot_theta_avg_heatmap(θ_avg_history, "plot_theta_avg_heatmap_hybrid_$(timestamp).html")
 
     total_real_cost = sum(p["real_generation_cost"] for p in values(partitions))
     total_expr_cost = sum(p["generation_cost_model_expr"] for p in values(partitions))
