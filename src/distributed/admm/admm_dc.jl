@@ -1,5 +1,9 @@
 function resolve_optimizer_dc(config)
-    opt = try getfield(config, :optimizer) catch; nothing end
+    opt = try
+        getfield(config, :optimizer)
+    catch
+        nothing
+    end
     if opt !== nothing
         if opt == COSMO.Optimizer
             return optimizer_with_attributes(COSMO.Optimizer,
@@ -15,7 +19,6 @@ function resolve_optimizer_dc(config)
         end
     end
 
-    
     eps_abs = try
         getfield(config, Symbol("ε_primal"))
     catch
@@ -59,7 +62,12 @@ end
     end
 end
 
-@inline function _theta_val(m::JuMP.Model, θ::JuMP.Containers.DenseAxisArray, b::Int, t::Int)
+@inline function _theta_val(
+    m::JuMP.Model,
+    θ::JuMP.Containers.DenseAxisArray,
+    b::Int,
+    t::Int,
+)
     return _val_or_start(m, θ[b, t])
 end
 
@@ -432,7 +440,6 @@ end
 #     end
 #     return nothing
 # end
-
 
 # ---------- Duais (flow) ----------
 function update_duals_flow!(

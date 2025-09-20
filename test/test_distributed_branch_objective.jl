@@ -34,7 +34,7 @@ const distributed_branch_zone_cases = [
     # 20758
     "pglib_opf_case20758_42zones_epigrids.m",
     # 30000
-    "pglib_opf_case30000_20zones_goc.m"
+    "pglib_opf_case30000_20zones_goc.m",
 ]
 
 function track_failure_branch(label::String, origin::String, case_name::String)
@@ -84,13 +84,13 @@ function compare_distributed_branch_vs_centralized(
         args_dist = String[
             file,
             "--model", "distributed-admm-branch-dc",
-            "--admm-rho",        string(admm_rho),
-            "--admm-max-iter",   string(admm_max_iter),
+            "--admm-rho", string(admm_rho),
+            "--admm-max-iter", string(admm_max_iter),
             "--admm-eps-primal", string(admm_eps_primal),
-            "--admm-eps-dual",   string(admm_eps_dual),
-            "--admm-alpha",      string(admm_alpha),
+            "--admm-eps-dual", string(admm_eps_dual),
+            "--admm-alpha", string(admm_alpha),
         ]
-        if admm_warm_start   
+        if admm_warm_start
             push!(args_dist, "--admm-warm-start")
         end
         if !isnothing(distributed_optimizer)
@@ -147,10 +147,10 @@ function run_distributed_branch_objective_tests(;
         end
         admm_rho_case = 1_000.0
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case   = admm_eps_dual
-        admm_alpha_case      = admm_alpha
+        admm_eps_dual_case = admm_eps_dual
+        admm_alpha_case = admm_alpha
         distributed_optimizer_case = distributed_optimizer
-        admm_warm_start_case = false                
+        admm_warm_start_case = false
 
         if occursin("case500_", case_name)
             admm_max_iter_case = 600
@@ -188,11 +188,11 @@ function run_distributed_branch_objective_tests(;
         end
 
         if occursin("case30000_20zones_", case_name)
-            admm_max_iter_case   = 1000
-            admm_rho_case        = 500.0
+            admm_max_iter_case = 1000
+            admm_rho_case = 500.0
             admm_eps_primal_case = 1e-4
-            admm_eps_dual_case   = 1e-4
-            admm_alpha_case      = 1.2
+            admm_eps_dual_case = 1e-4
+            admm_alpha_case = 1.2
             admm_warm_start_case = true
         end
         @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha_case), optimizer=$(distributed_optimizer_case === nothing ? "default" : string(distributed_optimizer_case)))"
