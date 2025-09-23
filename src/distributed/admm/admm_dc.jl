@@ -960,7 +960,6 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         @objective(m, Min, sub["obj_base"] + sub["quad_bus_expr"] + sub["quad_branch_expr"])
     end
 
-    # -------- Warm start ADMM: inicializações para híbrido --------
     if warm
         compute_theta_consensus_vec!(θ̄_vec, partitions, shared_buses_sorted, b2pos)
         for (z, sub) in partitions
@@ -1025,20 +1024,15 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
                 duals_flow[z],
                 ρe[],
             )
-            lin_total = lin_bus + lin_branch
 
-            @objective(
-                sub["model"],
-                Min,
+            @objective(sub["model"], Min,
                 sub["obj_base"] + sub["quad_bus_expr"] + sub["quad_branch_expr"] +
-                lin_total
-            )
+                (lin_bus + lin_branch))
             optimize!(sub["model"])
 
             m = sub["model"]
             gen_cost_expr = value(m[:generation_cost])
             real_cost = compute_real_generation_cost(m, sub["objective_params"])
-
             results[i] = (gen_cost_expr = gen_cost_expr, real_cost = real_cost)
         end
 
@@ -1062,8 +1056,7 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
 
         for z in zone_ids
             update_duals_theta_vec!(duals_theta[z], partitions[z], θ̄_vec, θ̄_prev_vec,
-                ρθ[], α_used,
-                shared_buses_sorted, b2pos)
+                ρθ[], α_used, shared_buses_sorted, b2pos)
         end
         update_duals_flow!(
             duals_flow,
@@ -1086,13 +1079,14 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         push!(res_primal_vec, res_primal)
         push!(res_dual_vec, res_dual)
 
-        ϵb = eps_primal_bus_dc(partitions, θ̄_vec, shared_buses_sorted, b2pos, ϵ_abs, ϵ_rel)
-        ϵe = eps_primal_branch_dc(partitions, z_flow, cut_edges, ϵ_abs, ϵ_rel)
-        push!(eps_primal_vec, sqrt(ϵb^2 + ϵe^2))
+        ϵb_pri =
+            eps_primal_bus_dc(partitions, θ̄_vec, shared_buses_sorted, b2pos, ϵ_abs, ϵ_rel)
+        ϵe_pri = eps_primal_branch_dc(partitions, z_flow, cut_edges, ϵ_abs, ϵ_rel)
+        push!(eps_primal_vec, sqrt(ϵb_pri^2 + ϵe_pri^2))
 
-        ϵb = eps_dual_bus_dc(θ̄_vec, θ̄_prev_vec, ϵ_abs, ϵ_rel)
-        ϵe = eps_dual_branch_dc(z_flow, z_flow_prev, ϵ_abs, ϵ_rel)
-        push!(eps_dual_vec, sqrt(ϵb^2 + ϵe^2))
+        ϵb_du = eps_dual_bus_dc(θ̄_vec, θ̄_prev_vec, ϵ_abs, ϵ_rel)
+        ϵe_du = eps_dual_branch_dc(z_flow, z_flow_prev, ϵ_abs, ϵ_rel)
+        push!(eps_dual_vec, sqrt(ϵb_du^2 + ϵe_du^2))
 
         _FAST_USE_LOGS &&
             println("‖r‖ = $(last(res_primal_vec)) | ε_pri = $(last(eps_primal_vec))")
@@ -1108,17 +1102,12 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
             break
         end
 
-        adaptive_rho_dc!(ρθ, res_primal, res_dual)
-        adaptive_rho_dc!(ρe, res_primal, res_dual)
+        adaptive_rho_dc!(ρθ, res_pri_bus, res_du_bus)
+        adaptive_rho_dc!(ρe, res_pri_br, res_du_br)
     end
 
-    plot_admm_convergence(
-        res_primal_vec,
-        res_dual_vec,
-        eps_primal_vec,
-        eps_dual_vec,
-        "plot_convergencia_admm_hybrid.html",
-    )
+    plot_admm_convergence(res_primal_vec, res_dual_vec, eps_primal_vec, eps_dual_vec,
+        "plot_convergencia_admm_hybrid.html")
 
     PlotlyLight.save(
         (
@@ -1136,7 +1125,10 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
                 p.layout.yaxis.title = "ρθ";
                 p.layout.yaxis.type = "log";
                 p
-            ))(), "plot_rho_theta_hybrid.html")
+            )
+        )(),
+        "plot_rho_theta_hybrid.html")
+
     PlotlyLight.save(
         (
             () -> (
@@ -1153,7 +1145,9 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
                 p.layout.yaxis.title = "ρe";
                 p.layout.yaxis.type = "log";
                 p
-            ))(), "plot_rho_flow_hybrid.html")
+            )
+        )(),
+        "plot_rho_flow_hybrid.html")
 
     plot_theta_avg_heatmap(θ_avg_history, "plot_theta_avg_heatmap_hybrid.html")
 
