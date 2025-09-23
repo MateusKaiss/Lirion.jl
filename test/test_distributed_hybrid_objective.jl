@@ -1,32 +1,32 @@
 # Casos particionados (2/3/4 zonas) — iguais aos do branch
 const distributed_hybrid_zone_cases = [
     # 14 buses
-    # "pglib_opf_case14_2zones_ieee.m",
-    # "pglib_opf_case14_3zones_ieee.m",
-    # # 24 buses
-    # "pglib_opf_case24_2zones_ieee_rts.m",
-    # "pglib_opf_case24_3zones_ieee_rts.m",
-    # # 30 buses
-    # "pglib_opf_case30_2zones_as.m",
-    # "pglib_opf_case30_3zones_as.m",
-    # # 57 buses
-    # "pglib_opf_case57_2zones_ieee.m",
-    # "pglib_opf_case57_4zones_ieee.m",
-    # # 118 buses
-    # "pglib_opf_case118_2zones_ieee.m",
-    # "pglib_opf_case118_3zones_ieee.m",
-    # "pglib_opf_case118_5zones_ieee.m",
-    # # 500 buses
-    # "pglib_opf_case500_3zones_goc.m",
-    # "pglib_opf_case500_4zones_goc.m",
-    # # 793
-    # "pglib_opf_case793_11zones_goc.m",
-    # # 2000
-    # "pglib_opf_case2000_5zones_goc.m",
-    # # 3970
-    # "pglib_opf_case3970_25zones_goc.m",
+    "pglib_opf_case14_2zones_ieee.m",
+    "pglib_opf_case14_3zones_ieee.m",
+    # 24 buses
+    "pglib_opf_case24_2zones_ieee_rts.m",
+    "pglib_opf_case24_3zones_ieee_rts.m",
+    # 30 buses
+    "pglib_opf_case30_2zones_as.m",
+    "pglib_opf_case30_3zones_as.m",
+    # 57 buses
+    "pglib_opf_case57_2zones_ieee.m",
+    "pglib_opf_case57_4zones_ieee.m",
+    # 118 buses
+    "pglib_opf_case118_2zones_ieee.m",
+    "pglib_opf_case118_3zones_ieee.m",
+    "pglib_opf_case118_5zones_ieee.m",
+    # 500 buses
+    "pglib_opf_case500_3zones_goc.m",
+    "pglib_opf_case500_4zones_goc.m",
+    # 793
+    "pglib_opf_case793_11zones_goc.m",
+    # 2000
+    "pglib_opf_case2000_5zones_goc.m",
+    # 3970
+    "pglib_opf_case3970_25zones_goc.m",
     "pglib_opf_case10000_50zones_goc.m",
-    # "pglib_opf_case20758_42zones_epigrids.m",
+    "pglib_opf_case20758_42zones_epigrids.m",
     # "pglib_opf_case30000_20zones_goc.m",
 ]
 
@@ -107,7 +107,6 @@ function run_distributed_hybrid_objective_tests(;
     case_list = distributed_hybrid_zone_cases,
     label = "ADMM-Hybrid-DC vs DC",
     central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
-    # `nothing` => usa OSQP default do resolve_optimizer_dc (recomendado)
     distributed_optimizer::Union{Nothing, Function} = nothing,
     rtol = 0.05, atol = 1e-6,
     admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,
@@ -141,10 +140,11 @@ function run_distributed_hybrid_objective_tests(;
             end
 
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case = admm_eps_dual
-        admm_alpha_case = admm_alpha
+        admm_eps_dual_case   = admm_eps_dual
+        admm_alpha_case      = admm_alpha
 
         extra_flags_case = String[]
+        admm_warm_start_case = false
 
         if occursin("case2000_5zones_", case_name)
             admm_max_iter_case = 600
@@ -152,7 +152,7 @@ function run_distributed_hybrid_objective_tests(;
             admm_rho_case = 1.0
             extra_flags_case = [
                 "--admm-rho-theta", "700",
-                "--admm-rho-flow", "300",
+                "--admm-rho-flow",  "300",
             ]
         end
 
@@ -162,22 +162,33 @@ function run_distributed_hybrid_objective_tests(;
             admm_rho_case = 1.0
             extra_flags_case = [
                 "--admm-rho-theta", "700",
-                "--admm-rho-flow", "300",
+                "--admm-rho-flow",  "300",
             ]
         end
 
-                if occursin("case10000_50zones_", case_name)
+        if occursin("case10000_50zones_", case_name)
             admm_max_iter_case = 600
             admm_alpha_case = 1.2
             admm_rho_case = 1.0
             extra_flags_case = [
                 "--admm-rho-theta", "700",
-                "--admm-rho-flow", "300",
+                "--admm-rho-flow",  "300",
             ]
         end
 
+        if occursin("case20758_42zones_", case_name)
+            admm_max_iter_case = 600
+            admm_alpha_case = 1.1
+            admm_rho_case = 1.0
+            admm_warm_start_case = true
+            extra_flags_case = [
+                "--admm-rho-theta", "700",
+                "--admm-rho-flow",  "300",
+            ]
+        end
 
-        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha_case), extra_flags=$(join(extra_flags_case, ' ')))"
+        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha_case), warm_start=$(admm_warm_start_case), extra_flags=$(join(extra_flags_case, ' ')))"
+
         @testset "$(label) - $(case_name)" begin
             compare_distributed_hybrid_vs_centralized(
                 file;
@@ -186,12 +197,13 @@ function run_distributed_hybrid_objective_tests(;
                 distributed_optimizer = distributed_optimizer,
                 rtol = rtol,
                 atol = atol,
-                admm_rho = admm_rho_case,              # compat: segue existindo
+                admm_rho = admm_rho_case,
                 admm_max_iter = admm_max_iter_case,
                 admm_eps_primal = admm_eps_primal_case,
                 admm_eps_dual = admm_eps_dual_case,
                 admm_alpha = admm_alpha_case,
-                extra_flags = extra_flags_case,         # <<< NOVO
+                admm_warm_start = admm_warm_start_case,  # <<< passa o warm start
+                extra_flags = extra_flags_case,
             )
         end
     end
