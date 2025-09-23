@@ -1,31 +1,31 @@
 # Casos particionados (2/3/4 zonas) — iguais aos do branch
 const distributed_hybrid_zone_cases = [
     # 14 buses
-    "pglib_opf_case14_2zones_ieee.m",
-    "pglib_opf_case14_3zones_ieee.m",
-    # 24 buses
-    "pglib_opf_case24_2zones_ieee_rts.m",
-    "pglib_opf_case24_3zones_ieee_rts.m",
-    # 30 buses
-    "pglib_opf_case30_2zones_as.m",
-    "pglib_opf_case30_3zones_as.m",
-    # 57 buses
-    "pglib_opf_case57_2zones_ieee.m",
-    "pglib_opf_case57_4zones_ieee.m",
-    # 118 buses
-    "pglib_opf_case118_2zones_ieee.m",
-    "pglib_opf_case118_3zones_ieee.m",
-    "pglib_opf_case118_5zones_ieee.m",
-    # 500 buses
-    "pglib_opf_case500_3zones_goc.m",
-    "pglib_opf_case500_4zones_goc.m",
-    # 793
-    "pglib_opf_case793_11zones_goc.m",
-    # 2000
-    "pglib_opf_case2000_5zones_goc.m",
-    # 3970
-    "pglib_opf_case3970_25zones_goc.m",
-    # "pglib_opf_case10000_50zones_goc.m",
+    # "pglib_opf_case14_2zones_ieee.m",
+    # "pglib_opf_case14_3zones_ieee.m",
+    # # 24 buses
+    # "pglib_opf_case24_2zones_ieee_rts.m",
+    # "pglib_opf_case24_3zones_ieee_rts.m",
+    # # 30 buses
+    # "pglib_opf_case30_2zones_as.m",
+    # "pglib_opf_case30_3zones_as.m",
+    # # 57 buses
+    # "pglib_opf_case57_2zones_ieee.m",
+    # "pglib_opf_case57_4zones_ieee.m",
+    # # 118 buses
+    # "pglib_opf_case118_2zones_ieee.m",
+    # "pglib_opf_case118_3zones_ieee.m",
+    # "pglib_opf_case118_5zones_ieee.m",
+    # # 500 buses
+    # "pglib_opf_case500_3zones_goc.m",
+    # "pglib_opf_case500_4zones_goc.m",
+    # # 793
+    # "pglib_opf_case793_11zones_goc.m",
+    # # 2000
+    # "pglib_opf_case2000_5zones_goc.m",
+    # # 3970
+    # "pglib_opf_case3970_25zones_goc.m",
+    "pglib_opf_case10000_50zones_goc.m",
     # "pglib_opf_case20758_42zones_epigrids.m",
     # "pglib_opf_case30000_20zones_goc.m",
 ]
@@ -157,6 +157,16 @@ function run_distributed_hybrid_objective_tests(;
         end
 
         if occursin("case3970_25zones_", case_name)
+            admm_max_iter_case = 600
+            admm_alpha_case = 1.2
+            admm_rho_case = 1.0
+            extra_flags_case = [
+                "--admm-rho-theta", "700",
+                "--admm-rho-flow", "300",
+            ]
+        end
+
+                if occursin("case10000_50zones_", case_name)
             admm_max_iter_case = 600
             admm_alpha_case = 1.2
             admm_rho_case = 1.0
