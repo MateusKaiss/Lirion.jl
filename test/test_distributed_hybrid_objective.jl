@@ -140,8 +140,8 @@ function run_distributed_hybrid_objective_tests(;
             end
 
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case   = admm_eps_dual
-        admm_alpha_case      = admm_alpha
+        admm_eps_dual_case = admm_eps_dual
+        admm_alpha_case = admm_alpha
 
         extra_flags_case = String[]
 
@@ -151,7 +151,7 @@ function run_distributed_hybrid_objective_tests(;
             admm_rho_case = 700.0
             extra_flags_case = [
                 "--admm-rho-theta", "700",
-                "--admm-rho-flow",  "300",
+                "--admm-rho-flow", "300",
             ]
         end
 
