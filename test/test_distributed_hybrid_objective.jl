@@ -23,7 +23,8 @@ const distributed_hybrid_zone_cases = [
     "pglib_opf_case793_11zones_goc.m",
     # 2000
     "pglib_opf_case2000_5zones_goc.m",
-    # "pglib_opf_case3970_25zones_goc.m",
+    # 3970
+    "pglib_opf_case3970_25zones_goc.m",
     # "pglib_opf_case10000_50zones_goc.m",
     # "pglib_opf_case20758_42zones_epigrids.m",
     # "pglib_opf_case30000_20zones_goc.m",
@@ -148,12 +149,23 @@ function run_distributed_hybrid_objective_tests(;
         if occursin("case2000_5zones_", case_name)
             admm_max_iter_case = 600
             admm_alpha_case = 1.2
-            admm_rho_case = 700.0
+            admm_rho_case = 1.0
             extra_flags_case = [
                 "--admm-rho-theta", "700",
                 "--admm-rho-flow", "300",
             ]
         end
+
+        if occursin("case3970_25zones_", case_name)
+            admm_max_iter_case = 600
+            admm_alpha_case = 1.2
+            admm_rho_case = 1.0
+            extra_flags_case = [
+                "--admm-rho-theta", "700",
+                "--admm-rho-flow", "300",
+            ]
+        end
+
 
         @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha_case), extra_flags=$(join(extra_flags_case, ' ')))"
         @testset "$(label) - $(case_name)" begin
