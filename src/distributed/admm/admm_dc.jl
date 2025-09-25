@@ -509,6 +509,9 @@ function save_dc_branch_plots(
     return plot_rho(ρ_hist, "plot_rho_$(stem).html")
 end
 
+@inline _adaptive_on(config) =
+    hasfield(typeof(config), :adaptive_rho) ? getfield(config, :adaptive_rho) : true
+
 # =======================================================
 # ADMM: BUS (com objetivo persistente)
 # =======================================================
@@ -526,6 +529,8 @@ function run_admm(config::DistributedOPFModel, data)
 
     ρ = Ref(config.rho_theta)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
+    adaptive = _adaptive_on(config)
+
 
     duals_dense = Dict{Int, Vector{Float64}}(
         z => zeros(Float64, length(shared_buses_sorted))
@@ -678,7 +683,9 @@ function run_admm(config::DistributedOPFModel, data)
             break
         end
 
-        adaptive_rho_dc!(ρ, res_primal, res_dual)
+        if adaptive
+            adaptive_rho_dc!(ρ, res_primal, res_dual)
+        end
     end
 
     save_dc_bus_plots(
@@ -733,6 +740,7 @@ function run_admm_branch(
 
     ρ = Ref(config.rho_flow)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
+    adaptive = _adaptive_on(config)
 
     z_flow = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     z_flow_prev = Dict{Int, Float64}()
@@ -848,22 +856,24 @@ function run_admm_branch(
             break
         end
 
-        if use_legacy_rho
-            if res_primal > μ_incr * res_dual
-                ρ[] *= τ_incr
-            elseif res_dual > μ_decr * res_primal
-                ρ[] *= τ_decr
+        if adaptive
+            if use_legacy_rho
+                if res_primal > μ_incr * res_dual
+                    ρ[] *= τ_incr
+                elseif res_dual > μ_decr * res_primal
+                    ρ[] *= τ_decr
+                end
+            else
+                adaptive_rho_dc!(
+                    ρ,
+                    res_primal,
+                    res_dual;
+                    μ_incr = μ_incr,
+                    μ_decr = μ_decr,
+                    τ_incr = τ_incr,
+                    τ_decr = τ_decr,
+                )
             end
-        else
-            adaptive_rho_dc!(
-                ρ,
-                res_primal,
-                res_dual;
-                μ_incr = μ_incr,
-                μ_decr = μ_decr,
-                τ_incr = τ_incr,
-                τ_decr = τ_decr,
-            )
         end
     end
 
@@ -912,6 +922,7 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     ρθ = Ref(config.rho_theta)
     ρe = Ref(config.rho_flow)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
+    adaptive = _adaptive_on(config)
 
     θ̄_vec = zeros(Float64, length(shared_buses_sorted))
     θ̄_prev_vec = similar(θ̄_vec)
@@ -1102,8 +1113,10 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
             break
         end
 
-        adaptive_rho_dc!(ρθ, res_pri_bus, res_du_bus)
-        adaptive_rho_dc!(ρe, res_pri_br, res_du_br)
+        if adaptive
+            adaptive_rho_dc!(ρθ, res_pri_bus, res_du_bus)
+            adaptive_rho_dc!(ρe,  res_pri_br,  res_du_br)
+        end
     end
 
     plot_admm_convergence(res_primal_vec, res_dual_vec, eps_primal_vec, eps_dual_vec,

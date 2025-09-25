@@ -88,6 +88,11 @@ struct Args
             "--admm-warm-start"
             help = "Warm start dos subproblemas (pré-solve base e usa θ como start)"
             action = :store_true
+
+            "--admm-adaptive"
+            help = "Liga/desliga o ajuste adaptativo de ρ no ADMM: on | off (padrão: on)"
+            arg_type = String
+            default = "on"
         end
 
         parsed = parse_args(raw_args, s)
@@ -128,6 +133,12 @@ struct Args
             @warn "Ignoring --admm-alpha=$(alpha_) because it must satisfy 1<α<2."
             alpha_ = nothing
         end
+
+        # ===== adaptive rho (on/off) =====
+        adaptive_flag_str = lowercase(strip(parsed["admm-adaptive"]))
+        adaptive_flag = adaptive_flag_str == "on" ? true :
+                        adaptive_flag_str == "off" ? false :
+                        ( @warn "Valor inválido para --admm-adaptive=$(parsed["admm-adaptive"]). Usando 'on'."; true )
 
         # avisos de flags irrelevantes/ignoradas
         local function _warn_irrelevant_rhos(
@@ -228,9 +239,10 @@ struct Args
                         ε_dual = parsed["admm-eps-dual"],
                         alpha_overrelax = alpha_,
                         warm_start = warm_start_flag,
+                        adaptive_rho = adaptive_flag,
                     )
                 catch err
-                    @warn "Esta versão de DistributedOPFModel não aceita :warm_start (atualize a struct/constructors). Prosseguindo sem warm start." err
+                    @warn "Esta versão de DistributedOPFModel não aceita :warm_start/adaptive_rho (atualize a struct/constructors). Prosseguindo sem esses campos." err
                     cfg = DistributedOPFModel(
                         base_map[base_str],
                         method_sym,

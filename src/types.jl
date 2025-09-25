@@ -15,6 +15,7 @@ mutable struct DistributedOPFModel
     ε_dual::Float64
     alpha_overrelax::Union{Nothing, Float64}
     warm_start::Bool
+    adaptive_rho::Bool
 
     function DistributedOPFModel(
         base_model::Type{<:OPFModel},
@@ -28,6 +29,7 @@ mutable struct DistributedOPFModel
         ε_dual::Real;
         alpha_overrelax::Union{Nothing, Real} = nothing,
         warm_start::Bool = false,
+        adaptive_rho::Bool = true,
     )
         max_iter > 0 || throw(ArgumentError("max_iter must be > 0"))
         rho_theta > 0 || throw(ArgumentError("rho_theta must be > 0"))
@@ -43,10 +45,12 @@ mutable struct DistributedOPFModel
             Float64(rho_flow_p), Float64(rho_flow_q),
             Float64(ε_primal), Float64(ε_dual), α,
             warm_start,
+            adaptive_rho,   # << persiste a flag
         )
     end
 end
 
+# ----- construtor compacto com ρ único -----
 DistributedOPFModel(
     base_model::Type{<:OPFModel},
     method::Symbol,
@@ -56,12 +60,15 @@ DistributedOPFModel(
     ε_dual::Float64;
     alpha_overrelax::Union{Nothing, Float64} = nothing,
     warm_start::Bool = false,
+    adaptive_rho::Bool = true,
 ) = DistributedOPFModel(
     base_model, method, max_iter, rho, rho, rho, rho, ε_primal, ε_dual;
     alpha_overrelax = alpha_overrelax,
     warm_start = warm_start,
+    adaptive_rho = adaptive_rho,
 )
 
+# ----- construtor keyword-friendly (permite sobrepor rhos específicos) -----
 DistributedOPFModel(
     base_model::Type{<:OPFModel},
     method::Symbol,
@@ -76,6 +83,7 @@ DistributedOPFModel(
     ε_dual::Float64 = 1e-7,
     alpha_overrelax::Union{Nothing, Float64} = nothing,
     warm_start::Bool = false,
+    adaptive_rho::Bool = true,
 ) = DistributedOPFModel(
     base_model, method, max_iter,
     coalesce(rho_theta, rho),
@@ -85,6 +93,7 @@ DistributedOPFModel(
     ε_primal, ε_dual;
     alpha_overrelax = alpha_overrelax,
     warm_start = warm_start,
+    adaptive_rho = adaptive_rho,
 )
 
 # ---------- SHIM ----------
