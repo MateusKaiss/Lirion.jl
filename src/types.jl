@@ -16,6 +16,10 @@ mutable struct DistributedOPFModel
     alpha_overrelax::Union{Nothing, Float64}
     warm_start::Bool
     adaptive_rho::Bool
+    mu_incr::Float64
+    mu_decr::Float64
+    tau_incr::Float64
+    tau_decr::Float64
 
     function DistributedOPFModel(
         base_model::Type{<:OPFModel},
@@ -30,6 +34,10 @@ mutable struct DistributedOPFModel
         alpha_overrelax::Union{Nothing, Real} = nothing,
         warm_start::Bool = false,
         adaptive_rho::Bool = true,
+        mu_incr::Real = 3.0,
+        mu_decr::Real = 3.0,
+        tau_incr::Real = 1.05,
+        tau_decr::Real = 0.98,
     )
         max_iter > 0 || throw(ArgumentError("max_iter must be > 0"))
         rho_theta > 0 || throw(ArgumentError("rho_theta must be > 0"))
@@ -38,6 +46,10 @@ mutable struct DistributedOPFModel
         rho_flow_q > 0 || throw(ArgumentError("rho_flow_q must be > 0"))
         ε_primal ≥ 0 || throw(ArgumentError("ε_primal must be ≥ 0"))
         ε_dual ≥ 0 || throw(ArgumentError("ε_dual must be ≥ 0"))
+        mu_incr > 0 || throw(ArgumentError("mu_incr must be > 0"))
+        mu_decr > 0 || throw(ArgumentError("mu_decr must be > 0"))
+        tau_incr > 0 || throw(ArgumentError("tau_incr must be > 0"))
+        tau_decr > 0 || throw(ArgumentError("tau_decr must be > 0"))
         α = isnothing(alpha_overrelax) ? nothing : Float64(alpha_overrelax)
         return new(
             base_model, method, Int(max_iter),
@@ -45,7 +57,8 @@ mutable struct DistributedOPFModel
             Float64(rho_flow_p), Float64(rho_flow_q),
             Float64(ε_primal), Float64(ε_dual), α,
             warm_start,
-            adaptive_rho,   # << persiste a flag
+            adaptive_rho,
+            Float64(mu_incr), Float64(mu_decr), Float64(tau_incr), Float64(tau_decr),
         )
     end
 end
@@ -61,11 +74,19 @@ DistributedOPFModel(
     alpha_overrelax::Union{Nothing, Float64} = nothing,
     warm_start::Bool = false,
     adaptive_rho::Bool = true,
+    mu_incr::Float64 = 3.0,
+    mu_decr::Float64 = 3.0,
+    tau_incr::Float64 = 1.05,
+    tau_decr::Float64 = 0.98,
 ) = DistributedOPFModel(
     base_model, method, max_iter, rho, rho, rho, rho, ε_primal, ε_dual;
     alpha_overrelax = alpha_overrelax,
     warm_start = warm_start,
     adaptive_rho = adaptive_rho,
+    mu_incr = mu_incr,
+    mu_decr = mu_decr,
+    tau_incr = tau_incr,
+    tau_decr = tau_decr,
 )
 
 # ----- construtor keyword-friendly (permite sobrepor rhos específicos) -----
@@ -84,6 +105,10 @@ DistributedOPFModel(
     alpha_overrelax::Union{Nothing, Float64} = nothing,
     warm_start::Bool = false,
     adaptive_rho::Bool = true,
+    mu_incr::Float64 = 3.0,
+    mu_decr::Float64 = 3.0,
+    tau_incr::Float64 = 1.05,
+    tau_decr::Float64 = 0.98,
 ) = DistributedOPFModel(
     base_model, method, max_iter,
     coalesce(rho_theta, rho),
@@ -94,6 +119,10 @@ DistributedOPFModel(
     alpha_overrelax = alpha_overrelax,
     warm_start = warm_start,
     adaptive_rho = adaptive_rho,
+    mu_incr = mu_incr,
+    mu_decr = mu_decr,
+    tau_incr = tau_incr,
+    tau_decr = tau_decr,
 )
 
 # ---------- SHIM ----------

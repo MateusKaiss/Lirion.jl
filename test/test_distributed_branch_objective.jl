@@ -89,6 +89,8 @@ function compare_distributed_branch_vs_centralized(
             "--admm-eps-primal", string(admm_eps_primal),
             "--admm-eps-dual", string(admm_eps_dual),
             "--admm-alpha", string(admm_alpha),
+            "--admm-mu-incr", "2.0", 
+            "--admm-mu-decr", "2.0",
         ]
         if admm_warm_start
             push!(args_dist, "--admm-warm-start")

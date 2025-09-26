@@ -93,6 +93,27 @@ struct Args
             help = "Liga/desliga o ajuste adaptativo de ρ no ADMM: on | off (padrão: on)"
             arg_type = String
             default = "on"
+
+            # ----- ADMM: parâmetros do ρ adaptativo -----
+            "--admm-mu-incr"
+            help = "Fator μ_incr para comparar r vs s (default: 3.0)"
+            arg_type = Float64
+            default = 3.0
+
+            "--admm-mu-decr"
+            help = "Fator μ_decr para comparar s vs r (default: 3.0)"
+            arg_type = Float64
+            default = 3.0
+
+            "--admm-tau-incr"
+            help = "Fator multiplicativo τ_incr quando r >> s (default: 1.05)"
+            arg_type = Float64
+            default = 1.05
+
+            "--admm-tau-decr"
+            help = "Fator multiplicativo τ_decr quando s >> r (default: 0.98)"
+            arg_type = Float64
+            default = 0.98
         end
 
         parsed = parse_args(raw_args, s)
@@ -139,6 +160,11 @@ struct Args
         adaptive_flag = adaptive_flag_str == "on" ? true :
                         adaptive_flag_str == "off" ? false :
                         ( @warn "Valor inválido para --admm-adaptive=$(parsed["admm-adaptive"]). Usando 'on'."; true )
+
+        mu_incr_val = parsed["admm-mu-incr"]
+        mu_decr_val = parsed["admm-mu-decr"]
+        tau_incr_val = parsed["admm-tau-incr"]
+        tau_decr_val = parsed["admm-tau-decr"]
 
         # avisos de flags irrelevantes/ignoradas
         local function _warn_irrelevant_rhos(
@@ -240,6 +266,10 @@ struct Args
                         alpha_overrelax = alpha_,
                         warm_start = warm_start_flag,
                         adaptive_rho = adaptive_flag,
+                        mu_incr = mu_incr_val,
+                        mu_decr = mu_decr_val,
+                        tau_incr = tau_incr_val,
+                        tau_decr = tau_decr_val,
                     )
                 catch err
                     @warn "Esta versão de DistributedOPFModel não aceita :warm_start/adaptive_rho (atualize a struct/constructors). Prosseguindo sem esses campos." err

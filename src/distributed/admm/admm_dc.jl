@@ -684,7 +684,9 @@ function run_admm(config::DistributedOPFModel, data)
         end
 
         if adaptive
-            adaptive_rho_dc!(ρ, res_primal, res_dual)
+            adaptive_rho_dc!(ρ, res_primal, res_dual;
+                μ_incr = config.mu_incr, μ_decr = config.mu_decr,
+                τ_incr = config.tau_incr, τ_decr = config.tau_decr)
         end
     end
 
@@ -741,6 +743,11 @@ function run_admm_branch(
     ρ = Ref(config.rho_flow)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
     adaptive = _adaptive_on(config)
+
+    μ_incr = config.mu_incr
+    μ_decr = config.mu_decr
+    τ_incr = config.tau_incr
+    τ_decr = config.tau_decr
 
     z_flow = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     z_flow_prev = Dict{Int, Float64}()
@@ -1114,8 +1121,12 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         end
 
         if adaptive
-            adaptive_rho_dc!(ρθ, res_pri_bus, res_du_bus)
-            adaptive_rho_dc!(ρe,  res_pri_br,  res_du_br)
+            adaptive_rho_dc!(ρθ, res_pri_bus, res_du_bus;
+                μ_incr = config.mu_incr, μ_decr = config.mu_decr,
+                τ_incr = config.tau_incr, τ_decr = config.tau_decr)
+            adaptive_rho_dc!(ρe,  res_pri_br,  res_du_br;
+                μ_incr = config.mu_incr, μ_decr = config.mu_decr,
+                τ_incr = config.tau_incr, τ_decr = config.tau_decr)
         end
     end
 
