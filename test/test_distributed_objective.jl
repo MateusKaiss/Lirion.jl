@@ -24,7 +24,7 @@ const distributed_zone_cases = [
     # 793
     # "pglib_opf_case793_11zones_goc.m",
     # 2000
-    "pglib_opf_case2000_5zonesbus_goc.m",
+    "pglib_opf_case2000_11zonesbus_goc.m",
 ]
 
 function track_failure_dist(label::String, origin::String, case_name::String)
@@ -153,7 +153,7 @@ function run_distributed_objective_tests(;
             admm_eps_primal_case = 1e-4
             admm_eps_dual_case   = 1e-4
         end
-        if occursin("case2000_5zonesbus", case_name)
+        if occursin("case2000_11zonesbus", case_name)
             admm_max_iter_case   = 900
             admm_rho_case        = 10_000.0
             admm_eps_primal_case = 1e-4
