@@ -23,6 +23,8 @@ const distributed_zone_cases = [
     "pglib_opf_case500_4zones_goc.m",
     # 793
     # "pglib_opf_case793_11zones_goc.m",
+    # 2000
+    "pglib_opf_case2000_5zonesbus_goc.m",
 ]
 
 function track_failure_dist(label::String, origin::String, case_name::String)
@@ -46,6 +48,10 @@ function compare_distributed_vs_centralized(
     admm_eps_dual = 1e-6,
     # α=1.0 => over-relaxation inativo
     admm_alpha::Float64 = 1.0,
+    admm_mu_incr::Float64 = 3.0,
+    admm_mu_decr::Float64 = 3.0,
+    admm_tau_incr::Float64 = 1.05,
+    admm_tau_decr::Float64 = 0.98,
 )
     case_name = basename(file)
 
@@ -74,6 +80,10 @@ function compare_distributed_vs_centralized(
             "--admm-eps-primal", string(admm_eps_primal),
             "--admm-eps-dual", string(admm_eps_dual),
             "--admm-alpha", string(admm_alpha),
+            "--admm-mu-incr", string(admm_mu_incr),
+            "--admm-mu-decr", string(admm_mu_decr),
+            "--admm-tau-incr", string(admm_tau_incr),
+            "--admm-tau-decr", string(admm_tau_decr),
         ]
         # Só passamos --optimizer se o usuário quiser sobrescrever o default (OSQP)
         if !isnothing(distributed_optimizer)
@@ -128,23 +138,33 @@ function run_distributed_objective_tests(;
             end
 
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case = admm_eps_dual
+        admm_eps_dual_case   = admm_eps_dual
 
-        # # ---- OVERRIDES para casos grandes ----
-        # if occursin("case500_", case_name)
-        #     admm_max_iter_case = 600
-        #     admm_rho_case = 1_000_000.0
-        #     admm_eps_primal_case = 1e-7
-        #     admm_eps_dual_case = 1e-7
-        # end
+        # parâmetros adaptativos: defaults gerais
+        admm_mu_incr_case = 3.0
+        admm_mu_decr_case = 3.0
+        admm_tau_incr_case = 1.05
+        admm_tau_decr_case = 0.98
+
+        # ---- OVERRIDES pontuais ----
         if occursin("case118_", case_name)
             admm_max_iter_case = 700
             admm_rho_case = 1_000_000.0
             admm_eps_primal_case = 1e-4
-            admm_eps_dual_case = 1e-4
+            admm_eps_dual_case   = 1e-4
+        end
+        if occursin("case2000_5zonesbus", case_name)
+            admm_max_iter_case   = 900
+            admm_rho_case        = 10_000.0
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case   = 1e-4
+            admm_mu_incr_case    = 3.0
+            admm_mu_decr_case    = 3.0
+            admm_tau_incr_case   = 1.2
+            admm_tau_decr_case   = 0.8
         end
 
-        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha))"
+        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha), μ_incr=$(admm_mu_incr_case), μ_decr=$(admm_mu_decr_case), τ_incr=$(admm_tau_incr_case), τ_decr=$(admm_tau_decr_case))"
         @testset "$(label) - $(case_name)" begin
             compare_distributed_vs_centralized(
                 file;
@@ -158,6 +178,10 @@ function run_distributed_objective_tests(;
                 admm_eps_primal = admm_eps_primal_case,
                 admm_eps_dual = admm_eps_dual_case,
                 admm_alpha = admm_alpha,
+                admm_mu_incr = admm_mu_incr_case,
+                admm_mu_decr = admm_mu_decr_case,
+                admm_tau_incr = admm_tau_incr_case,
+                admm_tau_decr = admm_tau_decr_case,
             )
         end
     end
