@@ -2,24 +2,39 @@
 # ADMM-Branch-DC vs DC (objetivo) – testes
 # ==============================================
 
-# Casos particionados (2/3/4 zonas) — mesmos do teste por barramento
+# Casos particionados (2/3/4 zonas)
 const distributed_branch_zone_cases = [
     # 14 buses
     "pglib_opf_case14_2zones_ieee.m",
     "pglib_opf_case14_3zones_ieee.m",
-    # # 24 buses
+    # 24 buses
     "pglib_opf_case24_2zones_ieee_rts.m",
     "pglib_opf_case24_3zones_ieee_rts.m",
-    # # 30 buses
+    # 30 buses
     "pglib_opf_case30_2zones_as.m",
     "pglib_opf_case30_3zones_as.m",
     # 57 buses
-    # "pglib_opf_case57_2zones_ieee.m",
-    # ########"pglib_opf_case57_4zones_ieee.m", #####problem
-    # # # 118 buses
-    # "pglib_opf_case118_2zones_ieee.m",
-    # # # 500 buses
-    # "pglib_opf_case500_2zones_goc.m",
+    "pglib_opf_case57_2zones_ieee.m",
+    "pglib_opf_case57_4zones_ieee.m",
+    # 118 buses
+    "pglib_opf_case118_2zones_ieee.m",
+    "pglib_opf_case118_3zones_ieee.m",
+    "pglib_opf_case118_5zones_ieee.m",
+    # 500 buses
+    "pglib_opf_case500_3zones_goc.m",
+    "pglib_opf_case500_4zones_goc.m",
+    # 793
+    # "pglib_opf_case793_11zones_goc.m",
+    # 2000
+    "pglib_opf_case2000_5zones_goc.m",
+    #3970
+    "pglib_opf_case3970_25zones_goc.m",
+    # 10000
+    "pglib_opf_case10000_50zones_goc.m",
+    # 20758
+    "pglib_opf_case20758_42zones_epigrids.m",
+    # 30000
+    "pglib_opf_case30000_20zones_goc.m",
 ]
 
 function track_failure_branch(label::String, origin::String, case_name::String)
@@ -36,14 +51,16 @@ Compara objetivo Centralizado DC vs Distribuído ADMM-Branch-DC no mesmo caso.
 function compare_distributed_branch_vs_centralized(
     file::String;
     label::String,
-    central_optimizer = Ipopt.Optimizer,
-    distributed_optimizer = Ipopt.Optimizer,
+    central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
+    distributed_optimizer::Union{Nothing, Function} = nothing,
     rtol = 0.05,
     atol = 1e-6,
     admm_rho = 1_000.0,
     admm_max_iter = 350,
-    admm_eps_primal = 1e-6,
-    admm_eps_dual = 1e-6,
+    admm_eps_primal = 1e-4,
+    admm_eps_dual = 1e-4,
+    admm_alpha::Float64 = 1.0,
+    admm_warm_start::Bool = false,
 )
     case_name = basename(file)
 
@@ -67,12 +84,21 @@ function compare_distributed_branch_vs_centralized(
         args_dist = String[
             file,
             "--model", "distributed-admm-branch-dc",
-            "--optimizer", string(distributed_optimizer),
             "--admm-rho", string(admm_rho),
             "--admm-max-iter", string(admm_max_iter),
             "--admm-eps-primal", string(admm_eps_primal),
             "--admm-eps-dual", string(admm_eps_dual),
+            "--admm-alpha", string(admm_alpha),
+            "--admm-mu-incr", "2.0", 
+            "--admm-mu-decr", "2.0",
         ]
+        if admm_warm_start
+            push!(args_dist, "--admm-warm-start")
+        end
+        if !isnothing(distributed_optimizer)
+            push!(args_dist, "--optimizer")
+            push!(args_dist, string(distributed_optimizer))
+        end
         obj, _ = PowerOptimization.main(args_dist)
         obj
     catch e
@@ -91,10 +117,11 @@ Roda a suíte de testes para ADMM-Branch-DC vs DC nos casos de zonas.
 function run_distributed_branch_objective_tests(;
     case_list = distributed_branch_zone_cases,
     label = "ADMM-Branch-DC vs DC",
-    central_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer),
-    distributed_optimizer = Ipopt.Optimizer,
+    central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
+    distributed_optimizer::Union{Nothing, Function} = nothing,
     rtol = 0.05, atol = 1e-6,
-    admm_eps_primal = 1e-6, admm_eps_dual = 1e-6,
+    admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,
+    admm_alpha::Float64 = 1.0,
 )
     if isempty(case_list)
         @info "Empty distributed (branch) case list. No tests will be run."
@@ -112,38 +139,79 @@ function run_distributed_branch_objective_tests(;
     for (i, file) in enumerate(selected_files)
         case_name = basename(file)
 
-        admm_max_iter_case, admm_rho_case =
-            if occursin("_3zones_", case_name)
-                (400, 1_000.0)
-            elseif occursin("_2zones_", case_name)
-                (350, 1_000.0)
-            else
-                (300, 1_000.0)
-            end
-
+        # defaults por case
+        admm_max_iter_case = if occursin("_3zones_", case_name)
+            400
+        elseif occursin("_2zones_", case_name)
+            350
+        else
+            300
+        end
+        admm_rho_case = 1_000.0
         admm_eps_primal_case = admm_eps_primal
         admm_eps_dual_case = admm_eps_dual
+        admm_alpha_case = admm_alpha
+        distributed_optimizer_case = distributed_optimizer
+        admm_warm_start_case = false
 
         if occursin("case500_", case_name)
             admm_max_iter_case = 600
             admm_rho_case = 1_000_000.0
-            admm_eps_primal_case = 1e-7
-            admm_eps_dual_case = 1e-7
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case = 1e-4
+        elseif occursin("case2000_", case_name)
+            admm_max_iter_case = 600
+            admm_rho_case = 700.0
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case = 1e-4
+            admm_alpha_case = 1.6
+        end
+        if occursin("case3970_25zones_", case_name)
+            admm_max_iter_case = 600
+            admm_rho_case = 1_000.0
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case = 1e-4
+            admm_alpha_case = 1.4
+        end
+        if occursin("case10000_50zones_", case_name)
+            admm_max_iter_case = 800
+            admm_rho_case = 200.0
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case = 1e-4
+            admm_alpha_case = 1.2
         end
 
-        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"
+        if occursin("case20758_42zones_", case_name)
+            admm_max_iter_case = 1000
+            admm_rho_case = 750.0
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case = 1e-4
+            admm_alpha_case = 1.1
+        end
+
+        if occursin("case30000_20zones_", case_name)
+            admm_max_iter_case = 1000
+            admm_rho_case = 500.0
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case = 1e-4
+            admm_alpha_case = 1.2
+            admm_warm_start_case = true
+        end
+        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha_case), optimizer=$(distributed_optimizer_case === nothing ? "default" : string(distributed_optimizer_case)))"
         @testset "$(label) - $(case_name)" begin
             compare_distributed_branch_vs_centralized(
                 file;
                 label = label,
                 central_optimizer = central_optimizer,
-                distributed_optimizer = distributed_optimizer,
+                distributed_optimizer = distributed_optimizer_case,
                 rtol = rtol,
                 atol = atol,
                 admm_rho = admm_rho_case,
                 admm_max_iter = admm_max_iter_case,
                 admm_eps_primal = admm_eps_primal_case,
                 admm_eps_dual = admm_eps_dual_case,
+                admm_alpha = admm_alpha_case,
+                admm_warm_start = admm_warm_start_case,            # <-- passa o warm start
             )
         end
     end

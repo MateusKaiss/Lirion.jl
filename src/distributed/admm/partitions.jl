@@ -149,7 +149,6 @@ function prepare_admm_partitions(data::Dict{String, Any})
             (; sbase = sub["baseMVA"]),
         )
 
-        # Set pronto para O(1) e lista local de compartilhadas (evita "b in busset" depois)
         sub["bus_set"] = Set(sub["bus"]["bus_i"])
 
         partitions[zone] = sub
@@ -169,23 +168,51 @@ function prepare_admm_partitions(data::Dict{String, Any})
     return partitions, shared_buses
 end
 
-# Silenciar solver (JuMP/MOI/solvers) – robusto
 function _set_model_silent!(m::JuMP.Model)
+    _safe(k, v) = (
+        try
+            set_optimizer_attribute(m, k, v)
+        catch
+        end
+    )
+
     try
         set_silent(m)
     catch
     end
     try
-        MOI = JuMP.MOI
-        set_optimizer_attribute(m, MOI.Silent(), true)
+        set_optimizer_attribute(m, JuMP.MOI.Silent(), true)
     catch
     end
 
-    for (k, v) in [("verbose", 0), ("output_flag", 0), ("print_level", 0)]
-        try
-            set_optimizer_attribute(m, k, v)
-        catch
-        end
+    solver = ""
+    try
+        backend = JuMP.backend(m)
+        solver = lowercase(JuMP.MOI.get(backend, JuMP.MOI.SolverName()))
+    catch
+    end
+
+    if occursin("ipopt", solver)
+        _safe("print_level", 0)    # inteiro 0..12
+        _safe("sb", "yes")         # suprime banners do Ipopt
+    elseif occursin("gurobi", solver)
+        _safe("OutputFlag", 0)
+    elseif occursin("cplex", solver)
+        _safe("CPXPARAM_ScreenOutput", 0)
+    elseif occursin("highs", solver)
+        _safe("log_to_console", false)
+        _safe("output_flag", false)  # aceito em algumas versões
+    elseif occursin("scs", solver)
+        _safe("verbose", false)
+        _safe("log_csv_filename", "")  # evita criar arquivo de log
+    elseif occursin("clarabel", solver)
+        _safe("verbose", false)
+    elseif occursin("glpk", solver)
+        _safe("msg_lev", 0)  # (GLPK.MSG_OFF se tiver GLPK carregado)
+    else
+        _safe("verbose", false)
+        _safe("output_flag", 0)
+        _safe("print_level", 0)
     end
 
     return nothing
