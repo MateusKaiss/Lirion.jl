@@ -632,9 +632,9 @@ version = "0.21.5"
 
 [[deps.PowerOptimization]]
 deps = ["ArgParse", "CSV", "DataFrames", "Dates", "Glob", "Gurobi", "InfrastructureModels", "Ipopt", "JuMP", "LinearAlgebra", "Logging", "PlotlyLight", "PowerModels", "SCS", "Statistics", "Test"]
-git-tree-sha1 = "3002163ec73da59c672d3daf5c6b295c6219fa4b"
+git-tree-sha1 = "202517adba6873b0e1ceebffe2aa42e58028d35a"
 repo-rev = "master"
-repo-url = "https://github.com/MateusKaiss/PowerOptimization.jl.git"
+repo-url = "git@github.com:MateusKaiss/PowerOptimization.jl.git"
 uuid = "39f2d509-5c07-4bae-a810-f080f7bd369c"
 version = "0.1.0"
 
