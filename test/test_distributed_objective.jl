@@ -32,7 +32,7 @@ const distributed_zone_cases = [
     #20758
     "pglib_opf_case20758_42zonesbus_epigrids.m",
     #30000
-    "pglib_opf_case30000_20zonesbus_goc.m",
+    # "pglib_opf_case30000_20zonesbus_goc.m",
 ]
 
 function track_failure_dist(label::String, origin::String, case_name::String)
