@@ -54,12 +54,13 @@ function compare_distributed_vs_centralized(
     admm_max_iter = 350,
     admm_eps_primal = 1e-6,
     admm_eps_dual = 1e-6,
-    # α=1.0 => over-relaxation inativo
     admm_alpha::Float64 = 1.0,
     admm_mu_incr::Float64 = 3.0,
     admm_mu_decr::Float64 = 3.0,
     admm_tau_incr::Float64 = 1.05,
     admm_tau_decr::Float64 = 0.98,
+    admm_accel::Bool = false,                       # se true, inclui --admm-accel
+    admm_adaptive::Union{Nothing,String} = nothing  # "on" | "off" | nothing
 )
     case_name = basename(file)
 
@@ -93,11 +94,19 @@ function compare_distributed_vs_centralized(
             "--admm-tau-incr", string(admm_tau_incr),
             "--admm-tau-decr", string(admm_tau_decr),
         ]
+        if admm_accel
+            push!(args_dist, "--admm-accel")
+        end
+        if !isnothing(admm_adaptive)
+            push!(args_dist, "--admm-adaptive")
+            push!(args_dist, admm_adaptive)
+        end
         # Só passamos --optimizer se o usuário quiser sobrescrever o default (OSQP)
         if !isnothing(distributed_optimizer)
             push!(args_dist, "--optimizer")
             push!(args_dist, string(distributed_optimizer))
         end
+
         obj, _ = PowerOptimization.main(args_dist)
         obj
     catch e
@@ -110,6 +119,9 @@ function compare_distributed_vs_centralized(
     @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
 end
 
+# -----------------------------------------------------------
+# run_distributed_objective_tests: overrides p/ 30000 + novos params
+# -----------------------------------------------------------
 function run_distributed_objective_tests(;
     case_list = distributed_zone_cases,
     label = "ADMM-DC (bus) vs DC",
@@ -118,6 +130,8 @@ function run_distributed_objective_tests(;
     rtol = 0.05, atol = 1e-6,
     admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,
     admm_alpha::Float64 = 1.0,  # over-relaxation inativo
+    admm_accel::Bool = false,
+    admm_adaptive::Union{Nothing,String} = nothing,
 )
     if isempty(case_list)
         @info "Empty distributed case list. No tests will be run."
@@ -147,12 +161,15 @@ function run_distributed_objective_tests(;
 
         admm_eps_primal_case = admm_eps_primal
         admm_eps_dual_case   = admm_eps_dual
+        admm_alpha_case      = admm_alpha
 
         # parâmetros adaptativos: defaults gerais
         admm_mu_incr_case = 3.0
         admm_mu_decr_case = 3.0
         admm_tau_incr_case = 1.05
         admm_tau_decr_case = 0.98
+        admm_accel_case    = admm_accel
+        admm_adaptive_case = admm_adaptive  # nothing | "on" | "off"
 
         # ---- OVERRIDES pontuais ----
         if occursin("case118_", case_name)
@@ -183,7 +200,7 @@ function run_distributed_objective_tests(;
         end
         if occursin("case10000_50zonesbus", case_name)
             admm_max_iter_case   = 1500
-            admm_rho_case        = 1_000_000.0   # 1e6
+            admm_rho_case        = 1_000_000.0
             admm_eps_primal_case = 1e-4
             admm_eps_dual_case   = 1e-4
             admm_mu_incr_case    = 3.0
@@ -201,18 +218,27 @@ function run_distributed_objective_tests(;
             admm_tau_incr_case   = 1.2
             admm_tau_decr_case   = 0.8
         end
-        if occursin("case30000_20zonesbus", case_name)
+        if occursin("case30000_20zonesbus", case_name) || occursin("case30000_20zones", case_name)
             admm_max_iter_case   = 1500
-            admm_rho_case        = 50_000_000.0   # 1e6
-            admm_eps_primal_case = 1e-4
-            admm_eps_dual_case   = 1e-4
+            admm_rho_case        = 350_000.0           
+            admm_eps_primal_case = 5e-4                
+            admm_eps_dual_case   = 5e-4                
+            admm_alpha_case      = 1.0                 
             admm_mu_incr_case    = 3.0
             admm_mu_decr_case    = 3.0
             admm_tau_incr_case   = 1.2
             admm_tau_decr_case   = 0.8
+            admm_accel_case      = true 
+            admm_adaptive_case   = "off"
         end
 
-        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha), μ_incr=$(admm_mu_incr_case), μ_decr=$(admm_mu_decr_case), τ_incr=$(admm_tau_incr_case), τ_decr=$(admm_tau_decr_case))"
+        @info "[$label] Rodando caso $i de $n: $case_name " *
+              "(max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), " *
+              "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), " *
+              "alpha=$(admm_alpha_case), μ_incr=$(admm_mu_incr_case), μ_decr=$(admm_mu_decr_case), " *
+              "τ_incr=$(admm_tau_incr_case), τ_decr=$(admm_tau_decr_case), " *
+              "accel=$(admm_accel_case), adaptive=$(admm_adaptive_case))"
+
         @testset "$(label) - $(case_name)" begin
             compare_distributed_vs_centralized(
                 file;
@@ -225,11 +251,13 @@ function run_distributed_objective_tests(;
                 admm_max_iter = admm_max_iter_case,
                 admm_eps_primal = admm_eps_primal_case,
                 admm_eps_dual = admm_eps_dual_case,
-                admm_alpha = admm_alpha,
+                admm_alpha = admm_alpha_case,
                 admm_mu_incr = admm_mu_incr_case,
                 admm_mu_decr = admm_mu_decr_case,
                 admm_tau_incr = admm_tau_incr_case,
                 admm_tau_decr = admm_tau_decr_case,
+                admm_accel = admm_accel_case,
+                admm_adaptive = admm_adaptive_case,
             )
         end
     end
