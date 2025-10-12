@@ -164,7 +164,7 @@ end
     x = sub["branch_full"]["br_x"][l_global]
     @assert abs(x) > 1e-8 "br_x≈0 no ramo $l_global (DC)."
     θ = m[:theta]
-    return (_theta_val(m, θ, f, t) - _theta_val(m, θ, tb, t)) / x  # seguro antes/depois
+    return (_theta_val(m, θ, f, t) - _theta_val(m, θ, tb, t)) / x
 end
 
 # =======================================================
@@ -330,7 +330,7 @@ end
 end
 
 # =======================================================
-# RESÍDUOS / TOLERÂNCIAS  (mantidos como estavam)
+# RESÍDUOS / TOLERÂNCIAS
 # =======================================================
 function primal_residual_bus_dc(
     partitions::Dict{Int, Dict{String, Any}},
@@ -425,22 +425,6 @@ function adaptive_rho_dc!(ρ::Base.RefValue{Float64}, r::Float64, s::Float64;
     end
 end
 
-# ---------- ρ adaptativo ----------
-# function adaptive_rho_dc!(
-#     θ::Base.RefValue{Float64}, r::Float64, s::Float64;
-#     μ_incr::Float64 = 3.0,
-#     μ_decr::Float64 = 3.0,
-#     τ_incr::Float64 = 1.5,
-#     τ_decr::Float64 = 1.98,
-# )
-#     if r > μ_incr * s
-#         θ[] *= (1 + τ_incr)
-#     elseif s > μ_decr * r
-#         θ[] *= 1 / (1 + τ_decr)
-#     end
-#     return nothing
-# end
-
 # ---------- Duais (flow) ----------
 function update_duals_flow!(
     duals::Dict{Int, Dict{Int, Float64}},
@@ -512,8 +496,56 @@ end
 @inline _adaptive_on(config) =
     hasfield(typeof(config), :adaptive_rho) ? getfield(config, :adaptive_rho) : true
 
+@inline _accel_on(config) =
+    hasfield(typeof(config), :accel_nesterov) ? getfield(config, :accel_nesterov) : false
+
 # =======================================================
-# ADMM: BUS (com objetivo persistente)
+# ACELERAÇÃO — IMPLEMENTAÇÃO FISTA (Alg. 3 do paper)
+# =======================================================
+# Extrapolação genérica (y_hat = y + γ (y - y_prev))
+@inline function _extrapolate!(
+    y_hat::AbstractVector{T},
+    y::AbstractVector{T},
+    y_prev::AbstractVector{T},
+    γ::T,
+) where {T <: Real}
+    @inbounds @simd for i in eachindex(y)
+        y_hat[i] = y[i] + γ * (y[i] - y_prev[i])
+    end
+    return nothing
+end
+
+mutable struct FISTAState
+    β::Float64            # parâmetro FISTA (t_k)
+    α::Float64            # momentum = (β-1)/β_next
+    prev_metric::Float64  # métrica do passo anterior (para restart por resíduos)
+end
+FISTAState() = FISTAState(1.0, 0.0, Inf)
+
+# Atualiza (β, α) e aplica restart se a métrica de resíduos não melhora.
+function fista_update!(st::FISTAState; metric::Float64)
+    if metric <= st.prev_metric
+        βnext = (1.0 + sqrt(1.0 + 4.0 * st.β^2)) / 2.0
+        st.α = (st.β - 1.0) / βnext
+        st.β = βnext
+        st.prev_metric = metric
+        return false  # sem restart
+    else
+        # Restart monotônico por resíduos: zera momentum
+        st.β = 1.0
+        st.α = 0.0
+        st.prev_metric = metric
+        return true   # houve restart
+    end
+end
+
+# métrica combinada de resíduos (||r||_2 e ||s||_2)
+@inline function _accel_metric(res_pri::Float64, res_du::Float64)
+    return hypot(res_pri, res_du)
+end
+
+# =======================================================
+# ADMM: BUS/DC
 # =======================================================
 function run_admm(config::DistributedOPFModel, data)
     t0_ns = time_ns()
@@ -530,7 +562,12 @@ function run_admm(config::DistributedOPFModel, data)
     ρ = Ref(config.rho_theta)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
     adaptive = _adaptive_on(config)
+    accel = _accel_on(config)
 
+    # quando aceleração ON: forçar ρ fixo e ignorar over-relaxation α
+    if accel
+        adaptive = false
+    end
 
     duals_dense = Dict{Int, Vector{Float64}}(
         z => zeros(Float64, length(shared_buses_sorted))
@@ -538,6 +575,19 @@ function run_admm(config::DistributedOPFModel, data)
     )
     θ̄_vec = zeros(Float64, length(shared_buses_sorted))
     θ̄_prev_vec = similar(θ̄_vec)
+
+    # --- Estado FISTA (Alg. 3) ---
+    θ̄_hat = similar(θ̄_vec)
+    fill!(θ̄_hat, 0.0)
+    fista = FISTAState()
+
+    # manter duais reais prévios para extrapolação "exata" (como θ)
+    λ_prev_real = Dict{Int, Vector{Float64}}(
+        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
+    )
+    λ_hat = Dict{Int, Vector{Float64}}(
+        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
+    )
 
     res_primal_vec = Float64[]
     res_dual_vec = Float64[]
@@ -575,6 +625,7 @@ function run_admm(config::DistributedOPFModel, data)
 
     if warm
         compute_theta_consensus_vec!(θ̄_vec, partitions, shared_buses_sorted, b2pos)
+        θ̄_hat .= θ̄_vec
         for (z, sub) in partitions
             θs = snapshot_theta_shared!(sub)
             lbs = sub["shared_buses_local"]
@@ -582,7 +633,10 @@ function run_admm(config::DistributedOPFModel, data)
                 j = b2pos[lbs[i]]
                 duals_dense[z][j] = ρ[] * (θs[i] - θ̄_vec[j])
             end
+            λ_prev_real[z] .= duals_dense[z]  # prev reais = atuais (k=0)
+            λ_hat[z] .= duals_dense[z]  # extrapolado inicia no real
         end
+        # fista.prev_metric permanece Inf (sem restart na 1ª iteração)
     end
 
     zone_ids = collect(keys(partitions))
@@ -591,7 +645,7 @@ function run_admm(config::DistributedOPFModel, data)
         for z in zone_ids
     )
 
-    prev_rho = ρ[]  # para detectar mudança e reinstalar Q
+    prev_rho = ρ[]
 
     for k in 1:config.max_iter
         _FAST_USE_LOGS && println("\nIteração $k (bus/DC)")
@@ -603,16 +657,26 @@ function run_admm(config::DistributedOPFModel, data)
             prev_rho = ρ[]
         end
 
-        α_used = _alpha_schedule(k, config.alpha_overrelax; k_on = 10)
+        # over-relaxation só se aceleração OFF
+        α_used = accel ? nothing : _alpha_schedule(k, config.alpha_overrelax; k_on = 10)
 
-        # ---------- resolve zonas em paralelo ----------
+        # alvo no termo linear:
+        # - aceleração ON (paper): usa θ̄_hat e λ_hat (FISTA)
+        # - senão: usa θ̄ e λ (padrão)
+        θ̄_target = accel ? θ̄_hat : θ̄_vec
+
         nz = length(zone_ids)
         results = Vector{Any}(undef, nz)
         @threads for i in 1:nz
             z = zone_ids[i]
             sub = partitions[z]
-            λz = gather_zone_lambda!(λ_zone_buf[z], duals_dense[z])
-            lin = _build_linear_bus_expr(sub, shared_buses_sorted, b2pos, θ̄_vec, λz, ρ[])
+            if accel
+                λz = gather_zone_lambda!(λ_zone_buf[z], λ_hat[z])
+            else
+                λz = gather_zone_lambda!(λ_zone_buf[z], duals_dense[z])
+            end
+            lin =
+                _build_linear_bus_expr(sub, shared_buses_sorted, b2pos, θ̄_target, λz, ρ[])
             @objective(sub["model"], Min, sub["obj_base"] + sub["quad_bus_expr"] + lin)
             optimize!(sub["model"])
 
@@ -623,8 +687,8 @@ function run_admm(config::DistributedOPFModel, data)
             θs = snapshot_theta_shared!(sub)
             θsnap = Dict{Int, Float64}()
             lbs = sub["shared_buses_local"]
-            @inbounds for i in eachindex(lbs)
-                θsnap[lbs[i]] = θs[i]
+            @inbounds for i2 in eachindex(lbs)
+                θsnap[lbs[i2]] = θs[i2]
             end
             results[i] =
                 (gen_cost_expr = gen_cost_expr, real_cost = real_cost, θsnap = θsnap)
@@ -648,6 +712,7 @@ function run_admm(config::DistributedOPFModel, data)
             end
         end
 
+        # ===== atualização consenso real (θ̄_k) e duais reais λ_k =====
         θ̄_prev_vec .= θ̄_vec
         compute_theta_consensus_vec!(θ̄_vec, partitions, shared_buses_sorted, b2pos)
         @inbounds for b in shared_buses_sorted
@@ -655,12 +720,20 @@ function run_admm(config::DistributedOPFModel, data)
             push!(get!(θ_avg_history, b, Float64[]), θ̄_vec[j])
         end
 
-        for z in zone_ids
-            update_duals_theta_vec!(duals_dense[z], partitions[z], θ̄_vec, θ̄_prev_vec, ρ[],
-                α_used,
-                shared_buses_sorted, b2pos)
+        # guardar λ reais anteriores antes do update deste k
+        if accel
+            for z in zone_ids
+                λ_prev_real[z] .= duals_dense[z]
+            end
         end
 
+        # atualização dos duais “reais” λ_k (sempre com θ̄ real)
+        for z in zone_ids
+            update_duals_theta_vec!(duals_dense[z], partitions[z], θ̄_vec, θ̄_prev_vec, ρ[],
+                α_used, shared_buses_sorted, b2pos)
+        end
+
+        # resíduos / tolerâncias (com variáveis reais)
         res_primal = primal_residual_bus_dc(partitions, θ̄_vec, shared_buses_sorted, b2pos)
         res_dual = dual_residual_bus_dc(θ̄_vec, θ̄_prev_vec)
         push!(res_primal_vec, res_primal)
@@ -673,7 +746,7 @@ function run_admm(config::DistributedOPFModel, data)
         push!(eps_dual_vec, ϵ_du)
 
         _FAST_USE_LOGS && println("‖r‖ = $res_primal | ε_pri = $ϵ_pri")
-        _FAST_USE_LOGS && println("‖s‖ = $res_dual   | ε_dual = $ϵ_du")
+        _FAST_USE_LOGS && println("‖s‖ = $res_dual   | ε_du  = $ϵ_du")
 
         push!(rho_vec, ρ[])
 
@@ -681,6 +754,25 @@ function run_admm(config::DistributedOPFModel, data)
         if res_primal < ϵ_pri && res_dual < ϵ_du
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
+        end
+
+        # ===== Aceleração FISTA (Alg. 3) — usar estados REAIS anteriores =====
+        if accel
+            metric = _accel_metric(res_primal, res_dual)
+            restarted = fista_update!(fista; metric = metric)
+            if restarted
+                # alinhar extrapolados com estados reais
+                θ̄_hat .= θ̄_vec
+                for z in zone_ids
+                    λ_hat[z] .= duals_dense[z]
+                end
+            else
+                # extrapola consenso e duais com α_k usando (real_k, real_{k-1})
+                _extrapolate!(θ̄_hat, θ̄_vec, θ̄_prev_vec, fista.α)
+                for z in zone_ids
+                    _extrapolate!(λ_hat[z], duals_dense[z], λ_prev_real[z], fista.α)
+                end
+            end
         end
 
         if adaptive
@@ -715,7 +807,7 @@ function run_admm(config::DistributedOPFModel, data)
 end
 
 # =======================================================
-# ADMM: BRANCH (objetivo persistente)
+# ADMM: BRANCH (objetivo persistente) — (sem aceleração)
 # =======================================================
 function run_admm_branch(
     config::DistributedOPFModel,
@@ -909,6 +1001,9 @@ end
 
 # =======================================================
 # ADMM: HÍBRIDO (bus + branch)
+#   - Quando accel_nesterov=true: BUS segue Alg. 3 (FISTA + restart)
+#   - Quando accel_nesterov=false: comportamento anterior (sem aceleração)
+#   - ρθ fixo quando aceleração ON; ρe pode ser adaptativo.
 # =======================================================
 function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     t0_ns = time_ns()
@@ -926,13 +1021,18 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
 
     shared_buses_sorted, b2pos = prepare_dense_maps(shared_buses)
 
-    ρθ = Ref(config.rho_theta)
-    ρe = Ref(config.rho_flow)
+    ρθ = Ref(config.rho_theta)  # rho para bus
+    ρe = Ref(config.rho_flow)   # rho para branch
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
     adaptive = _adaptive_on(config)
+    accel = _accel_on(config)   # quando true, aplicar Alg. 3 no bloco de bus
 
+    # === Estados/estruturas ===
     θ̄_vec = zeros(Float64, length(shared_buses_sorted))
     θ̄_prev_vec = similar(θ̄_vec)
+    θ̄_hat = similar(θ̄_vec)
+    fill!(θ̄_hat, 0.0)
+    fista = FISTAState()
 
     z_flow = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     z_flow_prev = Dict{Int, Float64}()
@@ -943,6 +1043,15 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         )
     duals_flow =
         Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in keys(partitions))
+
+    # manter duais de BUS reais prévios para extrapolação Alg. 3
+    λθ_prev_real = Dict{Int, Vector{Float64}}(
+        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
+    )
+    # extrapolados (usados só quando accel ON)
+    λθ_hat = Dict{Int, Vector{Float64}}(
+        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
+    )
 
     res_primal_vec = Float64[]
     res_dual_vec = Float64[]
@@ -960,6 +1069,7 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         false
     end
 
+    # === Build models por zona ===
     for (zone_id, sub) in partitions
         m = build_model(sub, DC; optimizer = optimizer_factory, build_only = true)
         sub["model"] = m
@@ -978,8 +1088,11 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         @objective(m, Min, sub["obj_base"] + sub["quad_bus_expr"] + sub["quad_branch_expr"])
     end
 
+    # === Warm start ADMM ===
     if warm
+        # bus
         compute_theta_consensus_vec!(θ̄_vec, partitions, shared_buses_sorted, b2pos)
+        θ̄_hat .= θ̄_vec
         for (z, sub) in partitions
             θs = snapshot_theta_shared!(sub)
             lbs = sub["shared_buses_local"]
@@ -987,7 +1100,11 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
                 j = b2pos[lbs[i]]
                 duals_theta[z][j] = ρθ[] * (θs[i] - θ̄_vec[j])
             end
+            λθ_prev_real[z] .= duals_theta[z]
+            λθ_hat[z] .= duals_theta[z]
         end
+        # fista.prev_metric permanece Inf
+        # branch
         compute_z_flow_consensus!(z_flow, partitions, cut_edges)
         for (z, sub) in partitions
             m = sub["model"]
@@ -1009,9 +1126,11 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     prev_ρθ = ρθ[]
     prev_ρe = ρe[]
 
+    # === Loop ADMM ===
     for k in 1:config.max_iter
         _FAST_USE_LOGS && println("\n[ADMM-hybrid/DC] Iteração $k")
 
+        # se algum rho mudou (p.ex., ρe adaptativo), rebuilde termos quadráticos
         if ρθ[] != prev_ρθ
             for (_, sub) in partitions
                 _build_quad_bus_expr!(sub, ρθ[])
@@ -1025,16 +1144,25 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
             prev_ρe = ρe[]
         end
 
-        α_used = _alpha_schedule(k, config.alpha_overrelax; k_on = 10)
+        # over-relaxation: desligado no bus quando aceleração ON
+        α_used = accel ? nothing : _alpha_schedule(k, config.alpha_overrelax; k_on = 10)
+
+        # alvo do termo linear no bus: extrapolado (Alg. 3) quando accel ON
+        θ̄_target = accel ? θ̄_hat : θ̄_vec
 
         nz = length(zone_ids)
         results = Vector{Any}(undef, nz)
         @threads for i in 1:nz
             z = zone_ids[i]
             sub = partitions[z]
-            λθ = gather_zone_lambda!(λθ_zone_buf[z], duals_theta[z])
+            # λ do bus: extrapolado quando accel ON
+            if accel
+                λθ = gather_zone_lambda!(λθ_zone_buf[z], λθ_hat[z])
+            else
+                λθ = gather_zone_lambda!(λθ_zone_buf[z], duals_theta[z])
+            end
             lin_bus =
-                _build_linear_bus_expr(sub, shared_buses_sorted, b2pos, θ̄_vec, λθ, ρθ[])
+                _build_linear_bus_expr(sub, shared_buses_sorted, b2pos, θ̄_target, λθ, ρθ[])
             lin_branch = _build_linear_branch_expr(
                 sub,
                 sub["zone_edges"],
@@ -1062,6 +1190,7 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
             sub["real_generation_cost"] = out.real_cost
         end
 
+        # consenso e estados anteriores
         θ̄_prev_vec .= θ̄_vec
         z_flow_prev = copy(z_flow)
 
@@ -1072,9 +1201,18 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         end
         compute_z_flow_consensus!(z_flow, partitions, cut_edges)
 
+        # ===== guardar λθ reais anteriores antes do update =====
+        if accel
+            for z in zone_ids
+                λθ_prev_real[z] .= duals_theta[z]
+            end
+        end
+
+        # duais reais (sempre com θ̄/z reais)
         for z in zone_ids
             update_duals_theta_vec!(duals_theta[z], partitions[z], θ̄_vec, θ̄_prev_vec,
-                ρθ[], α_used, shared_buses_sorted, b2pos)
+                ρθ[],
+                α_used, shared_buses_sorted, b2pos)
         end
         update_duals_flow!(
             duals_flow,
@@ -1086,13 +1224,14 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
             α_used,
         )
 
+        # resíduos
         res_pri_bus = primal_residual_bus_dc(partitions, θ̄_vec, shared_buses_sorted, b2pos)
         res_pri_br = primal_residual_branch_dc(partitions, z_flow, cut_edges)
-        res_primal = sqrt(res_pri_bus^2 + res_pri_br^2)
+        res_primal = hypot(res_pri_bus, res_pri_br)
 
         res_du_bus = dual_residual_bus_dc(θ̄_vec, θ̄_prev_vec)
         res_du_br = dual_residual_branch_dc(z_flow, z_flow_prev)
-        res_dual = sqrt(res_du_bus^2 + res_du_br^2)
+        res_dual = hypot(res_du_bus, res_du_br)
 
         push!(res_primal_vec, res_primal)
         push!(res_dual_vec, res_dual)
@@ -1100,16 +1239,16 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         ϵb_pri =
             eps_primal_bus_dc(partitions, θ̄_vec, shared_buses_sorted, b2pos, ϵ_abs, ϵ_rel)
         ϵe_pri = eps_primal_branch_dc(partitions, z_flow, cut_edges, ϵ_abs, ϵ_rel)
-        push!(eps_primal_vec, sqrt(ϵb_pri^2 + ϵe_pri^2))
+        push!(eps_primal_vec, hypot(ϵb_pri, ϵe_pri))
 
         ϵb_du = eps_dual_bus_dc(θ̄_vec, θ̄_prev_vec, ϵ_abs, ϵ_rel)
         ϵe_du = eps_dual_branch_dc(z_flow, z_flow_prev, ϵ_abs, ϵ_rel)
-        push!(eps_dual_vec, sqrt(ϵb_du^2 + ϵe_du^2))
+        push!(eps_dual_vec, hypot(ϵb_du, ϵe_du))
 
         _FAST_USE_LOGS &&
             println("‖r‖ = $(last(res_primal_vec)) | ε_pri = $(last(eps_primal_vec))")
         _FAST_USE_LOGS &&
-            println("‖s‖ = $(last(res_dual_vec))   | ε_dual = $(last(eps_dual_vec))")
+            println("‖s‖ = $(last(res_dual_vec))   | ε_du  = $(last(eps_dual_vec))")
 
         push!(rhoθ_vec, ρθ[])
         push!(rhoe_vec, ρe[])
@@ -1120,58 +1259,72 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
             break
         end
 
+        # ===== Aceleração (Alg. 3) — apenas BUS, usando estados REAIS =====
+        if accel
+            metric_bus = _accel_metric(res_pri_bus, res_du_bus)
+            restarted = fista_update!(fista; metric = metric_bus)
+
+            if restarted
+                θ̄_hat .= θ̄_vec
+                for z in zone_ids
+                    λθ_hat[z] .= duals_theta[z]
+                end
+            else
+                _extrapolate!(θ̄_hat, θ̄_vec, θ̄_prev_vec, fista.α)
+                for z in zone_ids
+                    _extrapolate!(λθ_hat[z], duals_theta[z], λθ_prev_real[z], fista.α)
+                end
+            end
+        end
+
+        # ===== ρ adaptativo =====
         if adaptive
-            adaptive_rho_dc!(ρθ, res_pri_bus, res_du_bus;
-                μ_incr = config.mu_incr, μ_decr = config.mu_decr,
-                τ_incr = config.tau_incr, τ_decr = config.tau_decr)
-            adaptive_rho_dc!(ρe,  res_pri_br,  res_du_br;
+            # quando aceleração ON, mantemos ρθ FIXO (paper)
+            if !accel
+                adaptive_rho_dc!(ρθ, res_pri_bus, res_du_bus;
+                    μ_incr = config.mu_incr, μ_decr = config.mu_decr,
+                    τ_incr = config.tau_incr, τ_decr = config.tau_decr)
+            end
+            # ρe permanece adaptativo (mesmo com aceleração ON)
+            adaptive_rho_dc!(ρe, res_pri_br, res_du_br;
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
         end
     end
 
+    # === Plots / resumo ===
     plot_admm_convergence(res_primal_vec, res_dual_vec, eps_primal_vec, eps_dual_vec,
         "plot_convergencia_admm_hybrid.html")
 
     PlotlyLight.save(
         (
             () -> (
-                p = Plot();
-                p(;
+                p = Plot(); p(;
                     x = 1:length(rhoθ_vec),
                     y = rhoθ_vec,
                     type = :scatter,
                     mode = "lines+markers",
                     name = "ρθ",
-                );
-                p.layout.title = "Evolução de ρθ";
-                p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρθ";
-                p.layout.yaxis.type = "log";
-                p
+                ); p.layout.title = "Evolução de ρθ"; p.layout.xaxis.title = "Iterações"; p.layout.yaxis.title = "ρθ"; p.layout.yaxis.type = "log"; p
             )
         )(),
-        "plot_rho_theta_hybrid.html")
+        "plot_rho_theta_hybrid.html",
+    )
 
     PlotlyLight.save(
         (
             () -> (
-                p = Plot();
-                p(;
+                p = Plot(); p(;
                     x = 1:length(rhoe_vec),
                     y = rhoe_vec,
                     type = :scatter,
                     mode = "lines+markers",
                     name = "ρe",
-                );
-                p.layout.title = "Evolução de ρe";
-                p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρe";
-                p.layout.yaxis.type = "log";
-                p
+                ); p.layout.title = "Evolução de ρe"; p.layout.xaxis.title = "Iterações"; p.layout.yaxis.title = "ρe"; p.layout.yaxis.type = "log"; p
             )
         )(),
-        "plot_rho_flow_hybrid.html")
+        "plot_rho_flow_hybrid.html",
+    )
 
     plot_theta_avg_heatmap(θ_avg_history, "plot_theta_avg_heatmap_hybrid.html")
 

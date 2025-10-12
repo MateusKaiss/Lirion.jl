@@ -114,6 +114,11 @@ struct Args
             help = "Fator multiplicativo τ_decr quando s >> r (default: 0.98)"
             arg_type = Float64
             default = 0.98
+
+            # ----- ADMM: aceleração (Nesterov) -----
+            "--admm-accel"
+            help = "Habilita aceleração tipo Nesterov no ADMM (padrão: desligado)"
+            action = :store_true
         end
 
         parsed = parse_args(raw_args, s)
@@ -157,14 +162,20 @@ struct Args
 
         # ===== adaptive rho (on/off) =====
         adaptive_flag_str = lowercase(strip(parsed["admm-adaptive"]))
-        adaptive_flag = adaptive_flag_str == "on" ? true :
-                        adaptive_flag_str == "off" ? false :
-                        ( @warn "Valor inválido para --admm-adaptive=$(parsed["admm-adaptive"]). Usando 'on'."; true )
+        adaptive_flag =
+            adaptive_flag_str == "on" ? true :
+            adaptive_flag_str == "off" ? false :
+            (
+                @warn "Valor inválido para --admm-adaptive=$(parsed["admm-adaptive"]). Usando 'on'."; true
+            )
 
         mu_incr_val = parsed["admm-mu-incr"]
         mu_decr_val = parsed["admm-mu-decr"]
         tau_incr_val = parsed["admm-tau-incr"]
         tau_decr_val = parsed["admm-tau-decr"]
+
+        # ===== aceleração (on/off) =====
+        accel_flag = get(parsed, "admm-accel", false)
 
         # avisos de flags irrelevantes/ignoradas
         local function _warn_irrelevant_rhos(
@@ -270,9 +281,10 @@ struct Args
                         mu_decr = mu_decr_val,
                         tau_incr = tau_incr_val,
                         tau_decr = tau_decr_val,
+                        accel_nesterov = accel_flag,
                     )
                 catch err
-                    @warn "Esta versão de DistributedOPFModel não aceita :warm_start/adaptive_rho (atualize a struct/constructors). Prosseguindo sem esses campos." err
+                    @warn "Esta versão de DistributedOPFModel não aceita alguns campos novos (warm_start/adaptive_rho/accel_nesterov). Prosseguindo sem eles." err
                     cfg = DistributedOPFModel(
                         base_map[base_str],
                         method_sym,

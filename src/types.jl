@@ -20,6 +20,7 @@ mutable struct DistributedOPFModel
     mu_decr::Float64
     tau_incr::Float64
     tau_decr::Float64
+    accel_nesterov::Bool
 
     function DistributedOPFModel(
         base_model::Type{<:OPFModel},
@@ -38,6 +39,7 @@ mutable struct DistributedOPFModel
         mu_decr::Real = 3.0,
         tau_incr::Real = 1.05,
         tau_decr::Real = 0.98,
+        accel_nesterov::Bool = false,
     )
         max_iter > 0 || throw(ArgumentError("max_iter must be > 0"))
         rho_theta > 0 || throw(ArgumentError("rho_theta must be > 0"))
@@ -59,6 +61,7 @@ mutable struct DistributedOPFModel
             warm_start,
             adaptive_rho,
             Float64(mu_incr), Float64(mu_decr), Float64(tau_incr), Float64(tau_decr),
+            accel_nesterov,
         )
     end
 end
@@ -78,6 +81,7 @@ DistributedOPFModel(
     mu_decr::Float64 = 3.0,
     tau_incr::Float64 = 1.05,
     tau_decr::Float64 = 0.98,
+    accel_nesterov::Bool = false,
 ) = DistributedOPFModel(
     base_model, method, max_iter, rho, rho, rho, rho, ε_primal, ε_dual;
     alpha_overrelax = alpha_overrelax,
@@ -87,6 +91,7 @@ DistributedOPFModel(
     mu_decr = mu_decr,
     tau_incr = tau_incr,
     tau_decr = tau_decr,
+    accel_nesterov = accel_nesterov,
 )
 
 # ----- construtor keyword-friendly (permite sobrepor rhos específicos) -----
@@ -109,6 +114,7 @@ DistributedOPFModel(
     mu_decr::Float64 = 3.0,
     tau_incr::Float64 = 1.05,
     tau_decr::Float64 = 0.98,
+    accel_nesterov::Bool = false,
 ) = DistributedOPFModel(
     base_model, method, max_iter,
     coalesce(rho_theta, rho),
@@ -123,6 +129,7 @@ DistributedOPFModel(
     mu_decr = mu_decr,
     tau_incr = tau_incr,
     tau_decr = tau_decr,
+    accel_nesterov = accel_nesterov,
 )
 
 # ---------- SHIM ----------
