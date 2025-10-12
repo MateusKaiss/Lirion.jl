@@ -32,7 +32,7 @@ const distributed_zone_cases = [
     #20758
     "pglib_opf_case20758_42zonesbus_epigrids.m",
     #30000
-    # "pglib_opf_case30000_20zonesbus_goc.m",
+    "pglib_opf_case30000_20zones_goc.m",
 ]
 
 function track_failure_dist(label::String, origin::String, case_name::String)
@@ -218,18 +218,25 @@ function run_distributed_objective_tests(;
             admm_tau_incr_case   = 1.2
             admm_tau_decr_case   = 0.8
         end
+
+        central_optimizer_case = central_optimizer
         if occursin("case30000_20zonesbus", case_name) || occursin("case30000_20zones", case_name)
             admm_max_iter_case   = 1500
-            admm_rho_case        = 350_000.0           
-            admm_eps_primal_case = 5e-4                
-            admm_eps_dual_case   = 5e-4                
-            admm_alpha_case      = 1.0                 
+            admm_rho_case        = 350_000.0
+            admm_eps_primal_case = 5e-4
+            admm_eps_dual_case   = 5e-4
+            admm_alpha_case      = 1.0
             admm_mu_incr_case    = 3.0
             admm_mu_decr_case    = 3.0
             admm_tau_incr_case   = 1.2
             admm_tau_decr_case   = 0.8
-            admm_accel_case      = true 
+            admm_accel_case      = true
             admm_adaptive_case   = "off"
+
+            central_optimizer_case = optimizer_with_attributes(Ipopt.Optimizer,
+                "tol" => 1e-8,
+                "print_level" => 0,
+            )
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name " *
@@ -237,13 +244,14 @@ function run_distributed_objective_tests(;
               "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), " *
               "alpha=$(admm_alpha_case), μ_incr=$(admm_mu_incr_case), μ_decr=$(admm_mu_decr_case), " *
               "τ_incr=$(admm_tau_incr_case), τ_decr=$(admm_tau_decr_case), " *
-              "accel=$(admm_accel_case), adaptive=$(admm_adaptive_case))"
+              "accel=$(admm_accel_case), adaptive=$(admm_adaptive_case), " *
+              "CENTRAL_SOLVER=$(typeof(central_optimizer_case)))"
 
         @testset "$(label) - $(case_name)" begin
             compare_distributed_vs_centralized(
                 file;
                 label = label,
-                central_optimizer = central_optimizer,
+                central_optimizer = central_optimizer_case,
                 distributed_optimizer = distributed_optimizer,
                 rtol = rtol,
                 atol = atol,
