@@ -60,7 +60,7 @@ function compare_distributed_vs_centralized(
     admm_tau_incr::Float64 = 1.05,
     admm_tau_decr::Float64 = 0.98,
     admm_accel::Bool = false,                       # se true, inclui --admm-accel
-    admm_adaptive::Union{Nothing,String} = nothing  # "on" | "off" | nothing
+    admm_adaptive::Union{Nothing, String} = nothing,  # "on" | "off" | nothing
 )
     case_name = basename(file)
 
@@ -131,7 +131,7 @@ function run_distributed_objective_tests(;
     admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,
     admm_alpha::Float64 = 1.0,  # over-relaxation inativo
     admm_accel::Bool = false,
-    admm_adaptive::Union{Nothing,String} = nothing,
+    admm_adaptive::Union{Nothing, String} = nothing,
 )
     if isempty(case_list)
         @info "Empty distributed case list. No tests will be run."
@@ -160,15 +160,15 @@ function run_distributed_objective_tests(;
             end
 
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case   = admm_eps_dual
-        admm_alpha_case      = admm_alpha
+        admm_eps_dual_case = admm_eps_dual
+        admm_alpha_case = admm_alpha
 
         # parâmetros adaptativos: defaults gerais
         admm_mu_incr_case = 3.0
         admm_mu_decr_case = 3.0
         admm_tau_incr_case = 1.05
         admm_tau_decr_case = 0.98
-        admm_accel_case    = admm_accel
+        admm_accel_case = admm_accel
         admm_adaptive_case = admm_adaptive  # nothing | "on" | "off"
 
         # ---- OVERRIDES pontuais ----
@@ -176,62 +176,63 @@ function run_distributed_objective_tests(;
             admm_max_iter_case = 700
             admm_rho_case = 1_000_000.0
             admm_eps_primal_case = 1e-4
-            admm_eps_dual_case   = 1e-4
+            admm_eps_dual_case = 1e-4
         end
         if occursin("case2000_11zonesbus", case_name)
-            admm_max_iter_case   = 900
-            admm_rho_case        = 10_000.0
+            admm_max_iter_case = 900
+            admm_rho_case = 10_000.0
             admm_eps_primal_case = 1e-4
-            admm_eps_dual_case   = 1e-4
-            admm_mu_incr_case    = 3.0
-            admm_mu_decr_case    = 3.0
-            admm_tau_incr_case   = 1.2
-            admm_tau_decr_case   = 0.8
+            admm_eps_dual_case = 1e-4
+            admm_mu_incr_case = 3.0
+            admm_mu_decr_case = 3.0
+            admm_tau_incr_case = 1.2
+            admm_tau_decr_case = 0.8
         end
         if occursin("case3970_20zonesbus", case_name)
-            admm_max_iter_case   = 1500
-            admm_rho_case        = 1000_000.0
+            admm_max_iter_case = 1500
+            admm_rho_case = 1000_000.0
             admm_eps_primal_case = 1e-4
-            admm_eps_dual_case   = 1e-4
-            admm_mu_incr_case    = 3.0
-            admm_mu_decr_case    = 3.0
-            admm_tau_incr_case   = 1.1
-            admm_tau_decr_case   = 0.9
+            admm_eps_dual_case = 1e-4
+            admm_mu_incr_case = 3.0
+            admm_mu_decr_case = 3.0
+            admm_tau_incr_case = 1.1
+            admm_tau_decr_case = 0.9
         end
         if occursin("case10000_50zonesbus", case_name)
-            admm_max_iter_case   = 1500
-            admm_rho_case        = 1_000_000.0
+            admm_max_iter_case = 1500
+            admm_rho_case = 1_000_000.0
             admm_eps_primal_case = 1e-4
-            admm_eps_dual_case   = 1e-4
-            admm_mu_incr_case    = 3.0
-            admm_mu_decr_case    = 3.0
-            admm_tau_incr_case   = 1.2
-            admm_tau_decr_case   = 0.8
+            admm_eps_dual_case = 1e-4
+            admm_mu_incr_case = 3.0
+            admm_mu_decr_case = 3.0
+            admm_tau_incr_case = 1.2
+            admm_tau_decr_case = 0.8
         end
         if occursin("case20758_42zonesbus", case_name)
-            admm_max_iter_case   = 1500
-            admm_rho_case        = 5_000_000.0   # 1e6
+            admm_max_iter_case = 1500
+            admm_rho_case = 5_000_000.0   # 1e6
             admm_eps_primal_case = 7e-5
-            admm_eps_dual_case   = 7e-5
-            admm_mu_incr_case    = 3.0
-            admm_mu_decr_case    = 3.0
-            admm_tau_incr_case   = 1.2
-            admm_tau_decr_case   = 0.8
+            admm_eps_dual_case = 7e-5
+            admm_mu_incr_case = 3.0
+            admm_mu_decr_case = 3.0
+            admm_tau_incr_case = 1.2
+            admm_tau_decr_case = 0.8
         end
 
         central_optimizer_case = central_optimizer
-        if occursin("case30000_20zonesbus", case_name) || occursin("case30000_20zones", case_name)
-            admm_max_iter_case   = 1500
-            admm_rho_case        = 300_000.0
+        if occursin("case30000_20zonesbus", case_name) ||
+           occursin("case30000_20zones", case_name)
+            admm_max_iter_case = 1500
+            admm_rho_case = 300_000.0
             admm_eps_primal_case = 5e-4
-            admm_eps_dual_case   = 5e-4
-            admm_alpha_case      = 1.0
-            admm_mu_incr_case    = 3.0
-            admm_mu_decr_case    = 3.0
-            admm_tau_incr_case   = 1.2
-            admm_tau_decr_case   = 0.8
-            admm_accel_case      = true
-            admm_adaptive_case   = "off"
+            admm_eps_dual_case = 5e-4
+            admm_alpha_case = 1.0
+            admm_mu_incr_case = 3.0
+            admm_mu_decr_case = 3.0
+            admm_tau_incr_case = 1.2
+            admm_tau_decr_case = 0.8
+            admm_accel_case = true
+            admm_adaptive_case = "off"
 
             central_optimizer_case = optimizer_with_attributes(Ipopt.Optimizer,
                 "tol" => 1e-8,

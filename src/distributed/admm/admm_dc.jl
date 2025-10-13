@@ -1299,13 +1299,19 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     PlotlyLight.save(
         (
             () -> (
-                p = Plot(); p(;
+                p = Plot();
+                p(;
                     x = 1:length(rhoθ_vec),
                     y = rhoθ_vec,
                     type = :scatter,
                     mode = "lines+markers",
                     name = "ρθ",
-                ); p.layout.title = "Evolução de ρθ"; p.layout.xaxis.title = "Iterações"; p.layout.yaxis.title = "ρθ"; p.layout.yaxis.type = "log"; p
+                );
+                p.layout.title = "Evolução de ρθ";
+                p.layout.xaxis.title = "Iterações";
+                p.layout.yaxis.title = "ρθ";
+                p.layout.yaxis.type = "log";
+                p
             )
         )(),
         "plot_rho_theta_hybrid.html",
@@ -1314,13 +1320,19 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     PlotlyLight.save(
         (
             () -> (
-                p = Plot(); p(;
+                p = Plot();
+                p(;
                     x = 1:length(rhoe_vec),
                     y = rhoe_vec,
                     type = :scatter,
                     mode = "lines+markers",
                     name = "ρe",
-                ); p.layout.title = "Evolução de ρe"; p.layout.xaxis.title = "Iterações"; p.layout.yaxis.title = "ρe"; p.layout.yaxis.type = "log"; p
+                );
+                p.layout.title = "Evolução de ρe";
+                p.layout.xaxis.title = "Iterações";
+                p.layout.yaxis.title = "ρe";
+                p.layout.yaxis.type = "log";
+                p
             )
         )(),
         "plot_rho_flow_hybrid.html",

@@ -139,8 +139,8 @@ function run_distributed_hybrid_objective_tests(;
             end
 
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case   = admm_eps_dual
-        admm_alpha_case      = admm_alpha
+        admm_eps_dual_case = admm_eps_dual
+        admm_alpha_case = admm_alpha
 
         extra_flags_case = String[]
         admm_warm_start_case = false
@@ -151,7 +151,7 @@ function run_distributed_hybrid_objective_tests(;
             admm_rho_case = 1.0
             extra_flags_case = [
                 "--admm-rho-theta", "700",
-                "--admm-rho-flow",  "300",
+                "--admm-rho-flow", "300",
             ]
         end
 
@@ -161,7 +161,7 @@ function run_distributed_hybrid_objective_tests(;
             admm_rho_case = 1.0
             extra_flags_case = [
                 "--admm-rho-theta", "700",
-                "--admm-rho-flow",  "300",
+                "--admm-rho-flow", "300",
             ]
         end
 
@@ -171,7 +171,7 @@ function run_distributed_hybrid_objective_tests(;
             admm_rho_case = 1.0
             extra_flags_case = [
                 "--admm-rho-theta", "700",
-                "--admm-rho-flow",  "300",
+                "--admm-rho-flow", "300",
             ]
         end
 
@@ -182,25 +182,25 @@ function run_distributed_hybrid_objective_tests(;
             admm_warm_start_case = true
             extra_flags_case = [
                 "--admm-rho-theta", "700",
-                "--admm-rho-flow",  "300",
+                "--admm-rho-flow", "300",
             ]
         end
 
         if occursin("case30000_20zones_", case_name)
-            admm_max_iter_case   = 1500
-            admm_alpha_case      = 1.0
-            admm_rho_case        = 1.0
+            admm_max_iter_case = 1500
+            admm_alpha_case = 1.0
+            admm_rho_case = 1.0
             admm_eps_primal_case = 3e-4
-            admm_eps_dual_case   = 3e-4
+            admm_eps_dual_case = 3e-4
             admm_warm_start_case = false
             extra_flags_case = String[
                 "--admm-adaptive", "on",
                 "--admm-rho-theta", "1000.0",
-                "--admm-rho-flow",  "1000.0",
+                "--admm-rho-flow", "1000.0",
                 "--admm-mu-incr", "3.0",
                 "--admm-mu-decr", "3.0",
-                "--admm-tau-incr","1.050",
-                "--admm-tau-decr","0.92",
+                "--admm-tau-incr", "1.050",
+                "--admm-tau-decr", "0.92",
                 "--optimizer", "OSQP.Optimizer",
             ]
         end
