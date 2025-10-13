@@ -27,12 +27,14 @@ const distributed_zone_cases = [
     "pglib_opf_case2000_11zonesbus_goc.m",
     # 3970
     "pglib_opf_case3970_20zonesbus_goc.m",
-    #10000
+    # 10000
     "pglib_opf_case10000_50zonesbus_goc.m",
-    #20758
+    # 20758
     "pglib_opf_case20758_42zonesbus_epigrids.m",
+    # 78484 
+    "pglib_opf_case78484_157zones_epigrids.m",
     # #30000
-    # "pglib_opf_case30000_20zones_goc.m",
+    "pglib_opf_case30000_20zones_goc.m",
 ]
 
 function track_failure_dist(label::String, origin::String, case_name::String)
@@ -190,7 +192,7 @@ function run_distributed_objective_tests(;
         end
         if occursin("case3970_20zonesbus", case_name)
             admm_max_iter_case = 1500
-            admm_rho_case = 1000_000.0
+            admm_rho_case = 1_000_000.0
             admm_eps_primal_case = 1e-4
             admm_eps_dual_case = 1e-4
             admm_mu_incr_case = 3.0
@@ -210,7 +212,7 @@ function run_distributed_objective_tests(;
         end
         if occursin("case20758_42zonesbus", case_name)
             admm_max_iter_case = 1500
-            admm_rho_case = 5_000_000.0   # 1e6
+            admm_rho_case = 5_000_000.0
             admm_eps_primal_case = 7e-5
             admm_eps_dual_case = 7e-5
             admm_mu_incr_case = 3.0
@@ -238,6 +240,20 @@ function run_distributed_objective_tests(;
                 "tol" => 1e-8,
                 "print_level" => 0,
             )
+        end
+
+        if occursin("case78484_157zones", case_name) || occursin("case78484_", case_name)
+            admm_max_iter_case = 1000
+            admm_rho_case = 7_000_000.0      # 7e6
+            admm_eps_primal_case = 3e-4
+            admm_eps_dual_case  = 3e-4
+            admm_alpha_case = 1.0            # α desligado
+            admm_mu_incr_case = 3.0
+            admm_mu_decr_case = 3.0
+            admm_tau_incr_case = 1.0         # neutro (sem adaptação efetiva)
+            admm_tau_decr_case = 1.0
+            admm_accel_case = true           # liga aceleração (θ̄ e λ extrapolados)
+            admm_adaptive_case = "off"       # ρ fixo no BUS
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name " *
