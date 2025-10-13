@@ -222,7 +222,7 @@ function run_distributed_objective_tests(;
         central_optimizer_case = central_optimizer
         if occursin("case30000_20zonesbus", case_name) || occursin("case30000_20zones", case_name)
             admm_max_iter_case   = 1500
-            admm_rho_case        = 350_000.0
+            admm_rho_case        = 300_000.0
             admm_eps_primal_case = 5e-4
             admm_eps_dual_case   = 5e-4
             admm_alpha_case      = 1.0
