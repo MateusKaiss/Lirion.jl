@@ -27,7 +27,7 @@ const distributed_branch_zone_cases = [
     # "pglib_opf_case793_11zones_goc.m",
     # 2000
     "pglib_opf_case2000_5zones_goc.m",
-    #3970
+    # 3970
     "pglib_opf_case3970_25zones_goc.m",
     # 10000
     "pglib_opf_case10000_50zones_goc.m",
@@ -35,6 +35,8 @@ const distributed_branch_zone_cases = [
     "pglib_opf_case20758_42zones_epigrids.m",
     # 30000
     "pglib_opf_case30000_20zones_goc.m",
+    # 78484
+    "pglib_opf_case78484_157zones_epigrids.m",
 ]
 
 function track_failure_branch(label::String, origin::String, case_name::String)
@@ -60,6 +62,10 @@ function compare_distributed_branch_vs_centralized(
     admm_eps_primal = 1e-4,
     admm_eps_dual = 1e-4,
     admm_alpha::Float64 = 1.0,
+    admm_mu_incr::Float64 = 2.0,
+    admm_mu_decr::Float64 = 2.0,
+    admm_tau_incr::Float64 = 1.0,
+    admm_tau_decr::Float64 = 1.0,
     admm_warm_start::Bool = false,
 )
     case_name = basename(file)
@@ -89,15 +95,20 @@ function compare_distributed_branch_vs_centralized(
             "--admm-eps-primal", string(admm_eps_primal),
             "--admm-eps-dual", string(admm_eps_dual),
             "--admm-alpha", string(admm_alpha),
-            "--admm-mu-incr", "2.0",
-            "--admm-mu-decr", "2.0",
+            "--admm-mu-incr", string(admm_mu_incr),
+            "--admm-mu-decr", string(admm_mu_decr),
         ]
+        if admm_tau_incr != 1.0
+            push!(args_dist, "--admm-tau-incr"); push!(args_dist, string(admm_tau_incr))
+        end
+        if admm_tau_decr != 1.0
+            push!(args_dist, "--admm-tau-decr"); push!(args_dist, string(admm_tau_decr))
+        end
         if admm_warm_start
             push!(args_dist, "--admm-warm-start")
         end
         if !isnothing(distributed_optimizer)
-            push!(args_dist, "--optimizer")
-            push!(args_dist, string(distributed_optimizer))
+            push!(args_dist, "--optimizer"); push!(args_dist, string(distributed_optimizer))
         end
         obj, _ = PowerOptimization.main(args_dist)
         obj
@@ -122,6 +133,10 @@ function run_distributed_branch_objective_tests(;
     rtol = 0.05, atol = 1e-6,
     admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,
     admm_alpha::Float64 = 1.0,
+    admm_mu_incr::Float64 = 2.0,
+    admm_mu_decr::Float64 = 2.0,
+    admm_tau_incr::Float64 = 1.0,
+    admm_tau_decr::Float64 = 1.0,
 )
     if isempty(case_list)
         @info "Empty distributed (branch) case list. No tests will be run."
@@ -151,6 +166,10 @@ function run_distributed_branch_objective_tests(;
         admm_eps_primal_case = admm_eps_primal
         admm_eps_dual_case = admm_eps_dual
         admm_alpha_case = admm_alpha
+        admm_mu_incr_case = admm_mu_incr
+        admm_mu_decr_case = admm_mu_decr
+        admm_tau_incr_case = admm_tau_incr
+        admm_tau_decr_case = admm_tau_decr
         distributed_optimizer_case = distributed_optimizer
         admm_warm_start_case = false
 
@@ -188,7 +207,6 @@ function run_distributed_branch_objective_tests(;
             admm_eps_dual_case = 1e-4
             admm_alpha_case = 1.1
         end
-
         if occursin("case30000_20zones_", case_name)
             admm_max_iter_case = 1000
             admm_rho_case = 500.0
@@ -197,7 +215,26 @@ function run_distributed_branch_objective_tests(;
             admm_alpha_case = 1.2
             admm_warm_start_case = true
         end
-        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha_case), optimizer=$(distributed_optimizer_case === nothing ? "default" : string(distributed_optimizer_case)))"
+        if occursin("case78484_157zones_", case_name)
+            admm_max_iter_case = 1000
+            admm_rho_case = 500.0
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case = 1e-4
+            admm_alpha_case = 1.2
+            admm_mu_incr_case = 2.0
+            admm_mu_decr_case = 2.0
+            admm_tau_incr_case = 1.1
+            admm_tau_decr_case = 0.92
+            admm_warm_start_case = true
+        end
+
+        @info "[$label] Rodando caso $i de $n: $case_name " *
+              "(max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), " *
+              "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), " *
+              "alpha=$(admm_alpha_case), mu_incr=$(admm_mu_incr_case), mu_decr=$(admm_mu_decr_case), " *
+              "tau_incr=$(admm_tau_incr_case), tau_decr=$(admm_tau_decr_case), " *
+              "warm=$(admm_warm_start_case), optimizer=$(distributed_optimizer_case === nothing ? "default" : string(distributed_optimizer_case)))"
+
         @testset "$(label) - $(case_name)" begin
             compare_distributed_branch_vs_centralized(
                 file;
@@ -211,7 +248,11 @@ function run_distributed_branch_objective_tests(;
                 admm_eps_primal = admm_eps_primal_case,
                 admm_eps_dual = admm_eps_dual_case,
                 admm_alpha = admm_alpha_case,
-                admm_warm_start = admm_warm_start_case,            # <-- passa o warm start
+                admm_mu_incr = admm_mu_incr_case,
+                admm_mu_decr = admm_mu_decr_case,
+                admm_tau_incr = admm_tau_incr_case,
+                admm_tau_decr = admm_tau_decr_case,
+                admm_warm_start = admm_warm_start_case,
             )
         end
     end
