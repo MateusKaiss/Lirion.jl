@@ -23,11 +23,10 @@ const distributed_hybrid_zone_cases = [
     "pglib_opf_case793_11zones_goc.m",
     # 2000
     "pglib_opf_case2000_5zones_goc.m",
-    # 3970
     "pglib_opf_case3970_25zones_goc.m",
     "pglib_opf_case10000_50zones_goc.m",
     "pglib_opf_case20758_42zones_epigrids.m",
-    # "pglib_opf_case30000_20zones_goc.m",
+    "pglib_opf_case30000_20zones_goc.m",
 ]
 
 function track_failure_hybrid(label::String, origin::String, case_name::String)
@@ -187,6 +186,25 @@ function run_distributed_hybrid_objective_tests(;
             ]
         end
 
+        if occursin("case30000_20zones_", case_name)
+            admm_max_iter_case   = 1500
+            admm_alpha_case      = 1.0
+            admm_rho_case        = 1.0
+            admm_eps_primal_case = 3e-4
+            admm_eps_dual_case   = 3e-4
+            admm_warm_start_case = false
+            extra_flags_case = String[
+                "--admm-adaptive", "on",
+                "--admm-rho-theta", "1000.0",
+                "--admm-rho-flow",  "1000.0",
+                "--admm-mu-incr", "3.0",
+                "--admm-mu-decr", "3.0",
+                "--admm-tau-incr","1.050",
+                "--admm-tau-decr","0.92",
+                "--optimizer", "OSQP.Optimizer",
+            ]
+        end
+
         @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha_case), warm_start=$(admm_warm_start_case), extra_flags=$(join(extra_flags_case, ' ')))"
 
         @testset "$(label) - $(case_name)" begin
@@ -202,7 +220,7 @@ function run_distributed_hybrid_objective_tests(;
                 admm_eps_primal = admm_eps_primal_case,
                 admm_eps_dual = admm_eps_dual_case,
                 admm_alpha = admm_alpha_case,
-                admm_warm_start = admm_warm_start_case,  # <<< passa o warm start
+                admm_warm_start = admm_warm_start_case,
                 extra_flags = extra_flags_case,
             )
         end
