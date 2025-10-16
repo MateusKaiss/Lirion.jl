@@ -41,7 +41,6 @@ function resolve_optimizer_dc(config)
     )
 end
 
-# --------- Helper de formatação de tempo ----------
 @inline function _pretty_time(sec::Real)
     if sec < 60
         return "$(round(sec; digits=3)) s"
@@ -52,7 +51,6 @@ end
     end
 end
 
-# --------- Helpers seguros para ler valores (value ou start_value) ----------
 @inline function _val_or_start(m::JuMP.Model, x::JuMP.VariableRef)
     if JuMP.has_values(m)
         return JuMP.value(x)
@@ -71,7 +69,6 @@ end
     return _val_or_start(m, θ[b, t])
 end
 
-# --------- Warm start do solver (JuMP/MOI) ----------
 function _warm_start_theta_base!(sub::Dict{String, Any})
     m = sub["model"]
     θ = sub["theta_var"]
@@ -94,7 +91,6 @@ function _warm_start_theta_base!(sub::Dict{String, Any})
     return nothing
 end
 
-# --------- Agenda de over-relaxation ----------
 @inline function _alpha_schedule(k::Int, α_cfg::Union{Nothing, Float64}; k_on::Int = 10)
     if α_cfg === nothing || !(1.0 < α_cfg < 2.0)
         return nothing
@@ -102,9 +98,6 @@ end
     return k >= k_on ? α_cfg : nothing
 end
 
-# =======================================================
-# HOTPATHS & SNAPSHOTS (1.1)
-# =======================================================
 function prepare_hotpaths!(sub::Dict{String, Any})
     bus_ids = sub["bus"]["bus_i"]
     bus_local_index = Dict{Int, Int}()
@@ -149,9 +142,6 @@ end
     return buf
 end
 
-# =======================================================
-# FLUXO DC (para branch/híbrido)
-# =======================================================
 @inline function _dc_flow_val_model(
     m::Model,
     sub::Dict{String, Any},
@@ -167,9 +157,6 @@ end
     return (_theta_val(m, θ, f, t) - _theta_val(m, θ, tb, t)) / x
 end
 
-# =======================================================
-# OBJETIVO PERSISTENTE (1.2 + 1.4)
-# =======================================================
 function _build_quad_bus_expr!(sub::Dict{String, Any}, ρ::Float64)
     m = sub["model"]
     θ = m[:theta]
@@ -244,16 +231,12 @@ function _build_linear_branch_expr(sub::Dict{String, Any},
     return lin
 end
 
-# =======================================================
-# CONSENSO / DUAIS DENSOS (1.3)
-# =======================================================
 function prepare_dense_maps(shared_buses::Vector{Int})
     shared_buses_sorted = sort(shared_buses)
     b2pos = Dict{Int, Int}(b => i for (i, b) in enumerate(shared_buses_sorted))
     return shared_buses_sorted, b2pos
 end
 
-# ---- usa snapshot só de compartilhadas (correção 3) ----
 function compute_theta_consensus_vec!(θ̄_vec::Vector{Float64},
     partitions::Dict{Int, Dict{String, Any}},
     shared_buses_sorted::Vector{Int},
@@ -329,9 +312,6 @@ end
     return λ_vec_zone
 end
 
-# =======================================================
-# RESÍDUOS / TOLERÂNCIAS
-# =======================================================
 function primal_residual_bus_dc(
     partitions::Dict{Int, Dict{String, Any}},
     θ̄_vec::Vector{Float64},
@@ -499,10 +479,6 @@ end
 @inline _accel_on(config) =
     hasfield(typeof(config), :accel_nesterov) ? getfield(config, :accel_nesterov) : false
 
-# =======================================================
-# ACELERAÇÃO — IMPLEMENTAÇÃO FISTA (Alg. 3 do paper)
-# =======================================================
-# Extrapolação genérica (y_hat = y + γ (y - y_prev))
 @inline function _extrapolate!(
     y_hat::AbstractVector{T},
     y::AbstractVector{T},
@@ -535,11 +511,10 @@ function fista_update!(st::FISTAState; metric::Float64)
         st.β = 1.0
         st.α = 0.0
         st.prev_metric = metric
-        return true   # houve restart
+        return true  
     end
 end
 
-# métrica combinada de resíduos (||r||_2 e ||s||_2)
 @inline function _accel_metric(res_pri::Float64, res_du::Float64)
     return hypot(res_pri, res_du)
 end
@@ -806,13 +781,10 @@ function run_admm(config::DistributedOPFModel, data)
     return total_real_cost, partitions
 end
 
-# =======================================================
-# ADMM: BRANCH (objetivo persistente) — (sem aceleração)
-# =======================================================
 function run_admm_branch(
     config::DistributedOPFModel,
     data::Dict{String, Any};
-    warm_start_theta::Bool = false, # compat: flag antiga ainda aceita
+    warm_start_theta::Bool = false,
     use_legacy_rho::Bool = false,
     μ_incr::Float64 = 2.0,
     μ_decr::Float64 = 2.0,
@@ -878,7 +850,6 @@ function run_admm_branch(
         @objective(m, Min, sub["obj_base"] + sub["quad_branch_expr"])
     end
 
-    # -------- Warm start ADMM: inicializa z_flow e duais de ramo --------
     if warm
         compute_z_flow_consensus!(z_flow, partitions, cut_edges)
         for (z, sub) in partitions
@@ -1001,9 +972,6 @@ end
 
 # =======================================================
 # ADMM: HÍBRIDO (bus + branch)
-#   - Quando accel_nesterov=true: BUS segue Alg. 3 (FISTA + restart)
-#   - Quando accel_nesterov=false: comportamento anterior (sem aceleração)
-#   - ρθ fixo quando aceleração ON; ρe pode ser adaptativo.
 # =======================================================
 function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     t0_ns = time_ns()
