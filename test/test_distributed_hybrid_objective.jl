@@ -12,10 +12,22 @@ const distributed_hybrid_zone_cases = [
     # 57 buses
     # "pglib_opf_case57_2zones_ieee.m",
     # "pglib_opf_case57_4zones_ieee.m",
-    # # # 118 buses
+    # # 118 buses
     # "pglib_opf_case118_2zones_ieee.m",
-    # # # 500 buses
-    # "pglib_opf_case500_2zones_goc.m",
+    # "pglib_opf_case118_3zones_ieee.m",
+    # "pglib_opf_case118_5zones_ieee.m",
+    # # 500 buses
+    # "pglib_opf_case500_3zones_goc.m",
+    # "pglib_opf_case500_4zones_goc.m",
+    # # 793
+    # "pglib_opf_case793_11zones_goc.m",
+    # # 2000
+    # "pglib_opf_case2000_5zones_goc.m",
+    # "pglib_opf_case3970_25zones_goc.m",
+    # "pglib_opf_case10000_50zones_goc.m",
+    # "pglib_opf_case20758_42zones_epigrids.m",
+    # "pglib_opf_case30000_20zones_goc.m",
+    # "pglib_opf_case78484_157zones_epigrids.m",
 ]
 
 function track_failure_hybrid(label::String, origin::String, case_name::String)
@@ -29,14 +41,17 @@ end
 function compare_distributed_hybrid_vs_centralized(
     file::String;
     label::String,
-    central_optimizer = Ipopt.Optimizer,
-    distributed_optimizer = Ipopt.Optimizer,
+    central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
+    distributed_optimizer::Union{Nothing, Function} = nothing,
     rtol = 0.05,
     atol = 1e-6,
     admm_rho = 1_000.0,
     admm_max_iter = 350,
-    admm_eps_primal = 1e-6,
-    admm_eps_dual = 1e-6,
+    admm_eps_primal = 1e-4,
+    admm_eps_dual = 1e-4,
+    admm_alpha::Float64 = 1.0,
+    admm_warm_start::Bool = false,
+    extra_flags::Vector{String} = String[],
 )
     case_name = basename(file)
 
@@ -60,12 +75,22 @@ function compare_distributed_hybrid_vs_centralized(
         args_dist = String[
             file,
             "--model", "distributed-admm-hybrid-dc",
-            "--optimizer", string(distributed_optimizer),
             "--admm-rho", string(admm_rho),
             "--admm-max-iter", string(admm_max_iter),
             "--admm-eps-primal", string(admm_eps_primal),
             "--admm-eps-dual", string(admm_eps_dual),
+            "--admm-alpha", string(admm_alpha),
         ]
+        if !isempty(extra_flags)
+            append!(args_dist, extra_flags)
+        end
+        if admm_warm_start
+            push!(args_dist, "--admm-warm-start")
+        end
+        if !isnothing(distributed_optimizer)
+            push!(args_dist, "--optimizer")
+            push!(args_dist, string(distributed_optimizer))
+        end
         obj, _ = PowerOptimization.main(args_dist)
         obj
     catch e
@@ -81,10 +106,11 @@ end
 function run_distributed_hybrid_objective_tests(;
     case_list = distributed_hybrid_zone_cases,
     label = "ADMM-Hybrid-DC vs DC",
-    central_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer),
-    distributed_optimizer = Ipopt.Optimizer,
+    central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
+    distributed_optimizer::Union{Nothing, Function} = nothing,
     rtol = 0.05, atol = 1e-6,
-    admm_eps_primal = 1e-6, admm_eps_dual = 1e-6,
+    admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,
+    admm_alpha::Float64 = 1.0,
 )
     if isempty(case_list)
         @info "Empty hybrid case list. No tests will be run."
@@ -106,29 +132,99 @@ function run_distributed_hybrid_objective_tests(;
             if occursin("_3zones_", case_name)
                 (400, 1_000.0)
             elseif occursin("_2zones_", case_name)
-                (350, 1_000.0)
+                (300, 1_000.0)
+            elseif occursin("_5zones_", case_name)
+                (700, 1_000.0)
             else
-                (350, 1_000.0)
+                (700, 1_000.0)
             end
 
         admm_eps_primal_case = admm_eps_primal
         admm_eps_dual_case = admm_eps_dual
+        admm_alpha_case = admm_alpha
 
-        # Overrides
-        if occursin("case500_", case_name)
+        extra_flags_case = String[]
+        admm_warm_start_case = false
+
+        if occursin("case2000_5zones_", case_name)
             admm_max_iter_case = 600
-            admm_rho_case = 1_000_000.0
-            admm_eps_primal_case = 1e-7
-            admm_eps_dual_case = 1e-7
-        end
-        if occursin("case118_", case_name)
-            admm_max_iter_case = 350
-            admm_rho_case = 1_000_000.0
-            admm_eps_primal_case = 1e-7
-            admm_eps_dual_case = 1e-7
+            admm_alpha_case = 1.2
+            admm_rho_case = 1.0
+            extra_flags_case = [
+                "--admm-rho-theta", "700",
+                "--admm-rho-flow", "300",
+            ]
         end
 
-        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"
+        if occursin("case3970_25zones_", case_name)
+            admm_max_iter_case = 600
+            admm_alpha_case = 1.2
+            admm_rho_case = 1.0
+            extra_flags_case = [
+                "--admm-rho-theta", "700",
+                "--admm-rho-flow", "300",
+            ]
+        end
+
+        if occursin("case10000_50zones_", case_name)
+            admm_max_iter_case = 600
+            admm_alpha_case = 1.2
+            admm_rho_case = 1.0
+            extra_flags_case = [
+                "--admm-rho-theta", "700",
+                "--admm-rho-flow", "300",
+            ]
+        end
+
+        if occursin("case20758_42zones_", case_name)
+            admm_max_iter_case = 600
+            admm_alpha_case = 1.1
+            admm_rho_case = 1.0
+            admm_warm_start_case = true
+            extra_flags_case = [
+                "--admm-rho-theta", "700",
+                "--admm-rho-flow", "300",
+            ]
+        end
+
+        if occursin("case30000_20zones_", case_name)
+            admm_max_iter_case = 1500
+            admm_alpha_case = 1.0
+            admm_rho_case = 1.0
+            admm_eps_primal_case = 3e-4
+            admm_eps_dual_case = 3e-4
+            admm_warm_start_case = false
+            extra_flags_case = String[
+                "--admm-adaptive", "on",
+                "--admm-rho-theta", "1000.0",
+                "--admm-rho-flow", "1000.0",
+                "--admm-mu-incr", "3.0",
+                "--admm-mu-decr", "3.0",
+                "--admm-tau-incr", "1.050",
+                "--admm-tau-decr", "0.92",
+                "--optimizer", "OSQP.Optimizer",
+            ]
+        end
+
+        if occursin("case78484_157zones_", case_name)
+            admm_max_iter_case = 2000
+            admm_alpha_case = 1.0
+            admm_rho_case = 1.0
+            admm_eps_primal_case = 5e-4
+            admm_eps_dual_case = 5e-4
+            admm_warm_start_case = false
+            extra_flags_case = String[
+                "--admm-mu-incr", "3.0",
+                "--admm-mu-decr", "3.0",
+                "--admm-tau-incr", "1.05",
+                "--admm-tau-decr", "0.94",
+                "--admm-rho-theta", "50000",
+                "--admm-rho-flow", "50000",
+            ]
+        end
+
+        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha_case), warm_start=$(admm_warm_start_case), extra_flags=$(join(extra_flags_case, ' ')))"
+
         @testset "$(label) - $(case_name)" begin
             compare_distributed_hybrid_vs_centralized(
                 file;
@@ -141,6 +237,9 @@ function run_distributed_hybrid_objective_tests(;
                 admm_max_iter = admm_max_iter_case,
                 admm_eps_primal = admm_eps_primal_case,
                 admm_eps_dual = admm_eps_dual_case,
+                admm_alpha = admm_alpha_case,
+                admm_warm_start = admm_warm_start_case,
+                extra_flags = extra_flags_case,
             )
         end
     end

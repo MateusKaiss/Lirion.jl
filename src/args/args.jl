@@ -25,7 +25,7 @@ struct Args
             required = true
 
             "--optimizer"
-            help = "Optimizer function, e.g., Ipopt.Optimizer or SCS.Optimizer or Gurobi.Optimizer (default: Ipopt.Optimizer)"
+            help = "Optimizer function, e.g., OSQP.Optimizer (default if omitted), or Ipopt.Optimizer / SCS.Optimizer / Gurobi.Optimizer, etc."
             arg_type = String
 
             "--plot-outputs"
@@ -80,6 +80,45 @@ struct Args
             help = "Dual tolerance ε_dual"
             arg_type = Float64
             default = 1e-7
+
+            "--admm-alpha"
+            help = "Over-relaxation α (use only if 1<α<2). If omitted, over-relaxation is disabled."
+            arg_type = Float64
+
+            "--admm-warm-start"
+            help = "Warm start dos subproblemas (pré-solve base e usa θ como start)"
+            action = :store_true
+
+            "--admm-adaptive"
+            help = "Liga/desliga o ajuste adaptativo de ρ no ADMM: on | off (padrão: on)"
+            arg_type = String
+            default = "on"
+
+            # ----- ADMM: parâmetros do ρ adaptativo -----
+            "--admm-mu-incr"
+            help = "Fator μ_incr para comparar r vs s (default: 3.0)"
+            arg_type = Float64
+            default = 3.0
+
+            "--admm-mu-decr"
+            help = "Fator μ_decr para comparar s vs r (default: 3.0)"
+            arg_type = Float64
+            default = 3.0
+
+            "--admm-tau-incr"
+            help = "Fator multiplicativo τ_incr quando r >> s (default: 1.05)"
+            arg_type = Float64
+            default = 1.05
+
+            "--admm-tau-decr"
+            help = "Fator multiplicativo τ_decr quando s >> r (default: 0.98)"
+            arg_type = Float64
+            default = 0.98
+
+            # ----- ADMM: aceleração (Nesterov) -----
+            "--admm-accel"
+            help = "Habilita aceleração tipo Nesterov no ADMM (padrão: desligado)"
+            action = :store_true
         end
 
         parsed = parse_args(raw_args, s)
@@ -114,6 +153,30 @@ struct Args
             isnothing(rho_flow_q_) ? (isnothing(rho_flow_) ? rho_base : rho_flow_) :
             rho_flow_q_
 
+        # ===== alpha (over-relaxation) =====
+        alpha_ = get(parsed, "admm-alpha", nothing)
+        if alpha_ !== nothing && !(1.0 < alpha_ < 2.0)
+            @warn "Ignoring --admm-alpha=$(alpha_) because it must satisfy 1<α<2."
+            alpha_ = nothing
+        end
+
+        # ===== adaptive rho (on/off) =====
+        adaptive_flag_str = lowercase(strip(parsed["admm-adaptive"]))
+        adaptive_flag =
+            adaptive_flag_str == "on" ? true :
+            adaptive_flag_str == "off" ? false :
+            (
+                @warn "Valor inválido para --admm-adaptive=$(parsed["admm-adaptive"]). Usando 'on'."; true
+            )
+
+        mu_incr_val = parsed["admm-mu-incr"]
+        mu_decr_val = parsed["admm-mu-decr"]
+        tau_incr_val = parsed["admm-tau-incr"]
+        tau_decr_val = parsed["admm-tau-decr"]
+
+        # ===== aceleração (on/off) =====
+        accel_flag = get(parsed, "admm-accel", false)
+
         # avisos de flags irrelevantes/ignoradas
         local function _warn_irrelevant_rhos(
             method_sym::Symbol,
@@ -125,18 +188,18 @@ struct Args
             rho_flow_p_orig::Union{Nothing, Float64},
             rho_flow_q_orig::Union{Nothing, Float64},
         )
-            # θ é usado em :admm(bus) para DC/AC/SOCP; em :admm_hybrid só para DC/AC (SOCP-hybrid NÃO usa θ)
+            # θ em :admm(bus) para DC/AC/SOCP; em :admm_hybrid só para DC/AC
             uses_theta =
                 (
                     method_sym == :admm &&
                     (base_str == "dc" || base_str == "ac" || base_str == "socp")
                 ) ||
                 (method_sym == :admm_hybrid && (base_str == "dc" || base_str == "ac"))
-            # V (|V| em AC, V^2 em SOCP) é usado em :admm e :admm_hybrid para AC/SOCP
+            # V (|V| em AC, V^2 em SOCP) em :admm e :admm_hybrid para AC/SOCP
             uses_v =
                 (method_sym == :admm || method_sym == :admm_hybrid) &&
                 (base_str == "ac" || base_str == "socp")
-            # flow (P/Q e afins) é usado em :admm_branch e :admm_hybrid para todos
+            # flow em :admm_branch e :admm_hybrid
             uses_flow = (method_sym == :admm_branch) || (method_sym == :admm_hybrid)
 
             if rho_theta_orig !== nothing && !uses_theta
@@ -195,33 +258,65 @@ struct Args
                     rho_theta_, rho_v_, rho_flow_, rho_flow_p_, rho_flow_q_,
                 )
 
-                DistributedOPFModel(
-                    base_map[base_str],
-                    method_sym,
-                    parsed["admm-max-iter"];
-                    rho = rho_base,
-                    rho_theta = rho_theta_val,
-                    rho_v = rho_v_val,
-                    rho_flow_p = rho_flow_p_val,   # em SOCP-hybrid vale para P e R
-                    rho_flow_q = rho_flow_q_val,   # em SOCP-hybrid vale para Q e T
-                    ε_primal = parsed["admm-eps-primal"],
-                    ε_dual = parsed["admm-eps-dual"],
-                )
+                # warm start (pode não existir no tipo -> fallback)
+                warm_start_flag = get(parsed, "admm-warm-start", false)
+
+                local cfg
+                try
+                    cfg = DistributedOPFModel(
+                        base_map[base_str],
+                        method_sym,
+                        parsed["admm-max-iter"];
+                        rho = rho_base,
+                        rho_theta = rho_theta_val,
+                        rho_v = rho_v_val,
+                        rho_flow_p = rho_flow_p_val,   # em SOCP-hybrid vale para P e R
+                        rho_flow_q = rho_flow_q_val,   # em SOCP-hybrid vale para Q e T
+                        ε_primal = parsed["admm-eps-primal"],
+                        ε_dual = parsed["admm-eps-dual"],
+                        alpha_overrelax = alpha_,
+                        warm_start = warm_start_flag,
+                        adaptive_rho = adaptive_flag,
+                        mu_incr = mu_incr_val,
+                        mu_decr = mu_decr_val,
+                        tau_incr = tau_incr_val,
+                        tau_decr = tau_decr_val,
+                        accel_nesterov = accel_flag,
+                    )
+                catch err
+                    @warn "Esta versão de DistributedOPFModel não aceita alguns campos novos (warm_start/adaptive_rho/accel_nesterov). Prosseguindo sem eles." err
+                    cfg = DistributedOPFModel(
+                        base_map[base_str],
+                        method_sym,
+                        parsed["admm-max-iter"];
+                        rho = rho_base,
+                        rho_theta = rho_theta_val,
+                        rho_v = rho_v_val,
+                        rho_flow_p = rho_flow_p_val,
+                        rho_flow_q = rho_flow_q_val,
+                        ε_primal = parsed["admm-eps-primal"],
+                        ε_dual = parsed["admm-eps-dual"],
+                        alpha_overrelax = alpha_,
+                    )
+                end
+                cfg
             else
                 haskey(base_map, model_key) || error("Invalid model: $model_key")
                 base_map[String(model_key)]
             end
         end
 
+        # Otimizador: se usuário forneceu, usa; senão, deixe nothing e
+        # resolve_optimizer_dc fará o default para OSQP.
         optimizer = if haskey(parsed, "optimizer") && !isnothing(parsed["optimizer"])
             try
                 eval(Meta.parse(parsed["optimizer"]))
             catch
-                @warn "Invalid optimizer: $(parsed["optimizer"]). Defaulting to Ipopt.Optimizer"
-                Ipopt.Optimizer
+                @warn "Invalid optimizer: $(parsed["optimizer"]). Falling back to default (OSQP) via resolve_optimizer_dc."
+                nothing
             end
         else
-            Ipopt.Optimizer
+            nothing
         end
 
         return new(
