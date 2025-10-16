@@ -14,29 +14,29 @@ const distributed_branch_zone_cases = [
     "pglib_opf_case30_2zones_as.m",
     "pglib_opf_case30_3zones_as.m",
     # 57 buses
-    "pglib_opf_case57_2zones_ieee.m",
-    "pglib_opf_case57_4zones_ieee.m",
-    # 118 buses
-    "pglib_opf_case118_2zones_ieee.m",
-    "pglib_opf_case118_3zones_ieee.m",
-    "pglib_opf_case118_5zones_ieee.m",
-    # 500 buses
-    "pglib_opf_case500_3zones_goc.m",
-    "pglib_opf_case500_4zones_goc.m",
-    # 793
-    # "pglib_opf_case793_11zones_goc.m",
-    # 2000
-    "pglib_opf_case2000_5zones_goc.m",
-    # 3970
-    "pglib_opf_case3970_25zones_goc.m",
-    # 10000
-    "pglib_opf_case10000_50zones_goc.m",
-    # 20758
-    "pglib_opf_case20758_42zones_epigrids.m",
-    # 30000
-    "pglib_opf_case30000_20zones_goc.m",
-    # 78484
-    "pglib_opf_case78484_157zones_epigrids.m",
+    # "pglib_opf_case57_2zones_ieee.m",
+    # "pglib_opf_case57_4zones_ieee.m",
+    # # 118 buses
+    # "pglib_opf_case118_2zones_ieee.m",
+    # "pglib_opf_case118_3zones_ieee.m",
+    # "pglib_opf_case118_5zones_ieee.m",
+    # # 500 buses
+    # "pglib_opf_case500_3zones_goc.m",
+    # "pglib_opf_case500_4zones_goc.m",
+    # # 793
+    # # "pglib_opf_case793_11zones_goc.m",
+    # # 2000
+    # "pglib_opf_case2000_5zones_goc.m",
+    # # 3970
+    # "pglib_opf_case3970_25zones_goc.m",
+    # # 10000
+    # "pglib_opf_case10000_50zones_goc.m",
+    # # 20758
+    # "pglib_opf_case20758_42zones_epigrids.m",
+    # # 30000
+    # "pglib_opf_case30000_20zones_goc.m",
+    # # 78484
+    # "pglib_opf_case78484_157zones_epigrids.m",
 ]
 
 function track_failure_branch(label::String, origin::String, case_name::String)

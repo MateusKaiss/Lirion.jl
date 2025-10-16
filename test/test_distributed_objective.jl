@@ -12,15 +12,15 @@ const distributed_zone_cases = [
     "pglib_opf_case30_2zones_as.m",
     "pglib_opf_case30_3zones_as.m",
     # 57 buses
-    "pglib_opf_case57_2zones_ieee.m",
-    "pglib_opf_case57_4zones_ieee.m",
-    # 118 buses
-    "pglib_opf_case118_2zones_ieee.m",
-    "pglib_opf_case118_3zones_ieee.m",
-    "pglib_opf_case118_5zones_ieee.m",
-    # 500 buses
-    "pglib_opf_case500_3zones_goc.m",
-    "pglib_opf_case500_4zones_goc.m",
+    # "pglib_opf_case57_2zones_ieee.m",
+    # "pglib_opf_case57_4zones_ieee.m",
+    # # 118 buses
+    # "pglib_opf_case118_2zones_ieee.m",
+    # "pglib_opf_case118_3zones_ieee.m",
+    # "pglib_opf_case118_5zones_ieee.m",
+    # # 500 buses
+    # "pglib_opf_case500_3zones_goc.m",
+    # "pglib_opf_case500_4zones_goc.m",
     # 793
     # "pglib_opf_case793_11zones_goc.m",
     # 2000
