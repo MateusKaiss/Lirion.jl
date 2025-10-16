@@ -204,7 +204,7 @@ function _set_model_silent!(m::JuMP.Model)
         _safe("output_flag", false)  # aceito em algumas versões
     elseif occursin("scs", solver)
         _safe("verbose", false)
-        _safe("log_csv_filename", "")  # evita criar arquivo de log
+        # _safe("log_csv_filename", "")  # evita criar arquivo de log
     elseif occursin("clarabel", solver)
         _safe("verbose", false)
     elseif occursin("glpk", solver)
