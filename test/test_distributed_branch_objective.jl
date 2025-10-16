@@ -99,16 +99,19 @@ function compare_distributed_branch_vs_centralized(
             "--admm-mu-decr", string(admm_mu_decr),
         ]
         if admm_tau_incr != 1.0
-            push!(args_dist, "--admm-tau-incr"); push!(args_dist, string(admm_tau_incr))
+            push!(args_dist, "--admm-tau-incr")
+            push!(args_dist, string(admm_tau_incr))
         end
         if admm_tau_decr != 1.0
-            push!(args_dist, "--admm-tau-decr"); push!(args_dist, string(admm_tau_decr))
+            push!(args_dist, "--admm-tau-decr")
+            push!(args_dist, string(admm_tau_decr))
         end
         if admm_warm_start
             push!(args_dist, "--admm-warm-start")
         end
         if !isnothing(distributed_optimizer)
-            push!(args_dist, "--optimizer"); push!(args_dist, string(distributed_optimizer))
+            push!(args_dist, "--optimizer")
+            push!(args_dist, string(distributed_optimizer))
         end
         obj, _ = PowerOptimization.main(args_dist)
         obj

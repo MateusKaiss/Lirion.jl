@@ -246,7 +246,7 @@ function run_distributed_objective_tests(;
             admm_max_iter_case = 1000
             admm_rho_case = 7_000_000.0      # 7e6
             admm_eps_primal_case = 3e-4
-            admm_eps_dual_case  = 3e-4
+            admm_eps_dual_case = 3e-4
             admm_alpha_case = 1.0            # α desligado
             admm_mu_incr_case = 3.0
             admm_mu_decr_case = 3.0

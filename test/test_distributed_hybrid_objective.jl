@@ -27,6 +27,7 @@ const distributed_hybrid_zone_cases = [
     "pglib_opf_case10000_50zones_goc.m",
     "pglib_opf_case20758_42zones_epigrids.m",
     "pglib_opf_case30000_20zones_goc.m",
+    "pglib_opf_case78484_157zones_epigrids.m",
 ]
 
 function track_failure_hybrid(label::String, origin::String, case_name::String)
@@ -202,6 +203,23 @@ function run_distributed_hybrid_objective_tests(;
                 "--admm-tau-incr", "1.050",
                 "--admm-tau-decr", "0.92",
                 "--optimizer", "OSQP.Optimizer",
+            ]
+        end
+
+        if occursin("case78484_157zones_", case_name)
+            admm_max_iter_case = 2000
+            admm_alpha_case = 1.0
+            admm_rho_case = 1.0
+            admm_eps_primal_case = 5e-4
+            admm_eps_dual_case = 5e-4
+            admm_warm_start_case = false
+            extra_flags_case = String[
+                "--admm-mu-incr", "3.0",
+                "--admm-mu-decr", "3.0",
+                "--admm-tau-incr", "1.05",
+                "--admm-tau-decr", "0.94",
+                "--admm-rho-theta", "50000",
+                "--admm-rho-flow", "50000",
             ]
         end
 
