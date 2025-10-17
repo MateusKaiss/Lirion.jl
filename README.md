@@ -18,6 +18,24 @@ PowerOptimization.jl provides a framework for power system optimization, support
 - **Storage Integration**: Battery and prosumer modeling
 - **Comprehensive Testing**: Extensive test suite with PGLib cases
 
+## Acknowledgments
+
+PowerOptimization.jl initially emerged as part of the undergraduate thesis (TCC) of its principal developer in the field of power systems.  
+The project later evolved into a research project funded by the **CNPq (Brazilian National Council for Scientific and Technological Development)**.  
+
+The package was conceived, designed, and developed by **Mateus Kaiss**, with support from:
+
+- **Daniel Gebbran** — contributions to distributed ADMM implementations and large-scale testing  
+- **Kristie Kaminsky Kuster** — academic advisor during the thesis, providing theoretical and practical guidance, as well as emotional support throughout the development process  
+
+
+We also acknowledge the inspiration and foundational work of the following open-source projects:  
+- [PowerModels.jl](https://github.com/lanl-ansi/PowerModels.jl) — solid foundation for power system modeling  
+- [PowerModelsADA.jl](https://github.com/mkhraijah/PowerModelsADA.jl) — reference for distributed algorithms  
+- [JuMP.jl](https://github.com/jump-dev/JuMP.jl) — mathematical optimization modeling framework  
+- [PGLib](https://github.com/power-grid-lib/pglib-opf) — benchmark test cases
+
+
 ## Comparison with Related Packages
 
 ### vs. [PowerModels.jl](https://github.com/lanl-ansi/PowerModels.jl)
@@ -367,12 +385,6 @@ If you use PowerOptimization.jl in your research, please cite:
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
-
-- Built on the solid foundation of [PowerModels.jl](https://github.com/lanl-ansi/PowerModels.jl)
-- Inspired by [PowerModelsADA.jl](https://github.com/mkhraijah/PowerModelsADA.jl) for distributed optimization
-- Uses [JuMP.jl](https://github.com/jump-dev/JuMP.jl) for mathematical modeling
-- Test cases from [PGLib](https://github.com/power-grid-lib/pglib-opf)
 
 ## Roadmap
 
