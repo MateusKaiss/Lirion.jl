@@ -8,249 +8,425 @@ function resolve_optimizer_ac(config)
     end
 end
 
-@inline function _assert_nonzero(x::Real, msg::AbstractString)
-    @assert abs(x) > 1e-8 msg
-end
-
-# ---------- Penalidades (ADMM) ----------
-"Penalidade por BARRA no AC: θ (local) vs θ̄ e V (local) vs V̄."
-function add_penalty_bus_ac!(
-    m::JuMP.Model,
+@inline function _ac_flow_from_exprs_existing(
+    model::Model,
     subdata::Dict{String, Any},
-    shared_buses::AbstractVector{<:Integer},
-    θ_avg::AbstractDict{<:Integer, <:Real},
-    v_avg::AbstractDict{<:Integer, <:Real},
-    dualsθ_zone::AbstractDict{<:Integer, <:Real},
-    dualsV_zone::AbstractDict{<:Integer, <:Real},
-    ρθ::Real,
-    ρV::Real,
+    l_local::Int;
+    t::Int = 1,
 )
-    pen = @expression(m, 0.0)  # anônima (sem nome fixo)
-    local_shared = get(subdata, "shared_buses_local", shared_buses)
-    @inbounds for b in local_shared
-        θ = m[:theta][b, 1]
-        θ̄ = Float64(get(θ_avg, b, 0.0))
-        λθ = Float64(get(dualsθ_zone, b, 0.0))
-        pen += λθ * (θ - θ̄) + (float(ρθ) / 2) * (θ - θ̄)^2
-
-        V = m[:v_magnitude][b, 1]
-        V̄ = Float64(get(v_avg, b, 1.0))
-        λV = Float64(get(dualsV_zone, b, 0.0))
-        pen += λV * (V - V̄) + (float(ρV) / 2) * (V - V̄)^2
-    end
-    return pen
+    return model[:p_flow_branches][l_local, t], model[:q_flow_branches][l_local, t]
 end
 
-"Penalidade por RAMO no AC: P_from/Q_from vs zP/zQ."
-function add_penalty_branch_ac!(
+@inline function _wrap_angle_diff(Δ::Float64)
+    return atan(sin(Δ), cos(Δ))
+end
+
+@inline function _circular_mean(θs::AbstractVector{<:Real})
+    sum_sin = 0.0
+    sum_cos = 0.0
+    @inbounds @simd for θ in θs
+        sum_sin += sin(θ)
+        sum_cos += cos(θ)
+    end
+    return atan(sum_sin, sum_cos)
+end
+
+@inline function _pretty_time_ac(sec::Real)
+    if sec < 60
+        return "$(round(sec; digits=3)) s"
+    elseif sec < 3600
+        return "$(round(sec/60; digits=2)) min"
+    else
+        return "$(round(sec/3600; digits=2)) h"
+    end
+end
+
+@inline function _val_or_start_ac(m::JuMP.Model, x::JuMP.VariableRef)
+    if JuMP.has_values(m)
+        return JuMP.value(x)
+    else
+        sv = JuMP.start_value(x)
+        return sv === nothing ? 0.0 : sv
+    end
+end
+
+@inline function _theta_val_ac(
     m::JuMP.Model,
-    subdata::Dict{String, Any},
-    zone_edges::AbstractVector{<:Integer},
-    zP::AbstractDict{<:Integer, <:Real},
-    zQ::AbstractDict{<:Integer, <:Real},
-    dualsP_zone::AbstractDict{<:Integer, <:Real},
-    dualsQ_zone::AbstractDict{<:Integer, <:Real},
-    ρP::Real,
-    ρQ::Real,
+    θ::JuMP.Containers.DenseAxisArray,
+    b::Int,
+    t::Int,
 )
-    pen = @expression(m, 0.0)  # anônima
-    @inbounds for e in zone_edges
-        l_local = _edge_local(subdata, e)
-        @assert l_local !== nothing "aresta global $e não pertence a esta partição"
-        P_loc, Q_loc = _ac_flow_from_exprs_existing(m, subdata, l_local)
-        λP = Float64(get(dualsP_zone, e, 0.0))
-        λQ = Float64(get(dualsQ_zone, e, 0.0))
-        zPe = Float64(get(zP, e, 0.0))
-        zQe = Float64(get(zQ, e, 0.0))
-        pen += λP * (P_loc - zPe) + (float(ρP) / 2) * (P_loc - zPe)^2
-        pen += λQ * (Q_loc - zQe) + (float(ρQ) / 2) * (Q_loc - zQe)^2
-    end
-    return pen
+    return _val_or_start_ac(m, θ[b, t])
 end
 
-# ---------- Consensos (sem value.(...): acumulação pontual) ----------
-function compute_ac_bus_consensus!(θ_avg::Dict{Int, Float64}, v_avg::Dict{Int, Float64},
-    partitions, shared_buses::Vector{Int})
-    sum_sin = Dict{Int, Float64}()
-    sum_cos = Dict{Int, Float64}()
-    Vacc = Dict{Int, Float64}()
-    cnts = Dict{Int, Int}()
+@inline function _vmag_val(m::JuMP.Model, V::JuMP.Containers.DenseAxisArray, b::Int, t::Int)
+    return _val_or_start_ac(m, V[b, t])
+end
+
+# ---------- Hotpaths (buffers e mapeamentos densos) ----------
+function prepare_hotpaths_ac!(sub::Dict{String, Any}, shared_buses::Vector{Int})
+    bus_ids = sub["bus"]["bus_i"]
+    bus_local_index = Dict{Int, Int}()
+    @inbounds for (i, b) in enumerate(bus_ids)
+        bus_local_index[b] = i
+    end
+    sub["bus_local_index"] = bus_local_index
+
+    busset = Set(bus_ids)
+    local_shared = [b for b in shared_buses if b in busset]
+    sub["shared_buses_local"] = local_shared
+
+    shared_pos_local = Vector{Int}(undef, length(local_shared))
+    @inbounds for (k, b) in enumerate(local_shared)
+        shared_pos_local[k] = bus_local_index[b]
+    end
+    sub["shared_pos_local"] = shared_pos_local
+
+    sub["theta_buf"] = zeros(Float64, length(bus_ids))
+    sub["vmag_buf"] = ones(Float64, length(bus_ids))
+    sub["theta_shared_buf"] = zeros(Float64, length(shared_pos_local))
+    sub["vmag_shared_buf"] = ones(Float64, length(shared_pos_local))
+    return nothing
+end
+
+@inline function snapshot_theta_ac!(sub::Dict{String, Any})
+    m = sub["model"]
+    θ = m[:theta]
+    buf = sub["theta_buf"]
+    bus_ids = sub["bus"]["bus_i"]
+    @inbounds for i in eachindex(bus_ids)
+        buf[i] = _theta_val_ac(m, θ, bus_ids[i], 1)
+    end
+    return buf
+end
+
+@inline function snapshot_vmag!(sub::Dict{String, Any})
+    m = sub["model"]
+    V = m[:v_magnitude]
+    buf = sub["vmag_buf"]
+    bus_ids = sub["bus"]["bus_i"]
+    @inbounds for i in eachindex(bus_ids)
+        buf[i] = _vmag_val(m, V, bus_ids[i], 1)
+    end
+    return buf
+end
+
+@inline function snapshot_theta_ac_shared!(sub::Dict{String, Any})
+    m = sub["model"]
+    θ = m[:theta]
+    buf = sub["theta_shared_buf"]
+    pos = sub["shared_pos_local"]
+    bus_ids = sub["bus"]["bus_i"]
+    @inbounds for i in eachindex(pos)
+        bidx = pos[i]
+        buf[i] = _theta_val_ac(m, θ, bus_ids[bidx], 1)
+    end
+    return buf
+end
+
+@inline function snapshot_vmag_shared!(sub::Dict{String, Any})
+    m = sub["model"]
+    V = m[:v_magnitude]
+    buf = sub["vmag_shared_buf"]
+    pos = sub["shared_pos_local"]
+    bus_ids = sub["bus"]["bus_i"]
+    @inbounds for i in eachindex(pos)
+        bidx = pos[i]
+        buf[i] = _vmag_val(m, V, bus_ids[bidx], 1)
+    end
+    return buf
+end
+
+# ---------- Maps densos globais para shared buses ----------
+function prepare_dense_maps_ac(shared_buses::Vector{Int})
+    shared_buses_sorted = sort(shared_buses)
+    b2pos = Dict{Int, Int}(b => i for (i, b) in enumerate(shared_buses_sorted))
+    return shared_buses_sorted, b2pos
+end
+
+# ---------- Penalidades (pré-constroem termos quadráticos e só trocam parte linear) ----------
+function _build_quad_bus_expr_ac!(sub::Dict{String, Any}, ρθ::Float64, ρV::Float64)
+    m = sub["model"]
+    θ = m[:theta]
+    V = m[:v_magnitude]
+    q = zero(JuMP.QuadExpr)
+    for b in sub["shared_buses_local"]
+        q += 0.5 * ρθ * θ[b, 1]^2 + 0.5 * ρV * V[b, 1]^2
+    end
+    sub["quad_bus_expr_ac"] = q
+    sub["ρ ακ_bus_cached"] = (ρθ, ρV)
+    return q
+end
+
+function _build_linear_bus_expr_ac!(
+    sub::Dict{String, Any},
+    shared_buses_sorted::Vector{Int},
+    b2pos::Dict{Int, Int},
+    θ̄_vec::Vector{Float64},
+    V̄_vec::Vector{Float64},
+    λθ_zone::AbstractVector{<:Real},
+    λV_zone::AbstractVector{<:Real},
+    ρθ::Float64,
+    ρV::Float64,
+)
+    m = sub["model"]
+    θ = m[:theta]
+    V = m[:v_magnitude]
+    lin = zero(JuMP.AffExpr)
+    for b in sub["shared_buses_local"]
+        j = b2pos[b]
+        lin += (λθ_zone[j] - ρθ * θ̄_vec[j]) * θ[b, 1]
+        lin += (λV_zone[j] - ρV * V̄_vec[j]) * V[b, 1]
+    end
+    sub["lin_bus_expr_ac"] = lin
+    return lin
+end
+
+function _build_quad_branch_expr_ac!(
+    sub::Dict{String, Any}, ρP::Float64, ρQ::Float64, zone_edges::Vector{Int},
+)
+    m = sub["model"]
+    q = zero(JuMP.QuadExpr)
+    for e in zone_edges
+        l_local = get(sub["edge_to_local"], e, nothing)
+        l_local === nothing && continue
+        P_loc, Q_loc = _ac_flow_from_exprs_existing(m, sub, l_local)
+        q += 0.5 * ρP * P_loc^2 + 0.5 * ρQ * Q_loc^2
+    end
+    sub["quad_branch_expr_ac"] = q
+    sub["ρ ακ_branch_cached"] = (ρP, ρQ)
+    return q
+end
+
+function _build_linear_branch_expr_ac!(
+    sub::Dict{String, Any},
+    zone_edges::Vector{Int},
+    zP::Dict{Int, Float64},
+    zQ::Dict{Int, Float64},
+    dualsP_zone::Dict{Int, Float64},
+    dualsQ_zone::Dict{Int, Float64},
+    ρP::Float64,
+    ρQ::Float64,
+)
+    m = sub["model"]
+    lin = zero(JuMP.AffExpr)
+    for e in zone_edges
+        l_local = get(sub["edge_to_local"], e, nothing)
+        l_local === nothing && continue
+        P_loc, Q_loc = _ac_flow_from_exprs_existing(m, sub, l_local)
+        λP = get(dualsP_zone, e, 0.0)
+        λQ = get(dualsQ_zone, e, 0.0)
+        zPe = get(zP, e, 0.0)
+        zQe = get(zQ, e, 0.0)
+        lin += λP * (P_loc - zPe) + λQ * (Q_loc - zQe) - ρP * zPe * P_loc - ρQ * zQe * Q_loc
+        # o termo 0.5*ρ*(P^2/Q^2) está no quadrático pré-construído,
+        # aqui só ficam os termos lineares dependentes de z/λ.
+    end
+    sub["lin_branch_expr_ac"] = lin
+    return lin
+end
+
+# ---------- Consensos densos (bus AC: θ por média circular + |V| média aritmética) ----------
+function compute_ac_bus_consensus_vec!(
+    θ̄_vec::Vector{Float64},
+    V̄_vec::Vector{Float64},
+    partitions::Dict{Int, Dict{String, Any}},
+    shared_buses_sorted::Vector{Int},
+    b2pos::Dict{Int, Int},
+)
+    fill!(θ̄_vec, 0.0)
+    fill!(V̄_vec, 0.0)
+    sums_sin = zeros(Float64, length(shared_buses_sorted))
+    sums_cos = zeros(Float64, length(shared_buses_sorted))
+    counts = zeros(Int, length(shared_buses_sorted))
+
     for (_, sub) in partitions
-        m = sub["model"]
-        local_shared = get(sub, "shared_buses_local", shared_buses)
-        @inbounds for b in local_shared
-            θb = value(m[:theta][b, 1])
-            Vb = value(m[:v_magnitude][b, 1])
-            sum_sin[b] = get(sum_sin, b, 0.0) + sin(θb)
-            sum_cos[b] = get(sum_cos, b, 0.0) + cos(θb)
-            Vacc[b] = get(Vacc, b, 0.0) + Vb
-            cnts[b] = get(cnts, b, 0) + 1
+        θs = snapshot_theta_ac_shared!(sub)
+        Vs = snapshot_vmag_shared!(sub)
+        lbs = sub["shared_buses_local"]
+        @inbounds for i in eachindex(lbs)
+            j = b2pos[lbs[i]]
+            s, c = sincos(θs[i])
+            sums_sin[j] += s
+            sums_cos[j] += c
+            V̄_vec[j] += Vs[i]
+            counts[j] += 1
         end
     end
-    @inbounds for b in shared_buses
-        n = get(cnts, b, 0)
-        if n > 0
-            θ_avg[b] = atan(get(sum_sin, b, 0.0), get(sum_cos, b, 0.0))
-            v_avg[b] = Vacc[b] / n
+
+    @inbounds for j in eachindex(θ̄_vec)
+        if counts[j] != 0
+            θ̄_vec[j] = atan(sums_sin[j], sums_cos[j])
+            V̄_vec[j] /= counts[j]
         end
     end
 end
 
-function compute_ac_branch_consensus!(zP::Dict{Int, Float64}, zQ::Dict{Int, Float64},
-    partitions, cut_edges::Vector{Int})
-    sumsP = Dict{Int, Float64}()
-    sumsQ = Dict{Int, Float64}()
-    counts = Dict{Int, Int}()
+# ---------- Consenso para BRANCH (AC) ----------
+function compute_ac_branch_consensus!(
+    zP::Dict{Int, Float64},
+    zQ::Dict{Int, Float64},
+    partitions::Dict{Int, Dict{String, Any}},
+    cut_edges::Vector{Int},
+)
+    # acumula P/Q locais das zonas e faz média por aresta de corte
+    sumsP = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    sumsQ = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    counts = Dict{Int, Int}(e => 0 for e in cut_edges)
+
     for (_, sub) in partitions
         m = sub["model"]
-        @inbounds for e in cut_edges
-            l_local = _edge_local(sub, e)
-            if l_local !== nothing
-                P_loc, Q_loc = _ac_flow_from_exprs_existing(m, sub, l_local)
-                p = value(P_loc)
-                q = value(Q_loc)
-                sumsP[e] = get(sumsP, e, 0.0) + p
-                sumsQ[e] = get(sumsQ, e, 0.0) + q
-                counts[e] = get(counts, e, 0) + 1
+        # use as arestas desta zona já pré-filtradas
+        for e in get(sub, "zone_edges", Int[])
+            l_local = get(sub["edge_to_local"], e, nothing)
+            l_local === nothing && continue
+            P_loc, Q_loc = _ac_flow_from_exprs_existing(m, sub, l_local)
+            pval = JuMP.value(P_loc)
+            qval = JuMP.value(Q_loc)
+            # protege contra NaN/Inf ocasionais em iterações iniciais
+            if isfinite(pval)
+                sumsP[e] += pval
+                counts[e] += 1
+            end
+            if isfinite(qval)
+                sumsQ[e] += qval
             end
         end
     end
-    @inbounds for e in cut_edges
-        n = get(counts, e, 0)
-        if n > 0
-            zP[e] = sumsP[e] / n
-            zQ[e] = sumsQ[e] / n
+
+    for e in cut_edges
+        c = counts[e]
+        if c > 0
+            zP[e] = sumsP[e] / c
+            zQ[e] = sumsQ[e] / c
         end
+        # se c==0, mantém zP/zQ como estavam
     end
+    return nothing
 end
 
-# ---------- Atualização de duais (pontual, sem matrizes inteiras) ----------
-function update_duals_bus_ac!(
-    dualsθ,
-    dualsV,
-    partitions,
-    θ_avg,
-    v_avg,
-    shared_buses,
-    ρθ,
-    ρV,
+# ---------- Duais densos para BUS (vetorizados por zona) ----------
+@inline function update_duals_bus_ac_vec!(
+    dualsθ_vec_zone::Vector{Float64},
+    dualsV_vec_zone::Vector{Float64},
+    sub::Dict{String, Any},
+    θ̄_vec::Vector{Float64},
+    V̄_vec::Vector{Float64},
+    ρθ::Float64,
+    ρV::Float64,
+    shared_buses_sorted::Vector{Int},
+    b2pos::Dict{Int, Int},
+)
+    θs = snapshot_theta_ac_shared!(sub)
+    Vs = snapshot_vmag_shared!(sub)
+    lbs = sub["shared_buses_local"]
+    @inbounds for i in eachindex(lbs)
+        j = b2pos[lbs[i]]
+        dθ = _wrap_angle_diff(θs[i] - θ̄_vec[j])
+        dV = (Vs[i] - V̄_vec[j])
+        dualsθ_vec_zone[j] += ρθ * dθ
+        dualsV_vec_zone[j] += ρV * dV
+    end
+    return nothing
+end
+
+# ---------- Duais para BRANCH (AC) ----------
+function update_duals_branch_ac!(
+    dualsP::Dict{Int, Dict{Int, Float64}},
+    dualsQ::Dict{Int, Dict{Int, Float64}},
+    partitions::Dict{Int, Dict{String, Any}},
+    zP::Dict{Int, Float64},
+    zQ::Dict{Int, Float64},
+    cut_edges::Vector{Int},   # não é estritamente necessário aqui, mas mantém a assinatura
+    ρP::Float64,
+    ρQ::Float64,
 )
     for (z, sub) in partitions
         m = sub["model"]
-        local_shared = get(sub, "shared_buses_local", shared_buses)
-        @inbounds for b in local_shared
-            dθ = _wrap_angle_diff(value(m[:theta][b, 1]) - get(θ_avg, b, 0.0))
-            dV = value(m[:v_magnitude][b, 1]) - get(v_avg, b, 0.0)
-            dualsθ[z][b] = get(dualsθ[z], b, 0.0) + ρθ * dθ
-            dualsV[z][b] = get(dualsV[z], b, 0.0) + ρV * dV
-        end
-    end
-end
+        λPz = get!(dualsP, z, Dict{Int, Float64}())
+        λQz = get!(dualsQ, z, Dict{Int, Float64}())
 
-function update_duals_branch_ac!(dualsP, dualsQ, partitions, zP, zQ, cut_edges, ρP, ρQ)
-    for (z, sub) in partitions
-        m = sub["model"]
-        @inbounds for e in cut_edges
-            l_local = _edge_local(sub, e)
-            if l_local !== nothing
-                P_loc, Q_loc = _ac_flow_from_exprs_existing(m, sub, l_local)
-                dualsP[z][e] = get(dualsP[z], e, 0.0) + ρP * (value(P_loc) - zP[e])
-                dualsQ[z][e] = get(dualsQ[z], e, 0.0) + ρQ * (value(Q_loc) - zQ[e])
+        for e in get(sub, "zone_edges", Int[])
+            l_local = get(sub["edge_to_local"], e, nothing)
+            l_local === nothing && continue
+            P_loc, Q_loc = _ac_flow_from_exprs_existing(m, sub, l_local)
+            pval = JuMP.value(P_loc)
+            qval = JuMP.value(Q_loc)
+
+            if isfinite(pval)
+                λPz[e] = get(λPz, e, 0.0) + ρP * (pval - get(zP, e, 0.0))
+            end
+            if isfinite(qval)
+                λQz[e] = get(λQz, e, 0.0) + ρQ * (qval - get(zQ, e, 0.0))
             end
         end
     end
+    return nothing
 end
 
-# ---------- Resíduos (sem value.(...)) ----------
-function primal_residual_bus_ac(partitions, θ_avg, v_avg, shared_buses)
+# ---------- Resíduos densos para BUS ----------
+function primal_residual_bus_ac_vec(
+    partitions::Dict{Int, Dict{String, Any}},
+    θ̄_vec::Vector{Float64},
+    V̄_vec::Vector{Float64},
+    shared_buses_sorted::Vector{Int},
+    b2pos::Dict{Int, Int},
+)
     acc = 0.0
     for (_, sub) in partitions
-        m = sub["model"]
-        local_shared = get(sub, "shared_buses_local", shared_buses)
-        @inbounds for b in local_shared
-            dθ = _wrap_angle_diff(value(m[:theta][b, 1]) - get(θ_avg, b, 0.0))
-            dV = value(m[:v_magnitude][b, 1]) - get(v_avg, b, 0.0)
-            acc += dθ^2 + dV^2
+        θbuf = snapshot_theta_ac!(sub)
+        Vbuf = snapshot_vmag!(sub)
+        pos = sub["bus_local_index"]
+        @inbounds for b in sub["shared_buses_local"]
+            j = b2pos[b]
+            acc +=
+                _wrap_angle_diff(θbuf[pos[b]] - θ̄_vec[j])^2 + (Vbuf[pos[b]] - V̄_vec[j])^2
         end
     end
     return sqrt(acc)
 end
 
-function dual_residual_bus_ac(θ_avg, v_avg, θ_prev, v_prev, shared_buses)
-    sθ = 0.0
-    sV = 0.0
-    @inbounds for b in shared_buses
-        sθ += _wrap_angle_diff(get(θ_avg, b, 0.0) - get(θ_prev, b, 0.0))^2
-        sV += (get(v_avg, b, 0.0) - get(v_prev, b, 0.0))^2
-    end
-    return sqrt(sθ + sV)
-end
-
-function eps_primal_bus_ac(partitions, θ_avg, v_avg, shared_buses, ϵ_abs, ϵ_rel)
+function eps_primal_bus_ac_vec(
+    partitions::Dict{Int, Dict{String, Any}},
+    θ̄_vec::Vector{Float64},
+    V̄_vec::Vector{Float64},
+    shared_buses_sorted::Vector{Int},
+    b2pos::Dict{Int, Int},
+    ϵ_abs::Float64,
+    ϵ_rel::Float64,
+)
     dim = 0
     for (_, sub) in partitions
-        local_shared = get(sub, "shared_buses_local", shared_buses)
-        dim += 2 * length(local_shared)
+        dim += 2 * length(sub["shared_buses_local"])
     end
     z_norm_sq = 0.0
-    @inbounds for b in shared_buses
-        z_norm_sq += get(θ_avg, b, 0.0)^2 + get(v_avg, b, 0.0)^2
+    @inbounds for j in eachindex(shared_buses_sorted)
+        z_norm_sq += θ̄_vec[j]^2 + V̄_vec[j]^2
     end
     return sqrt(max(1, dim)) * ϵ_abs + ϵ_rel * max(sqrt(z_norm_sq), 1e-12)
 end
 
-function eps_dual_bus_ac(θ_avg, v_avg, θ_prev, v_prev, shared_buses, ϵ_abs, ϵ_rel)
-    dim = 2 * max(1, length(shared_buses))
+function dual_residual_bus_ac_vec(
+    θ̄_vec::Vector{Float64}, V̄_vec::Vector{Float64},
+    θ̄_prev::Vector{Float64}, V̄_prev::Vector{Float64},
+)
     sθ = 0.0
     sV = 0.0
-    @inbounds for b in shared_buses
-        sθ += _wrap_angle_diff(get(θ_avg, b, 0.0) - get(θ_prev, b, 0.0))^2
-        sV += (get(v_avg, b, 0.0) - get(v_prev, b, 0.0))^2
+    @inbounds for j in eachindex(θ̄_vec)
+        sθ += _wrap_angle_diff(θ̄_vec[j] - θ̄_prev[j])^2
+        sV += (V̄_vec[j] - V̄_prev[j])^2
     end
-    return sqrt(dim) * ϵ_abs + ϵ_rel * sqrt(sθ + sV)
+    return sqrt(sθ + sV)
 end
 
-function primal_residual_branch_ac(partitions, zP, zQ, cut_edges)
-    acc = 0.0
-    for (_, sub) in partitions
-        m = sub["model"]
-        @inbounds for e in cut_edges
-            l_local = _edge_local(sub, e)
-            if l_local !== nothing
-                P_loc, Q_loc = _ac_flow_from_exprs_existing(m, sub, l_local)
-                acc += (value(P_loc) - zP[e])^2 + (value(Q_loc) - zQ[e])^2
-            end
-        end
-    end
-    return sqrt(acc)
-end
-
-function dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
-    sP = 0.0
-    sQ = 0.0
-    @inbounds for e in cut_edges
-        sP += (get(zP, e, 0.0) - get(zP_prev, e, 0.0))^2
-        sQ += (get(zQ, e, 0.0) - get(zQ_prev, e, 0.0))^2
-    end
-    return sqrt(sP + sQ)
-end
-
-function eps_primal_branch_ac(partitions, zP, zQ, cut_edges, ϵ_abs, ϵ_rel)
-    dim_pri = 0
-    for (_, sub) in partitions
-        dim_pri += 2 * length(_zone_cut_edges(sub, cut_edges))
-    end
-    z_norm_sq = 0.0
-    @inbounds for e in cut_edges
-        z_norm_sq += get(zP, e, 0.0)^2 + get(zQ, e, 0.0)^2
-    end
-    return sqrt(max(1, dim_pri)) * ϵ_abs + ϵ_rel * max(sqrt(z_norm_sq), 1e-12)
-end
-
-function eps_dual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges, ϵ_abs, ϵ_rel)
-    dim_du = 2 * max(1, length(cut_edges))
-    s = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
-    return sqrt(dim_du) * ϵ_abs + ϵ_rel * s
+function eps_dual_bus_ac_vec(
+    θ̄_vec::Vector{Float64}, V̄_vec::Vector{Float64},
+    θ̄_prev::Vector{Float64}, V̄_prev::Vector{Float64},
+    ϵ_abs::Float64, ϵ_rel::Float64,
+)
+    dim = 2 * max(1, length(θ̄_vec))
+    s = dual_residual_bus_ac_vec(θ̄_vec, V̄_vec, θ̄_prev, V̄_prev)
+    return sqrt(dim) * ϵ_abs + ϵ_rel * s
 end
 
 # ---------- ρ adaptativo ----------
@@ -263,7 +439,84 @@ function adaptive_rho_ac!(ρ::Base.RefValue{Float64}, r::Float64, s::Float64;
     end
 end
 
-# ---------- Plots (wrappers) ----------
+# ---------- Resíduos para BRANCH (AC) ----------
+function primal_residual_branch_ac(
+    partitions::Dict{Int, Dict{String, Any}},
+    zP::Dict{Int, Float64},
+    zQ::Dict{Int, Float64},
+    cut_edges::Vector{Int},
+)
+    acc = 0.0
+    for (_, sub) in partitions
+        m = sub["model"]
+        for e in get(sub, "zone_edges", Int[])
+            l_local = get(sub["edge_to_local"], e, nothing)
+            l_local === nothing && continue
+            P_loc, Q_loc = _ac_flow_from_exprs_existing(m, sub, l_local)
+            p = JuMP.value(P_loc)
+            q = JuMP.value(Q_loc)
+            if isfinite(p)
+                acc += (p - get(zP, e, 0.0))^2
+            end
+            if isfinite(q)
+                acc += (q - get(zQ, e, 0.0))^2
+            end
+        end
+    end
+    return sqrt(acc)
+end
+
+function dual_residual_branch_ac(
+    zP::Dict{Int, Float64},
+    zQ::Dict{Int, Float64},
+    zP_prev::Dict{Int, Float64},
+    zQ_prev::Dict{Int, Float64},
+    cut_edges::Vector{Int},
+)
+    s = 0.0
+    for e in cut_edges
+        s += (get(zP, e, 0.0) - get(zP_prev, e, 0.0))^2
+        s += (get(zQ, e, 0.0) - get(zQ_prev, e, 0.0))^2
+    end
+    return sqrt(s)
+end
+
+function eps_primal_branch_ac(
+    partitions::Dict{Int, Dict{String, Any}},
+    zP::Dict{Int, Float64},
+    zQ::Dict{Int, Float64},
+    cut_edges::Vector{Int},
+    ϵ_abs::Float64,
+    ϵ_rel::Float64,
+)
+    # dimensão = 2 variáveis (P,Q) por aresta local em cada zona
+    dim = 0
+    for (_, sub) in partitions
+        dim += 2 * length(get(sub, "zone_edges", Int[]))
+    end
+    # norma de z para termo relativo
+    z_norm_sq = 0.0
+    for e in cut_edges
+        z_norm_sq += get(zP, e, 0.0)^2 + get(zQ, e, 0.0)^2
+    end
+    return sqrt(max(1, dim)) * ϵ_abs + ϵ_rel * max(sqrt(z_norm_sq), 1e-12)
+end
+
+function eps_dual_branch_ac(
+    zP::Dict{Int, Float64},
+    zQ::Dict{Int, Float64},
+    zP_prev::Dict{Int, Float64},
+    zQ_prev::Dict{Int, Float64},
+    cut_edges::Vector{Int},
+    ϵ_abs::Float64,
+    ϵ_rel::Float64,
+)
+    dim = 2 * max(1, length(cut_edges))
+    s = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
+    return sqrt(dim) * ϵ_abs + ϵ_rel * s
+end
+
+# ---------- Plots (mesma API) ----------
 function save_ac_bus_plots(res_pri, res_du, eps_pri, eps_du, rhoθ_hist, rhoV_hist,
     θ_avg_hist;
     stem::String = "admm_ac")
@@ -278,30 +531,38 @@ function save_ac_bus_plots(res_pri, res_du, eps_pri, eps_du, rhoθ_hist, rhoV_hi
         (
             () -> (
                 p = Plot();
-                p(; x = 1:length(rhoθ_hist), y = rhoθ_hist, type = :scatter,
-                    mode = "lines+markers", name = "ρθ");
+                p(;
+                    x = 1:length(rhoθ_hist),
+                    y = rhoθ_hist,
+                    type = :scatter,
+                    mode = "lines+markers",
+                    name = "ρθ",
+                );
                 p.layout.title = "Evolução de ρθ";
                 p.layout.xaxis.title = "Iterações";
                 p.layout.yaxis.title = "ρθ";
                 p.layout.yaxis.type = "log";
                 p
             )
-        )(),
-        "plot_rho_theta_$(stem).html")
+        )(), "plot_rho_theta_$(stem).html")
     PlotlyLight.save(
         (
             () -> (
                 p = Plot();
-                p(; x = 1:length(rhoV_hist), y = rhoV_hist, type = :scatter,
-                    mode = "lines+markers", name = "ρV");
+                p(;
+                    x = 1:length(rhoV_hist),
+                    y = rhoV_hist,
+                    type = :scatter,
+                    mode = "lines+markers",
+                    name = "ρV",
+                );
                 p.layout.title = "Evolução de ρV";
                 p.layout.xaxis.title = "Iterações";
                 p.layout.yaxis.title = "ρV";
                 p.layout.yaxis.type = "log";
                 p
             )
-        )(),
-        "plot_rho_vmag_$(stem).html")
+        )(), "plot_rho_vmag_$(stem).html")
     return plot_theta_avg_heatmap(θ_avg_hist, "plot_theta_avg_heatmap_$(stem).html")
 end
 
@@ -318,34 +579,43 @@ function save_ac_branch_plots(res_pri, res_du, eps_pri, eps_du, rhoP_hist, rhoQ_
         (
             () -> (
                 p = Plot();
-                p(; x = 1:length(rhoP_hist), y = rhoP_hist, type = :scatter,
-                    mode = "lines+markers", name = "ρP");
+                p(;
+                    x = 1:length(rhoP_hist),
+                    y = rhoP_hist,
+                    type = :scatter,
+                    mode = "lines+markers",
+                    name = "ρP",
+                );
                 p.layout.title = "Evolução de ρP";
                 p.layout.xaxis.title = "Iterações";
                 p.layout.yaxis.title = "ρP";
                 p.layout.yaxis.type = "log";
                 p
             )
-        )(),
-        "plot_rhoP_$(stem).html")
+        )(), "plot_rhoP_$(stem).html")
     return PlotlyLight.save(
         (
             () -> (
                 p = Plot();
-                p(; x = 1:length(rhoQ_hist), y = rhoQ_hist, type = :scatter,
-                    mode = "lines+markers", name = "ρQ");
+                p(;
+                    x = 1:length(rhoQ_hist),
+                    y = rhoQ_hist,
+                    type = :scatter,
+                    mode = "lines+markers",
+                    name = "ρQ",
+                );
                 p.layout.title = "Evolução de ρQ";
                 p.layout.xaxis.title = "Iterações";
                 p.layout.yaxis.title = "ρQ";
                 p.layout.yaxis.type = "log";
                 p
             )
-        )(),
-        "plot_rhoQ_$(stem).html")
+        )(), "plot_rhoQ_$(stem).html")
 end
 
-# ---------- ADMM: BUS (AC) ----------
+# ============================ ADMM: BUS (AC) ============================
 function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
+    t0 = time_ns()
     @assert config.base_model == AC "ADMM-AC: base_model deve ser AC."
     partitions, shared_buses = prepare_admm_partitions(data)
 
@@ -353,14 +623,20 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
     ρV = Ref(config.rho_v)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
 
-    dualsθ =
-        Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in keys(partitions))
-    dualsV =
-        Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in keys(partitions))
-    θ_avg = Dict{Int, Float64}()
-    v_avg = Dict{Int, Float64}()
-    θ_prev = Dict{Int, Float64}()
-    v_prev = Dict{Int, Float64}()
+    shared_buses_sorted, b2pos = prepare_dense_maps_ac(shared_buses)
+
+    # duais densos por zona
+    dualsθ_dense = Dict{Int, Vector{Float64}}(
+        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
+    )
+    dualsV_dense = Dict{Int, Vector{Float64}}(
+        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
+    )
+
+    θ̄_vec = zeros(Float64, length(shared_buses_sorted))
+    V̄_vec = ones(Float64, length(shared_buses_sorted))
+    θ̄_prev = similar(θ̄_vec)
+    V̄_prev = similar(V̄_vec)
 
     res_pri_hist = Float64[]
     res_du_hist = Float64[]
@@ -372,7 +648,7 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
 
     optimizer_factory = resolve_optimizer_ac(config)
 
-    # build + cache locais
+    # build inicial + hotpaths + pré-quad
     for (zone_id, sub) in partitions
         m = build_model(sub, AC; optimizer = optimizer_factory, build_only = true)
         sub["model"] = m
@@ -380,88 +656,123 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
         sub["theta_var"] = m[:theta]
         sub["vmag_var"] = m[:v_magnitude]
         sub["has_solution"] = false
-        _set_model_silent!(m)    # (5)
+        _set_model_silent!(m)
 
-        # shared_buses_local (3)
-        busset = _bus_set(sub)
-        sub["shared_buses_local"] = [b for b in shared_buses if b in busset]
-
-        # starts (opcional)
+        # start values leves
         @inbounds for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
         end
         @inbounds for I in keys(sub["vmag_var"])
             set_start_value(sub["vmag_var"][I], 1.0)
         end
+
+        prepare_hotpaths_ac!(sub, shared_buses)
+        _build_quad_bus_expr_ac!(sub, ρθ[], ρV[])
+        @objective(m, Min, sub["obj_base"] + sub["quad_bus_expr_ac"])
     end
 
+    prev_ρθ, prev_ρV = ρθ[], ρV[]
+    zone_ids = collect(keys(partitions))
+    # buffers para juntar λ por zona (evita alocar toda iteração)
+    λθ_zone_buf = Dict{Int, Vector{Float64}}(
+        z => zeros(Float64, length(shared_buses_sorted)) for z in zone_ids
+    )
+    λV_zone_buf = Dict{Int, Vector{Float64}}(
+        z => zeros(Float64, length(shared_buses_sorted)) for z in zone_ids
+    )
+
     for k in 1:config.max_iter
-        println("\n[ADMM-AC] Iteração $k")
+        _FAST_USE_LOGS && println("\n[ADMM-AC] Iteração $k")
 
-        # locais (sem rebuild do modelo)
-        for (zone_id, sub) in partitions
+        # se rho mudou, reconstrói apenas termo quadrático
+        if ρθ[] != prev_ρθ || ρV[] != prev_ρV
+            for (_, sub) in partitions
+                _build_quad_bus_expr_ac!(sub, ρθ[], ρV[])
+            end
+            prev_ρθ, prev_ρV = ρθ[], ρV[]
+        end
+
+        # alvo do termo linear: θ̄_vec, V̄_vec reais
+        # (são atualizados depois da otimização de zona)
+        # solve por zona em paralelo
+        nz = length(zone_ids)
+        results = Vector{Any}(undef, nz)
+        Threads.@threads for i in 1:nz
+            z = zone_ids[i]
+            sub = partitions[z]
+            # junta λ densos da zona
+            λθ = (λθ_zone_buf[z] .= dualsθ_dense[z])
+            λV = (λV_zone_buf[z] .= dualsV_dense[z])
+            lin = _build_linear_bus_expr_ac!(sub, shared_buses_sorted, b2pos,
+                θ̄_vec, V̄_vec, λθ, λV, ρθ[], ρV[])
+            @objective(sub["model"], Min, sub["obj_base"] + sub["quad_bus_expr_ac"] + lin)
+            optimize!(sub["model"])
             m = sub["model"]
+            results[i] = (expr_cost = value(m[:generation_cost]),
+                real_cost = compute_real_generation_cost(m, sub["objective_params"]))
+        end
 
-            # warm-start leve, sem alocar matrizes inteiras
-            # if sub["has_solution"] === true
-            #     @inbounds for I in keys(sub["theta_var"])
-            #         set_start_value(sub["theta_var"][I], value(sub["theta_var"][I]))
-            #     end
-            #     @inbounds for I in keys(sub["vmag_var"])
-            #         set_start_value(sub["vmag_var"][I], value(sub["vmag_var"][I]))
-            #     end
-            # end
-
-            pen_bus = add_penalty_bus_ac!(m, sub, shared_buses,
-                θ_avg, v_avg, dualsθ[zone_id], dualsV[zone_id], ρθ[], ρV[])
-            @objective(m, Min, sub["obj_base"] + pen_bus)
-            optimize!(m)
+        for (i, z) in enumerate(zone_ids)
+            sub = partitions[z]
+            out = results[i]
             sub["has_solution"] = true
-
-            sub["generation_cost_model_expr"] = value(m[:generation_cost])
-            sub["real_generation_cost"] =
-                compute_real_generation_cost(m, sub["objective_params"])
+            sub["generation_cost_model_expr"] = out.expr_cost
+            sub["real_generation_cost"] = out.real_cost
         end
 
-        # consensos
-        θ_prev = isempty(θ_avg) ? θ_avg : copy(θ_avg)
-        v_prev = isempty(v_avg) ? v_avg : copy(v_avg)
-        compute_ac_bus_consensus!(θ_avg, v_avg, partitions, shared_buses)
-        @inbounds for b in shared_buses
-            push!(get!(θ_avg_hist, b, Float64[]), get(θ_avg, b, 0.0))
-        end
-
-        # duais
-        update_duals_bus_ac!(
-            dualsθ,
-            dualsV,
+        # consenso (densos)
+        θ̄_prev .= θ̄_vec
+        V̄_prev .= V̄_vec
+        compute_ac_bus_consensus_vec!(
+            θ̄_vec,
+            V̄_vec,
             partitions,
-            θ_avg,
-            v_avg,
-            shared_buses,
-            ρθ[],
-            ρV[],
+            shared_buses_sorted,
+            b2pos,
         )
+        @inbounds for b in shared_buses_sorted
+            j = b2pos[b]
+            push!(get!(θ_avg_hist, b, Float64[]), θ̄_vec[j])
+        end
 
-        # resíduos + tolerâncias
-        r = primal_residual_bus_ac(partitions, θ_avg, v_avg, shared_buses)
-        s = dual_residual_bus_ac(θ_avg, v_avg, θ_prev, v_prev, shared_buses)
+        # duais (densos)
+        for z in zone_ids
+            update_duals_bus_ac_vec!(dualsθ_dense[z], dualsV_dense[z], partitions[z],
+                θ̄_vec, V̄_vec, ρθ[], ρV[], shared_buses_sorted, b2pos)
+        end
+
+        # resíduos/tolerâncias
+        r = primal_residual_bus_ac_vec(
+            partitions,
+            θ̄_vec,
+            V̄_vec,
+            shared_buses_sorted,
+            b2pos,
+        )
+        s = dual_residual_bus_ac_vec(θ̄_vec, V̄_vec, θ̄_prev, V̄_prev)
+        εp = eps_primal_bus_ac_vec(
+            partitions,
+            θ̄_vec,
+            V̄_vec,
+            shared_buses_sorted,
+            b2pos,
+            ϵ_abs,
+            ϵ_rel,
+        )
+        εd = eps_dual_bus_ac_vec(θ̄_vec, V̄_vec, θ̄_prev, V̄_prev, ϵ_abs, ϵ_rel)
+
         push!(res_pri_hist, r)
         push!(res_du_hist, s)
-
-        ε_pri = eps_primal_bus_ac(partitions, θ_avg, v_avg, shared_buses, ϵ_abs, ϵ_rel)
-        ε_du = eps_dual_bus_ac(θ_avg, v_avg, θ_prev, v_prev, shared_buses, ϵ_abs, ϵ_rel)
-        push!(eps_pri_hist, ε_pri)
-        push!(eps_du_hist, ε_du)
-
-        println("‖r‖ = $r | ε_pri = $ε_pri")
-        println("‖s‖ = $s | ε_du  = $ε_du")
+        push!(eps_pri_hist, εp)
+        push!(eps_du_hist, εd)
+        _FAST_USE_LOGS && println("‖r‖ = $r | ε_pri = $εp")
+        _FAST_USE_LOGS && println("‖s‖ = $s | ε_du  = $εd")
 
         push!(rhoθ_hist, ρθ[])
         push!(rhoV_hist, ρV[])
 
-        if r < ε_pri && s < ε_du
-            println("Stopping criterion met.")
+        if r < εp && s < εd
+            _FAST_USE_LOGS && println("Stopping criterion met.")
             break
         end
 
@@ -486,12 +797,15 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
     println("→ Total (value(:generation_cost))     = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
     println("ρθ_final = $(ρθ[]) | ρV_final = $(ρV[])")
+    elapsed_s = (time_ns() - t0) / 1e9
+    println("Tempo ADMM (bus/AC): $(_pretty_time_ac(elapsed_s))")
 
     return total_real_cost, partitions
 end
 
-# ---------- ADMM: BRANCH (AC) ----------
+# ========================== ADMM: BRANCH (AC) ==========================
 function run_admm_ac_branch(config::DistributedOPFModel, data::Dict{String, Any})
+    t0 = time_ns()
     @assert config.base_model == AC "ADMM-AC-branch: base_model deve ser AC."
     partitions, _ = prepare_admm_partitions(data)
     cut_edges = _find_cut_edges(data)
@@ -526,41 +840,58 @@ function run_admm_ac_branch(config::DistributedOPFModel, data::Dict{String, Any}
         sub["vmag_var"] = m[:v_magnitude]
         sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
         sub["has_solution"] = false
-        _set_model_silent!(m)    # (5)
+        _set_model_silent!(m)
 
-        # starts
         @inbounds for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
         end
         @inbounds for I in keys(sub["vmag_var"])
             set_start_value(sub["vmag_var"][I], 1.0)
         end
+
+        # pré-quad branch
+        _build_quad_branch_expr_ac!(sub, ρP[], ρQ[], sub["zone_edges"])
+        @objective(m, Min, sub["obj_base"] + sub["quad_branch_expr_ac"])
     end
 
+    prev_ρP, prev_ρQ = ρP[], ρQ[]
+    zone_ids = collect(keys(partitions))
+
     for k in 1:config.max_iter
-        println("\n[ADMM-AC-branch] Iteração $k")
+        _FAST_USE_LOGS && println("\n[ADMM-AC-branch] Iteração $k")
 
-        for (zone_id, sub) in partitions
+        if ρP[] != prev_ρP || ρQ[] != prev_ρQ
+            for (_, sub) in partitions
+                _build_quad_branch_expr_ac!(sub, ρP[], ρQ[], sub["zone_edges"])
+            end
+            prev_ρP, prev_ρQ = ρP[], ρQ[]
+        end
+
+        nz = length(zone_ids)
+        results = Vector{Any}(undef, nz)
+        Threads.@threads for i in 1:nz
+            z = zone_ids[i]
+            sub = partitions[z]
+            lin = _build_linear_branch_expr_ac!(
+                sub, sub["zone_edges"], zP, zQ, dualsP[z], dualsQ[z], ρP[], ρQ[],
+            )
+            @objective(
+                sub["model"],
+                Min,
+                sub["obj_base"] + sub["quad_branch_expr_ac"] + lin
+            )
+            optimize!(sub["model"])
             m = sub["model"]
+            results[i] = (expr_cost = value(m[:generation_cost]),
+                real_cost = compute_real_generation_cost(m, sub["objective_params"]))
+        end
 
-            # if sub["has_solution"] === true
-            #     @inbounds for I in keys(sub["theta_var"])
-            #         set_start_value(sub["theta_var"][I], value(sub["theta_var"][I]))
-            #     end
-            #     @inbounds for I in keys(sub["vmag_var"])
-            #         set_start_value(sub["vmag_var"][I], value(sub["vmag_var"][I]))
-            #     end
-            # end
-
-            pen = add_penalty_branch_ac!(m, sub, sub["zone_edges"],
-                zP, zQ, dualsP[zone_id], dualsQ[zone_id], ρP[], ρQ[])
-            @objective(m, Min, sub["obj_base"] + pen)
-            optimize!(m)
+        for (i, z) in enumerate(zone_ids)
+            sub = partitions[z]
+            out = results[i]
             sub["has_solution"] = true
-
-            sub["generation_cost_model_expr"] = value(m[:generation_cost])
-            sub["real_generation_cost"] =
-                compute_real_generation_cost(m, sub["objective_params"])
+            sub["generation_cost_model_expr"] = out.expr_cost
+            sub["real_generation_cost"] = out.real_cost
         end
 
         zP_prev = copy(zP)
@@ -570,22 +901,21 @@ function run_admm_ac_branch(config::DistributedOPFModel, data::Dict{String, Any}
 
         r = primal_residual_branch_ac(partitions, zP, zQ, cut_edges)
         s = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
+        εp = eps_primal_branch_ac(partitions, zP, zQ, cut_edges, ϵ_abs, ϵ_rel)
+        εd = eps_dual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges, ϵ_abs, ϵ_rel)
+
         push!(res_pri_hist, r)
         push!(res_du_hist, s)
-
-        ε_pri = eps_primal_branch_ac(partitions, zP, zQ, cut_edges, ϵ_abs, ϵ_rel)
-        ε_du = eps_dual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges, ϵ_abs, ϵ_rel)
-        push!(eps_pri_hist, ε_pri)
-        push!(eps_du_hist, ε_du)
-
-        println("‖r‖ = $r | ε_pri = $ε_pri")
-        println("‖s‖ = $s | ε_du  = $ε_du")
+        push!(eps_pri_hist, εp)
+        push!(eps_du_hist, εd)
+        _FAST_USE_LOGS && println("‖r‖ = $r | ε_pri = $εp")
+        _FAST_USE_LOGS && println("‖s‖ = $s | ε_du  = $εd")
 
         push!(rhoP_hist, ρP[])
         push!(rhoQ_hist, ρQ[])
 
-        if r < ε_pri && s < ε_du
-            println("Stopping criterion met.")
+        if r < εp && s < εd
+            _FAST_USE_LOGS && println("Stopping criterion met.")
             break
         end
 
@@ -609,12 +939,15 @@ function run_admm_ac_branch(config::DistributedOPFModel, data::Dict{String, Any}
     println("→ Total (value(:generation_cost))     = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
     println("ρP_final = $(ρP[]) | ρQ_final = $(ρQ[])")
+    elapsed_s = (time_ns() - t0) / 1e9
+    println("Tempo ADMM (branch/AC): $(_pretty_time_ac(elapsed_s))")
 
     return total_real_cost, partitions
 end
 
-# ---------- ADMM: HÍBRIDO (AC) ----------
+# ========================== ADMM: HÍBRIDO (AC) ==========================
 function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
+    t0 = time_ns()
     @assert config.base_model == AC "Hybrid AC: base_model deve ser AC."
     partitions, shared_buses = prepare_admm_partitions(data)
     cut_edges = _find_cut_edges(data)
@@ -625,19 +958,24 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
     ρQ = Ref(config.rho_flow_q)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
 
-    dualsθ =
-        Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in keys(partitions))
-    dualsV =
-        Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in keys(partitions))
+    shared_buses_sorted, b2pos = prepare_dense_maps_ac(shared_buses)
+
+    dualsθ_dense = Dict{Int, Vector{Float64}}(
+        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
+    )
+    dualsV_dense = Dict{Int, Vector{Float64}}(
+        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
+    )
     dualsP =
         Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in keys(partitions))
     dualsQ =
         Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in keys(partitions))
 
-    θ_avg = Dict{Int, Float64}()
-    v_avg = Dict{Int, Float64}()
-    θ_prev = Dict{Int, Float64}()
-    v_prev = Dict{Int, Float64}()
+    θ̄_vec = zeros(Float64, length(shared_buses_sorted))
+    V̄_vec = ones(Float64, length(shared_buses_sorted))
+    θ̄_prev = similar(θ̄_vec)
+    V̄_prev = similar(V̄_vec)
+
     zP = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zQ = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zP_prev = Dict{Int, Float64}()
@@ -655,6 +993,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
 
     optimizer_factory = resolve_optimizer_ac(config)
 
+    # build inicial + hotpaths + termos quadráticos
     for (zone_id, sub) in partitions
         m = build_model(sub, AC; optimizer = optimizer_factory, build_only = true)
         sub["model"] = m
@@ -663,98 +1002,144 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
         sub["vmag_var"] = m[:v_magnitude]
         sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
         sub["has_solution"] = false
-        _set_model_silent!(m)    # (5)
+        _set_model_silent!(m)
 
-        # shared_buses_local (3)
-        busset = _bus_set(sub)
-        sub["shared_buses_local"] = [b for b in shared_buses if b in busset]
-
-        # starts
         @inbounds for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
         end
         @inbounds for I in keys(sub["vmag_var"])
             set_start_value(sub["vmag_var"][I], 1.0)
         end
+
+        prepare_hotpaths_ac!(sub, shared_buses)
+        _build_quad_bus_expr_ac!(sub, ρθ[], ρV[])
+        _build_quad_branch_expr_ac!(sub, ρP[], ρQ[], sub["zone_edges"])
+        @objective(
+            m,
+            Min,
+            sub["obj_base"] + sub["quad_bus_expr_ac"] + sub["quad_branch_expr_ac"]
+        )
     end
 
+    prev_ρθ, prev_ρV = ρθ[], ρV[]
+    prev_ρP, prev_ρQ = ρP[], ρQ[]
+    zone_ids = collect(keys(partitions))
+    λθ_zone_buf = Dict{Int, Vector{Float64}}(
+        z => zeros(Float64, length(shared_buses_sorted)) for z in zone_ids
+    )
+    λV_zone_buf = Dict{Int, Vector{Float64}}(
+        z => zeros(Float64, length(shared_buses_sorted)) for z in zone_ids
+    )
+
     for k in 1:config.max_iter
-        println("\n[ADMM-AC-hybrid] Iteração $k")
+        _FAST_USE_LOGS && println("\n[ADMM-AC-hybrid] Iteração $k")
 
-        for (zone_id, sub) in partitions
-            m = sub["model"]
-
-            # if sub["has_solution"] === true
-            #     @inbounds for I in keys(sub["theta_var"])
-            #         set_start_value(sub["theta_var"][I], value(sub["theta_var"][I]))
-            #     end
-            #     @inbounds for I in keys(sub["vmag_var"])
-            #         set_start_value(sub["vmag_var"][I], value(sub["vmag_var"][I]))
-            #     end
-            # end
-
-            pen_bus = add_penalty_bus_ac!(m, sub, shared_buses,
-                θ_avg, v_avg, dualsθ[zone_id], dualsV[zone_id], ρθ[], ρV[])
-            pen_flow = add_penalty_branch_ac!(m, sub, sub["zone_edges"],
-                zP, zQ, dualsP[zone_id], dualsQ[zone_id], ρP[], ρQ[])
-            @objective(m, Min, sub["obj_base"] + pen_bus + pen_flow)
-            optimize!(m)
-            sub["has_solution"] = true
-
-            sub["generation_cost_model_expr"] = value(m[:generation_cost])
-            sub["real_generation_cost"] =
-                compute_real_generation_cost(m, sub["objective_params"])
+        # rebuild apenas se algum ρ mudar
+        if ρθ[] != prev_ρθ || ρV[] != prev_ρV
+            for (_, sub) in partitions
+                _build_quad_bus_expr_ac!(sub, ρθ[], ρV[])
+            end
+            prev_ρθ, prev_ρV = ρθ[], ρV[]
+        end
+        if ρP[] != prev_ρP || ρQ[] != prev_ρQ
+            for (_, sub) in partitions
+                _build_quad_branch_expr_ac!(sub, ρP[], ρQ[], sub["zone_edges"])
+            end
+            prev_ρP, prev_ρQ = ρP[], ρQ[]
         end
 
-        θ_prev = isempty(θ_avg) ? θ_avg : copy(θ_avg)
-        v_prev = isempty(v_avg) ? v_avg : copy(v_avg)
+        nz = length(zone_ids)
+        results = Vector{Any}(undef, nz)
+        Threads.@threads for i in 1:nz
+            z = zone_ids[i]
+            sub = partitions[z]
+            λθ = (λθ_zone_buf[z] .= dualsθ_dense[z])
+            λV = (λV_zone_buf[z] .= dualsV_dense[z])
+
+            lin_bus = _build_linear_bus_expr_ac!(
+                sub, shared_buses_sorted, b2pos, θ̄_vec, V̄_vec, λθ, λV, ρθ[], ρV[],
+            )
+            lin_br = _build_linear_branch_expr_ac!(
+                sub, sub["zone_edges"], zP, zQ, dualsP[z], dualsQ[z], ρP[], ρQ[],
+            )
+
+            @objective(sub["model"], Min,
+                sub["obj_base"] + sub["quad_bus_expr_ac"] + sub["quad_branch_expr_ac"] +
+                (lin_bus + lin_br))
+            optimize!(sub["model"])
+            m = sub["model"]
+            results[i] = (expr_cost = value(m[:generation_cost]),
+                real_cost = compute_real_generation_cost(m, sub["objective_params"]))
+        end
+
+        for (i, z) in enumerate(zone_ids)
+            sub = partitions[z]
+            out = results[i]
+            sub["has_solution"] = true
+            sub["generation_cost_model_expr"] = out.expr_cost
+            sub["real_generation_cost"] = out.real_cost
+        end
+
+        θ̄_prev .= θ̄_vec
+        V̄_prev .= V̄_vec
         zP_prev = copy(zP)
         zQ_prev = copy(zQ)
 
-        compute_ac_bus_consensus!(θ_avg, v_avg, partitions, shared_buses)
-        @inbounds for b in shared_buses
-            push!(get!(θ_avg_hist, b, Float64[]), get(θ_avg, b, 0.0))
+        compute_ac_bus_consensus_vec!(
+            θ̄_vec,
+            V̄_vec,
+            partitions,
+            shared_buses_sorted,
+            b2pos,
+        )
+        @inbounds for b in shared_buses_sorted
+            j = b2pos[b]
+            push!(get!(θ_avg_hist, b, Float64[]), θ̄_vec[j])
         end
         compute_ac_branch_consensus!(zP, zQ, partitions, cut_edges)
 
-        update_duals_bus_ac!(
-            dualsθ,
-            dualsV,
-            partitions,
-            θ_avg,
-            v_avg,
-            shared_buses,
-            ρθ[],
-            ρV[],
-        )
+        for z in zone_ids
+            update_duals_bus_ac_vec!(dualsθ_dense[z], dualsV_dense[z], partitions[z],
+                θ̄_vec, V̄_vec, ρθ[], ρV[], shared_buses_sorted, b2pos)
+        end
         update_duals_branch_ac!(dualsP, dualsQ, partitions, zP, zQ, cut_edges, ρP[], ρQ[])
 
-        r_bus = primal_residual_bus_ac(partitions, θ_avg, v_avg, shared_buses)
+        r_bus = primal_residual_bus_ac_vec(
+            partitions,
+            θ̄_vec,
+            V̄_vec,
+            shared_buses_sorted,
+            b2pos,
+        )
         r_br = primal_residual_branch_ac(partitions, zP, zQ, cut_edges)
-        r_tot = sqrt(r_bus^2 + r_br^2)
+        r_tot = hypot(r_bus, r_br)
 
-        s_bus = dual_residual_bus_ac(θ_avg, v_avg, θ_prev, v_prev, shared_buses)
+        s_bus = dual_residual_bus_ac_vec(θ̄_vec, V̄_vec, θ̄_prev, V̄_prev)
         s_br = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
-        s_tot = sqrt(s_bus^2 + s_br^2)
+        s_tot = hypot(s_bus, s_br)
+
+        εb_pri = eps_primal_bus_ac_vec(
+            partitions,
+            θ̄_vec,
+            V̄_vec,
+            shared_buses_sorted,
+            b2pos,
+            ϵ_abs,
+            ϵ_rel,
+        )
+        εe_pri = eps_primal_branch_ac(partitions, zP, zQ, cut_edges, ϵ_abs, ϵ_rel)
+        ε_pri = hypot(εb_pri, εe_pri)
+
+        εb_du = eps_dual_bus_ac_vec(θ̄_vec, V̄_vec, θ̄_prev, V̄_prev, ϵ_abs, ϵ_rel)
+        εe_du = eps_dual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges, ϵ_abs, ϵ_rel)
+        ε_du = hypot(εb_du, εe_du)
 
         push!(res_pri_hist, r_tot)
         push!(res_du_hist, s_tot)
-
-        ε_pri = begin
-            εb = eps_primal_bus_ac(partitions, θ_avg, v_avg, shared_buses, ϵ_abs, ϵ_rel)
-            εe = eps_primal_branch_ac(partitions, zP, zQ, cut_edges, ϵ_abs, ϵ_rel)
-            sqrt(εb^2 + εe^2)
-        end
-        ε_du = begin
-            εb = eps_dual_bus_ac(θ_avg, v_avg, θ_prev, v_prev, shared_buses, ϵ_abs, ϵ_rel)
-            εe = eps_dual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges, ϵ_abs, ϵ_rel)
-            sqrt(εb^2 + εe^2)
-        end
         push!(eps_pri_hist, ε_pri)
         push!(eps_du_hist, ε_du)
-
-        println("‖r‖ = $r_tot | ε_pri = $ε_pri")
-        println("‖s‖ = $s_tot | ε_du  = $ε_du")
+        _FAST_USE_LOGS && println("‖r‖ = $r_tot | ε_pri = $ε_pri")
+        _FAST_USE_LOGS && println("‖s‖ = $s_tot | ε_du  = $ε_du")
 
         push!(rhoθ_hist, ρθ[])
         push!(rhoV_hist, ρV[])
@@ -762,7 +1147,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
         push!(rhoQ_hist, ρQ[])
 
         if r_tot < ε_pri && s_tot < ε_du
-            println("Stopping criterion met.")
+            _FAST_USE_LOGS && println("Stopping criterion met.")
             break
         end
 
@@ -772,64 +1157,85 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
         adaptive_rho_ac!(ρQ, r_br, s_br)
     end
 
-    plot_admm_convergence(res_pri_hist, res_du_hist, eps_pri_hist, eps_du_hist,
-        "plot_convergencia_admm_ac_hybrid.html")
+    plot_admm_convergence(
+        res_pri_hist,
+        res_du_hist,
+        eps_pri_hist,
+        eps_du_hist,
+        "plot_convergencia_admm_ac_hybrid.html",
+    )
     PlotlyLight.save(
         (
             () -> (
                 p = Plot();
-                p(; x = 1:length(rhoθ_hist), y = rhoθ_hist, type = :scatter,
-                    mode = "lines+markers", name = "ρθ");
+                p(;
+                    x = 1:length(rhoθ_hist),
+                    y = rhoθ_hist,
+                    type = :scatter,
+                    mode = "lines+markers",
+                    name = "ρθ",
+                );
                 p.layout.title = "Evolução de ρθ";
                 p.layout.xaxis.title = "Iterações";
                 p.layout.yaxis.title = "ρθ";
                 p.layout.yaxis.type = "log";
                 p
             )
-        )(),
-        "plot_rho_theta_ac_hybrid.html")
+        )(), "plot_rho_theta_ac_hybrid.html")
     PlotlyLight.save(
         (
             () -> (
                 p = Plot();
-                p(; x = 1:length(rhoV_hist), y = rhoV_hist, type = :scatter,
-                    mode = "lines+markers", name = "ρV");
+                p(;
+                    x = 1:length(rhoV_hist),
+                    y = rhoV_hist,
+                    type = :scatter,
+                    mode = "lines+markers",
+                    name = "ρV",
+                );
                 p.layout.title = "Evolução de ρV";
                 p.layout.xaxis.title = "Iterações";
                 p.layout.yaxis.title = "ρV";
                 p.layout.yaxis.type = "log";
                 p
             )
-        )(),
-        "plot_rho_v_ac_hybrid.html")
+        )(), "plot_rho_v_ac_hybrid.html")
     PlotlyLight.save(
         (
             () -> (
                 p = Plot();
-                p(; x = 1:length(rhoP_hist), y = rhoP_hist, type = :scatter,
-                    mode = "lines+markers", name = "ρP");
+                p(;
+                    x = 1:length(rhoP_hist),
+                    y = rhoP_hist,
+                    type = :scatter,
+                    mode = "lines+markers",
+                    name = "ρP",
+                );
                 p.layout.title = "Evolução de ρP";
                 p.layout.xaxis.title = "Iterações";
                 p.layout.yaxis.title = "ρP";
                 p.layout.yaxis.type = "log";
                 p
             )
-        )(),
-        "plot_rho_p_ac_hybrid.html")
+        )(), "plot_rho_p_ac_hybrid.html")
     PlotlyLight.save(
         (
             () -> (
                 p = Plot();
-                p(; x = 1:length(rhoQ_hist), y = rhoQ_hist, type = :scatter,
-                    mode = "lines+markers", name = "ρQ");
+                p(;
+                    x = 1:length(rhoQ_hist),
+                    y = rhoQ_hist,
+                    type = :scatter,
+                    mode = "lines+markers",
+                    name = "ρQ",
+                );
                 p.layout.title = "Evolução de ρQ";
                 p.layout.xaxis.title = "Iterações";
                 p.layout.yaxis.title = "ρQ";
                 p.layout.yaxis.type = "log";
                 p
             )
-        )(),
-        "plot_rho_q_ac_hybrid.html")
+        )(), "plot_rho_q_ac_hybrid.html")
 
     plot_theta_avg_heatmap(θ_avg_hist, "plot_theta_avg_heatmap_ac_hybrid.html")
 
@@ -841,6 +1247,8 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
     println(
         "ρθ_final = $(ρθ[]) | ρV_final = $(ρV[]) | ρP_final = $(ρP[]) | ρQ_final = $(ρQ[])",
     )
+    elapsed_s = (time_ns() - t0) / 1e9
+    println("Tempo ADMM (hybrid/AC): $(_pretty_time_ac(elapsed_s))")
 
     return total_real_cost, partitions
 end

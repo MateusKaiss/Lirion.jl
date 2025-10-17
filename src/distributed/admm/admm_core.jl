@@ -1,17 +1,3 @@
-@inline function _wrap_angle_diff(Δ::Float64)
-    return atan(sin(Δ), cos(Δ))
-end
-
-@inline function _circular_mean(θs::AbstractVector{<:Real})
-    sum_sin = 0.0
-    sum_cos = 0.0
-    @inbounds @simd for θ in θs
-        sum_sin += sin(θ)
-        sum_cos += cos(θ)
-    end
-    return atan(sum_sin, sum_cos)
-end
-
 function compute_real_generation_cost(model, params)
     T = get(model.ext, :time_periods, 1)
     active_generators = findall(params.generator_status .== 1)
@@ -28,15 +14,6 @@ function compute_real_generation_cost(model, params)
         end
     end
     return total_cost
-end
-
-@inline function _ac_flow_from_exprs_existing(
-    model::Model,
-    subdata::Dict{String, Any},
-    l_local::Int;
-    t::Int = 1,
-)
-    return model[:p_flow_branches][l_local, t], model[:q_flow_branches][l_local, t]
 end
 
 @inline function _socp_flow_from_exprs_existing(
