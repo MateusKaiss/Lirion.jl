@@ -70,6 +70,9 @@ include("distributed/admm/admm_dc.jl")
 include("distributed/admm/admm_ac.jl")
 include("distributed/admm/admm_socp.jl")
 
+include("distributed/aladin/aladin.jl")
+
+
 include("main.jl")
 
 end
