@@ -25,9 +25,8 @@ The project later evolved into a research project funded by the **CNPq (Brazilia
 
 The package was conceived, designed, and developed by **Mateus Kaiss**, with support from:
 
-- **Daniel Gebbran** — contributions to distributed ADMM implementations and large-scale testing  
-- **Kristie Kaminsky Kuster** — academic advisor during the thesis, providing theoretical and practical guidance, as well as emotional support throughout the development process  
-
+- **Kristie Kaminsky Kuster** — academic advisor during the thesis, providing theoretical and practical guidance, as well as emotional support throughout the development process. I will be forever grateful for her unwavering support and mentorship. 
+- **Daniel Gebbran** — contributions to distributed ADMM implementations and testing.
 
 We also acknowledge the inspiration and foundational work of the following open-source projects:  
 - [PowerModels.jl](https://github.com/lanl-ansi/PowerModels.jl) — solid foundation for power system modeling  
