@@ -23,7 +23,7 @@ PowerOptimization.jl provides a framework for power system optimization, support
 PowerOptimization.jl initially emerged as part of the undergraduate thesis (TCC) of its principal developer in the field of power systems.  
 The project later evolved into a research project funded by the **CNPq (Brazilian National Council for Scientific and Technological Development)**.  
 
-The package was conceived, designed, and developed by **Mateus Kaiss**, with support from:
+The package was conceived, designed, and developed by Mateus Kaiss, as its principal author and maintainer, with support from:
 
 - **Kristie Kaminsky Kuster** — academic advisor during the thesis, providing theoretical and practical guidance, as well as emotional support throughout the development process. I will be forever grateful for her unwavering support and mentorship. 
 - **Daniel Gebbran** — contributions to distributed ADMM implementations and testing.
