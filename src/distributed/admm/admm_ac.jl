@@ -472,6 +472,28 @@ function primal_residual_bus_ac_vec(
     return sqrt(acc)
 end
 
+function primal_residual_bus_ac_components(
+    partitions::Dict{Int, Dict{String, Any}},
+    θ̄_vec::Vector{Float64},
+    V̄_vec::Vector{Float64},
+    shared_buses_sorted::Vector{Int},
+    b2pos::Dict{Int, Int},
+)
+    rθ = 0.0
+    rV = 0.0
+    for (_, sub) in partitions
+        θbuf = snapshot_theta_ac!(sub)
+        Vbuf = snapshot_vmag!(sub)
+        pos = sub["bus_local_index"]
+        @inbounds for b in sub["shared_buses_local"]
+            j = b2pos[b]
+            rθ += _wrap_angle_diff(θbuf[pos[b]] - θ̄_vec[j])^2
+            rV += (Vbuf[pos[b]] - V̄_vec[j])^2
+        end
+    end
+    return sqrt(rθ), sqrt(rV)
+end
+
 function eps_primal_bus_ac_vec(
     partitions::Dict{Int, Dict{String, Any}},
     θ̄_vec::Vector{Float64},
@@ -503,6 +525,19 @@ function dual_residual_bus_ac_vec(
         sV += (V̄_vec[j] - V̄_prev[j])^2
     end
     return sqrt(sθ + sV)
+end
+
+function dual_residual_bus_ac_components(
+    θ̄_vec::Vector{Float64}, V̄_vec::Vector{Float64},
+    θ̄_prev::Vector{Float64}, V̄_prev::Vector{Float64},
+)
+    sθ = 0.0
+    sV = 0.0
+    @inbounds for j in eachindex(θ̄_vec)
+        sθ += _wrap_angle_diff(θ̄_vec[j] - θ̄_prev[j])^2
+        sV += (V̄_vec[j] - V̄_prev[j])^2
+    end
+    return sqrt(sθ), sqrt(sV)
 end
 
 function eps_dual_bus_ac_vec(
@@ -889,7 +924,6 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
                 α = α_used, θ̄_prev = θ̄_prev, V̄_prev = V̄_prev)
         end
 
-        # resíduos/tolerâncias
         r = primal_residual_bus_ac_vec(
             partitions,
             θ̄_vec,
@@ -919,6 +953,9 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
         push!(rhoθ_hist, ρθ[])
         push!(rhoV_hist, ρV[])
 
+        rθ, rV = primal_residual_bus_ac_components(partitions, θ̄_vec, V̄_vec, shared_buses_sorted, b2pos)
+        sθ, sV = dual_residual_bus_ac_components(θ̄_vec, V̄_vec, θ̄_prev, V̄_prev)
+
         if r < εp && s < εd
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
@@ -945,9 +982,9 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
         end
 
         if adaptive
-            adaptive_rho_ac!(ρθ, r, s; μ_incr = config.mu_incr, μ_decr = config.mu_decr,
+            adaptive_rho_ac!(ρθ, rθ, sθ; μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
-            adaptive_rho_ac!(ρV, r, s; μ_incr = config.mu_incr, μ_decr = config.mu_decr,
+            adaptive_rho_ac!(ρV, rV, sV; μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
         end
     end
@@ -1412,6 +1449,10 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
         push!(rhoP_hist, ρP[])
         push!(rhoQ_hist, ρQ[])
 
+        # NOVO: resíduos separados (para adaptação de ρθ e ρV)
+        rθ, rV = primal_residual_bus_ac_components(partitions, θ̄_vec, V̄_vec, shared_buses_sorted, b2pos)
+        sθ, sV = dual_residual_bus_ac_components(θ̄_vec, V̄_vec, θ̄_prev, V̄_prev)
+
         if r_tot < ε_pri && s_tot < ε_du
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
@@ -1438,10 +1479,10 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
         end
 
         if adaptive_bus
-            adaptive_rho_ac!(ρθ, r_bus, s_bus; μ_incr = config.mu_incr,
+            adaptive_rho_ac!(ρθ, rθ, sθ; μ_incr = config.mu_incr,
                 μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
-            adaptive_rho_ac!(ρV, r_bus, s_bus; μ_incr = config.mu_incr,
+            adaptive_rho_ac!(ρV, rV, sV; μ_incr = config.mu_incr,
                 μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
         end
