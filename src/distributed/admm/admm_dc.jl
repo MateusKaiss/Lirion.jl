@@ -511,7 +511,7 @@ function fista_update!(st::FISTAState; metric::Float64)
         st.β = 1.0
         st.α = 0.0
         st.prev_metric = metric
-        return true  
+        return true
     end
 end
 
