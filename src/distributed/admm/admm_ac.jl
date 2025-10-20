@@ -110,17 +110,28 @@ function _warm_start_ac_base!(sub::Dict{String, Any})
     m = sub["model"]
     θ = m[:theta]
     V = m[:v_magnitude]
+
     @objective(m, Min, sub["obj_base"])
     optimize!(m)
-    if !(JuMP.has_values(m))
+
+    if !JuMP.has_values(m)
         @warn "Warm start (AC) ignorado: optimize! não retornou valores (status=$(JuMP.termination_status(m)))."
         return
     end
+    θ_vals = Dict{typeof(first(keys(θ))) , Float64}()
     for I in keys(θ)
-        set_start_value(θ[I], JuMP.value(θ[I]))
+        θ_vals[I] = JuMP.value(θ[I])
+    end
+    V_vals = Dict{typeof(first(keys(V))) , Float64}()
+    for I in keys(V)
+        V_vals[I] = JuMP.value(V[I])
+    end
+
+    for I in keys(θ)
+        set_start_value(θ[I], θ_vals[I])
     end
     for I in keys(V)
-        set_start_value(V[I], JuMP.value(V[I]))
+        set_start_value(V[I], V_vals[I])
     end
     return nothing
 end
@@ -953,7 +964,13 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
         push!(rhoθ_hist, ρθ[])
         push!(rhoV_hist, ρV[])
 
-        rθ, rV = primal_residual_bus_ac_components(partitions, θ̄_vec, V̄_vec, shared_buses_sorted, b2pos)
+        rθ, rV = primal_residual_bus_ac_components(
+            partitions,
+            θ̄_vec,
+            V̄_vec,
+            shared_buses_sorted,
+            b2pos,
+        )
         sθ, sV = dual_residual_bus_ac_components(θ̄_vec, V̄_vec, θ̄_prev, V̄_prev)
 
         if r < εp && s < εd
@@ -1013,7 +1030,11 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
 end
 
 # ========================== ADMM: BRANCH (AC) ==========================
-function run_admm_ac_branch(config::DistributedOPFModel, data::Dict{String, Any})
+function run_admm_ac_branch(
+    config::DistributedOPFModel,
+    data::Dict{String, Any};
+    warm_start::Bool = false,
+)
     t0 = time_ns()
     @assert config.base_model == AC "ADMM-AC-branch: base_model deve ser AC."
     partitions, _ = prepare_admm_partitions(data)
@@ -1023,6 +1044,13 @@ function run_admm_ac_branch(config::DistributedOPFModel, data::Dict{String, Any}
     ρQ = Ref(config.rho_flow_q)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
     adaptive = _adaptive_on(config)
+
+    warm_cfg = try
+        getfield(config, :warm_start)
+    catch
+        false
+    end
+    warm = warm_start || warm_cfg
 
     dualsP =
         Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in keys(partitions))
@@ -1061,6 +1089,30 @@ function run_admm_ac_branch(config::DistributedOPFModel, data::Dict{String, Any}
 
         _build_quad_branch_expr_ac!(sub, ρP[], ρQ[], sub["zone_edges"])
         @objective(m, Min, sub["obj_base"] + sub["quad_branch_expr_ac"])
+    end
+
+    if warm
+        for (_, sub) in partitions
+            _warm_start_ac_base!(sub)
+            @objective(sub["model"], Min, sub["obj_base"] + sub["quad_branch_expr_ac"])
+        end
+        compute_ac_branch_consensus!(zP, zQ, partitions, cut_edges)
+        for (z, sub) in partitions
+            m = sub["model"]
+            for e in cut_edges
+                l_local = get(sub["edge_to_local"], e, nothing)
+                l_local === nothing && continue
+                P_loc, Q_loc = _ac_flow_from_exprs_existing(m, sub, l_local)
+                pval = JuMP.value(P_loc)
+                qval = JuMP.value(Q_loc)
+                if isfinite(pval)
+                    dualsP[z][e] = ρP[] * (pval - get(zP, e, 0.0))
+                end
+                if isfinite(qval)
+                    dualsQ[z][e] = ρQ[] * (qval - get(zQ, e, 0.0))
+                end
+            end
+        end
     end
 
     prev_ρP, prev_ρQ = ρP[], ρQ[]
@@ -1449,8 +1501,13 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
         push!(rhoP_hist, ρP[])
         push!(rhoQ_hist, ρQ[])
 
-        # NOVO: resíduos separados (para adaptação de ρθ e ρV)
-        rθ, rV = primal_residual_bus_ac_components(partitions, θ̄_vec, V̄_vec, shared_buses_sorted, b2pos)
+        rθ, rV = primal_residual_bus_ac_components(
+            partitions,
+            θ̄_vec,
+            V̄_vec,
+            shared_buses_sorted,
+            b2pos,
+        )
         sθ, sV = dual_residual_bus_ac_components(θ̄_vec, V̄_vec, θ̄_prev, V̄_prev)
 
         if r_tot < ε_pri && s_tot < ε_du
