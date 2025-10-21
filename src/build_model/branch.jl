@@ -36,15 +36,20 @@ function create_dc_branch_constraints(model, params)
 end
 
 # ---------------------------------------------------------------------
-# AC Branch Modeling
+# AC Branch Modeling (corrigido)
 # ---------------------------------------------------------------------
 function compute_ac_branch_expressions(model, params)
     T = get(model.ext, :time_periods, 1)
 
+    L = length(params.b_shunt)
+    g_fr = hasproperty(params, :g_fr) ? params.g_fr : zeros(L)
+    g_to = hasproperty(params, :g_to) ? params.g_to : zeros(L)
+
     @expression(model, p_flow_branches[l in params.active, t in 1:T],
         (
-            params.g[l] *
-            (params.inv_tap[l] * model[:v_magnitude][params.bus_from[l], t])^2 -
+            (params.g[l] + g_fr[l]) *
+            (params.inv_tap[l] * model[:v_magnitude][params.bus_from[l], t])^2
+            -
             params.inv_tap[l] * model[:v_magnitude][params.bus_from[l], t] *
             model[:v_magnitude][params.bus_to[l], t] *
             (
@@ -62,7 +67,9 @@ function compute_ac_branch_expressions(model, params)
 
     @expression(model, p_reverse_flow_branches[l in params.active, t in 1:T],
         (
-            params.g[l] * model[:v_magnitude][params.bus_to[l], t]^2 -
+            (params.g[l] + g_to[l]) *
+            model[:v_magnitude][params.bus_to[l], t]^2
+            -
             params.inv_tap[l] * model[:v_magnitude][params.bus_to[l], t] *
             model[:v_magnitude][params.bus_from[l], t] *
             (
@@ -81,7 +88,8 @@ function compute_ac_branch_expressions(model, params)
     @expression(model, q_flow_branches[l in params.active, t in 1:T],
         (
             -(params.b[l] + params.b_shunt[l] / 2) *
-            (params.inv_tap[l] * model[:v_magnitude][params.bus_from[l], t])^2 -
+            (params.inv_tap[l] * model[:v_magnitude][params.bus_from[l], t])^2
+            -
             params.inv_tap[l] * model[:v_magnitude][params.bus_from[l], t] *
             model[:v_magnitude][params.bus_to[l], t] *
             (
@@ -100,7 +108,8 @@ function compute_ac_branch_expressions(model, params)
     @expression(model, q_reverse_flow_branches[l in params.active, t in 1:T],
         (
             -(params.b[l] + params.b_shunt[l] / 2) *
-            model[:v_magnitude][params.bus_to[l], t]^2 -
+            model[:v_magnitude][params.bus_to[l], t]^2
+            -
             params.inv_tap[l] * model[:v_magnitude][params.bus_to[l], t] *
             model[:v_magnitude][params.bus_from[l], t] *
             (
@@ -120,25 +129,15 @@ end
 function create_ac_branch_constraints(model, params)
     T = get(model.ext, :time_periods, 1)
 
-    @variable(model, s_branches[l in params.active, t = 1:T] >= 0)
-    @variable(model, s_reverse_branches[l in params.active, t = 1:T] >= 0)
-
     @constraint(model, [l in params.active, t in 1:T],
-        s_branches[l, t]^2 >=
         model[:p_flow_branches][l, t]^2 + model[:q_flow_branches][l, t]^2
+        <=
+        params.capacity[l]^2
     )
-
     @constraint(model, [l in params.active, t in 1:T],
-        s_branches[l, t] <= params.capacity[l]
-    )
-
-    @constraint(model, [l in params.active, t in 1:T],
-        s_reverse_branches[l, t]^2 >=
         model[:p_reverse_flow_branches][l, t]^2 + model[:q_reverse_flow_branches][l, t]^2
-    )
-
-    @constraint(model, [l in params.active, t in 1:T],
-        s_reverse_branches[l, t] <= params.capacity[l]
+        <=
+        params.capacity[l]^2
     )
 
     @constraint(model,

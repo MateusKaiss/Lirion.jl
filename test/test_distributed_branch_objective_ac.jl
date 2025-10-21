@@ -11,13 +11,12 @@ const distributed_branch_ac_zone_cases = [
     # 30 buses
     "pglib_opf_case30_2zones_as.m",
     "pglib_opf_case30_3zones_as.m",
-    # 57 buses
+    # 118 buses (ativado para aplicar override)
+    "pglib_opf_case118_2zones_ieee.m",
+    # 57/500 (exemplos)
     # "pglib_opf_case57_2zones_ieee.m",
-    # "pglib_opf_case57_4zones_ieee.m", 
-
-    ####
-    # "pglib_opf_case118_2zones_ieee.m",
-    # "pglib_opf_case500_2zones_goc.m" ,
+    # "pglib_opf_case57_4zones_ieee.m",
+    # "pglib_opf_case500_2zones_goc.m",
 ]
 
 function track_failure_branch_ac(label::String, origin::String, case_name::String)
@@ -41,6 +40,11 @@ function compare_distributed_branch_ac_vs_centralized(
     admm_max_iter = 400,
     admm_eps_primal = 1e-6,
     admm_eps_dual = 1e-6,
+    admm_mu_incr = 2.0,
+    admm_mu_decr = 2.0,
+    admm_tau_incr = 1.05,
+    admm_tau_decr = 0.98,
+    admm_adaptive::Union{Nothing,String} = nothing,
 )
     case_name = basename(file)
 
@@ -68,19 +72,24 @@ function compare_distributed_branch_ac_vs_centralized(
             "--admm-max-iter", string(admm_max_iter),
             "--admm-eps-primal", string(admm_eps_primal),
             "--admm-eps-dual", string(admm_eps_dual),
+            "--admm-mu-incr", string(admm_mu_incr),
+            "--admm-mu-decr", string(admm_mu_decr),
+            "--admm-tau-incr", string(admm_tau_incr),
+            "--admm-tau-decr", string(admm_tau_decr),
         ]
         if admm_rho_flow_p === nothing && admm_rho_flow_q === nothing
             push!(args_dist, "--admm-rho-flow")
             push!(args_dist, string(admm_rho_flow))
         else
             if admm_rho_flow_p !== nothing
-                push!(args_dist, "--admm-rho-flow-p")
-                push!(args_dist, string(admm_rho_flow_p))
+                push!(args_dist, "--admm-rho-flow-p"); push!(args_dist, string(admm_rho_flow_p))
             end
             if admm_rho_flow_q !== nothing
-                push!(args_dist, "--admm-rho-flow-q")
-                push!(args_dist, string(admm_rho_flow_q))
+                push!(args_dist, "--admm-rho-flow-q"); push!(args_dist, string(admm_rho_flow_q))
             end
+        end
+        if admm_adaptive !== nothing
+            push!(args_dist, "--admm-adaptive"); push!(args_dist, admm_adaptive)
         end
 
         obj, _ = PowerOptimization.main(args_dist)
@@ -102,6 +111,10 @@ function run_distributed_branch_ac_objective_tests(;
     distributed_optimizer = Ipopt.Optimizer,
     rtol = 0.05, atol = 1e-6,
     admm_eps_primal = 1e-6, admm_eps_dual = 1e-6,
+    admm_mu_incr = 2.0,
+    admm_mu_decr = 2.0,
+    admm_tau_incr = 1.05,
+    admm_tau_decr = 0.98,
 )
     if isempty(case_list)
         @info "Empty distributed (branch-AC) case list. No tests will be run."
@@ -129,24 +142,38 @@ function run_distributed_branch_ac_objective_tests(;
             end
 
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case = admm_eps_dual
+        admm_eps_dual_case   = admm_eps_dual
 
-        #OVERRIDE
-        # if occursin("case118_", case_name)
-        #     admm_max_iter_case = max(admm_max_iter_case, 600)
-        #     admm_rho_case = 3.0e5
-        #     admm_eps_primal_case = min(admm_eps_primal_case, 1e-7)
-        #     admm_eps_dual_case = min(admm_eps_dual_case, 1e-7)
-        # end
+        μ_incr_case = admm_mu_incr
+        μ_decr_case = admm_mu_decr
+        τ_incr_case = admm_tau_incr
+        τ_decr_case = admm_tau_decr
+        adaptive_case = nothing
 
         if occursin("_3zones_", case_name)
             admm_eps_primal_case = 1e-8
-            admm_eps_dual_case = 1e-8
+            admm_eps_dual_case   = 1e-8
+        end
+
+        if case_name == "pglib_opf_case118_2zones_ieee.m"
+            admm_max_iter_case   = 500
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case   = 1e-4
+            admm_rho_case        = 1.0e5
+
+            adaptive_case = "on"
+            μ_incr_case   = 2.0
+            μ_decr_case   = 2.0
+            τ_incr_case   = 1.05
+            τ_decr_case   = 0.95
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name " *
               "(max_iter=$(admm_max_iter_case), rho_flow=$(admm_rho_case), " *
-              "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"
+              "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), " *
+              "μ=(incr=$(μ_incr_case),decr=$(μ_decr_case)), " *
+              "τ=(incr=$(τ_incr_case),decr=$(τ_decr_case)), " *
+              "adaptive=$(adaptive_case))"
 
         @testset "$(label) - $(case_name)" begin
             compare_distributed_branch_ac_vs_centralized(
@@ -160,6 +187,11 @@ function run_distributed_branch_ac_objective_tests(;
                 admm_max_iter = admm_max_iter_case,
                 admm_eps_primal = admm_eps_primal_case,
                 admm_eps_dual = admm_eps_dual_case,
+                admm_mu_incr = μ_incr_case,
+                admm_mu_decr = μ_decr_case,
+                admm_tau_incr = τ_incr_case,
+                admm_tau_decr = τ_decr_case,
+                admm_adaptive = adaptive_case,
             )
         end
     end

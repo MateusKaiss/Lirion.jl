@@ -39,6 +39,10 @@ function compare_distributed_hybrid_ac_vs_centralized(
     admm_max_iter::Int = 500,
     admm_eps_primal::Float64 = 1e-7,
     admm_eps_dual::Float64 = 1e-7,
+    admm_mu_incr::Float64 = 2.0,
+    admm_mu_decr::Float64 = 2.0,
+    admm_tau_incr::Float64 = 1.05,
+    admm_tau_decr::Float64 = 0.98,
 )
     case_name = basename(file)
 
@@ -66,6 +70,10 @@ function compare_distributed_hybrid_ac_vs_centralized(
             "--admm-max-iter", string(admm_max_iter),
             "--admm-eps-primal", string(admm_eps_primal),
             "--admm-eps-dual", string(admm_eps_dual),
+            "--admm-mu-incr", string(admm_mu_incr),
+            "--admm-mu-decr", string(admm_mu_decr),
+            "--admm-tau-incr", string(admm_tau_incr),
+            "--admm-tau-decr", string(admm_tau_decr),
         ]
 
         if rho_base !== nothing
@@ -97,7 +105,8 @@ function compare_distributed_hybrid_ac_vs_centralized(
         return
     end
 
-    @info "File $case_name | centralized AC = $(round(cent_obj, digits=6)) | distributed-hybrid-AC = $(round(dist_obj, digits=6))"
+    @info "File $case_name | centralized AC = $(round(cent_obj, digits=6)) | " *
+          "distributed-hybrid-AC = $(round(dist_obj, digits=6))"
     @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
 end
 
@@ -108,6 +117,10 @@ function run_distributed_hybrid_ac_objective_tests(;
     distributed_optimizer = Ipopt.Optimizer,
     rtol = 0.05, atol = 1e-6,
     admm_eps_primal = 1e-8, admm_eps_dual = 1e-8,
+    admm_mu_incr::Float64 = 2.0,
+    admm_mu_decr::Float64 = 2.0,
+    admm_tau_incr::Float64 = 1.05,
+    admm_tau_decr::Float64 = 0.98,
 )
     if isempty(case_list)
         @info "Empty hybrid-AC case list. No tests will be run."
@@ -136,8 +149,6 @@ function run_distributed_hybrid_ac_objective_tests(;
 
         admm_eps_primal_case = admm_eps_primal
         admm_eps_dual_case = admm_eps_dual
-
-        # ---- overrides para casos maiores (descomente quando ativar) ----
         # if occursin("case118_", case_name)
         #     admm_max_iter_case = max(admm_max_iter_case, 700)
         #     rho_bus_base  = 3.0e3
@@ -155,7 +166,9 @@ function run_distributed_hybrid_ac_objective_tests(;
 
         @info "[$label] Rodando caso $i de $n: $case_name " *
               "(max_iter=$(admm_max_iter_case), rho_bus=$(rho_bus_base), rho_flow=$(rho_flow_base), " *
-              "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"
+              "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), " *
+              "μ=(incr=$(admm_mu_incr),decr=$(admm_mu_decr)), " *
+              "τ=(incr=$(admm_tau_incr),decr=$(admm_tau_decr)))"
 
         @testset "$(label) - $(case_name)" begin
             compare_distributed_hybrid_ac_vs_centralized(
@@ -173,6 +186,11 @@ function run_distributed_hybrid_ac_objective_tests(;
                 admm_max_iter = admm_max_iter_case,
                 admm_eps_primal = admm_eps_primal_case,
                 admm_eps_dual = admm_eps_dual_case,
+                # passa μ/τ compat
+                admm_mu_incr = admm_mu_incr,
+                admm_mu_decr = admm_mu_decr,
+                admm_tau_incr = admm_tau_incr,
+                admm_tau_decr = admm_tau_decr,
             )
         end
     end
