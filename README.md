@@ -2,6 +2,10 @@
   <img src="docs/assets/logo_lirion.png" alt="Lirion.jl" width="400"/>
 </p>
 
+<h3 align="center" style="font-weight:normal; font-style:italic;">
+   Lirion — Large-scale Integrated Research in Intelligent Optimization of Networks
+</h3>
+
 
 # Lirion.jl
 
