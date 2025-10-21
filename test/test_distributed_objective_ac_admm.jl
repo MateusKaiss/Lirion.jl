@@ -16,7 +16,7 @@ const distributed_ac_zone_cases = [
     # 57/118/500 (exemplos comentados)
     # "pglib_opf_case57_2zones_ieee.m",
     # "pglib_opf_case57_4zones_ieee.m",
-    # "pglib_opf_case118_2zones_ieee.m",
+    "pglib_opf_case118_2zones_ieee.m",
     # "pglib_opf_case500_2zones_goc.m",
 ]
 
@@ -164,10 +164,10 @@ function run_distributed_ac_objective_tests(;
             admm_rho_theta_case  = 1e5
             admm_rho_v_case      = 1e5
             admm_adaptive_case   = "on"
-            admm_mu_incr = 5.0
-            admm_mu_decr = 5.0
-            admm_tau_incr = 1.25
-            admm_tau_decr = 0.75
+            admm_mu_incr = 2.0
+            admm_mu_decr = 2.0
+            admm_tau_incr = 1.05
+            admm_tau_decr = 0.95
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), ρθ=$(admm_rho_theta_case), ρV=$(admm_rho_v_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), μ=(incr=$(admm_mu_incr),decr=$(admm_mu_decr)), τ=(incr=$(admm_tau_incr),decr=$(admm_tau_decr)), adaptive=$(admm_adaptive_case))"
