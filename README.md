@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="docs/assets/logo_lirion.png" alt="Lirion.jl" width="400"/>
+</p>
+
+
 # Lirion.jl
 
 [![CI](https://github.com/your-username/Lirion.jl/workflows/CI/badge.svg)](https://github.com/your-username/Lirion.jl/actions)
