@@ -11,12 +11,30 @@ const distributed_branch_ac_zone_cases = [
     # 30 buses
     "pglib_opf_case30_2zones_as.m",
     "pglib_opf_case30_3zones_as.m",
-    # 118 buses (ativado para aplicar override)
-    "pglib_opf_case118_2zones_ieee.m",
-    # 57/500 (exemplos)
+    # 57 buses (descomente quando quiser)
     # "pglib_opf_case57_2zones_ieee.m",
     # "pglib_opf_case57_4zones_ieee.m",
-    # "pglib_opf_case500_2zones_goc.m",
+    # 118/500 buses
+    "pglib_opf_case118_2zones_ieee.m",
+    "pglib_opf_case118_3zones_ieee.m",
+    "pglib_opf_case118_5zones_ieee.m",
+    # # 500 buses
+    # "pglib_opf_case500_3zones_goc.m",
+    # "pglib_opf_case500_4zones_goc.m",
+    # # 793
+    # # "pglib_opf_case793_11zones_goc.m",
+    # # 2000
+    # "pglib_opf_case2000_5zones_goc.m",
+    # # 3970
+    # "pglib_opf_case3970_25zones_goc.m",
+    # # 10000
+    # "pglib_opf_case10000_50zones_goc.m",
+    # # 20758
+    # "pglib_opf_case20758_42zones_epigrids.m",
+    # # 30000
+    # "pglib_opf_case30000_20zones_goc.m",
+    # # 78484
+    # "pglib_opf_case78484_157zones_epigrids.m",
 ]
 
 function track_failure_branch_ac(label::String, origin::String, case_name::String)
@@ -166,6 +184,19 @@ function run_distributed_branch_ac_objective_tests(;
             μ_decr_case   = 2.0
             τ_incr_case   = 1.05
             τ_decr_case   = 0.95
+        end
+
+        if case_name == "pglib_opf_case118_5zones_ieee.m" || case_name == "pglib_opf_case118_3zones_ieee.m"
+            admm_max_iter_case   = 500
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case   = 1e-4
+            admm_rho_case        = 1.0e5
+
+            adaptive_case = "on"
+            μ_incr_case   = 3.0
+            μ_decr_case   = 3.0
+            τ_incr_case   = 1.1
+            τ_decr_case   = 0.9
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name " *
