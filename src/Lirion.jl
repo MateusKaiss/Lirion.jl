@@ -1,4 +1,4 @@
-module PowerOptimization
+module Lirion
 for k in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
     if !haskey(ENV, k)
         ENV[k] = "1"
@@ -34,7 +34,7 @@ const _FAST_USE_LOGS = true
 function __init__()
     if _FAST_USE_LOGS
         try
-            @info "[PowerOptimization] Threads: Julia=$(nthreads()) | BLAS=$(LinearAlgebra.BLAS.get_num_threads())"
+            @info "[Lirion] Threads: Julia=$(nthreads()) | BLAS=$(LinearAlgebra.BLAS.get_num_threads())"
         catch
         end
     end

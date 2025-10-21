@@ -2,7 +2,7 @@
 # Particionador por METIS (foco BUS-ADMM)
 ############################################################
 using Printf, LinearAlgebra, SparseArrays, Graphs, Random, Glob
-using PowerOptimization, Statistics
+using Lirion, Statistics
 using Metis
 using SimpleWeightedGraphs
 
@@ -11,21 +11,21 @@ const DEFAULT_DIR = normpath(@__DIR__, "..", "test", "matpower_cases")
 # ---------------------------
 # utilidades
 # ---------------------------
-function require_poweroptimization()
+function require_lirion()
     try
-        @eval using PowerOptimization
+        @eval using Lirion
     catch e
         error("""
-        Não consegui carregar `PowerOptimization`.
+        Não consegui carregar `Lirion`.
         Certifique-se de:
           1) Estar no ambiente certo (julia --project=.)
-          2) Ter `PowerOptimization.jl` no ambiente (ex: Pkg.develop(path=".../PowerOptimization.jl"))
+          2) Ter `Lirion.jl` no ambiente (ex: Pkg.develop(path=".../Lirion.jl"))
         Erro: $e
         """)
     end
 end
 
-load_case(path::String) = PowerOptimization.load_input_data(path)
+load_case(path::String) = Lirion.load_input_data(path)
 
 function has_multiple_zones(case::Dict{String,Any})
     if haskey(case, "bus") && haskey(case["bus"], "zone")
@@ -564,7 +564,7 @@ function partition_cases_metis_bus(indir::AbstractString=DEFAULT_DIR;
     target_shared_ratio::Float64 = 0.02,    # até ~2% dos buses na fronteira
     refine_passes::Int = 4,
 )
-    require_poweroptimization()
+    require_lirion()
     Random.seed!(seed)
 
     files = sort(Glob.glob(glob, indir))
@@ -646,7 +646,7 @@ end
 # Execução direta (edite os caminhos/flags se quiser)
 # --------------------------------------------
 # partition_cases_metis_bus(
-#     raw"C:\\Users\\franc\\PowerOptimization.jl\\test\\zones";
+#     raw"C:\\Users\\franc\\Lirion.jl\\test\\zones";
 #     ks = :auto,                     # ou ks=[25,50,100]
 #     max_zone_size = 1500,           # teto desejado por zona
 #     target_shared_ratio = 0.02,     # ≤2% de nós de fronteira (ajuste p/ sistemas grandes)
@@ -657,7 +657,7 @@ end
 # )
 
 partition_cases_metis_bus(
-    raw"/home/mateus-kaiss/Projects/PowerOptimization.jl/test/zones";
+    raw"/home/mateus-kaiss/Projects/Lirion.jl/test/zones";
     ks = :auto,
     max_zone_size = 200,        # força k≈ceil(2000/450)=5
     balance_tol = 0.08,

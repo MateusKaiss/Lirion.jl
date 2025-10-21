@@ -2,7 +2,7 @@
 # ADMM-Hybrid-SOCP vs SOCP (objetivo) – testes
 # ==============================================
 using Test
-using PowerOptimization
+using Lirion
 using Glob
 using SCS
 
@@ -57,7 +57,7 @@ function compare_distributed_hybrid_socp_vs_centralized(
             "--model", "socp",
             "--optimizer", string(central_optimizer),
         ]
-        result_dict, _, _ = PowerOptimization.main(args_cent)
+        result_dict, _, _ = Lirion.main(args_cent)
         result_dict["objective"]
     catch e
         @warn "Centralized SOCP failed on $case_name: $e"
@@ -78,7 +78,7 @@ function compare_distributed_hybrid_socp_vs_centralized(
             "--admm-eps-primal", string(admm_eps_primal),
             "--admm-eps-dual", string(admm_eps_dual),
         ]
-        obj, _ = PowerOptimization.main(args_dist)
+        obj, _ = Lirion.main(args_dist)
         obj
     catch e
         @warn "Distributed ADMM-Hybrid-SOCP failed on $case_name: $e"

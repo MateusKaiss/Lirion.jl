@@ -73,7 +73,7 @@ function compare_distributed_vs_centralized(
             "--model", "dc",
             "--optimizer", string(central_optimizer),
         ]
-        result_dict, _, _ = PowerOptimization.main(args_cent)
+        result_dict, _, _ = Lirion.main(args_cent)
         result_dict["objective"]
     catch e
         @warn "Centralized DC failed on $case_name: $e"
@@ -109,7 +109,7 @@ function compare_distributed_vs_centralized(
             push!(args_dist, string(distributed_optimizer))
         end
 
-        obj, _ = PowerOptimization.main(args_dist)
+        obj, _ = Lirion.main(args_dist)
         obj
     catch e
         @warn "Distributed ADMM-DC failed on $case_name: $e"

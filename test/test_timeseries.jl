@@ -8,7 +8,7 @@ function run_test_timeseries()
                 "--model", "dc",
                 "--optimizer", string(SCS.Optimizer),
             ]
-            result_dict, _ = PowerOptimization.main(args)
+            result_dict, _ = Lirion.main(args)
             obj = result_dict["objective"]
             @info "DC objective = $obj"
             @test isapprox(obj, 17087.68770350661; atol = 1e-1)
@@ -20,7 +20,7 @@ function run_test_timeseries()
                 "--model", "ac",
                 "--optimizer", string(Ipopt.Optimizer),
             ]
-            result_dict, _ = PowerOptimization.main(args)
+            result_dict, _ = Lirion.main(args)
             obj = result_dict["objective"]
             @info "AC objective = $obj"
             @test isapprox(obj, 17437.9297122154; atol = 1e-1)
@@ -32,7 +32,7 @@ function run_test_timeseries()
                 "--model", "socp",
                 "--optimizer", string(SCS.Optimizer),
             ]
-            result_dict, _ = PowerOptimization.main(args)
+            result_dict, _ = Lirion.main(args)
             obj = result_dict["objective"]
             @info "SOCP objective = $obj"
             @test isapprox(obj, 17205.621331837865; atol = 1)
@@ -42,8 +42,8 @@ function run_test_timeseries()
     @testset "Test preprocessing extension for timeseries (Dict-style)" begin
         case_path = joinpath(@__DIR__, "matpower_cases", "case3_timeseries_mismatch.m")
 
-        data = PowerOptimization.load_input_data(case_path)
-        PowerOptimization.preprocess_case_data!(data)
+        data = Lirion.load_input_data(case_path)
+        Lirion.preprocess_case_data!(data)
 
         expected_times = [1, 2, 3]
 

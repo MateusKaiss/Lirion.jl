@@ -1,5 +1,5 @@
 # ===============================================================
-# Parameter Extractors for PowerOptimization.jl
+# Parameter Extractors for Lirion.jl
 # All functions to preprocess and extract model-ready parameters
 # ===============================================================
 
