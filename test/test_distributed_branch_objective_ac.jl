@@ -20,7 +20,7 @@ const distributed_branch_ac_zone_cases = [
     "pglib_opf_case118_5zones_ieee.m",
     # # 500 buses
     "pglib_opf_case500_3zones_goc.m",
-    # "pglib_opf_case500_4zones_goc.m",
+    "pglib_opf_case500_4zones_goc.m",
     # # 793
     # # "pglib_opf_case793_11zones_goc.m",
     # # 2000
@@ -110,7 +110,6 @@ function compare_distributed_branch_ac_vs_centralized(
             push!(args_dist, "--admm-adaptive", admm_adaptive)
         end
 
-        # <<<<<< anexa flags extras “tal como o usuário escreveria na linha de comando”
         append!(args_dist, additional_flags)
 
         obj, _ = Lirion.main(args_dist)
@@ -190,7 +189,7 @@ function run_distributed_branch_ac_objective_tests(;
             τ_incr_case, τ_decr_case = 1.1, 0.9
         end
 
-        if case_name == "pglib_opf_case500_3zones_goc.m"
+        if case_name == "pglib_opf_case500_3zones_goc.m" || case_name == "pglib_opf_case500_4zones_goc.m"
             admm_max_iter_case = 700
             admm_eps_primal_case = 1e-4
             admm_eps_dual_case = 1e-4
