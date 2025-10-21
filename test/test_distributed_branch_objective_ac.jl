@@ -63,6 +63,7 @@ function compare_distributed_branch_ac_vs_centralized(
     admm_tau_incr = 1.05,
     admm_tau_decr = 0.98,
     admm_adaptive::Union{Nothing, String} = nothing,
+    additional_flags::Vector{String} = String[],
 )
     case_name = basename(file)
 
@@ -96,22 +97,21 @@ function compare_distributed_branch_ac_vs_centralized(
             "--admm-tau-decr", string(admm_tau_decr),
         ]
         if admm_rho_flow_p === nothing && admm_rho_flow_q === nothing
-            push!(args_dist, "--admm-rho-flow")
-            push!(args_dist, string(admm_rho_flow))
+            push!(args_dist, "--admm-rho-flow", string(admm_rho_flow))
         else
             if admm_rho_flow_p !== nothing
-                push!(args_dist, "--admm-rho-flow-p")
-                push!(args_dist, string(admm_rho_flow_p))
+                push!(args_dist, "--admm-rho-flow-p", string(admm_rho_flow_p))
             end
             if admm_rho_flow_q !== nothing
-                push!(args_dist, "--admm-rho-flow-q")
-                push!(args_dist, string(admm_rho_flow_q))
+                push!(args_dist, "--admm-rho-flow-q", string(admm_rho_flow_q))
             end
         end
         if admm_adaptive !== nothing
-            push!(args_dist, "--admm-adaptive")
-            push!(args_dist, admm_adaptive)
+            push!(args_dist, "--admm-adaptive", admm_adaptive)
         end
+
+        # <<<<<< anexa flags extras “tal como o usuário escreveria na linha de comando”
+        append!(args_dist, additional_flags)
 
         obj, _ = Lirion.main(args_dist)
         obj
@@ -124,7 +124,6 @@ function compare_distributed_branch_ac_vs_centralized(
     @info "File $case_name | centralized AC = $(round(cent_obj, digits=6)) | distributed-branch-AC = $(round(dist_obj, digits=6))"
     @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
 end
-
 function run_distributed_branch_ac_objective_tests(;
     case_list = distributed_branch_ac_zone_cases,
     label = "ADMM-Branch-AC vs AC",
@@ -143,11 +142,8 @@ function run_distributed_branch_ac_objective_tests(;
     end
 
     test_dir = joinpath(@__DIR__, "matpower_cases")
-    selected_files = [
-        joinpath(test_dir, fname)
-        for fname in case_list
-        if isfile(joinpath(test_dir, fname))
-    ]
+    selected_files =
+        [joinpath(test_dir, f) for f in case_list if isfile(joinpath(test_dir, f))]
 
     n = length(selected_files)
     for (i, file) in enumerate(selected_files)
@@ -161,46 +157,50 @@ function run_distributed_branch_ac_objective_tests(;
             else
                 (300, 1.0e5)
             end
-
         admm_eps_primal_case = admm_eps_primal
         admm_eps_dual_case = admm_eps_dual
-
         μ_incr_case = admm_mu_incr
         μ_decr_case = admm_mu_decr
         τ_incr_case = admm_tau_incr
         τ_decr_case = admm_tau_decr
         adaptive_case = nothing
+        extra_flags = String[]
 
         if occursin("_3zones_", case_name)
             admm_eps_primal_case = 1e-8
             admm_eps_dual_case = 1e-8
         end
-
         if case_name == "pglib_opf_case118_2zones_ieee.m"
             admm_max_iter_case = 500
             admm_eps_primal_case = 1e-4
             admm_eps_dual_case = 1e-4
             admm_rho_case = 1.0e5
-
             adaptive_case = "on"
-            μ_incr_case = 2.0
-            μ_decr_case = 2.0
-            τ_incr_case = 1.05
-            τ_decr_case = 0.95
+            μ_incr_case, μ_decr_case = 2.0, 2.0
+            τ_incr_case, τ_decr_case = 1.05, 0.95
         end
-
-        if case_name == "pglib_opf_case118_5zones_ieee.m" ||
-           case_name == "pglib_opf_case118_3zones_ieee.m"
+        if case_name in
+           ("pglib_opf_case118_5zones_ieee.m", "pglib_opf_case118_3zones_ieee.m")
             admm_max_iter_case = 500
             admm_eps_primal_case = 1e-4
             admm_eps_dual_case = 1e-4
             admm_rho_case = 1.0e5
-
             adaptive_case = "on"
-            μ_incr_case = 3.0
-            μ_decr_case = 3.0
-            τ_incr_case = 1.1
-            τ_decr_case = 0.9
+            μ_incr_case, μ_decr_case = 3.0, 3.0
+            τ_incr_case, τ_decr_case = 1.1, 0.9
+        end
+
+        if case_name == "pglib_opf_case500_3zones_goc.m"
+            admm_max_iter_case = 700
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case = 1e-4
+            adaptive_case = "on"
+            μ_incr_case, μ_decr_case = 3.0, 3.0
+            τ_incr_case, τ_decr_case = 1.3, 0.7
+            extra_flags = String[
+                "--admm-rho-theta", "1e5",
+                "--admm-rho-v", "1e5",
+            ]
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name " *
@@ -227,6 +227,7 @@ function run_distributed_branch_ac_objective_tests(;
                 admm_tau_incr = τ_incr_case,
                 admm_tau_decr = τ_decr_case,
                 admm_adaptive = adaptive_case,
+                additional_flags = extra_flags,
             )
         end
     end

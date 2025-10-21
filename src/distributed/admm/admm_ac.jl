@@ -118,11 +118,11 @@ function _warm_start_ac_base!(sub::Dict{String, Any})
         @warn "Warm start (AC) ignorado: optimize! não retornou valores (status=$(JuMP.termination_status(m)))."
         return
     end
-    θ_vals = Dict{typeof(first(keys(θ))) , Float64}()
+    θ_vals = Dict{typeof(first(keys(θ))), Float64}()
     for I in keys(θ)
         θ_vals[I] = JuMP.value(θ[I])
     end
-    V_vals = Dict{typeof(first(keys(V))) , Float64}()
+    V_vals = Dict{typeof(first(keys(V))), Float64}()
     for I in keys(V)
         V_vals[I] = JuMP.value(V[I])
     end
