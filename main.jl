@@ -1,5 +1,5 @@
 import Pkg
 Pkg.instantiate()
 
-using PowerOptimization
-PowerOptimization.main(ARGS)
+using Lirion
+Lirion.main(ARGS)

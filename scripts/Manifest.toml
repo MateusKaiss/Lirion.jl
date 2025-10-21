@@ -2,7 +2,7 @@
 
 julia_version = "1.9.4"
 manifest_format = "2.0"
-project_hash = "c352791f259b0cada5b953ebd3398d12c26f2599"
+project_hash = "237afb123d10301cc72bb992c01c2e19c044c835"
 
 [[deps.ASL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -630,11 +630,11 @@ git-tree-sha1 = "b8e410e1d827b621e82e7e670967f0efc5845c30"
 uuid = "c36e90e8-916a-50a6-bd94-075b64ef4655"
 version = "0.21.5"
 
-[[deps.PowerOptimization]]
+[[deps.Lirion]]
 deps = ["ArgParse", "CSV", "DataFrames", "Dates", "Glob", "Gurobi", "InfrastructureModels", "Ipopt", "JuMP", "LinearAlgebra", "Logging", "PlotlyLight", "PowerModels", "SCS", "Statistics", "Test"]
 git-tree-sha1 = "202517adba6873b0e1ceebffe2aa42e58028d35a"
 repo-rev = "master"
-repo-url = "git@github.com:MateusKaiss/PowerOptimization.jl.git"
+repo-url = "git@github.com:MateusKaiss/Lirion.jl.git"
 uuid = "39f2d509-5c07-4bae-a810-f080f7bd369c"
 version = "0.1.0"
 

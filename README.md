@@ -1,13 +1,13 @@
-# PowerOptimization.jl
+# Lirion.jl
 
-[![CI](https://github.com/your-username/PowerOptimization.jl/workflows/CI/badge.svg)](https://github.com/your-username/PowerOptimization.jl/actions)
-[![codecov](https://codecov.io/gh/your-username/PowerOptimization.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/your-username/PowerOptimization.jl)
+[![CI](https://github.com/your-username/Lirion.jl/workflows/CI/badge.svg)](https://github.com/your-username/Lirion.jl/actions)
+[![codecov](https://codecov.io/gh/your-username/Lirion.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/your-username/Lirion.jl)
 
 A Julia package for solving Optimal Power Flow (OPF) problems using both centralized and distributed algorithms. Currently focusing on advanced ADMM (Alternating Direction Method of Multipliers) implementations, and growing towards using other distributed algorithms.
 
 ## Overview
 
-PowerOptimization.jl provides a framework for power system optimization, supporting both traditional centralized OPF solutions and distributed optimization algorithms. The package is built on top of [JuMP.jl](https://github.com/jump-dev/JuMP.jl) and [PowerModels.jl](https://github.com/lanl-ansi/PowerModels.jl) for robust mathematical modeling and optimization.
+Lirion.jl provides a framework for power system optimization, supporting both traditional centralized OPF solutions and distributed optimization algorithms. The package is built on top of [JuMP.jl](https://github.com/jump-dev/JuMP.jl) and [PowerModels.jl](https://github.com/lanl-ansi/PowerModels.jl) for robust mathematical modeling and optimization.
 
 ### Key Features
 
@@ -20,7 +20,7 @@ PowerOptimization.jl provides a framework for power system optimization, support
 
 ## Acknowledgments
 
-PowerOptimization.jl initially emerged as part of the undergraduate thesis (TCC) of its principal developer in the field of power systems. The project later evolved into a research project funded by the **CNPq (Brazilian National Council for Scientific and Technological Development)**.  
+Lirion.jl initially emerged as part of the undergraduate thesis (TCC) of its principal developer in the field of power systems. The project later evolved into a research project funded by the **CNPq (Brazilian National Council for Scientific and Technological Development)**.  
 
 The package was conceived, designed, and developed by **Mateus Kaiss**, as its principal author and maintainer, with support from:
 
@@ -38,9 +38,9 @@ We also acknowledge the inspiration and foundational work of the following open-
 
 ### vs. [PowerModels.jl](https://github.com/lanl-ansi/PowerModels.jl)
 
-**PowerOptimization.jl** builds upon PowerModels.jl's solid foundation but offers several key advantages:
+**Lirion.jl** builds upon PowerModels.jl's solid foundation but offers several key advantages:
 
-- **Distributed Algorithms**: While PowerModels focuses on centralized optimization, PowerOptimization provides extensive distributed implementations, currently focusing on ADMM
+- **Distributed Algorithms**: While PowerModels focuses on centralized optimization, Lirion provides extensive distributed implementations, currently focusing on ADMM
 
 **Similarities**:
 - Both use JuMP.jl for mathematical modeling
@@ -51,9 +51,9 @@ We also acknowledge the inspiration and foundational work of the following open-
 
 ### vs. [PowerModelsADA.jl](https://github.com/mkhraijah/PowerModelsADA.jl)
 
-**PowerOptimization.jl** offers more depth in ADMM implementations but less breadth in distributed methods:
+**Lirion.jl** offers more depth in ADMM implementations but less breadth in distributed methods:
 
-**PowerOptimization.jl Advantages**:
+**Lirion.jl Advantages**:
 - **Deeper ADMM Implementation**: More sophisticated ADMM variants (hybrid, branch consensus)
 - **Advanced Partitioning**: Both spectral and METIS-based partitioning with power system-specific optimizations
 - **Centralized OPF**: Also implements centralized solutions (DC, AC, SOCP) and allows for easy comparisons across methods
@@ -79,14 +79,14 @@ We also acknowledge the inspiration and foundational work of the following open-
 
 ```julia
 using Pkg
-Pkg.add("PowerOptimization")
+Pkg.add("Lirion")
 ```
 
 ### Development Installation
 
 ```julia
 using Pkg
-Pkg.develop("PowerOptimization")
+Pkg.develop("Lirion")
 ```
 
 ### Dependencies
@@ -104,8 +104,8 @@ The package requires several Julia packages including:
 
 1. **Clone the repository**:
 ```bash
-git clone https://github.com/your-username/PowerOptimization.jl.git
-cd PowerOptimization.jl
+git clone https://github.com/your-username/Lirion.jl.git
+cd Lirion.jl
 ```
 
 2. **Activate the Julia environment**:
@@ -124,7 +124,7 @@ Pkg.instantiate()
 #### Centralized OPF
 
 ```julia
-using PowerOptimization
+using Lirion
 
 # Solve a DC OPF problem
 args = [
@@ -132,7 +132,7 @@ args = [
     "--model", "dc",
     "--optimizer", "Ipopt.Optimizer"
 ]
-result = PowerOptimization.main(args)
+result = Lirion.main(args)
 ```
 
 #### Distributed ADMM
@@ -146,7 +146,7 @@ args = [
     "--admm-rho", "1000.0",
     "--admm-max-iter", "350"
 ]
-result = PowerOptimization.main(args)
+result = Lirion.main(args)
 ```
 
 ### Available Models
@@ -194,7 +194,7 @@ julia main.jl case.m --model distributed-admm-hybrid-dc --optimizer Ipopt.Optimi
 The package includes a sophisticated spectral partitioning algorithm optimized for power systems:
 
 ```julia
-using PowerOptimization
+using Lirion
 include("scripts/partition_cases.jl")
 
 # Partition cases with spectral method
@@ -212,7 +212,7 @@ partition_cases(
 For large-scale systems, METIS-based partitioning is available:
 
 ```julia
-using PowerOptimization
+using Lirion
 include("scripts/partition_cases.jl")
 
 # Partition cases with METIS
@@ -262,7 +262,7 @@ partition_cases_metis(
 ### Example 1: Basic DC OPF
 
 ```julia
-using PowerOptimization
+using Lirion
 
 # Solve IEEE 30-bus case with DC OPF
 args = [
@@ -270,13 +270,13 @@ args = [
     "--model", "dc",
     "--optimizer", "Ipopt.Optimizer"
 ]
-result = PowerOptimization.main(args)
+result = Lirion.main(args)
 ```
 
 ### Example 2: Distributed ADMM with Custom Parameters
 
 ```julia
-using PowerOptimization
+using Lirion
 
 # Solve with hybrid ADMM and custom parameters
 args = [
@@ -289,13 +289,13 @@ args = [
     "--admm-eps-dual", "1e-6",
     "--admm-alpha", "1.5"
 ]
-result = PowerOptimization.main(args)
+result = Lirion.main(args)
 ```
 
 ### Example 3: AC OPF with Plotting
 
 ```julia
-using PowerOptimization
+using Lirion
 
 # Solve AC OPF and generate plots
 args = [
@@ -304,7 +304,7 @@ args = [
     "--optimizer", "Ipopt.Optimizer",
     "--plot-outputs"
 ]
-result = PowerOptimization.main(args)
+result = Lirion.main(args)
 ```
 
 ## Testing
@@ -313,7 +313,7 @@ Run the test suite to verify installation:
 
 ```julia
 using Pkg
-Pkg.test("PowerOptimization")
+Pkg.test("Lirion")
 ```
 
 Or run specific tests:
@@ -361,14 +361,14 @@ Contributions are welcome! Please feel free to submit pull requests or open issu
 
 ## Citation
 
-If you use PowerOptimization.jl in your research, please cite:
+If you use Lirion.jl in your research, please cite:
 
 ```bibtex
-@software{poweroptimization2024,
-  title={PowerOptimization.jl: A Julia Package for Distributed Optimal Power Flow},
+@software{Lirion2024,
+  title={Lirion.jl: A Julia Package for Distributed Optimal Power Flow},
   author={Kaiss, Mateus and Gebbran, Daniel},
   year={2024},
-  url={https://github.com/your-username/PowerOptimization.jl}
+  url={https://github.com/your-username/Lirion.jl}
 }
 ```
 
@@ -395,4 +395,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-For more information, please visit our [documentation](docs/) or open an [issue](https://github.com/your-username/PowerOptimization.jl/issues) for questions and support.
+For more information, please visit our [documentation](docs/) or open an [issue](https://github.com/your-username/Lirion.jl/issues) for questions and support.

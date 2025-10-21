@@ -110,32 +110,32 @@ const GLOBAL_FAILED_CASES = Dict{String, Dict{String, Vector{String}}}()
 function track_failure(label::String, origin::String, case_name::String)
     if !haskey(GLOBAL_FAILED_CASES, label)
         GLOBAL_FAILED_CASES[label] =
-            Dict("PowerModels" => String[], "PowerOptimization" => String[])
+            Dict("PowerModels" => String[], "Lirion" => String[])
     end
     return push!(GLOBAL_FAILED_CASES[label][origin], case_name)
 end
 
 function compare_with_powermodels(
     file::String,
-    model_type::Type{<:PowerOptimization.OPFModel};
+    model_type::Type{<:Lirion.OPFModel};
     label,
     optimizer = Ipopt.Optimizer,
     tol = 0.05,
 )
     case_name = basename(file)
 
-    # --- PowerOptimization ---
+    # --- Lirion ---
     my_obj = try
         args = [
             file,
             "--model", lowercase(string(model_type.name.name)),
             "--optimizer", string(optimizer),
         ]
-        result_dict, _ = PowerOptimization.main(args)
+        result_dict, _ = Lirion.main(args)
         result_dict["objective"]
     catch e
-        @warn "PowerOptimization failed on $case_name: $e"
-        track_failure(label, "PowerOptimization", case_name)
+        @warn "Lirion failed on $case_name: $e"
+        track_failure(label, "Lirion", case_name)
         return
     end
 
@@ -143,21 +143,21 @@ function compare_with_powermodels(
     pm_obj = try
         pm_data = PowerModels.parse_file(file)
         if haskey(pm_data, "storage") && !isempty(pm_data["storage"])
-            if model_type == PowerOptimization.DC
+            if model_type == Lirion.DC
                 PowerModels._solve_opf_strg(pm_data, DCPPowerModel, optimizer)["objective"]
-            elseif model_type == PowerOptimization.AC
+            elseif model_type == Lirion.AC
                 PowerModels._solve_opf_strg(pm_data, ACPPowerModel, optimizer)["objective"]
-            elseif model_type == PowerOptimization.SOCP
+            elseif model_type == Lirion.SOCP
                 PowerModels._solve_opf_strg(pm_data, SOCWRPowerModel, optimizer)["objective"]
             else
                 error("Model type not recognized.")
             end
         else
-            if model_type == PowerOptimization.DC
+            if model_type == Lirion.DC
                 PowerModels.solve_opf(pm_data, DCPPowerModel, optimizer)["objective"]
-            elseif model_type == PowerOptimization.AC
+            elseif model_type == Lirion.AC
                 PowerModels.solve_ac_opf(pm_data, optimizer)["objective"]
-            elseif model_type == PowerOptimization.SOCP
+            elseif model_type == Lirion.SOCP
                 PowerModels.solve_opf(pm_data, SOCWRConicPowerModel, optimizer)["objective"]
             else
                 error("Model type not recognized.")
@@ -175,12 +175,12 @@ function compare_with_powermodels(
         return
     end
 
-    @info "File $case_name | $(model_type) | PowerOptimization = $(round(my_obj, digits=3)) | PowerModels = $(round(pm_obj, digits=3))"
+    @info "File $case_name | $(model_type) | Lirion = $(round(my_obj, digits=3)) | PowerModels = $(round(pm_obj, digits=3))"
     @test isapprox(my_obj, pm_obj; rtol = tol)
 end
 
 function run_model_tests(
-    model_type::Type{<:PowerOptimization.OPFModel},
+    model_type::Type{<:Lirion.OPFModel},
     label::String;
     optimizer = Ipopt.Optimizer,
     case_list,
@@ -217,17 +217,17 @@ function run_model_tests(
 end
 
 function run_test_objective()
-    @testset "PowerOptimization vs PowerModels Unified Comparison" begin
+    @testset "Lirion vs PowerModels Unified Comparison" begin
         dc_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer)
         run_model_tests(
-            PowerOptimization.DC,
+            Lirion.DC,
             "DC";
             optimizer = dc_optimizer,
             case_list = reduced_list,
         )
 
         run_model_tests(
-            PowerOptimization.AC,
+            Lirion.AC,
             "AC";
             optimizer = Ipopt.Optimizer,
             case_list = reduced_testlist_ac,
@@ -235,26 +235,26 @@ function run_test_objective()
 
         socp_optimizer = get_available_optimizer(Gurobi.Optimizer, SCS.Optimizer)
         run_model_tests(
-            PowerOptimization.SOCP,
+            Lirion.SOCP,
             "SOCP";
             optimizer = socp_optimizer,
             case_list = reduced_list,
         )
 
         run_model_tests(
-            PowerOptimization.DC,
+            Lirion.DC,
             "DC com baterias";
             optimizer = dc_optimizer,
             case_list = battery_cases,
         )
         run_model_tests(
-            PowerOptimization.AC,
+            Lirion.AC,
             "AC com baterias";
             optimizer = Ipopt.Optimizer,
             case_list = battery_cases,
         )
         # run_model_tests(
-        #     PowerOptimization.SOCP,
+        #     Lirion.SOCP,
         #     "SOCP com baterias";
         #     optimizer = socp_optimizer,
         #     case_list = battery_cases,
