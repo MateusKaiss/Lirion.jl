@@ -21,8 +21,8 @@ const distributed_ac_zone_cases = [
     "pglib_opf_case118_3zones_ieee.m",
     "pglib_opf_case118_5zones_ieee.m",
     # # 500 buses
-    # "pglib_opf_case500_3zones_goc.m",
-    # "pglib_opf_case500_4zones_goc.m",
+    "pglib_opf_case500_3zones_goc.m",
+    "pglib_opf_case500_4zones_goc.m",
     # # 793
     # # "pglib_opf_case793_11zones_goc.m",
     # # 2000
@@ -210,6 +210,18 @@ function run_distributed_ac_objective_tests(;
             admm_eps_dual_case = 1e-4
             admm_rho_theta_case = 1e5
             admm_rho_v_case = 1e5
+            admm_adaptive_case = "on"
+            admm_mu_incr = 3.0
+            admm_mu_decr = 3.0
+            admm_tau_incr = 1.1
+            admm_tau_decr = 0.9
+        end
+        if case_name == "pglib_opf_case500_3zones_goc.m" ||case_name == "pglib_opf_case500_4zones_goc.m" 
+            admm_max_iter_case = 700
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case = 1e-4
+            admm_rho_theta_case = 1e4
+            admm_rho_v_case = 1e4
             admm_adaptive_case = "on"
             admm_mu_incr = 3.0
             admm_mu_decr = 3.0

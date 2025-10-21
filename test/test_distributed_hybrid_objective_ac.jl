@@ -16,8 +16,8 @@ const distributed_hybrid_ac_zone_cases = [
     "pglib_opf_case118_3zones_ieee.m",
     "pglib_opf_case118_5zones_ieee.m",
     # # 500 buses
-    # "pglib_opf_case500_3zones_goc.m",
-    # "pglib_opf_case500_4zones_goc.m",
+    "pglib_opf_case500_3zones_goc.m",
+    "pglib_opf_case500_4zones_goc.m",
     # # 793
     # # "pglib_opf_case793_11zones_goc.m",
     # # 2000
@@ -192,6 +192,19 @@ function run_distributed_hybrid_ac_objective_tests(;
             admm_mu_decr_case = 2.0
             admm_tau_incr_case = 1.05
             admm_tau_decr_case = 0.95
+        end
+
+        if case_name == "pglib_opf_case500_3zones_ieee.m" || case_name == "pglib_opf_case500_4zones_ieee.m"
+            admm_max_iter_case = 500
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case = 1e-4
+            rho_bus_base = 1e4     # --admm-rho-theta / --admm-rho-v
+            rho_flow_base = 1e4     # --admm-rho-flow-p / --admm-rho-flow-q
+            admm_adaptive_case = "on"      # --admm-adaptive on
+            admm_mu_incr_case = 3.0
+            admm_mu_decr_case = 3.0
+            admm_tau_incr_case = 1.1
+            admm_tau_decr_case = 0.9
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name " *
