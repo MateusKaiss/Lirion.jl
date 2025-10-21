@@ -3,7 +3,7 @@
 </p>
 
 <h3 align="center">
-  Lirion — Large-scale Integrated Research in Intelligent Optimization of Networks
+  Large-scale Integrated Research in Intelligent Optimization of Networks
 </h3>
 
 
