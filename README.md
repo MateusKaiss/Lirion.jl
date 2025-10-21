@@ -6,37 +6,30 @@
   Large-scale Integrated Research in Intelligent Optimization of Networks
 </h3>
 
-A Julia package for solving Optimal Power Flow (OPF) problems using both centralized and distributed algorithms.  
-Current focus: advanced ADMM (Alternating Direction Method of Multipliers) implementations, with plans to add more distributed methods.
-
+## Overview
 
 
 ## Overview
 
-Lirion.jl provides a framework for power system optimization, supporting both traditional centralized OPF solutions and distributed optimization algorithms. The package is built on top of [JuMP.jl](https://github.com/jump-dev/JuMP.jl) and [PowerModels.jl](https://github.com/lanl-ansi/PowerModels.jl) for robust mathematical modeling and optimization.
+**Lirion.jl** is a unified framework for solving Optimal Power Flow (OPF) problems, bringing together a wide range of centralized and distributed methods under a single package.  
+Its design emphasizes **robustness, scalability, and speed**, making it well-suited for both academic research and large-scale benchmarking.
 
-### Key Features
+The project introduces new perspectives into distributed OPF — including flexible ADMM variants, advanced partitioning strategies, and full support for DC, AC, and SOCP formulations. While the current release is code-driven, the long-term vision includes a user-friendly interface to make experimentation and analysis even more accessible.
 
-- **Centralized OPF**: DC, AC, and SOCP (Second-Order Cone Programming) formulations
-- **Distributed ADMM**: Multiple ADMM variants with extensive customization options
-- **Advanced Partitioning**: Both spectral and METIS-based network partitioning
-- **Multi-period Support**: Time-series optimization capabilities
-- **Storage Integration**: Battery and prosumer modeling
-- **Comprehensive Testing**: Extensive test suite with PGLib cases
+In its current form, Lirion.jl already serves as a powerful research tool, providing a solid foundation for innovation in modern power system optimization.
+
 
 ## Acknowledgments
 
-Lirion.jl initially emerged as part of the undergraduate thesis (TCC) of its principal developer in the field of power systems. The project later evolved into a research project funded by the **CNPq (Brazilian National Council for Scientific and Technological Development)**.  
+Lirion.jl initially emerged as part of the undergraduate thesis (TCC) of its principal developer in the field of power systems. The project later evolved into a research effort funded by **CNPq (Brazilian National Council for Scientific and Technological Development)**.  
 
-The package was conceived, designed, and developed by **Mateus Kaiss**, as its principal author and maintainer, with support from:
+The package was conceived, designed, and developed by **Mateus Kaiss**, its principal author and maintainer, with support from:
 
-- **Kristie Kaminsky Kuster** — academic advisor during the thesis, providing theoretical and practical guidance, as well as emotional support throughout the development process. I will be forever grateful for her unwavering support and mentorship. 
+- **Kristie Kaminsky Kuster** — academic advisor, providing theoretical and practical guidance as well as continuous encouragement. I remain deeply and forever grateful for her unwavering mentorship.  
 - **Daniel Gebbran** — contributions to distributed ADMM implementations and testing.
 
-We also acknowledge the inspiration and foundational work of the following open-source projects:  
+We also acknowledge the inspiration and foundational work of:  
 - [PowerModels.jl](https://github.com/lanl-ansi/PowerModels.jl) — solid foundation for power system modeling  
-- [PowerModelsADA.jl](https://github.com/mkhraijah/PowerModelsADA.jl) — reference for distributed algorithms  
-- [JuMP.jl](https://github.com/jump-dev/JuMP.jl) — mathematical optimization modeling framework  
 - [PGLib](https://github.com/power-grid-lib/pglib-opf) — benchmark test cases
 
 
