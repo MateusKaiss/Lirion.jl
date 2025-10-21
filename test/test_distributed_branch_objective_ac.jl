@@ -19,7 +19,7 @@ const distributed_branch_ac_zone_cases = [
     "pglib_opf_case118_3zones_ieee.m",
     "pglib_opf_case118_5zones_ieee.m",
     # # 500 buses
-    # "pglib_opf_case500_3zones_goc.m",
+    "pglib_opf_case500_3zones_goc.m",
     # "pglib_opf_case500_4zones_goc.m",
     # # 793
     # # "pglib_opf_case793_11zones_goc.m",
@@ -62,7 +62,7 @@ function compare_distributed_branch_ac_vs_centralized(
     admm_mu_decr = 2.0,
     admm_tau_incr = 1.05,
     admm_tau_decr = 0.98,
-    admm_adaptive::Union{Nothing,String} = nothing,
+    admm_adaptive::Union{Nothing, String} = nothing,
 )
     case_name = basename(file)
 
@@ -100,14 +100,17 @@ function compare_distributed_branch_ac_vs_centralized(
             push!(args_dist, string(admm_rho_flow))
         else
             if admm_rho_flow_p !== nothing
-                push!(args_dist, "--admm-rho-flow-p"); push!(args_dist, string(admm_rho_flow_p))
+                push!(args_dist, "--admm-rho-flow-p")
+                push!(args_dist, string(admm_rho_flow_p))
             end
             if admm_rho_flow_q !== nothing
-                push!(args_dist, "--admm-rho-flow-q"); push!(args_dist, string(admm_rho_flow_q))
+                push!(args_dist, "--admm-rho-flow-q")
+                push!(args_dist, string(admm_rho_flow_q))
             end
         end
         if admm_adaptive !== nothing
-            push!(args_dist, "--admm-adaptive"); push!(args_dist, admm_adaptive)
+            push!(args_dist, "--admm-adaptive")
+            push!(args_dist, admm_adaptive)
         end
 
         obj, _ = Lirion.main(args_dist)
@@ -160,7 +163,7 @@ function run_distributed_branch_ac_objective_tests(;
             end
 
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case   = admm_eps_dual
+        admm_eps_dual_case = admm_eps_dual
 
         μ_incr_case = admm_mu_incr
         μ_decr_case = admm_mu_decr
@@ -170,33 +173,34 @@ function run_distributed_branch_ac_objective_tests(;
 
         if occursin("_3zones_", case_name)
             admm_eps_primal_case = 1e-8
-            admm_eps_dual_case   = 1e-8
+            admm_eps_dual_case = 1e-8
         end
 
         if case_name == "pglib_opf_case118_2zones_ieee.m"
-            admm_max_iter_case   = 500
+            admm_max_iter_case = 500
             admm_eps_primal_case = 1e-4
-            admm_eps_dual_case   = 1e-4
-            admm_rho_case        = 1.0e5
+            admm_eps_dual_case = 1e-4
+            admm_rho_case = 1.0e5
 
             adaptive_case = "on"
-            μ_incr_case   = 2.0
-            μ_decr_case   = 2.0
-            τ_incr_case   = 1.05
-            τ_decr_case   = 0.95
+            μ_incr_case = 2.0
+            μ_decr_case = 2.0
+            τ_incr_case = 1.05
+            τ_decr_case = 0.95
         end
 
-        if case_name == "pglib_opf_case118_5zones_ieee.m" || case_name == "pglib_opf_case118_3zones_ieee.m"
-            admm_max_iter_case   = 500
+        if case_name == "pglib_opf_case118_5zones_ieee.m" ||
+           case_name == "pglib_opf_case118_3zones_ieee.m"
+            admm_max_iter_case = 500
             admm_eps_primal_case = 1e-4
-            admm_eps_dual_case   = 1e-4
-            admm_rho_case        = 1.0e5
+            admm_eps_dual_case = 1e-4
+            admm_rho_case = 1.0e5
 
             adaptive_case = "on"
-            μ_incr_case   = 3.0
-            μ_decr_case   = 3.0
-            τ_incr_case   = 1.1
-            τ_decr_case   = 0.9
+            μ_incr_case = 3.0
+            μ_decr_case = 3.0
+            τ_incr_case = 1.1
+            τ_decr_case = 0.9
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name " *

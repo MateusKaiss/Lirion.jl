@@ -61,7 +61,7 @@ function compare_distributed_hybrid_ac_vs_centralized(
     admm_mu_decr::Float64 = 2.0,
     admm_tau_incr::Float64 = 1.05,
     admm_tau_decr::Float64 = 0.98,
-    admm_adaptive::Union{Nothing,String} = nothing, # "on" | "off" | nothing
+    admm_adaptive::Union{Nothing, String} = nothing, # "on" | "off" | nothing
 )
     case_name = basename(file)
 
@@ -96,22 +96,28 @@ function compare_distributed_hybrid_ac_vs_centralized(
         ]
 
         if rho_base !== nothing
-            push!(args_dist, "--admm-rho");           push!(args_dist, string(rho_base))
+            push!(args_dist, "--admm-rho")
+            push!(args_dist, string(rho_base))
         end
         if rho_theta !== nothing
-            push!(args_dist, "--admm-rho-theta");     push!(args_dist, string(rho_theta))
+            push!(args_dist, "--admm-rho-theta")
+            push!(args_dist, string(rho_theta))
         end
         if rho_v !== nothing
-            push!(args_dist, "--admm-rho-v");         push!(args_dist, string(rho_v))
+            push!(args_dist, "--admm-rho-v")
+            push!(args_dist, string(rho_v))
         end
         if rho_flow_p !== nothing
-            push!(args_dist, "--admm-rho-flow-p");    push!(args_dist, string(rho_flow_p))
+            push!(args_dist, "--admm-rho-flow-p")
+            push!(args_dist, string(rho_flow_p))
         end
         if rho_flow_q !== nothing
-            push!(args_dist, "--admm-rho-flow-q");    push!(args_dist, string(rho_flow_q))
+            push!(args_dist, "--admm-rho-flow-q")
+            push!(args_dist, string(rho_flow_q))
         end
         if admm_adaptive !== nothing
-            push!(args_dist, "--admm-adaptive");      push!(args_dist, admm_adaptive)
+            push!(args_dist, "--admm-adaptive")
+            push!(args_dist, admm_adaptive)
         end
 
         obj, _ = Lirion.main(args_dist)
@@ -166,22 +172,24 @@ function run_distributed_hybrid_ac_objective_tests(;
             end
 
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case   = admm_eps_dual
-        admm_mu_incr_case    = admm_mu_incr
-        admm_mu_decr_case    = admm_mu_decr
-        admm_tau_incr_case   = admm_tau_incr
-        admm_tau_decr_case   = admm_tau_decr
-        admm_adaptive_case   = nothing
-        if case_name == "pglib_opf_case118_2zones_ieee.m" ||case_name == "pglib_opf_case118_3zones_ieee.m" ||case_name == "pglib_opf_case118_5zones_ieee.m" 
-            admm_max_iter_case   = 500
+        admm_eps_dual_case = admm_eps_dual
+        admm_mu_incr_case = admm_mu_incr
+        admm_mu_decr_case = admm_mu_decr
+        admm_tau_incr_case = admm_tau_incr
+        admm_tau_decr_case = admm_tau_decr
+        admm_adaptive_case = nothing
+        if case_name == "pglib_opf_case118_2zones_ieee.m" ||
+           case_name == "pglib_opf_case118_3zones_ieee.m" ||
+           case_name == "pglib_opf_case118_5zones_ieee.m"
+            admm_max_iter_case = 500
             admm_eps_primal_case = 1e-4
-            admm_eps_dual_case   = 1e-4
-            rho_bus_base         = 1.0e5     # --admm-rho-theta / --admm-rho-v
-            rho_flow_base        = 1.0e5     # --admm-rho-flow-p / --admm-rho-flow-q
-            admm_adaptive_case   = "on"      # --admm-adaptive on
+            admm_eps_dual_case = 1e-4
+            rho_bus_base = 1.0e5     # --admm-rho-theta / --admm-rho-v
+            rho_flow_base = 1.0e5     # --admm-rho-flow-p / --admm-rho-flow-q
+            admm_adaptive_case = "on"      # --admm-adaptive on
 
-            admm_mu_incr_case  = 2.0
-            admm_mu_decr_case  = 2.0
+            admm_mu_incr_case = 2.0
+            admm_mu_decr_case = 2.0
             admm_tau_incr_case = 1.05
             admm_tau_decr_case = 0.95
         end

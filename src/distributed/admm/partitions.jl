@@ -7,21 +7,30 @@ function prepare_admm_partitions(data::Dict{String, Any})
     partitions = Dict{Int, Dict{String, Any}}()
     zone_map = Dict(bus_ids[i] => zones[i] for i in eachindex(bus_ids))
 
+    has_branch = haskey(data, "branch")
+    if has_branch
+        f_bus_full = data["branch"]["f_bus"]
+        t_bus_full = data["branch"]["t_bus"]
+        br_status =
+            haskey(data["branch"], "br_status") ?
+            data["branch"]["br_status"] :
+            ones(Int, length(f_bus_full))
+        @assert length(br_status) == length(f_bus_full)
+        active_mask_full = [br_status[i] == 1 for i in eachindex(f_bus_full)]
+    end
+
     for zone in unique_zones
         zone_mask = findall(==(zone), zones)
         zone_bus_ids = @views bus_ids[zone_mask]
         zone_bus_set = Set(zone_bus_ids)               # O(1) membership
 
-        # --- extra (barras virtuais) com XOR sem "in" em vetor ---
         extra = Set{Int}()
-        if haskey(data, "branch")
-            f_bus = data["branch"]["f_bus"]
-            t_bus = data["branch"]["t_bus"]
-            @inbounds for i in eachindex(f_bus)
-                f_in = in(f_bus[i], zone_bus_set)
-                t_in = in(t_bus[i], zone_bus_set)
+        if has_branch
+            @inbounds for i in eachindex(f_bus_full)
+                f_in = in(f_bus_full[i], zone_bus_set)
+                t_in = in(t_bus_full[i], zone_bus_set)
                 if f_in ⊻ t_in
-                    push!(extra, f_in ? t_bus[i] : f_bus[i])
+                    push!(extra, f_in ? t_bus_full[i] : f_bus_full[i])
                 end
             end
         end
@@ -75,21 +84,25 @@ function prepare_admm_partitions(data::Dict{String, Any})
             end
         end
 
-        # ramos (guarde mapas prontos)
-        if haskey(data, "branch")
-            f_bus = data["branch"]["f_bus"]
-            t_bus = data["branch"]["t_bus"]
-            keep = findall(
-                i -> in(f_bus[i], zone_bus_set) || in(t_bus[i], zone_bus_set),
-                eachindex(f_bus),
+        if has_branch
+            keep_all = findall(
+                i ->
+                    (active_mask_full[i]) &&
+                        (
+                            in(f_bus_full[i], zone_bus_set) ||
+                            in(t_bus_full[i], zone_bus_set)
+                        ),
+                eachindex(f_bus_full),
             )
             sub["branch"] = Dict(
-                k => v[keep] for (k, v) in data["branch"] if length(v) == length(f_bus)
+                k => v[keep_all] for
+                (k, v) in data["branch"] if length(v) == length(f_bus_full)
             )
             sub["branch_full"] = data["branch"]
-            sub["branch_local_indices"] = keep
-            edge_to_local = Dict{Int, Int}()  # global->local
-            @inbounds for (loc, glob) in enumerate(keep)
+            sub["branch_local_indices"] = keep_all                # globais dos ativos mantidos
+            # mapa global->local (só para os ativos mantidos)
+            edge_to_local = Dict{Int, Int}()
+            @inbounds for (loc, glob) in enumerate(keep_all)
                 edge_to_local[glob] = loc
             end
             sub["edge_to_local"] = edge_to_local
@@ -193,28 +206,26 @@ function _set_model_silent!(m::JuMP.Model)
     end
 
     if occursin("ipopt", solver)
-        _safe("print_level", 0)    # inteiro 0..12
-        _safe("sb", "yes")         # suprime banners do Ipopt
+        _safe("print_level", 0)
+        _safe("sb", "yes")
     elseif occursin("gurobi", solver)
         _safe("OutputFlag", 0)
     elseif occursin("cplex", solver)
         _safe("CPXPARAM_ScreenOutput", 0)
     elseif occursin("highs", solver)
         _safe("log_to_console", false)
-        _safe("output_flag", false)  # aceito em algumas versões
+        _safe("output_flag", false)
     elseif occursin("scs", solver)
         _safe("verbose", false)
-        # _safe("log_csv_filename", "")  # evita criar arquivo de log
     elseif occursin("clarabel", solver)
         _safe("verbose", false)
     elseif occursin("glpk", solver)
-        _safe("msg_lev", 0)  # (GLPK.MSG_OFF se tiver GLPK carregado)
+        _safe("msg_lev", 0)
     else
         _safe("verbose", false)
         _safe("output_flag", 0)
         _safe("print_level", 0)
     end
-
     return nothing
 end
 
@@ -224,9 +235,12 @@ function _find_cut_edges(full::Dict{String, Any})
     bus2zone = Dict(bus_ids[i] => zones[i] for i in eachindex(bus_ids))
     f_bus = full["branch"]["f_bus"]
     t_bus = full["branch"]["t_bus"]
+    br_status =
+        haskey(full["branch"], "br_status") ? full["branch"]["br_status"] :
+        ones(Int, length(f_bus))
     cut = Int[]
     for i in eachindex(f_bus)
-        if bus2zone[f_bus[i]] != bus2zone[t_bus[i]]
+        if br_status[i] == 1 && bus2zone[f_bus[i]] != bus2zone[t_bus[i]]
             push!(cut, i)
         end
     end
@@ -234,7 +248,7 @@ function _find_cut_edges(full::Dict{String, Any})
 end
 
 function _zone_cut_edges(subdata::Dict{String, Any}, cut_edges::Vector{Int})
-    local_keep = Set(subdata["branch_local_indices"])
+    local_keep = Set(get(subdata, "branch_local_indices", Int[]))
     return [ℓ for ℓ in cut_edges if ℓ in local_keep]
 end
 

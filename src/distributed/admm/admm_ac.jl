@@ -9,7 +9,7 @@ function resolve_optimizer_ac(config)
 end
 
 @inline function _ac_flow_from_exprs_existing(
-    model::Model,
+    model::JuMP.Model,
     subdata::Dict{String, Any},
     l_local::Int;
     t::Int = 1,
@@ -227,7 +227,7 @@ function _build_quad_bus_expr_ac!(sub::Dict{String, Any}, ρθ::Float64, ρV::Fl
         q += 0.5 * ρθ * θ[b, 1]^2 + 0.5 * ρV * V[b, 1]^2
     end
     sub["quad_bus_expr_ac"] = q
-    sub["ρ ακ_bus_cached"] = (ρθ, ρV)
+    sub["rho_bus_cached"] = (ρθ, ρV)
     return q
 end
 
@@ -267,7 +267,7 @@ function _build_quad_branch_expr_ac!(
         q += 0.5 * ρP * P_loc^2 + 0.5 * ρQ * Q_loc^2
     end
     sub["quad_branch_expr_ac"] = q
-    sub["ρ ακ_branch_cached"] = (ρP, ρQ)
+    sub["rho_branch_cached"] = (ρP, ρQ)
     return q
 end
 

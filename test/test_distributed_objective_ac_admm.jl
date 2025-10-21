@@ -62,9 +62,9 @@ function compare_distributed_ac_vs_centralized(
     admm_mu_decr = 2.0,
     admm_tau_incr = 1.05,
     admm_tau_decr = 0.98,
-    admm_rho_theta::Union{Nothing,Real} = nothing,
-    admm_rho_v::Union{Nothing,Real} = nothing,
-    admm_adaptive::Union{Nothing,String} = nothing, # "on" | "off" | nothing (não passa flag)
+    admm_rho_theta::Union{Nothing, Real} = nothing,
+    admm_rho_v::Union{Nothing, Real} = nothing,
+    admm_adaptive::Union{Nothing, String} = nothing, # "on" | "off" | nothing (não passa flag)
 )
     case_name = basename(file)
 
@@ -98,16 +98,20 @@ function compare_distributed_ac_vs_centralized(
             "--admm-tau-decr", string(admm_tau_decr),
         ]
         if admm_rho_theta !== nothing
-            push!(args_dist, "--admm-rho-theta"); push!(args_dist, string(admm_rho_theta))
+            push!(args_dist, "--admm-rho-theta")
+            push!(args_dist, string(admm_rho_theta))
         end
         if admm_rho_v !== nothing
-            push!(args_dist, "--admm-rho-v");     push!(args_dist, string(admm_rho_v))
+            push!(args_dist, "--admm-rho-v")
+            push!(args_dist, string(admm_rho_v))
         end
         if admm_rho_theta === nothing && admm_rho_v === nothing
-            push!(args_dist, "--admm-rho");       push!(args_dist, string(admm_rho))
+            push!(args_dist, "--admm-rho")
+            push!(args_dist, string(admm_rho))
         end
         if admm_adaptive !== nothing
-            push!(args_dist, "--admm-adaptive");  push!(args_dist, admm_adaptive)
+            push!(args_dist, "--admm-adaptive")
+            push!(args_dist, admm_adaptive)
         end
 
         obj, _ = Lirion.main(args_dist)
@@ -160,11 +164,11 @@ function run_distributed_ac_objective_tests(;
             end
 
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case   = admm_eps_dual
+        admm_eps_dual_case = admm_eps_dual
 
         admm_rho_theta_case = nothing
-        admm_rho_v_case     = nothing
-        admm_adaptive_case  = nothing
+        admm_rho_v_case = nothing
+        admm_adaptive_case = nothing
 
         if occursin("case118_", case_name)
             admm_max_iter_case = max(admm_max_iter_case, 500)
@@ -173,40 +177,40 @@ function run_distributed_ac_objective_tests(;
             admm_max_iter_case = max(admm_max_iter_case, 800)
             admm_rho_case = 1_000_000.0
             admm_eps_primal_case = min(admm_eps_primal_case, 1e-4)
-            admm_eps_dual_case   = min(admm_eps_dual_case,   1e-4)
+            admm_eps_dual_case = min(admm_eps_dual_case, 1e-4)
         end
 
         if case_name == "pglib_opf_case118_2zones_ieee.m"
-            admm_max_iter_case   = 500
+            admm_max_iter_case = 500
             admm_eps_primal_case = 1e-4
-            admm_eps_dual_case   = 1e-4
-            admm_rho_theta_case  = 1e5
-            admm_rho_v_case      = 1e5
-            admm_adaptive_case   = "on"
+            admm_eps_dual_case = 1e-4
+            admm_rho_theta_case = 1e5
+            admm_rho_v_case = 1e5
+            admm_adaptive_case = "on"
             admm_mu_incr = 2.0
             admm_mu_decr = 2.0
             admm_tau_incr = 1.05
             admm_tau_decr = 0.95
         end
         if case_name == "pglib_opf_case118_3zones_ieee.m"
-            admm_max_iter_case   = 500
+            admm_max_iter_case = 500
             admm_eps_primal_case = 1e-4
-            admm_eps_dual_case   = 1e-4
-            admm_rho_theta_case  = 1e5
-            admm_rho_v_case      = 1e5
-            admm_adaptive_case   = "on"
+            admm_eps_dual_case = 1e-4
+            admm_rho_theta_case = 1e5
+            admm_rho_v_case = 1e5
+            admm_adaptive_case = "on"
             admm_mu_incr = 3.0
             admm_mu_decr = 3.0
             admm_tau_incr = 1.05
             admm_tau_decr = 0.95
         end
         if case_name == "pglib_opf_case118_5zones_ieee.m"
-            admm_max_iter_case   = 700
+            admm_max_iter_case = 700
             admm_eps_primal_case = 1e-4
-            admm_eps_dual_case   = 1e-4
-            admm_rho_theta_case  = 1e5
-            admm_rho_v_case      = 1e5
-            admm_adaptive_case   = "on"
+            admm_eps_dual_case = 1e-4
+            admm_rho_theta_case = 1e5
+            admm_rho_v_case = 1e5
+            admm_adaptive_case = "on"
             admm_mu_incr = 3.0
             admm_mu_decr = 3.0
             admm_tau_incr = 1.1
@@ -238,4 +242,3 @@ function run_distributed_ac_objective_tests(;
     end
     return true
 end
-
