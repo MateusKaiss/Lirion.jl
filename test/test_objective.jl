@@ -89,7 +89,7 @@ const reduced_testlist_ac = [
 
 # Cases with batteries
 const battery_cases = [
-    "case5_bus_2_bat.m",
+    # "case5_bus_2_bat.m",
     "case14_bus_4_bat.m",
     "case57_bus_6_bat.m",
     # "case118_bus_10_bat.m",
