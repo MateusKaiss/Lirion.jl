@@ -6,15 +6,20 @@
   Large-scale Integrated Research in Intelligent Optimization of Networks
 </h3>
 
+## Overview
 
 ## Overview
 
-**Lirion.jl** is a unified framework for solving Optimal Power Flow (OPF) problems, bringing together a wide range of centralized and distributed methods under a single package.  
-Its design emphasizes **robustness, scalability, and speed**, making it well-suited for both academic research and large-scale benchmarking.
+**Lirion.jl** is a unified framework for solving Optimal Power Flow (OPF) problems, bringing together centralized and distributed methods under one package. It emphasizes **robustness, scalability, and speed**, introducing new perspectives into distributed OPF with flexible ADMM variants, advanced partitioning strategies, and support for DC, AC, and SOCP formulations. 
 
-The project introduces new perspectives into distributed OPF — including flexible ADMM variants, advanced partitioning strategies, and full support for DC, AC, and SOCP formulations. While the current release is code-driven, the long-term vision includes a user-friendly interface to make experimentation and analysis even more accessible.
+### Key Capabilities
+- **Centralized formulations**: DC, AC, and SOCP (Second-Order Cone Programming)  
+- **Distributed ADMM**: bus-level, branch-level, and hybrid variants (DC, AC, SOCP)  
+- **Multi-period optimization**: time-series support *(still experimental and under validation)*  
+- **Storage models**: battery and prosumer integration  
+- **Data input**: compatible with CSV and MATPOWER `.m` case files  
+- **Testing**: benchmarked against [PGLib-OPF](https://github.com/power-grid-lib/pglib-opf) cases
 
-In its current form, Lirion.jl already serves as a powerful research tool, providing a solid foundation for innovation in modern power system optimization.
 
 
 ## Acknowledgments
