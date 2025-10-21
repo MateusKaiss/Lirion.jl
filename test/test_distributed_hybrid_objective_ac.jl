@@ -11,8 +11,8 @@ const distributed_hybrid_ac_zone_cases = [
     # 57 buses (descomente quando quiser)
     # "pglib_opf_case57_2zones_ieee.m",
     # "pglib_opf_case57_4zones_ieee.m",
-    # 118/500 buses (descomente quando quiser)
-    # "pglib_opf_case118_2zones_ieee.m",
+    # 118/500 buses
+    "pglib_opf_case118_2zones_ieee.m",
     # "pglib_opf_case500_2zones_goc.m",
 ]
 
@@ -43,6 +43,7 @@ function compare_distributed_hybrid_ac_vs_centralized(
     admm_mu_decr::Float64 = 2.0,
     admm_tau_incr::Float64 = 1.05,
     admm_tau_decr::Float64 = 0.98,
+    admm_adaptive::Union{Nothing,String} = nothing, # "on" | "off" | nothing
 )
     case_name = basename(file)
 
@@ -77,24 +78,22 @@ function compare_distributed_hybrid_ac_vs_centralized(
         ]
 
         if rho_base !== nothing
-            push!(args_dist, "--admm-rho")
-            push!(args_dist, string(rho_base))
+            push!(args_dist, "--admm-rho");           push!(args_dist, string(rho_base))
         end
         if rho_theta !== nothing
-            push!(args_dist, "--admm-rho-theta")
-            push!(args_dist, string(rho_theta))
+            push!(args_dist, "--admm-rho-theta");     push!(args_dist, string(rho_theta))
         end
         if rho_v !== nothing
-            push!(args_dist, "--admm-rho-v")
-            push!(args_dist, string(rho_v))
+            push!(args_dist, "--admm-rho-v");         push!(args_dist, string(rho_v))
         end
         if rho_flow_p !== nothing
-            push!(args_dist, "--admm-rho-flow-p")
-            push!(args_dist, string(rho_flow_p))
+            push!(args_dist, "--admm-rho-flow-p");    push!(args_dist, string(rho_flow_p))
         end
         if rho_flow_q !== nothing
-            push!(args_dist, "--admm-rho-flow-q")
-            push!(args_dist, string(rho_flow_q))
+            push!(args_dist, "--admm-rho-flow-q");    push!(args_dist, string(rho_flow_q))
+        end
+        if admm_adaptive !== nothing
+            push!(args_dist, "--admm-adaptive");      push!(args_dist, admm_adaptive)
         end
 
         obj, _ = Lirion.main(args_dist)
@@ -138,6 +137,7 @@ function run_distributed_hybrid_ac_objective_tests(;
     for (i, file) in enumerate(selected_files)
         case_name = basename(file)
 
+        # defaults por padrão (2/3 zonas)
         admm_max_iter_case, rho_bus_base, rho_flow_base =
             if occursin("_3zones_", case_name)
                 (400, 1.0e3, 1.0e5)
@@ -148,27 +148,33 @@ function run_distributed_hybrid_ac_objective_tests(;
             end
 
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case = admm_eps_dual
-        # if occursin("case118_", case_name)
-        #     admm_max_iter_case = max(admm_max_iter_case, 700)
-        #     rho_bus_base  = 3.0e3
-        #     rho_flow_base = 3.0e5
-        #     admm_eps_primal_case = min(admm_eps_primal_case, 1e-8)
-        #     admm_eps_dual_case   = min(admm_eps_dual_case, 1e-8)
-        # end
-        # if occursin("case500_", case_name)
-        #     admm_max_iter_case = 800
-        #     rho_bus_base  = 5.0e3
-        #     rho_flow_base = 5.0e5
-        #     admm_eps_primal_case = 1e-8
-        #     admm_eps_dual_case   = 1e-8
-        # end
+        admm_eps_dual_case   = admm_eps_dual
+        admm_mu_incr_case    = admm_mu_incr
+        admm_mu_decr_case    = admm_mu_decr
+        admm_tau_incr_case   = admm_tau_incr
+        admm_tau_decr_case   = admm_tau_decr
+        admm_adaptive_case   = nothing
+        if case_name == "pglib_opf_case118_2zones_ieee.m"
+            # exatamente como você validou:
+            admm_max_iter_case   = 500
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case   = 1e-4
+            rho_bus_base         = 1.0e5     # --admm-rho-theta / --admm-rho-v
+            rho_flow_base        = 1.0e5     # --admm-rho-flow-p / --admm-rho-flow-q
+            admm_adaptive_case   = "on"      # --admm-adaptive on
+
+            admm_mu_incr_case  = 2.0
+            admm_mu_decr_case  = 2.0
+            admm_tau_incr_case = 1.05
+            admm_tau_decr_case = 0.95
+        end
 
         @info "[$label] Rodando caso $i de $n: $case_name " *
-              "(max_iter=$(admm_max_iter_case), rho_bus=$(rho_bus_base), rho_flow=$(rho_flow_base), " *
+              "(max_iter=$(admm_max_iter_case), ρθ/ρV=$(rho_bus_base), ρ_flow=$(rho_flow_base), " *
               "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), " *
-              "μ=(incr=$(admm_mu_incr),decr=$(admm_mu_decr)), " *
-              "τ=(incr=$(admm_tau_incr),decr=$(admm_tau_decr)))"
+              "μ=(incr=$(admm_mu_incr_case),decr=$(admm_mu_decr_case)), " *
+              "τ=(incr=$(admm_tau_incr_case),decr=$(admm_tau_decr_case)), " *
+              "adaptive=$(admm_adaptive_case))"
 
         @testset "$(label) - $(case_name)" begin
             compare_distributed_hybrid_ac_vs_centralized(
@@ -178,7 +184,7 @@ function run_distributed_hybrid_ac_objective_tests(;
                 distributed_optimizer = distributed_optimizer,
                 rtol = rtol,
                 atol = atol,
-                rho_base = nothing,
+                rho_base = nothing,                 # usar rhos separados
                 rho_theta = rho_bus_base,
                 rho_v = rho_bus_base,
                 rho_flow_p = rho_flow_base,
@@ -186,11 +192,11 @@ function run_distributed_hybrid_ac_objective_tests(;
                 admm_max_iter = admm_max_iter_case,
                 admm_eps_primal = admm_eps_primal_case,
                 admm_eps_dual = admm_eps_dual_case,
-                # passa μ/τ compat
-                admm_mu_incr = admm_mu_incr,
-                admm_mu_decr = admm_mu_decr,
-                admm_tau_incr = admm_tau_incr,
-                admm_tau_decr = admm_tau_decr,
+                admm_mu_incr = admm_mu_incr_case,
+                admm_mu_decr = admm_mu_decr_case,
+                admm_tau_incr = admm_tau_incr_case,
+                admm_tau_decr = admm_tau_decr_case,
+                admm_adaptive = admm_adaptive_case,
             )
         end
     end
