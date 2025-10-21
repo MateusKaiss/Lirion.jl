@@ -8,7 +8,6 @@
 
 ## Overview
 
-## Overview
 
 **Lirion.jl** is a unified framework for solving Optimal Power Flow (OPF) problems, bringing together centralized and distributed methods under one package. It emphasizes **robustness, scalability, and speed**, introducing new perspectives into distributed OPF with flexible ADMM variants, advanced partitioning strategies, and support for DC, AC, and SOCP formulations. 
 
