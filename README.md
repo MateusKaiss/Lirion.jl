@@ -35,40 +35,6 @@ We also acknowledge the inspiration and foundational work of:
 - [PGLib](https://github.com/power-grid-lib/pglib-opf) — benchmark test cases
 
 
-## Comparison with Related Packages
-
-### vs. [PowerModels.jl](https://github.com/lanl-ansi/PowerModels.jl)
-
-**Lirion.jl** builds upon PowerModels.jl's solid foundation but offers several key advantages:
-
-- **Distributed Algorithms**: While PowerModels focuses on centralized optimization, Lirion provides extensive distributed implementations, currently focusing on ADMM
-
-**Similarities**:
-- Both use JuMP.jl for mathematical modeling
-- Both include variations for relaxed variations (DC, SOCP)
-- Compatible with the same optimizers (Ipopt, Gurobi, OSQP, SCS)
-- Support for standard MATPOWER case formats
-- Similar API design patterns
-
-### vs. [PowerModelsADA.jl](https://github.com/mkhraijah/PowerModelsADA.jl)
-
-**Lirion.jl** offers more depth in ADMM implementations but less breadth in distributed methods:
-
-**Lirion.jl Advantages**:
-- **Deeper ADMM Implementation**: More sophisticated ADMM variants (hybrid, branch consensus)
-- **Advanced Partitioning**: Both spectral and METIS-based partitioning with power system-specific optimizations
-- **Centralized OPF**: Also implements centralized solutions (DC, AC, SOCP) and allows for easy comparisons across methods
-- **Active Development**: Currently under active development with recent improvements
-- **Extensive Customization**: Fine-grained control over ADMM parameters and convergence criteria
-
-**Current PowerModelsADA.jl Advantages**:
-- **Broader Algorithm Support**: Implements multiple distributed algorithms (ADMM, ATC, APP, ALADIN)
-
-**Similarities**:
-- Both focus on distributed optimization for power systems
-- Built on PowerModels.jl foundation
-- Support for standard test cases
-
 ## Installation
 
 ### Prerequisites
