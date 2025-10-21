@@ -9,10 +9,9 @@
 
 # Lirion.jl
 
-[![CI](https://github.com/your-username/Lirion.jl/workflows/CI/badge.svg)](https://github.com/your-username/Lirion.jl/actions)
-[![codecov](https://codecov.io/gh/your-username/Lirion.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/your-username/Lirion.jl)
+A Julia package for solving Optimal Power Flow (OPF) problems using both centralized and distributed algorithms.  
+Current focus: advanced ADMM (Alternating Direction Method of Multipliers) implementations, with plans to add more distributed methods.
 
-A Julia package for solving Optimal Power Flow (OPF) problems using both centralized and distributed algorithms. Currently focusing on advanced ADMM (Alternating Direction Method of Multipliers) implementations, and growing towards using other distributed algorithms.
 
 ## Overview
 
