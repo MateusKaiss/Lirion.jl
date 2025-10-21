@@ -13,11 +13,30 @@ const distributed_ac_zone_cases = [
     # 30 buses
     "pglib_opf_case30_2zones_as.m",
     "pglib_opf_case30_3zones_as.m",
-    # 57/118/500 (exemplos comentados)
+    # 57 buses (descomente quando quiser)
     # "pglib_opf_case57_2zones_ieee.m",
     # "pglib_opf_case57_4zones_ieee.m",
+    # 118/500 buses
     "pglib_opf_case118_2zones_ieee.m",
-    # "pglib_opf_case500_2zones_goc.m",
+    "pglib_opf_case118_3zones_ieee.m",
+    "pglib_opf_case118_5zones_ieee.m",
+    # # 500 buses
+    # "pglib_opf_case500_3zones_goc.m",
+    # "pglib_opf_case500_4zones_goc.m",
+    # # 793
+    # # "pglib_opf_case793_11zones_goc.m",
+    # # 2000
+    # "pglib_opf_case2000_5zones_goc.m",
+    # # 3970
+    # "pglib_opf_case3970_25zones_goc.m",
+    # # 10000
+    # "pglib_opf_case10000_50zones_goc.m",
+    # # 20758
+    # "pglib_opf_case20758_42zones_epigrids.m",
+    # # 30000
+    # "pglib_opf_case30000_20zones_goc.m",
+    # # 78484
+    # "pglib_opf_case78484_157zones_epigrids.m",
 ]
 
 function track_failure_ac(label::String, origin::String, case_name::String)
@@ -168,6 +187,30 @@ function run_distributed_ac_objective_tests(;
             admm_mu_decr = 2.0
             admm_tau_incr = 1.05
             admm_tau_decr = 0.95
+        end
+        if case_name == "pglib_opf_case118_3zones_ieee.m"
+            admm_max_iter_case   = 500
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case   = 1e-4
+            admm_rho_theta_case  = 1e5
+            admm_rho_v_case      = 1e5
+            admm_adaptive_case   = "on"
+            admm_mu_incr = 3.0
+            admm_mu_decr = 3.0
+            admm_tau_incr = 1.05
+            admm_tau_decr = 0.95
+        end
+        if case_name == "pglib_opf_case118_5zones_ieee.m"
+            admm_max_iter_case   = 700
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case   = 1e-4
+            admm_rho_theta_case  = 1e5
+            admm_rho_v_case      = 1e5
+            admm_adaptive_case   = "on"
+            admm_mu_incr = 3.0
+            admm_mu_decr = 3.0
+            admm_tau_incr = 1.1
+            admm_tau_decr = 0.9
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), ρθ=$(admm_rho_theta_case), ρV=$(admm_rho_v_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), μ=(incr=$(admm_mu_incr),decr=$(admm_mu_decr)), τ=(incr=$(admm_tau_incr),decr=$(admm_tau_decr)), adaptive=$(admm_adaptive_case))"
