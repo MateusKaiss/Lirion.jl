@@ -6,8 +6,6 @@
   Large-scale Integrated Research in Intelligent Optimization of Networks
 </h3>
 
-## Overview
-
 
 ## Overview
 
