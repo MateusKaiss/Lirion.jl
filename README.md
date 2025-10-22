@@ -3,7 +3,7 @@
 </p>
 
 <h3 align="center">
-  Large-scale Integrated Research in Intelligent Optimization of Networks
+  Large-scale Integrated Research in Innovative Optimization of Networks
 </h3>
 
 
