@@ -305,6 +305,43 @@ function _build_linear_branch_expr_ac!(
 end
 
 # ---------- Consensos densos (bus AC: θ por média circular + |V| média aritmética) ----------
+function compute_ac_bus_consensus_vec!(
+    θ̄_vec::Vector{Float64},
+    V̄_vec::Vector{Float64},
+    partitions::Dict{Int, Dict{String, Any}},
+    shared_buses_sorted::Vector{Int},
+    b2pos::Dict{Int, Int},
+)
+    fill!(θ̄_vec, 0.0)
+    fill!(V̄_vec, 0.0)
+    sums_sin = zeros(Float64, length(shared_buses_sorted))
+    sums_cos = zeros(Float64, length(shared_buses_sorted))
+    counts = zeros(Int, length(shared_buses_sorted))
+
+    for (_, sub) in partitions
+        θs = snapshot_theta_ac_shared!(sub)
+        Vs = snapshot_vmag_shared!(sub)
+        lbs = sub["shared_buses_local"]
+        @inbounds for i in eachindex(lbs)
+            j = b2pos[lbs[i]]
+            s, c = sincos(θs[i])
+            sums_sin[j] += s
+            sums_cos[j] += c
+            V̄_vec[j] += Vs[i]
+            counts[j] += 1
+        end
+    end
+
+    @inbounds for j in eachindex(θ̄_vec)
+        if counts[j] != 0
+            θ̄_vec[j] = atan(sums_sin[j], sums_cos[j])
+            V̄_vec[j] /= counts[j]
+        end
+    end
+end
+
+
+# ---------- Consensos densos (bus AC: θ por média circular + |V| média aritmética) ----------
 function compute_ac_branch_consensus!(
     zP::Dict{Int, Float64},
     zQ::Dict{Int, Float64},
@@ -335,47 +372,6 @@ function compute_ac_branch_consensus!(
             if isfinite(qval)
                 sumsQ[e] += qval
                 cntQ[e]  += 1
-            end
-        end
-    end
-
-    for e in cut_edges
-        if cntP[e] > 0
-            zP[e] = sumsP[e] / cntP[e]
-        end
-        if cntQ[e] > 0
-            zQ[e] = sumsQ[e] / cntQ[e]
-        end
-    end
-    return nothing
-end
-
-function compute_ac_branch_consensus!(
-    zP::Dict{Int, Float64},
-    zQ::Dict{Int, Float64},
-    partitions::Dict{Int, Dict{String, Any}},
-    cut_edges::Vector{Int},
-)
-    sumsP = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
-    sumsQ = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
-    cntP = Dict{Int, Int}(e => 0 for e in cut_edges)
-    cntQ = Dict{Int, Int}(e => 0 for e in cut_edges)
-
-    for (_, sub) in partitions
-        m = sub["model"]
-        for e in get(sub, "zone_edges", Int[])
-            l_local = get(sub["edge_to_local"], e, nothing)
-            l_local === nothing && continue
-            P_loc, Q_loc = _ac_flow_from_exprs_existing(m, sub, l_local)
-            pval = JuMP.value(P_loc)
-            qval = JuMP.value(Q_loc)
-            if isfinite(pval)
-                sumsP[e] += pval
-                cntP[e] += 1
-            end
-            if isfinite(qval)
-                sumsQ[e] += qval
-                cntQ[e] += 1
             end
         end
     end
