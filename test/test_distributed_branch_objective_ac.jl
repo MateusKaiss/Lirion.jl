@@ -189,7 +189,8 @@ function run_distributed_branch_ac_objective_tests(;
             τ_incr_case, τ_decr_case = 1.1, 0.9
         end
 
-        if case_name == "pglib_opf_case500_3zones_goc.m" || case_name == "pglib_opf_case500_4zones_goc.m"
+        if case_name == "pglib_opf_case500_3zones_goc.m" ||
+           case_name == "pglib_opf_case500_4zones_goc.m"
             admm_max_iter_case = 700
             admm_eps_primal_case = 1e-4
             admm_eps_dual_case = 1e-4

@@ -194,7 +194,8 @@ function run_distributed_hybrid_ac_objective_tests(;
             admm_tau_decr_case = 0.95
         end
 
-        if case_name == "pglib_opf_case500_3zones_ieee.m" || case_name == "pglib_opf_case500_4zones_ieee.m"
+        if case_name == "pglib_opf_case500_3zones_ieee.m" ||
+           case_name == "pglib_opf_case500_4zones_ieee.m"
             admm_max_iter_case = 500
             admm_eps_primal_case = 1e-4
             admm_eps_dual_case = 1e-4
