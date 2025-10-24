@@ -4,7 +4,14 @@ function resolve_optimizer_ac(config)
     if hasproperty(config, :optimizer) && getproperty(config, :optimizer) !== nothing
         return getproperty(config, :optimizer)
     else
-        return Ipopt.Optimizer
+        return optimizer_with_attributes(
+            Ipopt.Optimizer,
+            "print_level"             => 0,      # 0 = nada no stdout
+            "sb"                      => "yes",  # suprime banner
+            "print_timing_statistics" => "no",
+            "print_user_options"      => "no",
+            "file_print_level"        => 0,      # evita escrever em arquivo
+        )
     end
 end
 
@@ -816,7 +823,6 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
         sub["theta_var"] = m[:theta]
         sub["vmag_var"] = m[:v_magnitude]
         sub["has_solution"] = false
-        _set_model_silent!(m)
 
         for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
@@ -1078,7 +1084,6 @@ function run_admm_ac_branch(
         sub["vmag_var"] = m[:v_magnitude]
         sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
         sub["has_solution"] = false
-        _set_model_silent!(m)
 
         for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
@@ -1299,7 +1304,6 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
         sub["vmag_var"] = m[:v_magnitude]
         sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
         sub["has_solution"] = false
-        _set_model_silent!(m)
 
         for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
