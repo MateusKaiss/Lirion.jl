@@ -4,19 +4,19 @@ function resolve_optimizer_ac(config)
     if hasproperty(config, :optimizer) && getproperty(config, :optimizer) !== nothing
         return getproperty(config, :optimizer)
     else
-        return Ipopt.Optimizer
+        return optimizer_with_attributes(
+            Ipopt.Optimizer,
+            "print_level"             => 0,      # 0 = nada no stdout
+            "sb"                      => "yes",  # suprime banner
+            "print_timing_statistics" => "no",
+            "print_user_options"      => "no",
+            "file_print_level"        => 0,      # evita escrever em arquivo
+        )
     end
-end
-
-@inline function _ensure_values!(m::JuMP.Model)
-    if !JuMP.has_values(m)
-        optimize!(m)
-    end
-    return nothing
 end
 
 @inline function _ac_flow_from_exprs_existing(
-    model::JuMP.Model,
+    model::Model,
     subdata::Dict{String, Any},
     l_local::Int;
     t::Int = 1,
@@ -125,11 +125,11 @@ function _warm_start_ac_base!(sub::Dict{String, Any})
         @warn "Warm start (AC) ignorado: optimize! não retornou valores (status=$(JuMP.termination_status(m)))."
         return
     end
-    θ_vals = Dict{typeof(first(keys(θ))), Float64}()
+    θ_vals = Dict{typeof(first(keys(θ))) , Float64}()
     for I in keys(θ)
         θ_vals[I] = JuMP.value(θ[I])
     end
-    V_vals = Dict{typeof(first(keys(V))), Float64}()
+    V_vals = Dict{typeof(first(keys(V))) , Float64}()
     for I in keys(V)
         V_vals[I] = JuMP.value(V[I])
     end
@@ -234,7 +234,7 @@ function _build_quad_bus_expr_ac!(sub::Dict{String, Any}, ρθ::Float64, ρV::Fl
         q += 0.5 * ρθ * θ[b, 1]^2 + 0.5 * ρV * V[b, 1]^2
     end
     sub["quad_bus_expr_ac"] = q
-    sub["rho_bus_cached"] = (ρθ, ρV)
+    sub["ρ ακ_bus_cached"] = (ρθ, ρV)
     return q
 end
 
@@ -274,7 +274,7 @@ function _build_quad_branch_expr_ac!(
         q += 0.5 * ρP * P_loc^2 + 0.5 * ρQ * Q_loc^2
     end
     sub["quad_branch_expr_ac"] = q
-    sub["rho_branch_cached"] = (ρP, ρQ)
+    sub["ρ ακ_branch_cached"] = (ρP, ρQ)
     return q
 end
 
@@ -340,8 +340,6 @@ function compute_ac_bus_consensus_vec!(
     end
 end
 
-
-# ---------- Consensos densos (bus AC: θ por média circular + |V| média aritmética) ----------
 function compute_ac_branch_consensus!(
     zP::Dict{Int, Float64},
     zQ::Dict{Int, Float64},
@@ -350,28 +348,24 @@ function compute_ac_branch_consensus!(
 )
     sumsP = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     sumsQ = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
-    cntP  = Dict{Int, Int}(e => 0 for e in cut_edges)
-    cntQ  = Dict{Int, Int}(e => 0 for e in cut_edges)
+    cntP = Dict{Int, Int}(e => 0 for e in cut_edges)
+    cntQ = Dict{Int, Int}(e => 0 for e in cut_edges)
 
     for (_, sub) in partitions
         m = sub["model"]
-
-        _ensure_values!(m)
-
         for e in get(sub, "zone_edges", Int[])
             l_local = get(sub["edge_to_local"], e, nothing)
             l_local === nothing && continue
             P_loc, Q_loc = _ac_flow_from_exprs_existing(m, sub, l_local)
             pval = JuMP.value(P_loc)
             qval = JuMP.value(Q_loc)
-
             if isfinite(pval)
                 sumsP[e] += pval
-                cntP[e]  += 1
+                cntP[e] += 1
             end
             if isfinite(qval)
                 sumsQ[e] += qval
-                cntQ[e]  += 1
+                cntQ[e] += 1
             end
         end
     end
@@ -441,10 +435,6 @@ function update_duals_branch_ac!(
 )
     for (z, sub) in partitions
         m = sub["model"]
-
-        # >>> Novo: garanta que podemos ler valores
-        _ensure_values!(m)
-
         λPz = get!(dualsP, z, Dict{Int, Float64}())
         λQz = get!(dualsQ, z, Dict{Int, Float64}())
 
@@ -833,7 +823,6 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
         sub["theta_var"] = m[:theta]
         sub["vmag_var"] = m[:v_magnitude]
         sub["has_solution"] = false
-        _set_model_silent!(m)
 
         for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
@@ -1095,7 +1084,6 @@ function run_admm_ac_branch(
         sub["vmag_var"] = m[:v_magnitude]
         sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
         sub["has_solution"] = false
-        _set_model_silent!(m)
 
         for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
@@ -1316,7 +1304,6 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
         sub["vmag_var"] = m[:v_magnitude]
         sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
         sub["has_solution"] = false
-        _set_model_silent!(m)
 
         for I in keys(sub["theta_var"])
             set_start_value(sub["theta_var"][I], 0.0)
