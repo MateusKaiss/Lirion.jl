@@ -112,28 +112,28 @@ function resolve_optimizer_ac(config)
 #             # ---------------------------
 #             # Linear Solver & Refinement
 #             # ---------------------------
-#             "linear_solver"               => "mumps",   # default = "ma27"
-#             "linear_system_scaling"       => "mc19",    # default = "mc19" (HSL), "none" caso contrário
-#             "linear_scaling_on_demand"    => "yes",     # default = "yes"
-#             "fast_step_computation"       => "no",      # default = "no"
-#             "min_refinement_steps"        => 1,         # default = 1
-#             "max_refinement_steps"        => 5,         # default = 10
-#             "neg_curv_test_tol"           => 1e-12,     # default = 0
-#             "neg_curv_test_reg"           => "yes",     # default = "yes"
-#             "max_hessian_perturbation"    => 1e20,      # default = 1e20
-#             "min_hessian_perturbation"    => 1e-20,     # default = 1e-20
+            "linear_solver"               => "mumps",   # default = "ma27"
+            # "linear_system_scaling"       => "mc19",    # default = "mc19" (HSL), "none" caso contrário
+            "linear_scaling_on_demand"    => "yes",     # default = "yes"
+            "fast_step_computation"       => "no",      # default = "no"
+            "min_refinement_steps"        => 1,         # default = 1
+            "max_refinement_steps"        => 8,         # default = 10
+            "neg_curv_test_tol"           => 1e-12,     # default = 0
+            "neg_curv_test_reg"           => "yes",     # default = "yes"
+            "max_hessian_perturbation"    => 1e20,      # default = 1e20
+            "min_hessian_perturbation"    => 1e-20,     # default = 1e-20
 
 #             # ---- Parâmetros específicos do MUMPS ----
-#             "mumps_mem_percent"           => 500,    # default = 1000
-#             "mumps_pivtol"                => 1e-6,   # default = 1e-6
-#             "mumps_pivtolmax"             => 0.1,    # default = 0.1
-#             "mumps_pivot_order"           => 7,      # default = 7
+            "mumps_mem_percent"           => 500,    # default = 1000
+            "mumps_pivtol"                => 1e-6,   # default = 1e-6
+            "mumps_pivtolmax"             => 0.1,    # default = 0.1
+            "mumps_pivot_order"           => 7,      # default = 7
 
 #             # ---------------------------
 #             # Hessian Approximation
 #             # ---------------------------
-#             "hessian_approximation"       => "exact",  # default = "exact"
-#             "limited_memory_max_history"  => 6,        # default = 6
+            "hessian_approximation"       => "exact",  # default = "exact"
+            "limited_memory_max_history"  => 6,        # default = 6
         )
     end
 end
