@@ -1,141 +1,77 @@
 # =========================
 # BUILD ENTRYPOINT
 # =========================
-function build_model(data, model_type; optimizer, build_only::Bool = false)
-    if model_type == SOCP
-        return try_with_fallback_scale(data, model_type; optimizer, build_only = build_only)
-    else
-        return build_and_optimize_model(
-            data,
-            model_type;
-            optimizer,
-            build_only = build_only,
-        )
+function _select_default_optimizer(model_type::Type{<:OPFModel}, opt)
+    if opt !== nothing
+        return opt
     end
+    if model_type == DC
+        return OSQP.Optimizer
+    elseif model_type == SOCP
+        return SCS.Optimizer
+    else
+        return Ipopt.Optimizer
+    end
+end
+
+function build_model(data, model_type; optimizer=nothing, build_only::Bool=false)
+    return build_and_optimize_model(
+        data,
+        model_type;
+        optimizer,
+        build_only=build_only,
+    )
 end
 
 # =========================
 # CENTRALIZED (DC/AC/SOCP)
 # =========================
 function build_and_optimize_model(
-    matpower_data,
+    matpower_data::Dict{String,Any},
     model_type::Type{<:OPFModel};
-    optimizer = Ipopt.Optimizer,
-    build_only::Bool = false,
+    optimizer=nothing,
+    build_only::Bool=false,
 )
-    optimizer === nothing && (optimizer = Ipopt.Optimizer)
+    # define optimizer default por tipo, se não veio de Args
+    optimizer === nothing && (optimizer = _select_default_optimizer(model_type, optimizer))
+
+    # timeseries? single x multi
     times = get_model_times(matpower_data)
     if length(unique(times)) > 1
         return build_and_optimize_multiperiod_model(
-            matpower_data, model_type; optimizer, times = times, build_only = build_only,
+            matpower_data, model_type; optimizer, times=times, build_only=build_only,
         )
     else
         return build_and_optimize_singleperiod_model(
-            matpower_data, model_type; optimizer, build_only = build_only,
+            matpower_data, model_type; optimizer, build_only=build_only,
         )
     end
-end
-
-# =========================================================
-# SOCP: tenta escalas diferentes (a menos que build_only)
-# =========================================================
-"""
-Attempts to solve the model using a sequence of scaling factors
-to improve numerical stability for conic models (e.g., SOCP).
-
-Tries up to 5 scale values: selected, 150, 1, 300, 500.
-When `build_only=true`, it only builds once (no scaling loop, no optimize).
-"""
-function try_with_fallback_scale(
-    matpower_data::Dict,
-    model_type::Type{<:OPFModel};
-    optimizer = Ipopt.Optimizer,
-    build_only::Bool = false,
-)
-    if build_only
-        matpower_data_once = deepcopy(matpower_data)
-        matpower_data_once["selected_scale"] = get(matpower_data, "selected_scale", nothing)
-        return build_and_optimize_model(
-            matpower_data_once,
-            model_type;
-            optimizer,
-            build_only = true,
-        )
-    end
-
-    # 1) escala selecionada a partir dos buses
-    scale = select_cone_scale(matpower_data["bus_params"])
-    matpower_data_attempt = deepcopy(matpower_data)
-    matpower_data_attempt["selected_scale"] = scale
-    model = build_and_optimize_model(matpower_data_attempt, model_type; optimizer)
-    status = JuMP.termination_status(model)
-
-    # 2) fallback 150
-    if status ∉ (MOI.OPTIMAL, MOI.LOCALLY_SOLVED)
-        @warn "Model with scale=$scale failed (status: $status). Trying scale=150..."
-        matpower_data_fallback = deepcopy(matpower_data)
-        matpower_data_fallback["selected_scale"] = 150
-        model = build_and_optimize_model(matpower_data_fallback, model_type; optimizer)
-        status = JuMP.termination_status(model)
-    end
-
-    # 3) minimal 1
-    if status ∉ (MOI.OPTIMAL, MOI.LOCALLY_SOLVED)
-        @warn "Model still failed with scale=150 (status: $status). Trying scale=1..."
-        matpower_data_final_attempt = deepcopy(matpower_data)
-        matpower_data_final_attempt["selected_scale"] = 1
-        model = build_and_optimize_model(matpower_data_final_attempt, model_type; optimizer)
-        status = JuMP.termination_status(model)
-    end
-
-    # 4) 300
-    if status ∉ (MOI.OPTIMAL, MOI.LOCALLY_SOLVED)
-        @warn "Model still failed with scale=1 (status: $status). Trying scale=300..."
-        matpower_data_last_attempt = deepcopy(matpower_data)
-        matpower_data_last_attempt["selected_scale"] = 300
-        model = build_and_optimize_model(matpower_data_last_attempt, model_type; optimizer)
-        status = JuMP.termination_status(model)
-    end
-
-    # 5) 500
-    if status ∉ (MOI.OPTIMAL, MOI.LOCALLY_SOLVED)
-        @warn "Model still failed with scale=300 (status: $status). Trying scale=500 (final attempt)..."
-        matpower_data_extreme_attempt = deepcopy(matpower_data)
-        matpower_data_extreme_attempt["selected_scale"] = 500
-        model =
-            build_and_optimize_model(matpower_data_extreme_attempt, model_type; optimizer)
-    end
-
-    return model
 end
 
 # ============================================
 # SINGLE-PERIOD
 # ============================================
 function build_and_optimize_singleperiod_model(
-    matpower_data,
+    matpower_data::Dict{String,Any},
     model_type::Type{<:OPFModel};
-    optimizer = Ipopt.Optimizer,
-    build_only::Bool = false,
+    optimizer=nothing,
+    build_only::Bool=false,
 )
+    optimizer === nothing && (optimizer = _select_default_optimizer(model_type, optimizer))
     model = JuMP.Model(optimizer)
     model.ext[:time_periods] = 1
     model.ext[:times] = [1]
-    model.ext[:selected_scale] = get(matpower_data, "selected_scale", nothing)
 
     process_subproblem(model, matpower_data, model_type, SubproblemBuild)
 
     if !build_only
         JuMP.optimize!(model)
-        print(model)
-        termination_status = JuMP.termination_status(model)
-        if termination_status == MOI.OPTIMAL || termination_status == MOI.LOCALLY_SOLVED
-            @show JuMP.objective_value(model)
+        status = JuMP.termination_status(model)
+        if status == MOI.OPTIMAL || status == MOI.LOCALLY_SOLVED
+            @info "Objective value = $(JuMP.objective_value(model)) | status=$status"
         else
-            @warn "Modelo não resolveu com sucesso. Status: $termination_status"
-            print(model)
+            @warn "Modelo não resolveu com sucesso. Status: $status"
             # compute_conflict!(model)  # habilite se quiser depurar
-            # error("Falha na otimização do modelo single-period.")
         end
     end
 
@@ -146,22 +82,27 @@ end
 # MULTI-PERIOD
 # ============================================
 function build_and_optimize_multiperiod_model(
-    matpower_data,
+    matpower_data::Dict{String,Any},
     model_type::Type{<:OPFModel};
-    optimizer = Ipopt.Optimizer,
+    optimizer=nothing,
     times::AbstractVector,
-    build_only::Bool = false,
+    build_only::Bool=false,
 )
+    optimizer === nothing && (optimizer = _select_default_optimizer(model_type, optimizer))
     model = JuMP.Model(optimizer)
     model.ext[:time_periods] = length(times)
     model.ext[:times] = times
-    model.ext[:selected_scale] = get(matpower_data, "selected_scale", nothing)
 
     process_subproblem(model, matpower_data, model_type, SubproblemBuild)
 
     if !build_only
         JuMP.optimize!(model)
-        @show JuMP.objective_value(model)
+        status = JuMP.termination_status(model)
+        if status == MOI.OPTIMAL || status == MOI.LOCALLY_SOLVED
+            @info "Objective value (multi) = $(JuMP.objective_value(model)) | status=$status"
+        else
+            @warn "Modelo multi-período não resolveu com sucesso. Status: $status"
+        end
     end
 
     return model

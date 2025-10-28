@@ -3,7 +3,7 @@ function main(ARGS)
 
     @info "Case: $(args.database_path)"
     @info "Model: $(args.model_type)"
-    @info "Optimizer: $(args.optimizer)"
+    @info "Optimizer (raw): $(args.optimizer)"
 
     # --- Load and preprocess input data ---
     data = load_input_data(args.database_path)
