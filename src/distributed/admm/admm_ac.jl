@@ -1153,7 +1153,7 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
     elapsed_s = (time_ns() - t0) / 1e9
     println("Tempo ADMM (bus/AC): $(_pretty_time_ac(elapsed_s))")
 
-    return total_real_cost, partitions
+    return total_real_cost, partitions, elapsed_s
 end
 
 # ========================== ADMM: BRANCH (AC) ==========================
@@ -1336,7 +1336,7 @@ function run_admm_ac_branch(
     elapsed_s = (time_ns() - t0) / 1e9
     println("Tempo ADMM (branch/AC): $(_pretty_time_ac(elapsed_s))")
 
-    return total_real_cost, partitions
+    return total_real_cost, partitions, elapsed_s
 end
 
 # ========================== ADMM: HÍBRIDO (AC) ==========================
@@ -1771,5 +1771,5 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
     elapsed_s = (time_ns() - t0) / 1e9
     println("Tempo ADMM (hybrid/AC): $(_pretty_time_ac(elapsed_s))")
 
-    return total_real_cost, partitions
+    return total_real_cost, partitions, elapsed_s
 end
