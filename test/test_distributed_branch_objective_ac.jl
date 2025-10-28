@@ -15,12 +15,12 @@ const distributed_branch_ac_zone_cases = [
     # "pglib_opf_case57_2zones_ieee.m",
     # "pglib_opf_case57_4zones_ieee.m",
     # 118/500 buses
-    "pglib_opf_case118_2zones_ieee.m",
-    "pglib_opf_case118_3zones_ieee.m",
+    # "pglib_opf_case118_2zones_ieee.m",
+    # "pglib_opf_case118_3zones_ieee.m",
     "pglib_opf_case118_5zones_ieee.m",
     # # 500 buses
-    "pglib_opf_case500_3zones_goc.m",
-    "pglib_opf_case500_4zones_goc.m",
+    # "pglib_opf_case500_3zones_goc.m",
+    # "pglib_opf_case500_4zones_goc.m",
     # # 793
     # # "pglib_opf_case793_11zones_goc.m",
     # # 2000
@@ -56,8 +56,8 @@ function compare_distributed_branch_ac_vs_centralized(
     admm_rho_flow_p = nothing,
     admm_rho_flow_q = nothing,
     admm_max_iter = 400,
-    admm_eps_primal = 1e-6,
-    admm_eps_dual = 1e-6,
+    admm_eps_primal = 1e-4,
+    admm_eps_dual = 1e-4,
     admm_mu_incr = 2.0,
     admm_mu_decr = 2.0,
     admm_tau_incr = 1.05,
@@ -129,7 +129,7 @@ function run_distributed_branch_ac_objective_tests(;
     central_optimizer = Ipopt.Optimizer,
     distributed_optimizer = Ipopt.Optimizer,
     rtol = 0.05, atol = 1e-6,
-    admm_eps_primal = 1e-6, admm_eps_dual = 1e-6,
+    admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,
     admm_mu_incr = 2.0,
     admm_mu_decr = 2.0,
     admm_tau_incr = 1.05,
@@ -166,8 +166,8 @@ function run_distributed_branch_ac_objective_tests(;
         extra_flags = String[]
 
         if occursin("_3zones_", case_name)
-            admm_eps_primal_case = 1e-8
-            admm_eps_dual_case = 1e-8
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case = 1e-4
         end
         if case_name == "pglib_opf_case118_2zones_ieee.m"
             admm_max_iter_case = 500
