@@ -14,12 +14,12 @@ function _select_default_optimizer(model_type::Type{<:OPFModel}, opt)
     end
 end
 
-function build_model(data, model_type; optimizer=nothing, build_only::Bool=false)
+function build_model(data, model_type; optimizer = nothing, build_only::Bool = false)
     return build_and_optimize_model(
         data,
         model_type;
         optimizer,
-        build_only=build_only,
+        build_only = build_only,
     )
 end
 
@@ -27,10 +27,10 @@ end
 # CENTRALIZED (DC/AC/SOCP)
 # =========================
 function build_and_optimize_model(
-    matpower_data::Dict{String,Any},
+    matpower_data::Dict{String, Any},
     model_type::Type{<:OPFModel};
-    optimizer=nothing,
-    build_only::Bool=false,
+    optimizer = nothing,
+    build_only::Bool = false,
 )
     # define optimizer default por tipo, se não veio de Args
     optimizer === nothing && (optimizer = _select_default_optimizer(model_type, optimizer))
@@ -39,11 +39,11 @@ function build_and_optimize_model(
     times = get_model_times(matpower_data)
     if length(unique(times)) > 1
         return build_and_optimize_multiperiod_model(
-            matpower_data, model_type; optimizer, times=times, build_only=build_only,
+            matpower_data, model_type; optimizer, times = times, build_only = build_only,
         )
     else
         return build_and_optimize_singleperiod_model(
-            matpower_data, model_type; optimizer, build_only=build_only,
+            matpower_data, model_type; optimizer, build_only = build_only,
         )
     end
 end
@@ -52,10 +52,10 @@ end
 # SINGLE-PERIOD
 # ============================================
 function build_and_optimize_singleperiod_model(
-    matpower_data::Dict{String,Any},
+    matpower_data::Dict{String, Any},
     model_type::Type{<:OPFModel};
-    optimizer=nothing,
-    build_only::Bool=false,
+    optimizer = nothing,
+    build_only::Bool = false,
 )
     optimizer === nothing && (optimizer = _select_default_optimizer(model_type, optimizer))
     model = JuMP.Model(optimizer)
@@ -82,11 +82,11 @@ end
 # MULTI-PERIOD
 # ============================================
 function build_and_optimize_multiperiod_model(
-    matpower_data::Dict{String,Any},
+    matpower_data::Dict{String, Any},
     model_type::Type{<:OPFModel};
-    optimizer=nothing,
+    optimizer = nothing,
     times::AbstractVector,
-    build_only::Bool=false,
+    build_only::Bool = false,
 )
     optimizer === nothing && (optimizer = _select_default_optimizer(model_type, optimizer))
     model = JuMP.Model(optimizer)
