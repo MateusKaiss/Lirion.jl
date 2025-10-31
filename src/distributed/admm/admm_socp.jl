@@ -5,12 +5,48 @@
 _warm_on(config) =
     (hasproperty(config, :warm_start) && getproperty(config, :warm_start) == true)
 
-# ---- Otimizador (default SCS) ----
+# ---- Otimizador: tenta Gurobi -> COSMO -> SCS (com override) ----
 function resolve_socp_optimizer(config)
+    # 1) prioridade absoluta: se vier um otimizador explícito no config
     if hasproperty(config, :optimizer) && getproperty(config, :optimizer) !== nothing
         return getproperty(config, :optimizer)
-    else
-        return SCS.Optimizer
+    end
+
+    # 2) ordem preferida (opcional): :auto | :gurobi | :cosmo | :scs
+    prefer = hasproperty(config, :prefer_socp_solver) ?
+        getproperty(config, :prefer_socp_solver) : :auto
+
+    # helper para montar a cadeia na ordem desejada
+    function _chain(prefer_sym)
+        if prefer_sym == :gurobi
+            return (:gurobi, :cosmo, :scs)
+        elseif prefer_sym == :cosmo
+            return (:cosmo, :gurobi, :scs)
+        elseif prefer_sym == :scs
+            return (:scs, :gurobi, :cosmo)
+        else
+            return (:gurobi, :cosmo, :scs)  # :auto
+        end
+    end
+    order = _chain(prefer)
+
+    # 3) factory que instancia o primeiro solver que funcionar
+    return () -> begin
+        for s in order
+            try
+                if s === :gurobi
+                    return Gurobi.Optimizer()
+                elseif s === :cosmo
+                    return COSMO.Optimizer()
+                else
+                    return SCS.Optimizer()
+                end
+            catch
+                # falhou criar esse solver? tenta o próximo da cadeia
+            end
+        end
+        # fallback paranoico (improvável chegar aqui)
+        return SCS.Optimizer()
     end
 end
 
