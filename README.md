@@ -1,10 +1,12 @@
 <p align="center">
-  <img src="docs/assets/logo_lirion.png" alt="Lirion.jl" width="420"/>
+  <img src="docs/assets/lirion-sm.png" alt="Lirion.jl" 
+  width="420"/>
 </p>
 
 <h3 align="center">
-  Large-scale Integrated Research in Intelligent Optimization of Networks
+  Large-scale Integrated Research in Innovative Optimization of Networks
 </h3>
+
 
 
 # Lirion.jl
@@ -32,8 +34,11 @@ Lirion.jl initially emerged as part of the undergraduate thesis (TCC) of its pri
 
 The package was conceived, designed, and developed by **Mateus Kaiss**, as its principal author and maintainer, with support from:
 
-- **Kristie Kaminsky Kuster** — academic advisor during the thesis, providing theoretical and practical guidance, as well as emotional support throughout the development process. I will be forever grateful for her unwavering support and mentorship. 
-- **Daniel Gebbran** — contributions to distributed ADMM implementations and testing.
+- **Daniel Gebbran** — academic co-advisor, whose guidance and contributions were fundamental to the design, implementation, and testing of the distributed ADMM formulations. His insights greatly enhanced the depth and robustness of the project.  
+- **Kristie Kaminsky Kuster** — academic advisor during the thesis, providing invaluable theoretical and practical guidance, as well as continuous encouragement throughout the process. Her mentorship was essential both academically and personally.  
+
+I will be forever grateful to both for their unwavering support, mentorship, and encouragement throughout the development of this project.
+
 
 We also acknowledge the inspiration and foundational work of the following open-source projects:  
 - [PowerModels.jl](https://github.com/lanl-ansi/PowerModels.jl) — solid foundation for power system modeling  
