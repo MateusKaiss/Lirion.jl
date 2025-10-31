@@ -1,6 +1,22 @@
 ############################################################
 # Particionador por METIS (edge-cut balanceado) — drop-in
 ############################################################
+
+# --- garantir ambiente e o pacote local Lirion ---
+import Pkg
+# ativa o ambiente de scripts (Project.toml que está nesta pasta)
+Pkg.activate(@__DIR__)
+
+# tenta carregar Lirion; se não existir, desenvolve via path local e instancia
+try
+    @eval using Lirion
+catch
+    # usa o repositório local (um nível acima de /scripts)
+    Pkg.develop(path = joinpath(@__DIR__, ".."))
+    Pkg.instantiate()
+    @eval using Lirion
+end
+
 using Printf, LinearAlgebra, SparseArrays, Graphs, Random, Glob
 using Lirion, Statistics
 using Metis                    # Metis.jl (módulo Metis)
@@ -394,9 +410,9 @@ end
 # Execução direta (edite os caminhos/flags se quiser)
 # --------------------------------------------
 partition_cases_metis(
-    raw"C:\\Users\\franc\\Lirion.jl\\test\\zones";
+    raw"/home/mateus-kaiss/Projects/Lirion.jl/test/zones";
     ks = :auto,                 # ou ks=[25,50,100]
-    max_zone_size = 1500,        # teto desejado por zona
+    max_zone_size = 750,        # teto desejado por zona
     target_edgecut = 0.02,      # 2% (suba para 0.03–0.05 se ficar difícil)
     balance_tol = 0.10,         # ±10%
     glob = "*.m",

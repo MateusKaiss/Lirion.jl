@@ -4,6 +4,12 @@ julia_version = "1.9.4"
 manifest_format = "2.0"
 project_hash = "237afb123d10301cc72bb992c01c2e19c044c835"
 
+[[deps.AMD]]
+deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse_jll"]
+git-tree-sha1 = "45a1272e3f809d36431e57ab22703c6896b8908f"
+uuid = "14f7f29c-3bd6-536c-9a0b-7339e30b5a3e"
+version = "0.5.3"
+
 [[deps.ASL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "6252039f98492252f9e47c312c8ffda0e3b9e78d"
@@ -93,6 +99,18 @@ version = "1.0.9+0"
 git-tree-sha1 = "389ad5c84de1ae7cf0e28e381131c98ea87d54fc"
 uuid = "fa961155-64e5-5f13-b03f-caf6b980ea82"
 version = "0.5.0"
+
+[[deps.COSMO]]
+deps = ["AMD", "COSMOAccelerators", "DataStructures", "IterTools", "LinearAlgebra", "MathOptInterface", "Pkg", "Printf", "QDLDL", "Random", "Reexport", "Requires", "SparseArrays", "Statistics", "SuiteSparse", "Test", "UnsafeArrays"]
+git-tree-sha1 = "9ee9809bde10b6875ca58aadcb22af8e36bd83f9"
+uuid = "1e616198-aa4e-51ec-90a2-23f7fbd31d8d"
+version = "0.8.9"
+
+[[deps.COSMOAccelerators]]
+deps = ["LinearAlgebra", "Random", "SparseArrays", "Test"]
+git-tree-sha1 = "b1153b40dd95f856e379f25ae335755ecc24298e"
+uuid = "bbd8fffe-5ad0-4d78-a55e-85575421b4ac"
+version = "0.1.0"
 
 [[deps.CSV]]
 deps = ["CodecZlib", "Dates", "FilePathsBase", "InlineStrings", "Mmap", "Parsers", "PooledArrays", "PrecompileTools", "SentinelArrays", "Tables", "Unicode", "WeakRefStrings", "WorkerUtilities"]
@@ -364,6 +382,11 @@ git-tree-sha1 = "e2222959fbc6c19554dc15174c81bf7bf3aa691c"
 uuid = "92d709cd-6900-40b7-9082-c6be49f344b6"
 version = "0.2.4"
 
+[[deps.IterTools]]
+git-tree-sha1 = "42d5f897009e7ff2cf88db414a389e5ed1bdd023"
+uuid = "c8e1da08-722c-5040-9ed9-7db0dc04731e"
+version = "1.10.0"
+
 [[deps.IteratorInterfaceExtensions]]
 git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
 uuid = "82899510-4779-5014-852e-03e436cf321d"
@@ -453,6 +476,12 @@ version = "7.4.0"
 [[deps.LinearAlgebra]]
 deps = ["Libdl", "OpenBLAS_jll", "libblastrampoline_jll"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+
+[[deps.Lirion]]
+deps = ["ArgParse", "COSMO", "CSV", "DataFrames", "Dates", "Glob", "Graphs", "Gurobi", "InfrastructureModels", "Ipopt", "JuMP", "LinearAlgebra", "Logging", "MathOptInterface", "OSQP", "PlotlyLight", "PowerModels", "SCS", "Statistics", "Test"]
+path = "/home/mateus-kaiss/Projects/Lirion.jl/scripts/.."
+uuid = "39f2d509-5c07-4bae-a810-f080f7bd369c"
+version = "0.1.0"
 
 [[deps.LogExpFunctions]]
 deps = ["DocStringExtensions", "IrrationalConstants", "LinearAlgebra"]
@@ -568,6 +597,18 @@ version = "1.0.3"
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
 
+[[deps.OSQP]]
+deps = ["Libdl", "LinearAlgebra", "MathOptInterface", "OSQP_jll", "SparseArrays"]
+git-tree-sha1 = "50faf456a64ac1ca097b78bcdf288d94708adcdd"
+uuid = "ab2f91bb-94b4-55e3-9ba0-7f65df51de79"
+version = "0.8.1"
+
+[[deps.OSQP_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "d0f73698c33e04e557980a06d75c2d82e3f0eb49"
+uuid = "9c4f68bf-6205-5545-a508-2878b064d984"
+version = "0.600.200+0"
+
 [[deps.OpenBLAS32_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "2fb9ee2dc14d555a6df2a714b86b7125178344c2"
@@ -630,14 +671,6 @@ git-tree-sha1 = "b8e410e1d827b621e82e7e670967f0efc5845c30"
 uuid = "c36e90e8-916a-50a6-bd94-075b64ef4655"
 version = "0.21.5"
 
-[[deps.Lirion]]
-deps = ["ArgParse", "CSV", "DataFrames", "Dates", "Glob", "Gurobi", "InfrastructureModels", "Ipopt", "JuMP", "LinearAlgebra", "Logging", "PlotlyLight", "PowerModels", "SCS", "Statistics", "Test"]
-git-tree-sha1 = "202517adba6873b0e1ceebffe2aa42e58028d35a"
-repo-rev = "master"
-repo-url = "git@github.com:MateusKaiss/Lirion.jl.git"
-uuid = "39f2d509-5c07-4bae-a810-f080f7bd369c"
-version = "0.1.0"
-
 [[deps.PrecompileTools]]
 deps = ["Preferences"]
 git-tree-sha1 = "5aa36f7049a63a1528fe8f7c3f2113413ffd4e1f"
@@ -663,6 +696,12 @@ uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 [[deps.Profile]]
 deps = ["Printf"]
 uuid = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
+
+[[deps.QDLDL]]
+deps = ["AMD", "LinearAlgebra", "SparseArrays"]
+git-tree-sha1 = "5a3c14e534faf5b66c4633b5770a665ec1a87503"
+uuid = "bfc457fd-c171-5ab7-bd9e-d5dbfc242d63"
+version = "0.4.1"
 
 [[deps.REPL]]
 deps = ["InteractiveUtils", "Markdown", "Sockets", "Unicode"]
@@ -873,6 +912,11 @@ version = "1.0.2"
 
 [[deps.Unicode]]
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
+
+[[deps.UnsafeArrays]]
+git-tree-sha1 = "efcbb6828697ffffc245a9de7300552535abe005"
+uuid = "c4a57d5a-5b31-53a6-b365-19f8c011fbd6"
+version = "1.0.8"
 
 [[deps.WeakRefStrings]]
 deps = ["DataAPI", "InlineStrings", "Parsers"]

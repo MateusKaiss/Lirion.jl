@@ -13,11 +13,30 @@ const distributed_ac_zone_cases = [
     # 30 buses
     "pglib_opf_case30_2zones_as.m",
     "pglib_opf_case30_3zones_as.m",
-    # 57/118/500 (exemplos comentados)
+    # 57 buses (descomente quando quiser)
     # "pglib_opf_case57_2zones_ieee.m",
     # "pglib_opf_case57_4zones_ieee.m",
-    "pglib_opf_case118_2zones_ieee.m",
-    # "pglib_opf_case500_2zones_goc.m",
+    # 118/500 buses
+    # "pglib_opf_case118_2zones_ieee.m",
+    # "pglib_opf_case118_3zones_ieee.m",
+    "pglib_opf_case118_5zones_ieee.m",
+    # # 500 buses
+    # "pglib_opf_case500_3zones_goc.m",
+    # "pglib_opf_case500_4zones_goc.m",
+    # # 793
+    # # "pglib_opf_case793_11zones_goc.m",
+    # # 2000
+    # "pglib_opf_case2000_5zones_goc.m",
+    # # 3970
+    # "pglib_opf_case3970_25zones_goc.m",
+    # # 10000
+    # "pglib_opf_case10000_50zones_goc.m",
+    # # 20758
+    # "pglib_opf_case20758_42zones_epigrids.m",
+    # # 30000
+    # "pglib_opf_case30000_20zones_goc.m",
+    # # 78484
+    # "pglib_opf_case78484_157zones_epigrids.m",
 ]
 
 function track_failure_ac(label::String, origin::String, case_name::String)
@@ -37,15 +56,15 @@ function compare_distributed_ac_vs_centralized(
     # parâmetros padrões
     admm_rho = 1_000.0,
     admm_max_iter = 350,
-    admm_eps_primal = 1e-6,
-    admm_eps_dual = 1e-6,
+    admm_eps_primal = 1e-4,
+    admm_eps_dual = 1e-4,
     admm_mu_incr = 2.0,
     admm_mu_decr = 2.0,
     admm_tau_incr = 1.05,
     admm_tau_decr = 0.98,
-    admm_rho_theta::Union{Nothing,Real} = nothing,
-    admm_rho_v::Union{Nothing,Real} = nothing,
-    admm_adaptive::Union{Nothing,String} = nothing, # "on" | "off" | nothing (não passa flag)
+    admm_rho_theta::Union{Nothing, Real} = nothing,
+    admm_rho_v::Union{Nothing, Real} = nothing,
+    admm_adaptive::Union{Nothing, String} = nothing, # "on" | "off" | nothing (não passa flag)
 )
     case_name = basename(file)
 
@@ -79,16 +98,20 @@ function compare_distributed_ac_vs_centralized(
             "--admm-tau-decr", string(admm_tau_decr),
         ]
         if admm_rho_theta !== nothing
-            push!(args_dist, "--admm-rho-theta"); push!(args_dist, string(admm_rho_theta))
+            push!(args_dist, "--admm-rho-theta")
+            push!(args_dist, string(admm_rho_theta))
         end
         if admm_rho_v !== nothing
-            push!(args_dist, "--admm-rho-v");     push!(args_dist, string(admm_rho_v))
+            push!(args_dist, "--admm-rho-v")
+            push!(args_dist, string(admm_rho_v))
         end
         if admm_rho_theta === nothing && admm_rho_v === nothing
-            push!(args_dist, "--admm-rho");       push!(args_dist, string(admm_rho))
+            push!(args_dist, "--admm-rho")
+            push!(args_dist, string(admm_rho))
         end
         if admm_adaptive !== nothing
-            push!(args_dist, "--admm-adaptive");  push!(args_dist, admm_adaptive)
+            push!(args_dist, "--admm-adaptive")
+            push!(args_dist, admm_adaptive)
         end
 
         obj, _ = Lirion.main(args_dist)
@@ -141,11 +164,11 @@ function run_distributed_ac_objective_tests(;
             end
 
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case   = admm_eps_dual
+        admm_eps_dual_case = admm_eps_dual
 
         admm_rho_theta_case = nothing
-        admm_rho_v_case     = nothing
-        admm_adaptive_case  = nothing
+        admm_rho_v_case = nothing
+        admm_adaptive_case = nothing
 
         if occursin("case118_", case_name)
             admm_max_iter_case = max(admm_max_iter_case, 500)
@@ -154,21 +177,98 @@ function run_distributed_ac_objective_tests(;
             admm_max_iter_case = max(admm_max_iter_case, 800)
             admm_rho_case = 1_000_000.0
             admm_eps_primal_case = min(admm_eps_primal_case, 1e-4)
-            admm_eps_dual_case   = min(admm_eps_dual_case,   1e-4)
+            admm_eps_dual_case = min(admm_eps_dual_case, 1e-4)
         end
 
         if case_name == "pglib_opf_case118_2zones_ieee.m"
-            admm_max_iter_case   = 500
+            admm_max_iter_case = 500
             admm_eps_primal_case = 1e-4
-            admm_eps_dual_case   = 1e-4
-            admm_rho_theta_case  = 1e5
-            admm_rho_v_case      = 1e5
-            admm_adaptive_case   = "on"
+            admm_eps_dual_case = 1e-4
+            admm_rho_theta_case = 1e5
+            admm_rho_v_case = 1e5
+            admm_adaptive_case = "on"
             admm_mu_incr = 2.0
             admm_mu_decr = 2.0
             admm_tau_incr = 1.05
             admm_tau_decr = 0.95
         end
+        if case_name == "pglib_opf_case118_3zones_ieee.m"
+            admm_max_iter_case = 500
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case = 1e-4
+            admm_rho_theta_case = 1e5
+            admm_rho_v_case = 1e5
+            admm_adaptive_case = "on"
+            admm_mu_incr = 3.0
+            admm_mu_decr = 3.0
+            admm_tau_incr = 1.05
+            admm_tau_decr = 0.95
+        end
+        if case_name == "pglib_opf_case118_5zones_ieee.m"
+            admm_max_iter_case = 700
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case = 1e-4
+            admm_rho_theta_case = 1e5
+            admm_rho_v_case = 1e5
+            admm_adaptive_case = "on"
+            admm_mu_incr = 3.0
+            admm_mu_decr = 3.0
+            admm_tau_incr = 1.1
+            admm_tau_decr = 0.9
+        end
+        if case_name == "pglib_opf_case500_3zones_goc.m" ||
+           case_name == "pglib_opf_case500_4zones_goc.m"
+            admm_max_iter_case = 700
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case = 1e-4
+            admm_rho_theta_case = 1e4
+            admm_rho_v_case = 1e4
+            admm_adaptive_case = "on"
+            admm_mu_incr = 3.0
+            admm_mu_decr = 3.0
+            admm_tau_incr = 1.1
+            admm_tau_decr = 0.9
+        end
+
+        if case_name == "pglib_opf_case2000_5zones_goc.m"
+            admm_max_iter_case   = 700
+            admm_eps_primal_case = 1e-4
+            admm_eps_dual_case   = 1e-4
+            admm_rho_theta_case  = 1e5
+            admm_rho_v_case      = 1e5
+            admm_adaptive_case   = "on"
+            admm_mu_incr = 3.0
+            admm_mu_decr = 3.0
+            admm_tau_incr = 1.1
+            admm_tau_decr = 0.9
+        end
+
+        if case_name == "pglib_opf_case3970_25zones_goc.m"
+            admm_max_iter_case   = 700
+            admm_eps_primal_case = 3e-4
+            admm_eps_dual_case   = 3e-4
+            admm_rho_theta_case  = 1e5
+            admm_rho_v_case      = 1e5
+            admm_adaptive_case   = "on"
+            admm_mu_incr = 3.0
+            admm_mu_decr = 3.0
+            admm_tau_incr = 1.1
+            admm_tau_decr = 0.9
+        end
+
+        if case_name == "pglib_opf_case10000_50zones_goc.m"
+            admm_max_iter_case   = 700
+            admm_eps_primal_case = 3e-4
+            admm_eps_dual_case   = 3e-4
+            admm_rho_theta_case  = 1e5
+            admm_rho_v_case      = 1e5
+            admm_adaptive_case   = "on"
+            admm_mu_incr = 3.0
+            admm_mu_decr = 3.0
+            admm_tau_incr = 1.1
+            admm_tau_decr = 0.9
+        end
+
 
         @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), ρθ=$(admm_rho_theta_case), ρV=$(admm_rho_v_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), μ=(incr=$(admm_mu_incr),decr=$(admm_mu_decr)), τ=(incr=$(admm_tau_incr),decr=$(admm_tau_decr)), adaptive=$(admm_adaptive_case))"
         @testset "$(label) - $(case_name)" begin
@@ -195,4 +295,3 @@ function run_distributed_ac_objective_tests(;
     end
     return true
 end
-

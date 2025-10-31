@@ -1,16 +1,137 @@
 # ================= AC Utils =================
 # ---------- Solver ----------
+# function resolve_optimizer_ac(config)
+#     if hasproperty(config, :optimizer) && getproperty(config, :optimizer) !== nothing
+#         return getproperty(config, :optimizer)
+#     else
+#         return optimizer_with_attributes(
+#             Ipopt.Optimizer,
+#             "print_level"             => 0,      # 0 = nada no stdout
+#             "sb"                      => "yes",  # suprime banner
+#             "print_timing_statistics" => "no",
+#             "print_user_options"      => "no",
+#             "file_print_level"        => 0,      # evita escrever em arquivo
+#         )
+#     end
+# end
+
 function resolve_optimizer_ac(config)
     if hasproperty(config, :optimizer) && getproperty(config, :optimizer) !== nothing
         return getproperty(config, :optimizer)
     else
         return optimizer_with_attributes(
             Ipopt.Optimizer,
-            "print_level"             => 0,      # 0 = nada no stdout
-            "sb"                      => "yes",  # suprime banner
-            "print_timing_statistics" => "no",
-            "print_user_options"      => "no",
-            "file_print_level"        => 0,      # evita escrever em arquivo
+
+            # ---------------------------
+            # Saída silenciosa
+            # ---------------------------
+            "print_level" => 0,      # default = 5
+            "sb" => "yes",  # default = "no"
+            "print_timing_statistics" => "no",   # default = "yes"
+            "print_user_options" => "no",   # default = "yes"
+            "file_print_level" => 0,      # default = 5
+
+            # ---------------------------
+            # Critérios de parada (inner ADMM)
+            # ---------------------------
+            "tol" => 1e-7,   # default = 1e-8
+            "acceptable_tol" => 1e-5,   # default = 1e-6
+            "acceptable_iter" => 10,     # default = 15
+            "dual_inf_tol" => 1e-4,   # default = 1.0
+            "constr_viol_tol" => 1e-4,   # default = 1e-4
+            "compl_inf_tol" => 1e-4,   # default = 1e-4
+            "acceptable_dual_inf_tol" => 1e-2,   # default = 1e10
+            "acceptable_constr_viol_tol" => 1e-3,   # default = 1e-2
+            "acceptable_compl_inf_tol" => 1e-3,   # default = 1e-2
+
+            # ---------------------------
+            # NLP & Bounds
+            # ---------------------------
+            "fixed_variable_treatment" => "make_parameter_nodual", # default = "make_parameter"
+            "bound_relax_factor" => 1e-6,   # default = 1e-8
+            #             "honor_original_bounds"       => "yes",  # default = "no"
+            "check_derivatives_for_naninf" => "no",   # default = "no"
+            "jacobian_approximation" => "exact",# default = "exact"
+            "gradient_approximation" => "exact",# default = "exact"
+            "kappa_d" => 1e-5,   # default = 1e-5
+
+            # ---------------------------
+            # Escalonamento
+            # ---------------------------
+            # "nlp_scaling_method"          => "equilibration-based", # default = "gradient-based"
+            "nlp_scaling_max_gradient" => 100.0,  # default = 100
+            "nlp_scaling_min_value" => 1e-8,   # default = 1e-8
+
+            # ---------------------------
+            # Inicialização
+            # ---------------------------
+            "bound_push" => 1e-8,   # default = 0.01
+            "bound_frac" => 1e-6,   # default = 0.01
+            "slack_bound_push" => 1e-8,   # default = 0.01
+            "slack_bound_frac" => 1e-6,   # default = 0.01
+
+            # ---------------------------
+            # Warm start (essencial no ADMM)
+            # ---------------------------
+            # "warm_start_init_point"       => "yes",  # default = "no"
+            # "warm_start_same_structure"   => "yes",  # default = "no"
+            # "warm_start_bound_push"       => 1e-8,   # default = 1e-3
+            # "warm_start_bound_frac"       => 1e-6,   # default = 1e-3
+            # "warm_start_slack_bound_push" => 1e-8,   # default = 1e-3
+            # "warm_start_slack_bound_frac" => 1e-6,   # default = 1e-3
+            # "warm_start_mult_bound_push"  => 1e-6,   # default = 1e-3
+
+            # ---------------------------
+            # Limites de esforço (inner loop)
+            # ---------------------------
+            # "max_iter"                    => 250,    # default = 3000
+            # "max_wall_time"               => 45.0,   # default = 1e20
+
+            # ---------------------------
+            # Estratégia da barreira (mu)
+            # ---------------------------
+            # "mu_strategy"                 => "adaptive",          # default = "monotone"
+            # "mu_oracle"                   => "quality-function",  # default = "quality-function"
+            # # "adaptive_mu_restore_previous_iterate" => "yes",      # default = "no"
+            # "mu_allow_fast_monotone_decrease" => "yes",           # default = "yes"
+            # "tau_min"                     => 0.95,                # default = 0.99
+
+            # ---------------------------
+            # Line Search (globalization)
+            # ---------------------------
+            # "line_search_method"          => "filter",  # default = "filter"
+            # "alpha_red_factor"            => 0.6,       # default = 0.5
+            # "accept_every_trial_step"     => "no",      # default = "no"
+            # "watchdog_shortened_iter_trigger" => 7,     # default = 10
+            # "watchdog_trial_iter_max"     => 3,         # default = 3
+            # "max_soc"                     => 3,         # default = 4
+            # "constraint_violation_norm_type" => "1-norm", # default = "1-norm"
+
+            #             # ---------------------------
+            #             # Linear Solver & Refinement
+            #             # ---------------------------
+            "linear_solver" => "mumps",   # default = "ma27"
+            # "linear_system_scaling"       => "mc19",    # default = "mc19" (HSL), "none" caso contrário
+            "linear_scaling_on_demand" => "yes",     # default = "yes"
+            "fast_step_computation" => "no",      # default = "no"
+            "min_refinement_steps" => 1,         # default = 1
+            "max_refinement_steps" => 8,         # default = 10
+            "neg_curv_test_tol" => 1e-12,     # default = 0
+            "neg_curv_test_reg" => "yes",     # default = "yes"
+            "max_hessian_perturbation" => 1e20,      # default = 1e20
+            "min_hessian_perturbation" => 1e-20,     # default = 1e-20
+
+            #             # ---- Parâmetros específicos do MUMPS ----
+            "mumps_mem_percent" => 500,    # default = 1000
+            "mumps_pivtol" => 1e-6,   # default = 1e-6
+            "mumps_pivtolmax" => 0.1,    # default = 0.1
+            "mumps_pivot_order" => 7,      # default = 7
+
+            #             # ---------------------------
+            #             # Hessian Approximation
+            #             # ---------------------------
+            "hessian_approximation" => "exact",  # default = "exact"
+            "limited_memory_max_history" => 6,        # default = 6
         )
     end
 end
@@ -125,11 +246,11 @@ function _warm_start_ac_base!(sub::Dict{String, Any})
         @warn "Warm start (AC) ignorado: optimize! não retornou valores (status=$(JuMP.termination_status(m)))."
         return
     end
-    θ_vals = Dict{typeof(first(keys(θ))) , Float64}()
+    θ_vals = Dict{typeof(first(keys(θ))), Float64}()
     for I in keys(θ)
         θ_vals[I] = JuMP.value(θ[I])
     end
-    V_vals = Dict{typeof(first(keys(V))) , Float64}()
+    V_vals = Dict{typeof(first(keys(V))), Float64}()
     for I in keys(V)
         V_vals[I] = JuMP.value(V[I])
     end
@@ -1032,7 +1153,7 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
     elapsed_s = (time_ns() - t0) / 1e9
     println("Tempo ADMM (bus/AC): $(_pretty_time_ac(elapsed_s))")
 
-    return total_real_cost, partitions
+    return total_real_cost, partitions, elapsed_s
 end
 
 # ========================== ADMM: BRANCH (AC) ==========================
@@ -1215,7 +1336,7 @@ function run_admm_ac_branch(
     elapsed_s = (time_ns() - t0) / 1e9
     println("Tempo ADMM (branch/AC): $(_pretty_time_ac(elapsed_s))")
 
-    return total_real_cost, partitions
+    return total_real_cost, partitions, elapsed_s
 end
 
 # ========================== ADMM: HÍBRIDO (AC) ==========================
@@ -1650,5 +1771,5 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
     elapsed_s = (time_ns() - t0) / 1e9
     println("Tempo ADMM (hybrid/AC): $(_pretty_time_ac(elapsed_s))")
 
-    return total_real_cost, partitions
+    return total_real_cost, partitions, elapsed_s
 end
