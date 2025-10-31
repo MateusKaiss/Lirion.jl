@@ -209,38 +209,37 @@ function run_distributed_hybrid_ac_objective_tests(;
         end
 
         if case_name == "pglib_opf_case2000_5zones_goc.m"
-            admm_max_iter_case   = 500
+            admm_max_iter_case = 500
             admm_eps_primal_case = 1e-4
-            admm_eps_dual_case   = 1e-4
-            rho_bus_base         = 1.0e4   # --admm-rho-theta / --admm-rho-v
-            rho_flow_base        = 1.0e4   # --admm-rho-flow-p / --admm-rho-flow-q
-            admm_adaptive_case   = "on"
+            admm_eps_dual_case = 1e-4
+            rho_bus_base = 1.0e4   # --admm-rho-theta / --admm-rho-v
+            rho_flow_base = 1.0e4   # --admm-rho-flow-p / --admm-rho-flow-q
+            admm_adaptive_case = "on"
             admm_mu_incr_case, admm_mu_decr_case = 2.0, 2.0
             admm_tau_incr_case, admm_tau_decr_case = 1.1, 0.9
         end
 
         if case_name == "pglib_opf_case3970_25zones_goc.m"
-            admm_max_iter_case   = 500
+            admm_max_iter_case = 500
             admm_eps_primal_case = 3e-4
-            admm_eps_dual_case   = 3e-4
-            rho_bus_base         = 1.0e4   # --admm-rho-theta / --admm-rho-v
-            rho_flow_base        = 1.0e4   # --admm-rho-flow-p / --admm-rho-flow-q
-            admm_adaptive_case   = "on"
+            admm_eps_dual_case = 3e-4
+            rho_bus_base = 1.0e4   # --admm-rho-theta / --admm-rho-v
+            rho_flow_base = 1.0e4   # --admm-rho-flow-p / --admm-rho-flow-q
+            admm_adaptive_case = "on"
             admm_mu_incr_case, admm_mu_decr_case = 2.0, 2.0
             admm_tau_incr_case, admm_tau_decr_case = 1.3, 0.7
         end
 
         if case_name == "pglib_opf_case10000_10zones_ac_goc.m"
-            admm_max_iter_case   = 800
+            admm_max_iter_case = 800
             admm_eps_primal_case = 3e-4
-            admm_eps_dual_case   = 3e-4
-            rho_bus_base         = 1.0e3   # --admm-rho-theta / --admm-rho-v
-            rho_flow_base        = 1.0e3   # --admm-rho-flow-p / --admm-rho-flow-q
-            admm_adaptive_case   = "on"
+            admm_eps_dual_case = 3e-4
+            rho_bus_base = 1.0e3   # --admm-rho-theta / --admm-rho-v
+            rho_flow_base = 1.0e3   # --admm-rho-flow-p / --admm-rho-flow-q
+            admm_adaptive_case = "on"
             admm_mu_incr_case, admm_mu_decr_case = 3.0, 3.0
             admm_tau_incr_case, admm_tau_decr_case = 1.05, 0.95
         end
-
 
         @info "[$label] Rodando caso $i de $n: $case_name " *
               "(max_iter=$(admm_max_iter_case), ρθ/ρV=$(rho_bus_base), ρ_flow=$(rho_flow_base), " *

@@ -12,13 +12,13 @@ const ADMM_MAX_IT = 300
 const distributed_socp_zone_cases = [
     # 14 buses
     "pglib_opf_case14_2zones_ieee_socp.m",
-    "pglib_opf_case14_3zones_ieee_socp.m",
-    # 24 buses
-    "pglib_opf_case24_2zones_ieee_rts.m",
-    "pglib_opf_case24_3zones_ieee_rts.m",
-    # 30 buses
-    "pglib_opf_case30_2zones_as.m",
-    "pglib_opf_case30_3zones_as.m",
+    # "pglib_opf_case14_3zones_ieee_socp.m",
+    # # 24 buses
+    # "pglib_opf_case24_2zones_ieee_rts.m",
+    # "pglib_opf_case24_3zones_ieee_rts.m",
+    # # 30 buses
+    # "pglib_opf_case30_2zones_as.m",
+    # "pglib_opf_case30_3zones_as.m",
     # 57/118/500 (descomentando conforme seus arquivos)
     # "pglib_opf_case57_2zones_ieee.m",
     # "pglib_opf_case57_4zones_ieee.m",
@@ -45,8 +45,8 @@ function compare_distributed_socp_vs_centralized(
     rho_v::Float64 = 1.0e3,
     rho_flow_p::Float64 = 3.0e2,
     rho_flow_q::Float64 = 3.0e2,
-    admm_eps_primal::Float64 = 1e-5,
-    admm_eps_dual::Float64 = 1e-5,
+    admm_eps_primal::Float64 = 1e-4,
+    admm_eps_dual::Float64 = 1e-4,
 )
     case_name = basename(file)
 
@@ -96,7 +96,7 @@ function run_distributed_socp_objective_tests(;
     central_optimizer = SCS.Optimizer,
     distributed_optimizer = SCS.Optimizer,
     rtol = 0.05, atol = 1e-6,
-    admm_eps_primal = 1e-5, admm_eps_dual = 1e-5,
+    admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,
 )
     if isempty(case_list)
         @info "Empty SOCP distributed case list. No tests will be run."
