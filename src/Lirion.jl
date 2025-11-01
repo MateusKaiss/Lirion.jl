@@ -27,6 +27,7 @@ using OSQP
 using Base.Threads
 using MathOptInterface
 using COSMO
+using Clarabel
 
 const MOI = MathOptInterface
 const _FAST_USE_LOGS = true

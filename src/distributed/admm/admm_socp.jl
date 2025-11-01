@@ -95,26 +95,26 @@ function resolve_socp_optimizer(config)
     if Base.hasfield(typeof(config), :optimizer)
         opt = getfield(config, :optimizer)
         if opt !== nothing
-            return opt              # ex.: COSMO.Optimizer, Gurobi.Optimizer, SCS.Optimizer
+            return opt              # ex.: clarabel.Optimizer, Gurobi.Optimizer, SCS.Optimizer
         end
     end
 
-    # 2) Ordem preferida opcional: :auto | :gurobi | :cosmo | :scs
+    # 2) Ordem preferida opcional: :auto | :gurobi | :clarabel | :scs
     prefer = (Base.hasfield(typeof(config), :prefer_socp_solver) ?
               getfield(config, :prefer_socp_solver) : :auto)
 
-    order = prefer === :gurobi ? (:gurobi, :cosmo, :scs) :
-            prefer === :cosmo  ? (:cosmo,  :gurobi, :scs) :
-            prefer === :scs    ? (:scs,    :gurobi, :cosmo) :
-                                 (:gurobi, :cosmo,  :scs)   # :auto
+    order = prefer === :gurobi ? (:gurobi, :clarabel, :scs) :
+            prefer === :clarabel  ? (:clarabel,  :gurobi, :scs) :
+            prefer === :scs    ? (:scs,    :gurobi, :clarabel) :
+                                 (:gurobi, :clarabel,  :scs)   # :auto
 
     # 3) Retorna o primeiro construtor disponível (factory), sem instanciar aqui
     for s in order
         try
             if s === :gurobi
                 return Gurobi.Optimizer
-            elseif s === :cosmo
-                return COSMO.Optimizer
+            elseif s === :clarabel
+                return Clarabel.Optimizer
             else
                 return SCS.Optimizer
             end
