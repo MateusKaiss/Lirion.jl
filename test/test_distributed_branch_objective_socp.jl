@@ -5,17 +5,52 @@ using Test
 using Lirion
 using Glob
 using SCS
+using Gurobi
+using COSMO
+
+# -------- helper local (caso o runtests não tenha definido) --------
+# ENV["LIRION_SOCP_PREFER"] pode ser "auto" | "gurobi" | "cosmo" | "scs"
+if !@isdefined(pick_socp_optimizer)
+    const _SOCP_CHAIN_MAP_LOCAL = Dict(
+        :auto   => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
+        :gurobi => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
+        :cosmo  => (COSMO.Optimizer,  Gurobi.Optimizer, SCS.Optimizer),
+        :scs    => (SCS.Optimizer,    Gurobi.Optimizer, COSMO.Optimizer),
+    )
+    function pick_socp_optimizer(; prefer::Symbol = Symbol(
+        lowercase(get(ENV, "LIRION_SOCP_PREFER", "auto"))
+    ))
+        chain = get(_SOCP_CHAIN_MAP_LOCAL, prefer, _SOCP_CHAIN_MAP_LOCAL[:auto])
+        for factory in chain
+            try
+                _ = factory()
+                return factory
+            catch
+            end
+        end
+        return SCS.Optimizer
+    end
+end
+
+# Defaults: usa os do runtests se existirem; senão, cai para o picker local
+const _CENTRAL_DEFAULT = @isdefined(CENTRAL_SOCP_SOLVER)     ? CENTRAL_SOCP_SOLVER     :
+                         (@isdefined(DEFAULT_SOCP_SOLVER)    ? DEFAULT_SOCP_SOLVER     :
+                          pick_socp_optimizer(; prefer = :gurobi))
+
+const _DISTRIB_DEFAULT = @isdefined(DISTRIBUTED_SOCP_SOLVER) ? DISTRIBUTED_SOCP_SOLVER :
+                         (@isdefined(DEFAULT_SOCP_SOLVER)    ? DEFAULT_SOCP_SOLVER     :
+                          pick_socp_optimizer(; prefer = :auto))
 
 const distributed_branch_socp_zone_cases = [
     # 14 buses
     "pglib_opf_case14_2zones_ieee_socp.m",
-    # "pglib_opf_case14_3zones_ieee_socp.m",
+    "pglib_opf_case14_3zones_ieee_socp.m",
     # # 24 buses
-    # "pglib_opf_case24_2zones_ieee_rts.m",
-    # "pglib_opf_case24_3zones_ieee_rts.m",
-    # # 30 buses
-    # "pglib_opf_case30_2zones_as.m",
-    # "pglib_opf_case30_3zones_as.m",
+    "pglib_opf_case24_2zones_ieee_rts.m",
+    "pglib_opf_case24_3zones_ieee_rts.m",
+    # 30 buses
+    "pglib_opf_case30_2zones_as.m",
+    "pglib_opf_case30_3zones_as.m",
     # 57/118/500 
     # "pglib_opf_case57_2zones_ieee.m",
     # "pglib_opf_case57_4zones_ieee.m",
@@ -34,8 +69,8 @@ end
 function compare_distributed_branch_socp_vs_centralized(
     file::String;
     label::String,
-    central_optimizer = SCS.Optimizer,        # SOCP central
-    distributed_optimizer = SCS.Optimizer,    # ADMM-Branch-SOCP
+    central_optimizer = _CENTRAL_DEFAULT,     # fallback (Gurobi→COSMO→SCS)
+    distributed_optimizer = _DISTRIB_DEFAULT, # idem para o distribuído
     rtol = 0.05,
     atol = 1e-6,
     # ADMM penalties
@@ -68,10 +103,10 @@ function compare_distributed_branch_socp_vs_centralized(
         args_dist = String[
             file,
             "--model", "distributed-admm-branch-socp",
-            "--optimizer", string(distributed_optimizer), "--admm-rho-flow-p",
-            string(rho_flow_p),
-            "--admm-rho-flow-q", string(rho_flow_q), "--admm-max-iter",
-            string(admm_max_iter),
+            "--optimizer", string(distributed_optimizer),
+            "--admm-rho-flow-p", string(rho_flow_p),
+            "--admm-rho-flow-q", string(rho_flow_q),
+            "--admm-max-iter", string(admm_max_iter),
             "--admm-eps-primal", string(admm_eps_primal),
             "--admm-eps-dual", string(admm_eps_dual),
         ]
@@ -90,8 +125,8 @@ end
 function run_distributed_branch_socp_objective_tests(;
     case_list = distributed_branch_socp_zone_cases,
     label = "ADMM-Branch-SOCP vs SOCP",
-    central_optimizer = SCS.Optimizer,
-    distributed_optimizer = SCS.Optimizer,
+    central_optimizer = _CENTRAL_DEFAULT,
+    distributed_optimizer = _DISTRIB_DEFAULT,
     rtol = 0.05, atol = 1e-6,
     admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,
 )

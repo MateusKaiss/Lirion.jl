@@ -5,6 +5,41 @@
 _warm_on(config) =
     (hasproperty(config, :warm_start) && getproperty(config, :warm_start) == true)
 
+"Retorna true se o modelo `m` está usando Gurobi."
+is_gurobi(m::JuMP.Model)::Bool = occursin("Gurobi", MOI.get(m, MOI.SolverName()))
+
+"Ridge suave para estabilizar QCP no runner branch (P,Q)."
+function _soft_anchor_branch_expr!(sub::Dict{String,Any};
+    κV2::Float64 = 1e-6, κPQ::Float64 = 1e-8,
+    use_bus::Bool = true, use_pq::Bool = true,
+)
+    m = sub["model"]
+    q = zero(JuMP.QuadExpr)
+
+    if use_bus && haskey(m, :v_magnitude_sq)
+        V2 = m[:v_magnitude_sq]
+        sub["v2_var"] = V2
+        # ancora TODAS as barras da zona (não só compartilhadas)
+        for I in keys(V2)
+            x = V2[I]
+            # start_value se houver, senão 1.0 (flat seguro p/ SOCP)
+            xref = (JuMP.start_value(x) === nothing) ? 1.0 : JuMP.start_value(x)
+            q += 0.5 * κV2 * (x - xref)^2
+        end
+    end
+
+    if use_pq && haskey(sub, "zone_edges")
+        for e in sub["zone_edges"]
+            l = get(sub["edge_to_local"], e, nothing); l === nothing && continue
+            P, Q = _socp_flow_from_exprs_existing(m, l)   # deve ser AffExpr!
+            q += 0.5 * κPQ * (P^2 + Q^2)
+        end
+    end
+
+    sub["soft_anchor_expr"] = q
+    return q
+end
+
 # ---- Otimizador: tenta Gurobi -> COSMO -> SCS (com override) ----
 function resolve_socp_optimizer(config)
     # 1) prioridade absoluta: se vier um otimizador explícito no config
@@ -941,12 +976,22 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, An
         _set_model_silent!(m)
         sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
 
-        # cache quadráticos
+        # 🔧 ridge (apenas se Gurobi) — antes de definir obj_static
+        if is_gurobi(m)
+            _soft_anchor_branch_expr!(sub; κV2=1e-6, κPQ=1e-8, use_bus=true, use_pq=true)
+        else
+            sub["soft_anchor_expr"] = zero(JuMP.QuadExpr)
+        end
+
+        # quadrático do ADMM (P,Q)
         _build_quad_branch_pq_expr!(sub, ρP[], ρQ[], sub["zone_edges"])
-        sub["obj_static"] = sub["obj_base"] + sub["quad_pq_expr"]
+
+        # 🔧 obj_static inclui SEMPRE o ridge (mesmo se zero)
+        sub["obj_static"] = sub["obj_base"] + sub["quad_pq_expr"] + sub["soft_anchor_expr"]
         @objective(m, Min, sub["obj_static"])
         optimize!(m)
     end
+
 
     # consensos/duais
     zP = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
@@ -990,7 +1035,7 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, An
         if ρP[] != prev_ρP || ρQ[] != prev_ρQ
             for (_, sub) in partitions
                 _build_quad_branch_pq_expr!(sub, ρP[], ρQ[], sub["zone_edges"])
-                sub["obj_static"] = sub["obj_base"] + sub["quad_pq_expr"]
+                sub["obj_static"] = sub["obj_base"] + sub["quad_pq_expr"] + sub["soft_anchor_expr"]
             end
             prev_ρP, prev_ρQ = ρP[], ρQ[]
         end
