@@ -929,9 +929,15 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
 
         # ρ adaptativo por bloco
         if adaptive
-            adaptive_rho!(ρV2, r_bus, s_bus)
-            adaptive_rho!(ρR, r_rt, s_rt)
-            adaptive_rho!(ρT, r_rt, s_rt)
+            adaptive_rho!(ρV2, r_bus, s_bus;
+                μ_incr = config.mu_incr, μ_decr = config.mu_decr,
+                τ_incr = config.tau_incr, τ_decr = config.tau_decr)
+            adaptive_rho!(ρR,  r_rt,  s_rt;
+                μ_incr = config.mu_incr, μ_decr = config.mu_decr,
+                τ_incr = config.tau_incr, τ_decr = config.tau_decr)
+            adaptive_rho!(ρT,  r_rt,  s_rt;
+                μ_incr = config.mu_incr, μ_decr = config.mu_decr,
+                τ_incr = config.tau_incr, τ_decr = config.tau_decr)
         end
     end
 
@@ -1098,9 +1104,14 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, An
         end
 
         if adaptive
-            adaptive_rho!(ρP, r, s)
-            adaptive_rho!(ρQ, r, s)
+            adaptive_rho!(ρP, r, s;
+                μ_incr = config.mu_incr, μ_decr = config.mu_decr,
+                τ_incr = config.tau_incr, τ_decr = config.tau_decr)
+            adaptive_rho!(ρQ, r, s;
+                μ_incr = config.mu_incr, μ_decr = config.mu_decr,
+                τ_incr = config.tau_incr, τ_decr = config.tau_decr)
         end
+
     end
 
     save_socp_branch_pq_plots(r_hist, s_hist, eps_r_hist, eps_s_hist, rhoP_hist, rhoQ_hist;
@@ -1428,12 +1439,23 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, An
         end
 
         if adaptive
-            adaptive_rho!(ρV2, r_bus, s_bus)
-            adaptive_rho!(ρP, r_pq, s_pq)
-            adaptive_rho!(ρQ, r_pq, s_pq)
-            adaptive_rho!(ρR, r_rt, s_rt)
-            adaptive_rho!(ρT, r_rt, s_rt)
+            adaptive_rho!(ρV2, r_bus, s_bus;
+                μ_incr = config.mu_incr, μ_decr = config.mu_decr,
+                τ_incr = config.tau_incr, τ_decr = config.tau_decr)
+            adaptive_rho!(ρP,  r_pq,  s_pq;
+                μ_incr = config.mu_incr, μ_decr = config.mu_decr,
+                τ_incr = config.tau_incr, τ_decr = config.tau_decr)
+            adaptive_rho!(ρQ,  r_pq,  s_pq;
+                μ_incr = config.mu_incr, μ_decr = config.mu_decr,
+                τ_incr = config.tau_incr, τ_decr = config.tau_decr)
+            adaptive_rho!(ρR,  r_rt,  s_rt;
+                μ_incr = config.mu_incr, μ_decr = config.mu_decr,
+                τ_incr = config.tau_incr, τ_decr = config.tau_decr)
+            adaptive_rho!(ρT,  r_rt,  s_rt;
+                μ_incr = config.mu_incr, μ_decr = config.mu_decr,
+                τ_incr = config.tau_incr, τ_decr = config.tau_decr)
         end
+
     end
 
     save_socp_hybrid_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
