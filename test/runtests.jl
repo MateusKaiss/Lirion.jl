@@ -14,15 +14,17 @@ using COSMO   # <- adicionado para o fallback
 # Ordem padrão: Gurobi → COSMO → SCS. Você pode alterar via:
 # ENV["LIRION_SOCP_PREFER"] = "auto" | "gurobi" | "cosmo" | "scs"
 const _SOCP_CHAIN_MAP = Dict(
-    :auto   => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
+    :auto => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
     :gurobi => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
-    :cosmo  => (COSMO.Optimizer,  Gurobi.Optimizer, SCS.Optimizer),
-    :scs    => (SCS.Optimizer,    Gurobi.Optimizer, COSMO.Optimizer),
+    :cosmo => (COSMO.Optimizer, Gurobi.Optimizer, SCS.Optimizer),
+    :scs => (SCS.Optimizer, Gurobi.Optimizer, COSMO.Optimizer),
 )
 
-function pick_socp_optimizer(; prefer::Symbol = Symbol(
-    lowercase(get(ENV, "LIRION_SOCP_PREFER", "auto"))
-))
+function pick_socp_optimizer(;
+    prefer::Symbol = Symbol(
+        lowercase(get(ENV, "LIRION_SOCP_PREFER", "auto")),
+    ),
+)
     chain = get(_SOCP_CHAIN_MAP, prefer, _SOCP_CHAIN_MAP[:auto])
     for factory in chain
         try
@@ -63,19 +65,19 @@ include("test_distributed_hybrid_objective_socp.jl")
     # SOCP: força o mesmo fallback para centralizado e distribuído
     run_distributed_socp_objective_tests(;
         rtol = 0.05,
-        central_optimizer    = DEFAULT_SOCP_SOLVER,
+        central_optimizer = DEFAULT_SOCP_SOLVER,
         distributed_optimizer = DEFAULT_SOCP_SOLVER,
     )
 
     run_distributed_branch_socp_objective_tests(;
         rtol = 0.05,
-        central_optimizer    = DEFAULT_SOCP_SOLVER,
+        central_optimizer = DEFAULT_SOCP_SOLVER,
         distributed_optimizer = DEFAULT_SOCP_SOLVER,
     )
 
     run_distributed_hybrid_socp_objective_tests(;
         rtol = 0.05,
-        central_optimizer    = DEFAULT_SOCP_SOLVER,
+        central_optimizer = DEFAULT_SOCP_SOLVER,
         distributed_optimizer = DEFAULT_SOCP_SOLVER,
     )
 end

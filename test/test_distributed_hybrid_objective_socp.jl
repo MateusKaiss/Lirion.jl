@@ -12,14 +12,16 @@ using COSMO
 # ENV["LIRION_SOCP_PREFER"] pode ser "auto" | "gurobi" | "cosmo" | "scs"
 if !@isdefined(pick_socp_optimizer)
     const _SOCP_CHAIN_MAP_LOCAL = Dict(
-        :auto   => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
+        :auto => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
         :gurobi => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
-        :cosmo  => (COSMO.Optimizer,  Gurobi.Optimizer, SCS.Optimizer),
-        :scs    => (SCS.Optimizer,    Gurobi.Optimizer, COSMO.Optimizer),
+        :cosmo => (COSMO.Optimizer, Gurobi.Optimizer, SCS.Optimizer),
+        :scs => (SCS.Optimizer, Gurobi.Optimizer, COSMO.Optimizer),
     )
-    function pick_socp_optimizer(; prefer::Symbol = Symbol(
-        lowercase(get(ENV, "LIRION_SOCP_PREFER", "auto"))
-    ))
+    function pick_socp_optimizer(;
+        prefer::Symbol = Symbol(
+            lowercase(get(ENV, "LIRION_SOCP_PREFER", "auto")),
+        ),
+    )
         chain = get(_SOCP_CHAIN_MAP_LOCAL, prefer, _SOCP_CHAIN_MAP_LOCAL[:auto])
         for factory in chain
             try
@@ -33,13 +35,19 @@ if !@isdefined(pick_socp_optimizer)
 end
 
 # Defaults: usa os do runtests se existirem; senão, cai para o picker local
-const _CENTRAL_DEFAULT = @isdefined(CENTRAL_SOCP_SOLVER)     ? CENTRAL_SOCP_SOLVER     :
-                         (@isdefined(DEFAULT_SOCP_SOLVER)    ? DEFAULT_SOCP_SOLVER     :
-                          pick_socp_optimizer(; prefer = :gurobi))
+const _CENTRAL_DEFAULT =
+    @isdefined(CENTRAL_SOCP_SOLVER) ? CENTRAL_SOCP_SOLVER :
+    (
+        @isdefined(DEFAULT_SOCP_SOLVER) ? DEFAULT_SOCP_SOLVER :
+        pick_socp_optimizer(; prefer = :gurobi)
+    )
 
-const _DISTRIB_DEFAULT = @isdefined(DISTRIBUTED_SOCP_SOLVER) ? DISTRIBUTED_SOCP_SOLVER :
-                         (@isdefined(DEFAULT_SOCP_SOLVER)    ? DEFAULT_SOCP_SOLVER     :
-                          pick_socp_optimizer(; prefer = :auto))
+const _DISTRIB_DEFAULT =
+    @isdefined(DISTRIBUTED_SOCP_SOLVER) ? DISTRIBUTED_SOCP_SOLVER :
+    (
+        @isdefined(DEFAULT_SOCP_SOLVER) ? DEFAULT_SOCP_SOLVER :
+        pick_socp_optimizer(; prefer = :auto)
+    )
 
 # --- lista de casos particionados (2/3/4 zonas) ---
 const distributed_hybrid_socp_zone_cases = [
@@ -126,12 +134,12 @@ function compare_distributed_hybrid_socp_vs_centralized(
             file,
             "--model", "distributed-admm-hybrid-socp",
             "--optimizer", string(distributed_optimizer),
-            "--admm-rho-v",       string(rho_v),
-            "--admm-rho-flow-p",  string(rho_flow_p),
-            "--admm-rho-flow-q",  string(rho_flow_q),
-            "--admm-max-iter",    string(admm_max_iter),
-            "--admm-eps-primal",  string(admm_eps_primal),
-            "--admm-eps-dual",    string(admm_eps_dual),
+            "--admm-rho-v", string(rho_v),
+            "--admm-rho-flow-p", string(rho_flow_p),
+            "--admm-rho-flow-q", string(rho_flow_q),
+            "--admm-max-iter", string(admm_max_iter),
+            "--admm-eps-primal", string(admm_eps_primal),
+            "--admm-eps-dual", string(admm_eps_dual),
         ]
         obj, _ = Lirion.main(args_dist)
         obj

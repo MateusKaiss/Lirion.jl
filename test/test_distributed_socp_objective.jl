@@ -14,14 +14,16 @@ const ADMM_MAX_IT = 500
 # ENV["LIRION_SOCP_PREFER"] pode ser "auto" | "gurobi" | "cosmo" | "scs"
 if !@isdefined(pick_socp_optimizer)
     const _SOCP_CHAIN_MAP_LOCAL = Dict(
-        :auto   => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
+        :auto => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
         :gurobi => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
-        :cosmo  => (COSMO.Optimizer,  Gurobi.Optimizer, SCS.Optimizer),
-        :scs    => (SCS.Optimizer,    Gurobi.Optimizer, COSMO.Optimizer),
+        :cosmo => (COSMO.Optimizer, Gurobi.Optimizer, SCS.Optimizer),
+        :scs => (SCS.Optimizer, Gurobi.Optimizer, COSMO.Optimizer),
     )
-    function pick_socp_optimizer(; prefer::Symbol = Symbol(
-        lowercase(get(ENV, "LIRION_SOCP_PREFER", "auto"))
-    ))
+    function pick_socp_optimizer(;
+        prefer::Symbol = Symbol(
+            lowercase(get(ENV, "LIRION_SOCP_PREFER", "auto")),
+        ),
+    )
         chain = get(_SOCP_CHAIN_MAP_LOCAL, prefer, _SOCP_CHAIN_MAP_LOCAL[:auto])
         for factory in chain
             try
@@ -35,13 +37,19 @@ if !@isdefined(pick_socp_optimizer)
 end
 
 # Defaults: usa os do runtests se existirem; senão, cai para o picker local
-const _CENTRAL_DEFAULT = @isdefined(CENTRAL_SOCP_SOLVER)     ? CENTRAL_SOCP_SOLVER     :
-                         (@isdefined(DEFAULT_SOCP_SOLVER)    ? DEFAULT_SOCP_SOLVER     :
-                          pick_socp_optimizer(; prefer = :gurobi))
+const _CENTRAL_DEFAULT =
+    @isdefined(CENTRAL_SOCP_SOLVER) ? CENTRAL_SOCP_SOLVER :
+    (
+        @isdefined(DEFAULT_SOCP_SOLVER) ? DEFAULT_SOCP_SOLVER :
+        pick_socp_optimizer(; prefer = :gurobi)
+    )
 
-const _DISTRIB_DEFAULT = @isdefined(DISTRIBUTED_SOCP_SOLVER) ? DISTRIBUTED_SOCP_SOLVER :
-                         (@isdefined(DEFAULT_SOCP_SOLVER)    ? DEFAULT_SOCP_SOLVER     :
-                          pick_socp_optimizer(; prefer = :auto))
+const _DISTRIB_DEFAULT =
+    @isdefined(DISTRIBUTED_SOCP_SOLVER) ? DISTRIBUTED_SOCP_SOLVER :
+    (
+        @isdefined(DEFAULT_SOCP_SOLVER) ? DEFAULT_SOCP_SOLVER :
+        pick_socp_optimizer(; prefer = :auto)
+    )
 
 # --- lista de casos particionados (2/3/4 zonas) ---
 const distributed_socp_zone_cases = [
