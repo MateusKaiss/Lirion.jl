@@ -87,7 +87,6 @@ end
 #     end
 # end
 
-
 # ---- Otimizador: tenta Gurobi -> COSMO -> SCS (com override) ----
 function resolve_socp_optimizer(config)
     # 1) Prioridade absoluta ao que veio no config (se existir e não-nothing)
@@ -100,13 +99,16 @@ function resolve_socp_optimizer(config)
     end
 
     # 2) Ordem preferida opcional: :auto | :gurobi | :clarabel | :scs
-    prefer = (Base.hasfield(typeof(config), :prefer_socp_solver) ?
-              getfield(config, :prefer_socp_solver) : :auto)
+    prefer = (
+        Base.hasfield(typeof(config), :prefer_socp_solver) ?
+        getfield(config, :prefer_socp_solver) : :auto
+    )
 
-    order = prefer === :gurobi ? (:gurobi, :clarabel, :scs) :
-            prefer === :clarabel  ? (:clarabel,  :gurobi, :scs) :
-            prefer === :scs    ? (:scs,    :gurobi, :clarabel) :
-                                 (:gurobi, :clarabel,  :scs)   # :auto
+    order =
+        prefer === :gurobi ? (:gurobi, :clarabel, :scs) :
+        prefer === :clarabel ? (:clarabel, :gurobi, :scs) :
+        prefer === :scs ? (:scs, :gurobi, :clarabel) :
+        (:gurobi, :clarabel, :scs)   # :auto
 
     # 3) Retorna o primeiro construtor disponível (factory), sem instanciar aqui
     for s in order
@@ -970,10 +972,10 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
             adaptive_rho!(ρV2, r_bus, s_bus;
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
-            adaptive_rho!(ρR,  r_rt,  s_rt;
+            adaptive_rho!(ρR, r_rt, s_rt;
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
-            adaptive_rho!(ρT,  r_rt,  s_rt;
+            adaptive_rho!(ρT, r_rt, s_rt;
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
         end
@@ -1149,7 +1151,6 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, An
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
         end
-
     end
 
     save_socp_branch_pq_plots(r_hist, s_hist, eps_r_hist, eps_s_hist, rhoP_hist, rhoQ_hist;
@@ -1480,20 +1481,19 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, An
             adaptive_rho!(ρV2, r_bus, s_bus;
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
-            adaptive_rho!(ρP,  r_pq,  s_pq;
+            adaptive_rho!(ρP, r_pq, s_pq;
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
-            adaptive_rho!(ρQ,  r_pq,  s_pq;
+            adaptive_rho!(ρQ, r_pq, s_pq;
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
-            adaptive_rho!(ρR,  r_rt,  s_rt;
+            adaptive_rho!(ρR, r_rt, s_rt;
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
-            adaptive_rho!(ρT,  r_rt,  s_rt;
+            adaptive_rho!(ρT, r_rt, s_rt;
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
         end
-
     end
 
     save_socp_hybrid_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,

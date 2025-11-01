@@ -7,20 +7,58 @@ using Glob
 using SCS
 using Gurobi
 using COSMO
+using Clarabel
+
+# -------------------------------------------------
+# Pacote de atributos robustos do Clarabel
+# -------------------------------------------------
+const CLARABEL_ROBUST = """
+optimizer_with_attributes(Clarabel.Optimizer,
+    "tol_feas" => 1e-4,
+    "tol_gap_abs" => 1e-4,
+    "tol_gap_rel" => 1e-4,
+    "max_iter" => 1200,
+
+    "dynamic_regularization_enable" => true,
+    "dynamic_regularization_eps"   => 1e-10,
+    "dynamic_regularization_delta" => 1e-4,
+
+    "static_regularization_enable" => true,
+
+    "equilibrate_enable" => true,
+    "equilibrate_min_scaling" => 1e-4,
+    "equilibrate_max_scaling" => 1e4,
+
+    "direct_solve_method" => :qdldl,
+
+    "iterative_refinement_reltol" => 1e-9,
+    "iterative_refinement_abstol" => 1e-9,
+
+    "max_step_fraction" => 0.7,
+    "linesearch_backtrack_step" => 0.5,
+
+    "tol_ktratio" => 1e-5,
+    "min_terminate_step_length" => 1e-6,
+    "min_switch_step_length" => 5e-2,
+
+    "reduced_tol_gap_abs" => 5e-4,
+    "reduced_tol_gap_rel" => 5e-4,
+    "reduced_tol_feas"    => 5e-4,
+    "reduced_tol_infeas_abs" => 5e-11,
+    "reduced_tol_infeas_rel" => 5e-4,
+    "reduced_tol_ktratio"    => 1e-4
+)"""
 
 # -------- helper local (caso o runtests não tenha definido) --------
-# ENV["LIRION_SOCP_PREFER"] pode ser "auto" | "gurobi" | "cosmo" | "scs"
 if !@isdefined(pick_socp_optimizer)
     const _SOCP_CHAIN_MAP_LOCAL = Dict(
-        :auto => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
+        :auto   => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
         :gurobi => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
-        :cosmo => (COSMO.Optimizer, Gurobi.Optimizer, SCS.Optimizer),
-        :scs => (SCS.Optimizer, Gurobi.Optimizer, COSMO.Optimizer),
+        :cosmo  => (COSMO.Optimizer,  Gurobi.Optimizer, SCS.Optimizer),
+        :scs    => (SCS.Optimizer,    Gurobi.Optimizer, COSMO.Optimizer),
     )
     function pick_socp_optimizer(;
-        prefer::Symbol = Symbol(
-            lowercase(get(ENV, "LIRION_SOCP_PREFER", "auto")),
-        ),
+        prefer::Symbol = Symbol(lowercase(get(ENV, "LIRION_SOCP_PREFER", "auto"))),
     )
         chain = get(_SOCP_CHAIN_MAP_LOCAL, prefer, _SOCP_CHAIN_MAP_LOCAL[:auto])
         for factory in chain
@@ -34,7 +72,7 @@ if !@isdefined(pick_socp_optimizer)
     end
 end
 
-# Defaults: usa os do runtests se existirem; senão, cai para o picker local
+# Defaults
 const _CENTRAL_DEFAULT =
     @isdefined(CENTRAL_SOCP_SOLVER) ? CENTRAL_SOCP_SOLVER :
     (
@@ -49,7 +87,6 @@ const _DISTRIB_DEFAULT =
         pick_socp_optimizer(; prefer = :auto)
     )
 
-# --- lista de casos particionados (2/3/4 zonas) ---
 const distributed_hybrid_socp_zone_cases = [
     # 14 buses
     "pglib_opf_case14_2zones_ieee_socp.m",
@@ -86,11 +123,9 @@ const distributed_hybrid_socp_zone_cases = [
     # # 78484
     # "pglib_opf_case78484_157zones_epigrids.m",
 ]
-
 function track_failure_hybrid_socp(label::String, origin::String, case_name::String)
     if !haskey(GLOBAL_FAILED_CASES, label)
-        GLOBAL_FAILED_CASES[label] =
-            Dict("Centralized" => String[], "Distributed" => String[])
+        GLOBAL_FAILED_CASES[label] = Dict("Centralized" => String[], "Distributed" => String[])
     end
     return push!(GLOBAL_FAILED_CASES[label][origin], case_name)
 end
@@ -98,22 +133,74 @@ end
 function compare_distributed_hybrid_socp_vs_centralized(
     file::String;
     label::String,
-    central_optimizer = _CENTRAL_DEFAULT,     # SOCP central com fallback
-    distributed_optimizer = _DISTRIB_DEFAULT, # ADMM-Hybrid-SOCP com fallback
+    central_optimizer = _CENTRAL_DEFAULT,
+    distributed_optimizer = _DISTRIB_DEFAULT,
     rtol = 0.05,
     atol = 1e-6,
-    # ADMM penalties
-    rho_v::Float64 = 1.0e3,      # ρ(V²) em buses compartilhados
-    rho_flow_p::Float64 = 3.0e2, # ρP e também ρR=Re(W)
-    rho_flow_q::Float64 = 3.0e2, # ρQ e também ρT=Im(W)
-    # ADMM settings
-    admm_max_iter::Int = 1000,
+    rho_v::Float64 = 1.0e3,
+    rho_flow_p::Float64 = 3.0e2,
+    rho_flow_q::Float64 = 3.0e2,
+    admm_max_iter::Int = 350,
     admm_eps_primal::Float64 = 1e-4,
     admm_eps_dual::Float64 = 1e-4,
 )
     case_name = basename(file)
 
-    # --- Centralizado SOCP ---
+    # ===========================================================
+    # Caso especial: 2000-bus / 5 zonas
+    # ===========================================================
+    if case_name == "pglib_opf_case2000_5zones_goc.m"
+        @info "⚙️ [HYBRID-SOCP] Caso especial $case_name com Clarabel robusto (central) e Clarabel com ρ=1e8 (distribuído)."
+
+        # --- Centralizado Clarabel robusto ---
+        cent_obj = try
+            args_cent = String[
+                file,
+                "--model", "socp",
+                "--optimizer", CLARABEL_ROBUST,
+            ]
+            result_dict, _, _ = Lirion.main(args_cent)
+            result_dict["objective"]
+        catch e
+            @warn "Centralized SOCP failed on $case_name: $e"
+            track_failure_hybrid_socp(label, "Centralized", case_name)
+            return
+        end
+
+        # --- Distribuído ADMM-Hybrid-SOCP com Clarabel e args específicos ---
+        dist_obj = try
+            args_dist = String[
+                file,
+                "--model", "distributed-admm-hybrid-socp",
+                "--optimizer", "Clarabel.Optimizer",
+                "--admm-max-iter", "700",
+                "--admm-rho-v", "1e8",
+                "--admm-rho-flow-p", "1e8",
+                "--admm-rho-flow-q", "1e8",
+                "--admm-eps-primal", "1e-4",
+                "--admm-eps-dual", "1e-4",
+                "--admm-adaptive", "on",
+                "--admm-mu-incr", "3.0",
+                "--admm-mu-decr", "3.0",
+                "--admm-tau-incr", "1.1",
+                "--admm-tau-decr", "0.9",
+            ]
+            obj, _ = Lirion.main(args_dist)
+            obj
+        catch e
+            @warn "Distributed ADMM-Hybrid-SOCP failed on $case_name: $e"
+            track_failure_hybrid_socp(label, "Distributed", case_name)
+            return
+        end
+
+        @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-hybrid-SOCP = $(round(dist_obj, digits=6))"
+        @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
+        return
+    end
+
+    # ===========================================================
+    # Casos gerais (fallback)
+    # ===========================================================
     cent_obj = try
         args_cent = String[
             file,
@@ -128,7 +215,6 @@ function compare_distributed_hybrid_socp_vs_centralized(
         return
     end
 
-    # --- Distribuído ADMM-Hybrid-SOCP ---
     dist_obj = try
         args_dist = String[
             file,
@@ -149,7 +235,7 @@ function compare_distributed_hybrid_socp_vs_centralized(
         return
     end
 
-    @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-hybrid-SOCP = $(round(dist_obj, digits=6))"
+    @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-hybrid-SOCP = $(round(dist_obj, digits=6)) | max_iter=$(admm_max_iter), ρV²=$(rho_v), ρP=$(rho_flow_p), ρQ=$(rho_flow_q)"
     @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
 end
 
@@ -180,12 +266,12 @@ function run_distributed_hybrid_socp_objective_tests(;
         rho_v_case = 1.0e3
         rho_flow_p_case = 3.0e2
         rho_flow_q_case = 3.0e2
-        admm_max_iter_case = 300
+        admm_max_iter_case = 350
         admm_eps_primal_case = admm_eps_primal
         admm_eps_dual_case = admm_eps_dual
 
         if occursin("_3zones_", case_name) || occursin("_4zones_", case_name)
-            admm_max_iter_case = max(admm_max_iter_case, 350)
+            admm_max_iter_case = max(admm_max_iter_case, 800)
         end
         # if occursin("case118_", case_name)
         #     admm_max_iter_case = max(admm_max_iter_case, 1500)

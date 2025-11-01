@@ -7,6 +7,7 @@ using Glob
 using SCS
 using Gurobi
 using COSMO
+using Clarabel
 
 const ADMM_MAX_IT = 500
 
@@ -96,15 +97,13 @@ function track_failure_socp(label::String, origin::String, case_name::String)
     end
     return push!(GLOBAL_FAILED_CASES[label][origin], case_name)
 end
-
 function compare_distributed_socp_vs_centralized(
     file::String;
     label::String,
-    central_optimizer = _CENTRAL_DEFAULT,     # agora com fallback (Gurobi→COSMO→SCS)
-    distributed_optimizer = _DISTRIB_DEFAULT, # idem para o distribuído
+    central_optimizer = _CENTRAL_DEFAULT,
+    distributed_optimizer = _DISTRIB_DEFAULT,
     rtol = 0.05,
     atol = 1e-6,
-    # ADMM penalties
     rho_v::Float64 = 1.0e3,
     rho_flow_p::Float64 = 3.0e2,
     rho_flow_q::Float64 = 3.0e2,
@@ -113,7 +112,85 @@ function compare_distributed_socp_vs_centralized(
 )
     case_name = basename(file)
 
-    # --- Centralizado SOCP ---
+    # =====================================================================
+    # Caso especial: 2000-bus (usa Clarabel tunado no centralizado)
+    # =====================================================================
+    if case_name == "pglib_opf_case2000_5zones_goc.m"
+        @info "⚙️ Usando Clarabel robusto no caso especial $case_name"
+
+        # --- Centralizado SOCP (Clarabel robusto) ---
+        cent_obj = try
+            args_cent = String[
+                file,
+                "--model", "socp",
+                "--optimizer",
+                """optimizer_with_attributes(Clarabel.Optimizer,
+                    "tol_feas" => 1e-4,
+                    "tol_gap_abs" => 1e-4,
+                    "tol_gap_rel" => 1e-4,
+                    "max_iter" => 1200,
+                    "dynamic_regularization_enable" => true,
+                    "dynamic_regularization_eps"   => 1e-10,
+                    "dynamic_regularization_delta" => 1e-4,
+                    "static_regularization_enable" => true,
+                    "equilibrate_enable" => true,
+                    "equilibrate_min_scaling" => 1e-4,
+                    "equilibrate_max_scaling" => 1e4,
+                    "direct_solve_method" => :qdldl,
+                    "iterative_refinement_reltol" => 1e-9,
+                    "iterative_refinement_abstol" => 1e-9,
+                    "max_step_fraction" => 0.7,
+                    "linesearch_backtrack_step" => 0.5,
+                    "tol_ktratio" => 1e-5,
+                    "min_terminate_step_length" => 1e-6,
+                    "min_switch_step_length" => 5e-2,
+                    "reduced_tol_gap_abs" => 5e-4,
+                    "reduced_tol_gap_rel" => 5e-4,
+                    "reduced_tol_feas"    => 5e-4,
+                    "reduced_tol_infeas_abs" => 5e-11,
+                    "reduced_tol_infeas_rel" => 5e-4,
+                    "reduced_tol_ktratio"    => 1e-4
+                )"""
+            ]
+            result_dict, _, _ = Lirion.main(args_cent)
+            result_dict["objective"]
+        catch e
+            @warn "Centralized SOCP failed on $case_name: $e"
+            track_failure_socp(label, "Centralized", case_name)
+            return
+        end
+
+        # --- Distribuído ADMM-SOCP (Clarabel padrão) ---
+        dist_obj = try
+            args_dist = String[
+                file,
+                "--model", "distributed-admm-socp",
+                "--optimizer", "Clarabel.Optimizer",
+                "--admm-max-iter", "700",
+                "--admm-rho-v", "1e6",
+                "--admm-rho-flow-p", "1e6",
+                "--admm-rho-flow-q", "1e6",
+                "--admm-eps-primal", "1e-4",
+                "--admm-eps-dual", "1e-4",
+                "--admm-adaptive", "on",
+                "--admm-mu-incr", "5.0",
+                "--admm-mu-decr", "5.0",
+                "--admm-tau-incr", "1.1",
+                "--admm-tau-decr", "0.9"
+            ]
+            obj, _ = Lirion.main(args_dist)
+            obj
+        catch e
+            @warn "Distributed ADMM-SOCP failed on $case_name: $e"
+            track_failure_socp(label, "Distributed", case_name)
+            return
+        end
+
+        @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-ADMM-SOCP = $(round(dist_obj, digits=6))"
+        @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
+        return
+    end
+
     cent_obj = try
         args_cent = String[
             file,
@@ -128,7 +205,6 @@ function compare_distributed_socp_vs_centralized(
         return
     end
 
-    # --- Distribuído ADMM-SOCP (travado em 300) ---
     dist_obj = try
         args_dist = String[
             file,
@@ -137,7 +213,7 @@ function compare_distributed_socp_vs_centralized(
             "--admm-rho-v", string(rho_v),
             "--admm-rho-flow-p", string(rho_flow_p),
             "--admm-rho-flow-q", string(rho_flow_q),
-            "--admm-max-iter", string(ADMM_MAX_IT),           # <- FIXO 300
+            "--admm-max-iter", string(ADMM_MAX_IT),
             "--admm-eps-primal", string(admm_eps_primal),
             "--admm-eps-dual", string(admm_eps_dual),
         ]
@@ -152,6 +228,7 @@ function compare_distributed_socp_vs_centralized(
     @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-ADMM-SOCP = $(round(dist_obj, digits=6)) | ADMM_MAX_IT=$(ADMM_MAX_IT)"
     @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
 end
+
 
 function run_distributed_socp_objective_tests(;
     case_list = distributed_socp_zone_cases,

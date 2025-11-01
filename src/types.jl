@@ -1,6 +1,6 @@
 abstract type OPFModel end
-struct DC   <: OPFModel end
-struct AC   <: OPFModel end
+struct DC <: OPFModel end
+struct AC <: OPFModel end
 struct SOCP <: OPFModel end
 
 mutable struct DistributedOPFModel
@@ -164,8 +164,8 @@ Base.propertynames(c::DistributedOPFModel, private::Bool = false) =
     (propertynames(typeof(c), private)..., :rho, :rho_flow)
 
 abstract type SubproblemAction end
-struct SubproblemBuild              <: SubproblemAction end
-struct SubproblemUpdate             <: SubproblemAction end
-struct SubproblemGetResult          <: SubproblemAction end
+struct SubproblemBuild <: SubproblemAction end
+struct SubproblemUpdate <: SubproblemAction end
+struct SubproblemGetResult <: SubproblemAction end
 struct SubproblemNameElementsDimensions <: SubproblemAction end
-struct SubproblemWriteResult        <: SubproblemAction end
+struct SubproblemWriteResult <: SubproblemAction end
