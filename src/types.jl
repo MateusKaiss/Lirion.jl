@@ -1,6 +1,6 @@
 abstract type OPFModel end
-struct DC <: OPFModel end
-struct AC <: OPFModel end
+struct DC   <: OPFModel end
+struct AC   <: OPFModel end
 struct SOCP <: OPFModel end
 
 mutable struct DistributedOPFModel
@@ -8,9 +8,9 @@ mutable struct DistributedOPFModel
     method::Symbol
     max_iter::Int
     rho_theta::Float64     # ρθ (consenso de ângulo)     [AC-bus; DC-bus]
-    rho_v::Float64         # ρV  (consenso de |V|)       [AC-bus]
-    rho_flow_p::Float64    # ρP  (consenso de P_flow)    [branch]
-    rho_flow_q::Float64    # ρQ  (consenso de Q_flow)    [branch]
+    rho_v::Float64         # ρV  (consenso de |V| ou V²) [AC/SOCP-bus]
+    rho_flow_p::Float64    # ρP  (consenso de P_flow / Re(W))
+    rho_flow_q::Float64    # ρQ  (consenso de Q_flow / Im(W))
     ε_primal::Float64
     ε_dual::Float64
     alpha_overrelax::Union{Nothing, Float64}
@@ -21,6 +21,8 @@ mutable struct DistributedOPFModel
     tau_incr::Float64
     tau_decr::Float64
     accel_nesterov::Bool
+    optimizer::Any                      # << novo (pode ser nothing ou ex.: SCS.Optimizer)
+    prefer_socp_solver::Symbol          # << novo (:auto | :gurobi | :cosmo | :scs)
 
     function DistributedOPFModel(
         base_model::Type{<:OPFModel},
@@ -40,6 +42,8 @@ mutable struct DistributedOPFModel
         tau_incr::Real = 1.05,
         tau_decr::Real = 0.98,
         accel_nesterov::Bool = false,
+        optimizer::Any = nothing,                 # << novo
+        prefer_socp_solver::Symbol = :auto,       # << novo
     )
         max_iter > 0 || throw(ArgumentError("max_iter must be > 0"))
         rho_theta > 0 || throw(ArgumentError("rho_theta must be > 0"))
@@ -62,6 +66,8 @@ mutable struct DistributedOPFModel
             adaptive_rho,
             Float64(mu_incr), Float64(mu_decr), Float64(tau_incr), Float64(tau_decr),
             accel_nesterov,
+            optimizer,
+            prefer_socp_solver,
         )
     end
 end
@@ -82,6 +88,8 @@ DistributedOPFModel(
     tau_incr::Float64 = 1.05,
     tau_decr::Float64 = 0.98,
     accel_nesterov::Bool = false,
+    optimizer::Any = nothing,                    # << novo
+    prefer_socp_solver::Symbol = :auto,          # << novo
 ) = DistributedOPFModel(
     base_model, method, max_iter, rho, rho, rho, rho, ε_primal, ε_dual;
     alpha_overrelax = alpha_overrelax,
@@ -92,6 +100,8 @@ DistributedOPFModel(
     tau_incr = tau_incr,
     tau_decr = tau_decr,
     accel_nesterov = accel_nesterov,
+    optimizer = optimizer,                       # << novo
+    prefer_socp_solver = prefer_socp_solver,     # << novo
 )
 
 # ----- construtor keyword-friendly (permite sobrepor rhos específicos) -----
@@ -115,6 +125,8 @@ DistributedOPFModel(
     tau_incr::Float64 = 1.05,
     tau_decr::Float64 = 0.98,
     accel_nesterov::Bool = false,
+    optimizer::Any = nothing,                    # << novo
+    prefer_socp_solver::Symbol = :auto,          # << novo
 ) = DistributedOPFModel(
     base_model, method, max_iter,
     coalesce(rho_theta, rho),
@@ -130,6 +142,8 @@ DistributedOPFModel(
     tau_incr = tau_incr,
     tau_decr = tau_decr,
     accel_nesterov = accel_nesterov,
+    optimizer = optimizer,                       # << novo
+    prefer_socp_solver = prefer_socp_solver,     # << novo
 )
 
 # ---------- SHIM ----------
@@ -150,8 +164,8 @@ Base.propertynames(c::DistributedOPFModel, private::Bool = false) =
     (propertynames(typeof(c), private)..., :rho, :rho_flow)
 
 abstract type SubproblemAction end
-struct SubproblemBuild <: SubproblemAction end
-struct SubproblemUpdate <: SubproblemAction end
-struct SubproblemGetResult <: SubproblemAction end
+struct SubproblemBuild              <: SubproblemAction end
+struct SubproblemUpdate             <: SubproblemAction end
+struct SubproblemGetResult          <: SubproblemAction end
 struct SubproblemNameElementsDimensions <: SubproblemAction end
-struct SubproblemWriteResult <: SubproblemAction end
+struct SubproblemWriteResult        <: SubproblemAction end
