@@ -1,5 +1,10 @@
 # ================= SOCP Utils (revisado para espelhar DC/AC) =================
 
+# (requer JuMP e MOI já carregados no seu core)
+# using JuMP
+# import MathOptInterface as MOI
+# using Base.Threads: @threads
+
 # ---- Helper: warm-start on/off (espelha AC/DC) ----
 # Se já existir no seu core (ex.: Core/args.jl), remova esta definição.
 _warm_on(config) =
@@ -167,11 +172,10 @@ end
 # ---- Otimizador: tenta Gurobi -> COSMO -> SCS (com override) ----
 function resolve_socp_optimizer(config)
     # 1) Prioridade absoluta ao que veio no config (se existir e não-nothing)
-    @show Base.hasfield(typeof(config), :optimizer)
     if Base.hasfield(typeof(config), :optimizer)
         opt = getfield(config, :optimizer)
         if opt !== nothing
-            return opt              # ex.: clarabel.Optimizer, Gurobi.Optimizer, SCS.Optimizer
+            return opt              # ex.: Clarabel.Optimizer, Gurobi.Optimizer, SCS.Optimizer
         end
     end
 
@@ -1044,15 +1048,18 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
             end
         end
 
-        # ρ adaptativo por bloco
+        # === Atualização totalmente independente dos ρ (somente blocos presentes) ===
         if adaptive
+            # --- BUS (V²) ---
             adaptive_rho!(ρV2, r_bus, s_bus;
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
-            adaptive_rho!(ρR, r_rt, s_rt;
+
+            # --- BRANCH (R, T) ---
+            adaptive_rho!(ρR, r_rt / sqrt(2), s_rt / sqrt(2);
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
-            adaptive_rho!(ρT, r_rt, s_rt;
+            adaptive_rho!(ρT, r_rt / sqrt(2), s_rt / sqrt(2);
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
         end
@@ -1220,11 +1227,12 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, An
             break
         end
 
+        # === Atualização totalmente independente dos ρ (P e Q) ===
         if adaptive
-            adaptive_rho!(ρP, r, s;
+            adaptive_rho!(ρP, r / sqrt(2), s / sqrt(2);
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
-            adaptive_rho!(ρQ, r, s;
+            adaptive_rho!(ρQ, r / sqrt(2), s / sqrt(2);
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
         end
@@ -1554,20 +1562,26 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, An
             end
         end
 
+        # === Atualização totalmente independente dos ρ (todos os blocos) ===
         if adaptive
+            # BUS
             adaptive_rho!(ρV2, r_bus, s_bus;
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
-            adaptive_rho!(ρP, r_pq, s_pq;
+
+            # BRANCH (P, Q)
+            adaptive_rho!(ρP, r_pq / sqrt(2), s_pq / sqrt(2);
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
-            adaptive_rho!(ρQ, r_pq, s_pq;
+            adaptive_rho!(ρQ, r_pq / sqrt(2), s_pq / sqrt(2);
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
-            adaptive_rho!(ρR, r_rt, s_rt;
+
+            # BRANCH (R, T)
+            adaptive_rho!(ρR, r_rt / sqrt(2), s_rt / sqrt(2);
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
-            adaptive_rho!(ρT, r_rt, s_rt;
+            adaptive_rho!(ρT, r_rt / sqrt(2), s_rt / sqrt(2);
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
         end
