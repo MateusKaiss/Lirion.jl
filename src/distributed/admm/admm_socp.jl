@@ -88,6 +88,83 @@ end
 # end
 
 # ---- Otimizador: tenta Gurobi -> COSMO -> SCS (com override) ----
+# ---- Otimizador: tenta Gurobi -> Clarabel -> SCS (com override) ----
+# function resolve_socp_optimizer(config)
+#     # 1) Prioridade absoluta: se vier explicitamente no config
+#     if Base.hasfield(typeof(config), :optimizer)
+#         opt = getfield(config, :optimizer)
+#         if opt !== nothing
+#             return opt   # pode ser Clarabel.Optimizer, Gurobi.Optimizer, etc.
+#         end
+#     end
+
+#     # 2) Ordem preferida opcional: :auto | :gurobi | :clarabel | :scs
+#     prefer = (
+#         Base.hasfield(typeof(config), :prefer_socp_solver) ?
+#         getfield(config, :prefer_socp_solver) : :auto
+#     )
+
+#     order =
+#         prefer === :gurobi ? (:gurobi, :clarabel, :scs) :
+#         prefer === :clarabel ? (:clarabel, :gurobi, :scs) :
+#         prefer === :scs ? (:scs, :gurobi, :clarabel) :
+#         (:gurobi, :clarabel, :scs)   # :auto
+
+#     # 3) Retorna o primeiro construtor disponível (factory)
+#     for s in order
+#         try
+#             if s === :gurobi
+#                 return Gurobi.Optimizer
+#             elseif s === :clarabel
+#                 # ====== CLARABEL ROBUST DEFAULTS ======
+#                 return optimizer_with_attributes(
+#                     Clarabel.Optimizer,
+#                     "tol_feas" => 1e-4,
+#                     "tol_gap_abs" => 1e-4,
+#                     "tol_gap_rel" => 1e-4,
+#                     "max_iter" => 1200,
+
+#                     "dynamic_regularization_enable" => true,
+#                     "dynamic_regularization_eps"   => 1e-10,
+#                     "dynamic_regularization_delta" => 1e-4,
+
+#                     "static_regularization_enable" => true,
+
+#                     "equilibrate_enable" => true,
+#                     "equilibrate_min_scaling" => 1e-4,
+#                     "equilibrate_max_scaling" => 1e4,
+
+#                     "direct_solve_method" => :qdldl,
+
+#                     "iterative_refinement_reltol" => 1e-9,
+#                     "iterative_refinement_abstol" => 1e-9,
+
+#                     "max_step_fraction" => 0.7,
+#                     "linesearch_backtrack_step" => 0.5,
+
+#                     "tol_ktratio" => 1e-5,
+#                     "min_terminate_step_length" => 1e-6,
+#                     "min_switch_step_length" => 5e-2,
+
+#                     "reduced_tol_gap_abs" => 5e-4,
+#                     "reduced_tol_gap_rel" => 5e-4,
+#                     "reduced_tol_feas"    => 5e-4,
+#                     "reduced_tol_infeas_abs" => 5e-11,
+#                     "reduced_tol_infeas_rel" => 5e-4,
+#                     "reduced_tol_ktratio"    => 1e-4
+#                 )
+#             else
+#                 return SCS.Optimizer
+#             end
+#         catch
+#             # pacote ausente? tenta o próximo
+#         end
+#     end
+#     return SCS.Optimizer
+# end
+
+
+# ---- Otimizador: tenta Gurobi -> COSMO -> SCS (com override) ----
 function resolve_socp_optimizer(config)
     # 1) Prioridade absoluta ao que veio no config (se existir e não-nothing)
     @show Base.hasfield(typeof(config), :optimizer)
