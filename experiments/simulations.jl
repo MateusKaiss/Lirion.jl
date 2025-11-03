@@ -1,203 +1,209 @@
-# =========================
-# batch_experiments.jl
-# =========================
-using Dates, Printf, CSV, DataFrames
+# experiments/simulations.jl
+# Batch para Lirion: variações ADMM (bus/branch/hybrid) + centralizado — SEM MÓDULO
 
-# --- tente carregar Lirion no ambiente atual ---
-try
-    @eval using Lirion
-catch
-    @warn "Não foi possível carregar Lirion; certifique-se de estar com --project correto."
+using Glob
+using DataFrames
+using CSV
+using Dates
+using Printf
+using JuMP
+import MathOptInterface as MOI
+# ----------------------- Utils -----------------------
+const _FMT_TIME = dateformat"yyyy-mm-dd HH:MM:SS"
+
+_family_to_modelkey(fam::Symbol) = begin
+    fam === :dc   && return "dc"
+    fam === :ac   && return "ac"
+    fam === :socp && return "socp"
+    error("family inválido: $fam (use :dc, :ac ou :socp)")
 end
 
-# --------- Descoberta de casos na pasta atual ---------
-"""
-    discover_cases()
+_variants() = (:bus, :branch, :hybrid)
 
-Retorna vetor de (label, path) para os 3 casos: :std, :api, :sad (se existirem).
-"""
-function discover_cases()
-    files = readdir(pwd(); join=true)
-    pick(pat) = begin
-        xs = filter(f -> occursin(pat, basename(f)) && endswith(f, ".m"), files)
-        isempty(xs) ? nothing : xs[1]
-    end
-    std = pick(r"_lmbd\.m$")           # std tem 1 underscore antes de lmbd
-    api = pick(r"_lmbd__api\.m$")
-    sad = pick(r"_lmbd__sad\.m$")
-    out = Tuple{Symbol,String}[]
-    std !== nothing && push!(out, (:std, std))
-    api !== nothing && push!(out, (:api, api))
-    sad !== nothing && push!(out, (:sad, sad))
-    return out
+_modelkey_distributed(family::Symbol, variant::Symbol) = begin
+    base = _family_to_modelkey(family)
+    variant === :bus    && return "distributed-admm-$base"
+    variant === :branch && return "distributed-admm-branch-$base"
+    variant === :hybrid && return "distributed-admm-hybrid-$base"
+    error("variant inválido: $variant")
 end
 
-# --------- Mapeamento de variantes por família ---------
-# --------- Mapeamento de variantes por família ---------
-const VARIANTS = Dict(
-    :dc   => [(:admm_bus,    "distributed-admm-dc"),          # <- sem "bus" na string
-              (:admm_branch, "distributed-admm-branch-dc"),
-              (:admm_hybrid, "distributed-admm-hybrid-dc")],
-    :ac   => [(:admm_bus,    "distributed-admm-ac"),          # <- sem "bus" na string
-              (:admm_branch, "distributed-admm-branch-ac"),
-              (:admm_hybrid, "distributed-admm-hybrid-ac")],
-    :socp => [(:admm_bus,    "distributed-admm-socp"),        # <- sem "bus" na string
-              (:admm_branch, "distributed-admm-branch-socp"),
-              (:admm_hybrid, "distributed-admm-hybrid-socp")]
-)
-
-# --------- Helpers simples ---------
-getflag(args::Vector{String}, key::String) = begin
-    i = findfirst(==(key), args)
-    (i === nothing || i == length(args)) ? missing : args[i+1]
+function _list_cases(dir::AbstractString)
+    isdir(dir) || error("Diretório não existe: $dir")
+    return sort(glob("*.m", dir))
 end
 
-# --------- Builder de ARGS p/ uma execução ---------
-"""
-    build_args(case_path; model_key, family, extra_args=String[])
+_now_str() = Dates.format(Dates.now(), _FMT_TIME)
 
-Monta: [case_path, "--model", <modelo>, ...extra_args]
-Use `extra_args` para passar tudo (ex.: solver, ρ, tolerâncias, warm, etc).
-"""
-function build_args(case_path::String; model_key::Symbol, family::Symbol, extra_args::Vector{String}=String[])
-    model_str = only(filter(p -> p[1] == model_key, VARIANTS[family]))[2]
-    args = String[case_path, "--model", model_str]
-    append!(args, extra_args)
-    return args
-end
-
-# --------- Execução de um job via sua entrypoint de ARGS ---------
-"""
-    run_once(args::Vector{String}) -> (status, obj, iters, time_s)
-
-Chama sua entrada ARGS. Esperado: (total_real_cost, partitions, iter_done, elapsed_s).
-"""
-function run_once(args::Vector{String})
+# Extrai objetivo do retorno centralizado
+function _objective_from_centralized(result_tuple)::Float64
+    # Esperado: (result_dict, result_model, data)
+    length(result_tuple) >= 2 || error("Retorno centralizado inesperado (tuple curto).")
+    result_model = result_tuple[2]
     try
-        if isdefined(Lirion, :run_with_args)
-            res = Lirion.run_with_args(args)
-        elseif isdefined(Lirion, :main)
-            res = Lirion.main(args)
-        elseif isdefined(Main, :main)
-            res = Main.main(args)
-        else
-            error("Não encontrei entrypoint por ARGS (ex.: Lirion.run_with_args / Lirion.main).")
+        return JuMP.objective_value(result_model)
+    catch
+        try
+            return value(result_model[:generation_cost])
+        catch
+            error("Não foi possível extrair objetivo do modelo centralizado.")
         end
-        obj, _, iters, time_s = res
-        return ("ok", float(obj), Int(iters), float(time_s))
-    catch err
-        @warn "Falhou: $err" args=args
-        return ("error", NaN, 0, NaN)
     end
 end
 
-# --------- Runner de lote ---------
+# Extrai (obj, iters, tempo_s) do retorno distribuído
+function _triple_from_distributed(result_any)
+    # runners retornam: (total_real_cost, partitions, iter_done, elapsed_s)
+    if result_any isa Tuple && length(result_any) >= 4
+        obj = Float64(result_any[1])
+        iters = Int(result_any[3])
+        time_s = Float64(result_any[4])
+        return obj, iters, time_s
+    end
+    error("Retorno distribuído inesperado; esperado tuple (obj, ..., iters, time_s).")
+end
+
+# Executa Lirion.main e captura erro/resultado
+function _call_lirion_main(argsvec::Vector{String})
+    try
+        res = Lirion.main(argsvec)
+        return (status = "ok", result = res, error = "")
+    catch err
+        return (status = "error", result = nothing, error = sprint(showerror, err))
+    end
+end
+
+# ----------------------- Batch: Distribuído -----------------------
 """
-    run_batch(dir=pwd(); family=:socp, which=:all, extra_args=String[], outfile=nothing)
+run_batch(dir; family=:dc, extra_args=String[], outpath=nothing)
 
-- `family`: :dc | :ac | :socp
-- `which`:  :all | vetor de Symbols em [:admm_bus, :admm_branch, :admm_hybrid]
-- `extra_args`: será anexado a *todas* as execuções (ex.: ["--optimizer","Clarabel.Optimizer", ...])
-- `outfile`: caminho do CSV; se `nothing`, gera automático.
+- Roda as *três variantes distribuídas* (bus/branch/hybrid) do `family` (dc/ac/socp)
+  para todos os `.m` dentro de `dir`.
+- CSV: [:timestamp, :case, :family, :variant, :objective, :iters, :time_s, :status, :error]
 """
-function run_batch(dir::AbstractString=pwd(); family::Symbol=:socp, which=:all,
-                   extra_args::Vector{String}=String[], outfile=nothing)
-    haskey(VARIANTS, family) || error("family deve ser :dc, :ac ou :socp")
-    cd(dir) do
-        cases = discover_cases()
-        isempty(cases) && error("Nenhum caso encontrado nesta pasta.")
-        variants = which === :all ? VARIANTS[family] : filter(v -> v[1] in which, VARIANTS[family])
+function run_batch(dir::AbstractString; family::Symbol=:dc,
+                   extra_args::Vector{String}=String[],
+                   outpath::Union{Nothing,String}=nothing)
 
-        rows = NamedTuple[]
-        for (label, cpath) in cases
-            for (vkey, model_str) in variants
-                args = build_args(cpath; model_key=vkey, family=family, extra_args=extra_args)
-                status, obj, iters, time_s = run_once(args)
+    famkey = _family_to_modelkey(family)
+    cases = _list_cases(dir)
+    isempty(cases) && @warn "Nenhum .m encontrado em $dir"
 
+    rows = Vector{NamedTuple}()
+    for f in cases
+        for variant in _variants()
+            modelkey = _modelkey_distributed(family, variant)
+            args = String[f, "--model", modelkey]
+            append!(args, extra_args)
+
+            @info "[ADMM] $(basename(f)) | $modelkey"
+            call = _call_lirion_main(args)
+
+            if call.status == "ok"
+                try
+                    obj, iters, time_s = _triple_from_distributed(call.result)
+                    push!(rows, (
+                        timestamp = _now_str(),
+                        case = f, family = famkey, variant = String(variant),
+                        objective = obj, iters = iters, time_s = time_s,
+                        status = "ok", error = "",
+                    ))
+                catch err
+                    push!(rows, (
+                        timestamp = _now_str(),
+                        case = f, family = famkey, variant = String(variant),
+                        objective = NaN, iters = -1, time_s = NaN,
+                        status = "error", error = sprint(showerror, err),
+                    ))
+                end
+            else
                 push!(rows, (
-                    timestamp = Dates.format(now(), "yyyy-mm-ddTHH:MM:SS"),
-                    case_label = String(label),
-                    case_name  = basename(cpath),
-                    base_model = String(family),
-                    variant    = String(vkey),
-                    model_str  = model_str,
-                    optimizer  = getflag(args, "--optimizer"),
-                    status     = status,
-                    objective  = obj,
-                    iterations = iters,
-                    time_s     = time_s,
-                    args_line  = join(args, " ")
+                    timestamp = _now_str(),
+                    case = f, family = famkey, variant = String(variant),
+                    objective = NaN, iters = -1, time_s = NaN,
+                    status = "error", error = call.error,
                 ))
-                @info "Concluído" case=basename(cpath) model=model_str variant=vkey status iters time_s obj=@sprintf("%.8f", obj)
             end
         end
-
-        df = DataFrame(rows)
-        if isnothing(outfile)
-            ts = Dates.format(now(), "yyyy-mm-dd_HHMMSS")
-            outfile = joinpath(dir, "results_$(String(family))_$ts.csv")
-        end
-        CSV.write(outfile, df)
-        @info "CSV salvo" outfile rows=length(rows)
-        return outfile, df
     end
+
+    df = DataFrame(rows)
+    outcsv = isnothing(outpath) ? joinpath(dir, "admm_results_$(famkey).csv") : outpath
+    CSV.write(outcsv, df)
+    @info "CSV (ADMM) salvo em: $outcsv"
+    return df
 end
 
-# =========================
-# ARGSETS DE EXEMPLO (edite livremente)
-# =========================
-# Você pode usar estes vetores diretamente no `extra_args` do run_batch.
+# ----------------------- Batch: Centralizado -----------------------
+"""
+run_batch_centralized(dir; family=:dc, extra_args=String[], outpath=nothing)
 
+- Roda o **centralizado** (dc/ac/socp) para todos os `.m` em `dir`.
+- CSV: [:timestamp, :case, :family, :objective, :status, :error]
+"""
+function run_batch_centralized(dir::AbstractString; family::Symbol=:dc,
+                               extra_args::Vector{String}=String[],
+                               outpath::Union{Nothing,String}=nothing)
+
+    famkey = _family_to_modelkey(family)
+    cases = _list_cases(dir)
+    isempty(cases) && @warn "Nenhum .m encontrado em $dir"
+
+    rows = Vector{NamedTuple}()
+    for f in cases
+        args = String[f, "--model", famkey]
+        append!(args, extra_args)
+
+        @info "[CENT] $(basename(f)) | $famkey"
+        call = _call_lirion_main(args)
+
+        if call.status == "ok"
+            try
+                obj = _objective_from_centralized(call.result)
+                push!(rows, (
+                    timestamp = _now_str(),
+                    case = f, family = famkey, objective = obj,
+                    status = "ok", error = "",
+                ))
+            catch err
+                push!(rows, (
+                    timestamp = _now_str(),
+                    case = f, family = famkey, objective = NaN,
+                    status = "error", error = sprint(showerror, err),
+                ))
+            end
+        else
+            push!(rows, (
+                timestamp = _now_str(),
+                case = f, family = famkey, objective = NaN,
+                status = "error", error = call.error,
+            ))
+        end
+    end
+
+    df = DataFrame(rows)
+    outcsv = isnothing(outpath) ? joinpath(dir, "centralized_results_$(famkey).csv") : outpath
+    CSV.write(outcsv, df)
+    @info "CSV (centralizado) salvo em: $outcsv"
+    return df
+end
+
+# ----------------------- EXEMPLOS (opcional) -----------------------
+# Deixe comentado e rode a partir do REPL.
 extra_dc = String[
-    "--optimizer","OSQP.Optimizer",
     "--admm-max-iter","700",
+    "--admm-rho","1e3",
     "--admm-rho-v","1e3",
     "--admm-rho-flow-p","1e3",
     "--admm-rho-flow-q","1e3",
     "--admm-eps-primal","1e-4",
     "--admm-eps-dual","1e-4",
     "--admm-adaptive","on",
-    "--admm-mu-incr","3.0",
-    "--admm-mu-decr","3.0",
-    "--admm-tau-incr","1.1",
-    "--admm-tau-decr","0.9",
-    # "--admm-warm-start","on",
-    # "--admm-acceleration","on"
+    "--admm-mu-incr","2.0",
+    "--admm-mu-decr","2.0",
+    "--admm-tau-incr","1.05",
+    "--admm-tau-decr","0.98",
 ]
-
-extra_socp = String[
-    "--optimizer","Clarabel.Optimizer",   # ou COSMO.Optimizer / SCS.Optimizer
-    "--admm-max-iter","700",
-    "--admm-rho-v","1e3",
-    "--admm-rho-flow-p","1e3",
-    "--admm-rho-flow-q","1e3",
-    "--admm-eps-primal","1e-4",
-    "--admm-eps-dual","1e-4",
-    "--admm-adaptive","on",
-    "--admm-mu-incr","3.0",
-    "--admm-mu-decr","3.0",
-    "--admm-tau-incr","1.1",
-    "--admm-tau-decr","0.9",
-    "--admm-warm-start","on",
-    "--admm-acceleration","on"
-]
-
-extra_ac = String[
-    "--optimizer","Ipopt.Optimizer",
-    "--admm-max-iter","700",
-    "--admm-rho-v","1e3",
-    "--admm-rho-flow-p","1e3",
-    "--admm-rho-flow-q","1e3",
-    "--admm-eps-primal","1e-4",
-    "--admm-eps-dual","1e-4",
-    "--admm-adaptive","on",
-    "--admm-mu-incr","3.0",
-    "--admm-mu-decr","3.0",
-    "--admm-tau-incr","1.1",
-    "--admm-tau-decr","0.9",
-    "--admm-warm-start","on",
-    "--admm-acceleration","on"
-]
-
-run_batch("/home/mateus-kaiss/Projects/experiments/03-bus";
-          family=:dc, extra_args=extra_dc)
+run_batch("/home/mateus-kaiss/Projects/experiments/03-bus"; family=:dc, extra_args=extra_dc)
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
+#     family=:dc, extra_args=["--optimizer","OSQP.Optimizer"])
