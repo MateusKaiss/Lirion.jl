@@ -252,3 +252,43 @@ extra_ac = String[
 # ----- Rodar AC (centralizado) -----
 # run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
 #     family=:ac, extra_args=["--optimizer","Ipopt.Optimizer"])
+
+
+# ----- Preset SOCP (distribuído) -----
+# Observações:
+# - Em SOCP usamos consenso em V² (bus) e P/Q ou R/T (branch/hybrid).
+# - Clarabel/COSMO/SCS funcionam; se tiver Gurobi, também aceita cone de segunda ordem.
+# - ρ altos ajudam a estabilizar V² e fluxos em SOCP.
+extra_socp = String[
+    "--optimizer","Clarabel.Optimizer",  # troque para COSMO.Optimizer ou SCS.Optimizer se preferir
+    "--admm-max-iter","700",
+    "--admm-rho","9e3",                  # base alto
+    "--admm-rho-v","9e3",                # V² (bus/hybrid)
+    "--admm-rho-flow-p","9e3",           # P (ou Re(W) no híbrido)
+    "--admm-rho-flow-q","9e3",           # Q (ou Im(W) no híbrido)
+    "--admm-eps-primal","1e-4",
+    "--admm-eps-dual","1e-4",
+    "--admm-adaptive","on",
+    "--admm-mu-incr","5.0",
+    "--admm-mu-decr","5.0",
+    "--admm-tau-incr","1.8",
+    "--admm-tau-decr","0.2",
+    # "--admm-warm-start","on",
+    # "--admm-accel",                    # opcional (aceleração estilo FISTA no bloco BUS)
+]
+
+# ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
+# Exemplos:
+run_batch("/home/mateus-kaiss/Projects/experiments/03-bus";
+    family=:socp, extra_args=extra_socp)
+
+
+# ----- SOCP (centralizado) -----
+# Dica: para centralizado só precisamos do --optimizer; as flags ADMM são ignoradas.
+# Clarabel:
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
+#     family=:socp, extra_args=["--optimizer","Clarabel.Optimizer"])
+
+# Gurobi (se disponível com cones de 2ª ordem):
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
+#     family=:socp, extra_args=["--optimizer","Gurobi.Optimizer"])
