@@ -131,6 +131,8 @@ function run_batch(dir::AbstractString; family::Symbol=:dc,
     outcsv = isnothing(outpath) ? joinpath(dir, "admm_results_$(famkey).csv") : outpath
     CSV.write(outcsv, df)
     @info "CSV (ADMM) salvo em: $outcsv"
+    show(df)
+    println()  # pular linha
     return df
 end
 
@@ -185,6 +187,8 @@ function run_batch_centralized(dir::AbstractString; family::Symbol=:dc,
     outcsv = isnothing(outpath) ? joinpath(dir, "centralized_results_$(famkey).csv") : outpath
     CSV.write(outcsv, df)
     @info "CSV (centralizado) salvo em: $outcsv"
+    show(df)
+    println()  # pular linha
     return df
 end
 
@@ -205,7 +209,7 @@ extra_dc = String[
     "--admm-tau-incr","1.05",
     "--admm-tau-decr","0.95",
 ]
-# run_batch("/home/mateus-kaiss/Projects/experiments/03-bus"; family=:dc, extra_args=extra_dc)
+run_batch("/home/mateus-kaiss/Projects/experiments/05-bus"; family=:dc, extra_args=extra_dc)
 # run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
 #     family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
 
@@ -259,28 +263,28 @@ extra_ac = String[
 # - Em SOCP usamos consenso em V² (bus) e P/Q ou R/T (branch/hybrid).
 # - Clarabel/COSMO/SCS funcionam; se tiver Gurobi, também aceita cone de segunda ordem.
 # - ρ altos ajudam a estabilizar V² e fluxos em SOCP.
-extra_socp = String[
-    "--optimizer","Clarabel.Optimizer",  # troque para COSMO.Optimizer ou SCS.Optimizer se preferir
-    "--admm-max-iter","700",
-    "--admm-rho","9e3",                  # base alto
-    "--admm-rho-v","9e3",                # V² (bus/hybrid)
-    "--admm-rho-flow-p","9e3",           # P (ou Re(W) no híbrido)
-    "--admm-rho-flow-q","9e3",           # Q (ou Im(W) no híbrido)
-    "--admm-eps-primal","1e-4",
-    "--admm-eps-dual","1e-4",
-    "--admm-adaptive","on",
-    "--admm-mu-incr","5.0",
-    "--admm-mu-decr","5.0",
-    "--admm-tau-incr","1.8",
-    "--admm-tau-decr","0.2",
-    # "--admm-warm-start","on",
-    # "--admm-accel",                    # opcional (aceleração estilo FISTA no bloco BUS)
-]
+# extra_socp = String[
+#     "--optimizer","Clarabel.Optimizer",  # troque para COSMO.Optimizer ou SCS.Optimizer se preferir
+#     "--admm-max-iter","700",
+#     "--admm-rho","9e3",                  # base alto
+#     "--admm-rho-v","9e3",                # V² (bus/hybrid)
+#     "--admm-rho-flow-p","9e3",           # P (ou Re(W) no híbrido)
+#     "--admm-rho-flow-q","9e3",           # Q (ou Im(W) no híbrido)
+#     "--admm-eps-primal","1e-4",
+#     "--admm-eps-dual","1e-4",
+#     "--admm-adaptive","on",
+#     "--admm-mu-incr","5.0",
+#     "--admm-mu-decr","5.0",
+#     "--admm-tau-incr","1.8",
+#     "--admm-tau-decr","0.2",
+#     # "--admm-warm-start","on",
+#     # "--admm-accel",                    # opcional (aceleração estilo FISTA no bloco BUS)
+# ]
 
 # ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
 # Exemplos:
-run_batch("/home/mateus-kaiss/Projects/experiments/03-bus";
-    family=:socp, extra_args=extra_socp)
+# run_batch("/home/mateus-kaiss/Projects/experiments/05-bus";
+#     family=:socp, extra_args=extra_socp)
 
 
 # ----- SOCP (centralizado) -----
