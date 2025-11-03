@@ -231,12 +231,12 @@ function run_distributed_ac_objective_tests(;
         end
 
         if case_name == "pglib_opf_case2000_5zones_goc.m"
-            admm_max_iter_case   = 700
+            admm_max_iter_case = 700
             admm_eps_primal_case = 1e-4
-            admm_eps_dual_case   = 1e-4
-            admm_rho_theta_case  = 1e5
-            admm_rho_v_case      = 1e5
-            admm_adaptive_case   = "on"
+            admm_eps_dual_case = 1e-4
+            admm_rho_theta_case = 1e5
+            admm_rho_v_case = 1e5
+            admm_adaptive_case = "on"
             admm_mu_incr = 3.0
             admm_mu_decr = 3.0
             admm_tau_incr = 1.1
@@ -244,12 +244,12 @@ function run_distributed_ac_objective_tests(;
         end
 
         if case_name == "pglib_opf_case3970_25zones_goc.m"
-            admm_max_iter_case   = 700
+            admm_max_iter_case = 700
             admm_eps_primal_case = 3e-4
-            admm_eps_dual_case   = 3e-4
-            admm_rho_theta_case  = 1e5
-            admm_rho_v_case      = 1e5
-            admm_adaptive_case   = "on"
+            admm_eps_dual_case = 3e-4
+            admm_rho_theta_case = 1e5
+            admm_rho_v_case = 1e5
+            admm_adaptive_case = "on"
             admm_mu_incr = 3.0
             admm_mu_decr = 3.0
             admm_tau_incr = 1.1
@@ -257,18 +257,17 @@ function run_distributed_ac_objective_tests(;
         end
 
         if case_name == "pglib_opf_case10000_50zones_goc.m"
-            admm_max_iter_case   = 700
+            admm_max_iter_case = 700
             admm_eps_primal_case = 3e-4
-            admm_eps_dual_case   = 3e-4
-            admm_rho_theta_case  = 1e5
-            admm_rho_v_case      = 1e5
-            admm_adaptive_case   = "on"
+            admm_eps_dual_case = 3e-4
+            admm_rho_theta_case = 1e5
+            admm_rho_v_case = 1e5
+            admm_adaptive_case = "on"
             admm_mu_incr = 3.0
             admm_mu_decr = 3.0
             admm_tau_incr = 1.1
             admm_tau_decr = 0.9
         end
-
 
         @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), ρθ=$(admm_rho_theta_case), ρV=$(admm_rho_v_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), μ=(incr=$(admm_mu_incr),decr=$(admm_mu_decr)), τ=(incr=$(admm_tau_incr),decr=$(admm_tau_decr)), adaptive=$(admm_adaptive_case))"
         @testset "$(label) - $(case_name)" begin

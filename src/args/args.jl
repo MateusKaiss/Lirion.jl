@@ -177,6 +177,18 @@ struct Args
         # ===== aceleração (on/off) =====
         accel_flag = get(parsed, "admm-accel", false)
 
+        # ===== optimizer (avaliado cedo para poder entrar no cfg distribuído) =====
+        optimizer = if haskey(parsed, "optimizer") && !isnothing(parsed["optimizer"])
+            try
+                eval(Meta.parse(parsed["optimizer"]))
+            catch
+                @warn "Invalid optimizer: $(parsed["optimizer"]). Falling back to default (OSQP) via resolve_optimizer_dc."
+                nothing
+            end
+        else
+            nothing
+        end
+
         # avisos de flags irrelevantes/ignoradas
         local function _warn_irrelevant_rhos(
             method_sym::Symbol,
@@ -282,6 +294,8 @@ struct Args
                         tau_incr = tau_incr_val,
                         tau_decr = tau_decr_val,
                         accel_nesterov = accel_flag,
+                        optimizer = optimizer,               # <<<<<< AQUI
+                        prefer_socp_solver = :auto,          # opcional
                     )
                 catch err
                     @warn "Esta versão de DistributedOPFModel não aceita alguns campos novos (warm_start/adaptive_rho/accel_nesterov). Prosseguindo sem eles." err
@@ -297,6 +311,8 @@ struct Args
                         ε_primal = parsed["admm-eps-primal"],
                         ε_dual = parsed["admm-eps-dual"],
                         alpha_overrelax = alpha_,
+                        optimizer = optimizer,               # <<<<<< E AQUI
+                        prefer_socp_solver = :auto,
                     )
                 end
                 cfg
@@ -304,19 +320,6 @@ struct Args
                 haskey(base_map, model_key) || error("Invalid model: $model_key")
                 base_map[String(model_key)]
             end
-        end
-
-        # Otimizador: se usuário forneceu, usa; senão, deixe nothing e
-        # resolve_optimizer_dc fará o default para OSQP.
-        optimizer = if haskey(parsed, "optimizer") && !isnothing(parsed["optimizer"])
-            try
-                eval(Meta.parse(parsed["optimizer"]))
-            catch
-                @warn "Invalid optimizer: $(parsed["optimizer"]). Falling back to default (OSQP) via resolve_optimizer_dc."
-                nothing
-            end
-        else
-            nothing
         end
 
         return new(
