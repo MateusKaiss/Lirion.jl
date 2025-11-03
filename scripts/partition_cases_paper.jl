@@ -433,6 +433,9 @@ end
 #     strategy=:bus, k=6, refine_passes=5, overwrite=true)
 
 # 500 buses cases (forçando k=2)
-uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/500-bus";
-    strategy=:bus, k=8, refine_passes=5, overwrite=true)
+# uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/500-bus";
+#     strategy=:bus, k=8, refine_passes=5, overwrite=true)
 
+# 793 buses cases (forçando k=2)
+uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/793-bus";
+    strategy=:bus, k=30, refine_passes=5, overwrite=true)
