@@ -195,23 +195,24 @@ end
 # ----------------------- EXEMPLOS (opcional) -----------------------
 # Deixe comentado e rode a partir do REPL.
 extra_dc = String[
-    "--optimizer","Gurobi.Optimizer",
+    # "--optimizer","Gurobi.Optimizer",
     "--admm-max-iter","300",
-    "--admm-rho","1e2",
-    "--admm-rho-v","1e2",
-    "--admm-rho-flow-p","1e2",
-    "--admm-rho-flow-q","1e2",
+    "--admm-rho","4.2e6",
+    # "--admm-rho-v","1000",
+    # "--admm-rho-flow-p","5e5",
+    # "--admm-rho-flow-q","5e5",
     "--admm-eps-primal","1e-4",
     "--admm-eps-dual","1e-4",
-    "--admm-adaptive","on",
-    "--admm-mu-incr","5.0",
-    "--admm-mu-decr","5.0",
-    "--admm-tau-incr","1.2",
-    "--admm-tau-decr","0.8",
+    # "--admm-adaptive","on",
+    # "--admm-mu-incr","3.0",
+    # "--admm-mu-decr","3.0",
+    # "--admm-tau-incr","1.04",
+    # "--admm-tau-decr","0.9",
 ]
+
 run_batch("/home/mateus-kaiss/Projects/experiments/14-bus"; family=:dc, extra_args=extra_dc)
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
-#     family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
+run_batch_centralized("/home/mateus-kaiss/Projects/experiments/14-bus";
+    family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
 
 # ----- Preset AC (distribuído) -----
 extra_ac = String[
