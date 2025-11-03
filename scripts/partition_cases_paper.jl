@@ -107,6 +107,66 @@ function count_shared_buses(case::Dict{String,Any}, zone::Vector{Int})
 end
 
 # ---------------------------
+# Helpers p/ rótulos (garantir ≥2 zonas e compactar)
+# ---------------------------
+# ---------------------------
+# Helpers p/ rótulos (garantir ≥2 zonas e compactar)
+# ---------------------------
+function _relabel_compact!(Z::Vector{Int})
+    labs = sort(unique(Z))
+    m = length(labs)
+    if m == 0
+        return 0
+    end
+    map = Dict(labs[i] => i for i in eachindex(labs))
+    @inbounds for i in eachindex(Z)
+        Z[i] = map[Z[i]]
+    end
+    return m
+end
+
+function _ensure_k_labels!(case::Dict{String,Any}, Z::Vector{Int}, K::Int)
+    n = length(Z)
+    target = min(K, n)
+    m = _relabel_compact!(Z)
+    m >= target && return Z
+
+    # maior bloco atual
+    counts = Dict(z => count(==(z), Z) for z in unique(Z))
+    zbig   = argmax(counts)  # rótulo com maior cardinalidade
+
+    # preferir mover um bus com gerador a partir de zbig
+    buses = case["bus"]["bus_i"]
+    pos   = Dict(buses[i]=>i for i in eachindex(buses))
+    gen   = get(case, "gen", Dict{String,Any}())
+    genbus = get(gen, "gen_bus", Int[])
+
+    # CORREÇÃO: usar haskey(pos, b) (e não b in pos)
+    candidates = [pos[b] for b in genbus if haskey(pos, b) && Z[pos[b]] == zbig]
+
+    # se não houver gerador em zbig, qualquer nó do bloco
+    if isempty(candidates)
+        candidates = [i for i in eachindex(Z) if Z[i] == zbig]
+    end
+    isempty(candidates) && return Z  # nada a fazer
+
+    need = target - m
+    # garanta que haja 'need' candidatos (repete do bloco maior se preciso)
+    if length(candidates) < need
+        extra = [i for i in eachindex(Z) if Z[i] == zbig && !(i in candidates)]
+        append!(candidates, extra)
+    end
+    need = min(need, length(candidates))
+
+    for j in 1:need
+        idx = candidates[j]
+        Z[idx] = m + j  # cria novo rótulo (m+1, m+2, ...)
+    end
+    _relabel_compact!(Z)
+    return Z
+end
+
+# ---------------------------
 # Grafo ponderado e METIS comum
 # ---------------------------
 function _build_weighted_graph(case::Dict{String,Any})
@@ -156,21 +216,18 @@ end
 
 function metis_partition_edgecut(case::Dict{String,Any}; k::Int)
     G, buses, glob2loc = _build_weighted_graph(case)
-    parts = Metis.partition(G, k; alg = :KWAY)   # rótulos em 1..k
+    parts = Metis.partition(G, k; alg = :KWAY)   # rótulos em 1..k (pode "degenerar")
     Z = fill(1, length(buses))
     @inbounds for (i, bid) in enumerate(buses)
         Z[i] = parts[glob2loc[bid]]
     end
+    _ensure_k_labels!(case, Z, k)   # garante pelo menos min(k,n) zonas não-vazias
     return Z
 end
 
 # ---------------------------
 # Refinamento p/ BUS-ADMM (reduz fronteira)
 # ---------------------------
-# (versão leve: só garante conectividade e tenta reduzir #shared via movimentos locais,
-# mantendo ao menos um gerador por zona; reusa o seu raciocínio anterior)
-# Para encurtar, iremos apenas chamar um "refine" simples aqui.
-
 function fix_connectivity!(case::Dict{String,Any}, zone::Vector{Int})
     buses = case["bus"]["bus_i"]
     f = case["branch"]["f_bus"]; t = case["branch"]["t_bus"]; on = case["branch"]["br_status"]
@@ -209,7 +266,9 @@ function fix_connectivity!(case::Dict{String,Any}, zone::Vector{Int})
                 zv = zone[pos[v]]
                 counts[zv] = get(counts, zv, 0) + 1
             end
-            zbest = let ks = collect(keys(counts)); ks[argmax(collect(values(counts)))] end
+            ks = collect(keys(counts))
+            vs = [counts[k] for k in ks]
+            zbest = ks[argmax(vs)]
             for u in comp
                 zone[pos[u]] = zbest
             end
@@ -220,13 +279,13 @@ end
 
 function metis_partition_bus(case::Dict{String,Any}; k::Int, refine_passes::Int=3)
     Z = metis_partition_edgecut(case; k=k)
+    Z = _ensure_k_labels!(case, Z, k)  # reforço extra
     # refinamento leve: algumas passagens de conectividade e redução de shared
     for _ in 1:refine_passes
         fix_connectivity!(case, Z)
     end
     return Z
 end
-
 
 # ---------------------------
 # Escolha automática de k
@@ -326,7 +385,7 @@ function uniform_partition_subfolder(indir::AbstractString;
         # métricas por arquivo
         shared = count_shared_buses(c, zone)
         @info @sprintf("OK: %-30s → zones=%d | shared=%d (%.2f%%)",
-                       base, maximum(zone), shared, 100*shared/length(zone))
+                       base, length(unique(zone)), shared, 100*shared/length(zone))
     end
 
     @info "Concluído. Saída em: $outdir"
@@ -344,8 +403,6 @@ end
 # uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/03-bus";
 #     strategy=:edgecut, k=3, overwrite=true)
 
-
-
-# 3 buses cases
+# 3 buses cases (forçando k=2)
 uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/03-bus";
     strategy=:bus, k=2, refine_passes=3, overwrite=true)
