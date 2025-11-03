@@ -191,19 +191,20 @@ end
 # ----------------------- EXEMPLOS (opcional) -----------------------
 # Deixe comentado e rode a partir do REPL.
 extra_dc = String[
+    "--optimizer","Gurobi.Optimizer",
     "--admm-max-iter","700",
-    "--admm-rho","1e3",
-    "--admm-rho-v","1e3",
-    "--admm-rho-flow-p","1e3",
-    "--admm-rho-flow-q","1e3",
+    "--admm-rho","8e3",
+    "--admm-rho-v","8e3",
+    "--admm-rho-flow-p","8e3",
+    "--admm-rho-flow-q","8e3",
     "--admm-eps-primal","1e-4",
     "--admm-eps-dual","1e-4",
     "--admm-adaptive","on",
-    "--admm-mu-incr","2.0",
-    "--admm-mu-decr","2.0",
+    "--admm-mu-incr","3.0",
+    "--admm-mu-decr","3.0",
     "--admm-tau-incr","1.05",
-    "--admm-tau-decr","0.98",
+    "--admm-tau-decr","0.95",
 ]
 run_batch("/home/mateus-kaiss/Projects/experiments/03-bus"; family=:dc, extra_args=extra_dc)
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
-#     family=:dc, extra_args=["--optimizer","OSQP.Optimizer"])
+run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
+    family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
