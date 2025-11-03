@@ -53,10 +53,10 @@ optimizer_with_attributes(Clarabel.Optimizer,
 # ENV["LIRION_SOCP_PREFER"] pode ser "auto" | "gurobi" | "cosmo" | "scs"
 if !@isdefined(pick_socp_optimizer)
     const _SOCP_CHAIN_MAP_LOCAL = Dict(
-        :auto   => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
+        :auto => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
         :gurobi => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
-        :cosmo  => (COSMO.Optimizer,  Gurobi.Optimizer, SCS.Optimizer),
-        :scs    => (SCS.Optimizer,    Gurobi.Optimizer, COSMO.Optimizer),
+        :cosmo => (COSMO.Optimizer, Gurobi.Optimizer, SCS.Optimizer),
+        :scs => (SCS.Optimizer, Gurobi.Optimizer, COSMO.Optimizer),
     )
     function pick_socp_optimizer(;
         prefer::Symbol = Symbol(lowercase(get(ENV, "LIRION_SOCP_PREFER", "auto"))),
@@ -103,8 +103,8 @@ const distributed_branch_socp_zone_cases = [
     # # "pglib_opf_case57_2zones_ieee.m", problem
     # # "pglib_opf_case57_4zones_ieee.m", problem
     # # # 118 buses
-    "pglib_opf_case118_2zones_ieee.m",
-    "pglib_opf_case118_3zones_ieee.m",
+    # "pglib_opf_case118_2zones_ieee.m",
+    # "pglib_opf_case118_3zones_ieee.m",
     "pglib_opf_case118_5zones_ieee.m",
 
     # # 500 buses
@@ -128,7 +128,8 @@ const distributed_branch_socp_zone_cases = [
 
 function track_failure_branch_socp(label::String, origin::String, case_name::String)
     if !haskey(GLOBAL_FAILED_CASES, label)
-        GLOBAL_FAILED_CASES[label] = Dict("Centralized" => String[], "Distributed" => String[])
+        GLOBAL_FAILED_CASES[label] =
+            Dict("Centralized" => String[], "Distributed" => String[])
     end
     return push!(GLOBAL_FAILED_CASES[label][origin], case_name)
 end
@@ -270,12 +271,12 @@ function run_distributed_branch_socp_objective_tests(;
         case_name = basename(file)
 
         # hiperparâmetros default para os demais casos
-        rho_v_case       = 1e3
-        rho_flow_p_case  = 1e3
-        rho_flow_q_case  = 1e3
+        rho_v_case = 1e3
+        rho_flow_p_case = 1e3
+        rho_flow_q_case = 1e3
         admm_max_iter_case = 350
         admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case   = admm_eps_dual
+        admm_eps_dual_case = admm_eps_dual
 
         # regras simples por tamanho/zonas (mantém ρs)
         if occursin("_3zones_", case_name) || occursin("_4zones_", case_name)

@@ -996,7 +996,10 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
         z => zeros(Float64, length(shared_buses_sorted)) for z in zone_ids
     )
 
+    iter_done = 0
+
     for k in 1:config.max_iter
+        iter_done = k
         _FAST_USE_LOGS && println("\n[ADMM-AC] Iteração $k")
 
         if ρθ[] != prev_ρθ || ρV[] != prev_ρV
@@ -1153,9 +1156,10 @@ function run_admm_ac(config::DistributedOPFModel, data::Dict{String, Any})
     elapsed_s = (time_ns() - t0) / 1e9
     println("Tempo ADMM (bus/AC): $(_pretty_time_ac(elapsed_s))")
 
-    return total_real_cost, partitions, elapsed_s
+    return total_real_cost, partitions, iter_done, elapsed_s
 end
 
+# ========================== ADMM: BRANCH (AC) ==========================
 # ========================== ADMM: BRANCH (AC) ==========================
 function run_admm_ac_branch(
     config::DistributedOPFModel,
@@ -1244,7 +1248,11 @@ function run_admm_ac_branch(
     prev_ρP, prev_ρQ = ρP[], ρQ[]
     zone_ids = collect(keys(partitions))
 
+    # ==== NOVO: contador de iterações ====
+    iter_done = 0
+
     for k in 1:config.max_iter
+        iter_done = k
         _FAST_USE_LOGS && println("\n[ADMM-AC-branch] Iteração $k")
 
         if ρP[] != prev_ρP || ρQ[] != prev_ρQ
@@ -1303,7 +1311,6 @@ function run_admm_ac_branch(
 
         push!(rhoP_hist, ρP[])
         push!(rhoQ_hist, ρQ[])
-
         if r < εp && s < εd
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
@@ -1336,7 +1343,7 @@ function run_admm_ac_branch(
     elapsed_s = (time_ns() - t0) / 1e9
     println("Tempo ADMM (branch/AC): $(_pretty_time_ac(elapsed_s))")
 
-    return total_real_cost, partitions, elapsed_s
+    return total_real_cost, partitions, iter_done, elapsed_s
 end
 
 # ========================== ADMM: HÍBRIDO (AC) ==========================
@@ -1487,8 +1494,10 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
     λV_zone_buf = Dict{Int, Vector{Float64}}(
         z => zeros(Float64, length(shared_buses_sorted)) for z in zone_ids
     )
+    iter_done = 0
 
     for k in 1:config.max_iter
+        iter_done = k
         _FAST_USE_LOGS && println("\n[ADMM-AC-hybrid] Iteração $k")
 
         if ρθ[] != prev_ρθ || ρV[] != prev_ρV
@@ -1771,5 +1780,5 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, data::Dict{String, Any}
     elapsed_s = (time_ns() - t0) / 1e9
     println("Tempo ADMM (hybrid/AC): $(_pretty_time_ac(elapsed_s))")
 
-    return total_real_cost, partitions, elapsed_s
+    return total_real_cost, partitions, iter_done, elapsed_s
 end

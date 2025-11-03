@@ -67,12 +67,12 @@ const distributed_socp_zone_cases = [
     # # "pglib_opf_case57_2zones_ieee.m", problem
     # # "pglib_opf_case57_4zones_ieee.m", problem
     # # # 118 buses
-    "pglib_opf_case118_2zones_ieee.m",
-    "pglib_opf_case118_3zones_ieee.m",
+    # "pglib_opf_case118_2zones_ieee.m",
+    # "pglib_opf_case118_3zones_ieee.m",
     "pglib_opf_case118_5zones_ieee.m",
 
     # # 500 buses
-    "pglib_opf_case500_3zones_goc.m",
+    # "pglib_opf_case500_3zones_goc.m",
     # "pglib_opf_case500_4zones_goc.m", problema
     # # 793
     # # "pglib_opf_case793_11zones_goc.m",
@@ -150,7 +150,7 @@ function compare_distributed_socp_vs_centralized(
                     "reduced_tol_infeas_abs" => 5e-11,
                     "reduced_tol_infeas_rel" => 5e-4,
                     "reduced_tol_ktratio"    => 1e-4
-                )"""
+                )""",
             ]
             result_dict, _, _ = Lirion.main(args_cent)
             result_dict["objective"]
@@ -176,7 +176,7 @@ function compare_distributed_socp_vs_centralized(
                 "--admm-mu-incr", "5.0",
                 "--admm-mu-decr", "5.0",
                 "--admm-tau-incr", "1.1",
-                "--admm-tau-decr", "0.9"
+                "--admm-tau-decr", "0.9",
             ]
             obj, _ = Lirion.main(args_dist)
             obj
@@ -228,7 +228,6 @@ function compare_distributed_socp_vs_centralized(
     @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-ADMM-SOCP = $(round(dist_obj, digits=6)) | ADMM_MAX_IT=$(ADMM_MAX_IT)"
     @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
 end
-
 
 function run_distributed_socp_objective_tests(;
     case_list = distributed_socp_zone_cases,

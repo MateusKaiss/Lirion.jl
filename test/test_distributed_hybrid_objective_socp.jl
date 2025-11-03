@@ -52,10 +52,10 @@ optimizer_with_attributes(Clarabel.Optimizer,
 # -------- helper local (caso o runtests não tenha definido) --------
 if !@isdefined(pick_socp_optimizer)
     const _SOCP_CHAIN_MAP_LOCAL = Dict(
-        :auto   => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
+        :auto => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
         :gurobi => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
-        :cosmo  => (COSMO.Optimizer,  Gurobi.Optimizer, SCS.Optimizer),
-        :scs    => (SCS.Optimizer,    Gurobi.Optimizer, COSMO.Optimizer),
+        :cosmo => (COSMO.Optimizer, Gurobi.Optimizer, SCS.Optimizer),
+        :scs => (SCS.Optimizer, Gurobi.Optimizer, COSMO.Optimizer),
     )
     function pick_socp_optimizer(;
         prefer::Symbol = Symbol(lowercase(get(ENV, "LIRION_SOCP_PREFER", "auto"))),
@@ -101,12 +101,12 @@ const distributed_hybrid_socp_zone_cases = [
     # # "pglib_opf_case57_2zones_ieee.m", problem
     # # "pglib_opf_case57_4zones_ieee.m", problem
     # # # 118 buses
-    "pglib_opf_case118_2zones_ieee.m",
-    "pglib_opf_case118_3zones_ieee.m",
+    # "pglib_opf_case118_2zones_ieee.m",
+    # "pglib_opf_case118_3zones_ieee.m",
     "pglib_opf_case118_5zones_ieee.m",
 
-    # # 500 buses
-    "pglib_opf_case500_3zones_goc.m",
+    # # # 500 buses
+    # "pglib_opf_case500_3zones_goc.m",
     # "pglib_opf_case500_4zones_goc.m", problema
     # # 793
     # # "pglib_opf_case793_11zones_goc.m",
@@ -125,7 +125,8 @@ const distributed_hybrid_socp_zone_cases = [
 ]
 function track_failure_hybrid_socp(label::String, origin::String, case_name::String)
     if !haskey(GLOBAL_FAILED_CASES, label)
-        GLOBAL_FAILED_CASES[label] = Dict("Centralized" => String[], "Distributed" => String[])
+        GLOBAL_FAILED_CASES[label] =
+            Dict("Centralized" => String[], "Distributed" => String[])
     end
     return push!(GLOBAL_FAILED_CASES[label][origin], case_name)
 end

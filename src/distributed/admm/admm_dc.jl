@@ -608,10 +608,9 @@ function run_admm(config::DistributedOPFModel, data)
                 j = b2pos[lbs[i]]
                 duals_dense[z][j] = ρ[] * (θs[i] - θ̄_vec[j])
             end
-            λ_prev_real[z] .= duals_dense[z]  # prev reais = atuais (k=0)
-            λ_hat[z] .= duals_dense[z]  # extrapolado inicia no real
+            λ_prev_real[z] .= duals_dense[z]
+            λ_hat[z] .= duals_dense[z]
         end
-        # fista.prev_metric permanece Inf (sem restart na 1ª iteração)
     end
 
     zone_ids = collect(keys(partitions))
@@ -632,12 +631,7 @@ function run_admm(config::DistributedOPFModel, data)
             prev_rho = ρ[]
         end
 
-        # over-relaxation só se aceleração OFF
         α_used = accel ? nothing : _alpha_schedule(k, config.alpha_overrelax; k_on = 10)
-
-        # alvo no termo linear:
-        # - aceleração ON (paper): usa θ̄_hat e λ_hat (FISTA)
-        # - senão: usa θ̄ e λ (padrão)
         θ̄_target = accel ? θ̄_hat : θ̄_vec
 
         nz = length(zone_ids)
@@ -687,7 +681,6 @@ function run_admm(config::DistributedOPFModel, data)
             end
         end
 
-        # ===== atualização consenso real (θ̄_k) e duais reais λ_k =====
         θ̄_prev_vec .= θ̄_vec
         compute_theta_consensus_vec!(θ̄_vec, partitions, shared_buses_sorted, b2pos)
         @inbounds for b in shared_buses_sorted
@@ -695,20 +688,17 @@ function run_admm(config::DistributedOPFModel, data)
             push!(get!(θ_avg_history, b, Float64[]), θ̄_vec[j])
         end
 
-        # guardar λ reais anteriores antes do update deste k
         if accel
             for z in zone_ids
                 λ_prev_real[z] .= duals_dense[z]
             end
         end
 
-        # atualização dos duais “reais” λ_k (sempre com θ̄ real)
         for z in zone_ids
             update_duals_theta_vec!(duals_dense[z], partitions[z], θ̄_vec, θ̄_prev_vec, ρ[],
                 α_used, shared_buses_sorted, b2pos)
         end
 
-        # resíduos / tolerâncias (com variáveis reais)
         res_primal = primal_residual_bus_dc(partitions, θ̄_vec, shared_buses_sorted, b2pos)
         res_dual = dual_residual_bus_dc(θ̄_vec, θ̄_prev_vec)
         push!(res_primal_vec, res_primal)
@@ -731,18 +721,15 @@ function run_admm(config::DistributedOPFModel, data)
             break
         end
 
-        # ===== Aceleração FISTA (Alg. 3) — usar estados REAIS anteriores =====
         if accel
             metric = _accel_metric(res_primal, res_dual)
             restarted = fista_update!(fista; metric = metric)
             if restarted
-                # alinhar extrapolados com estados reais
                 θ̄_hat .= θ̄_vec
                 for z in zone_ids
                     λ_hat[z] .= duals_dense[z]
                 end
             else
-                # extrapola consenso e duais com α_k usando (real_k, real_{k-1})
                 _extrapolate!(θ̄_hat, θ̄_vec, θ̄_prev_vec, fista.α)
                 for z in zone_ids
                     _extrapolate!(λ_hat[z], duals_dense[z], λ_prev_real[z], fista.α)
@@ -778,7 +765,7 @@ function run_admm(config::DistributedOPFModel, data)
     println("Iterações realizadas: $iter_done")
     println("Tempo ADMM (bus/DC): $(_pretty_time(elapsed_s))")
 
-    return total_real_cost, partitions
+    return total_real_cost, partitions, iter_done, elapsed_s
 end
 
 function run_admm_branch(
@@ -967,7 +954,7 @@ function run_admm_branch(
     println("Iterações realizadas: $iter_done")
     println("Tempo ADMM (branch/DC): $(_pretty_time(elapsed_s))")
 
-    return total_real_cost, partitions
+    return total_real_cost, partitions, iter_done, elapsed_s
 end
 
 # =======================================================
@@ -989,13 +976,12 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
 
     shared_buses_sorted, b2pos = prepare_dense_maps(shared_buses)
 
-    ρθ = Ref(config.rho_theta)  # rho para bus
-    ρe = Ref(config.rho_flow)   # rho para branch
+    ρθ = Ref(config.rho_theta)
+    ρe = Ref(config.rho_flow)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
     adaptive = _adaptive_on(config)
-    accel = _accel_on(config)   # quando true, aplicar Alg. 3 no bloco de bus
+    accel = _accel_on(config)
 
-    # === Estados/estruturas ===
     θ̄_vec = zeros(Float64, length(shared_buses_sorted))
     θ̄_prev_vec = similar(θ̄_vec)
     θ̄_hat = similar(θ̄_vec)
@@ -1012,11 +998,9 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     duals_flow =
         Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in keys(partitions))
 
-    # manter duais de BUS reais prévios para extrapolação Alg. 3
     λθ_prev_real = Dict{Int, Vector{Float64}}(
         z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
     )
-    # extrapolados (usados só quando accel ON)
     λθ_hat = Dict{Int, Vector{Float64}}(
         z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
     )
@@ -1037,7 +1021,6 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         false
     end
 
-    # === Build models por zona ===
     for (zone_id, sub) in partitions
         m = build_model(sub, DC; optimizer = optimizer_factory, build_only = true)
         sub["model"] = m
@@ -1056,9 +1039,7 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         @objective(m, Min, sub["obj_base"] + sub["quad_bus_expr"] + sub["quad_branch_expr"])
     end
 
-    # === Warm start ADMM ===
     if warm
-        # bus
         compute_theta_consensus_vec!(θ̄_vec, partitions, shared_buses_sorted, b2pos)
         θ̄_hat .= θ̄_vec
         for (z, sub) in partitions
@@ -1071,8 +1052,6 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
             λθ_prev_real[z] .= duals_theta[z]
             λθ_hat[z] .= duals_theta[z]
         end
-        # fista.prev_metric permanece Inf
-        # branch
         compute_z_flow_consensus!(z_flow, partitions, cut_edges)
         for (z, sub) in partitions
             m = sub["model"]
@@ -1094,11 +1073,9 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     prev_ρθ = ρθ[]
     prev_ρe = ρe[]
 
-    # === Loop ADMM ===
     for k in 1:config.max_iter
         _FAST_USE_LOGS && println("\n[ADMM-hybrid/DC] Iteração $k")
 
-        # se algum rho mudou (p.ex., ρe adaptativo), rebuilde termos quadráticos
         if ρθ[] != prev_ρθ
             for (_, sub) in partitions
                 _build_quad_bus_expr!(sub, ρθ[])
@@ -1112,10 +1089,7 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
             prev_ρe = ρe[]
         end
 
-        # over-relaxation: desligado no bus quando aceleração ON
         α_used = accel ? nothing : _alpha_schedule(k, config.alpha_overrelax; k_on = 10)
-
-        # alvo do termo linear no bus: extrapolado (Alg. 3) quando accel ON
         θ̄_target = accel ? θ̄_hat : θ̄_vec
 
         nz = length(zone_ids)
@@ -1123,7 +1097,6 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         @threads for i in 1:nz
             z = zone_ids[i]
             sub = partitions[z]
-            # λ do bus: extrapolado quando accel ON
             if accel
                 λθ = gather_zone_lambda!(λθ_zone_buf[z], λθ_hat[z])
             else
@@ -1158,7 +1131,6 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
             sub["real_generation_cost"] = out.real_cost
         end
 
-        # consenso e estados anteriores
         θ̄_prev_vec .= θ̄_vec
         z_flow_prev = copy(z_flow)
 
@@ -1169,14 +1141,12 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
         end
         compute_z_flow_consensus!(z_flow, partitions, cut_edges)
 
-        # ===== guardar λθ reais anteriores antes do update =====
         if accel
             for z in zone_ids
                 λθ_prev_real[z] .= duals_theta[z]
             end
         end
 
-        # duais reais (sempre com θ̄/z reais)
         for z in zone_ids
             update_duals_theta_vec!(duals_theta[z], partitions[z], θ̄_vec, θ̄_prev_vec,
                 ρθ[],
@@ -1192,7 +1162,6 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
             α_used,
         )
 
-        # resíduos
         res_pri_bus = primal_residual_bus_dc(partitions, θ̄_vec, shared_buses_sorted, b2pos)
         res_pri_br = primal_residual_branch_dc(partitions, z_flow, cut_edges)
         res_primal = hypot(res_pri_bus, res_pri_br)
@@ -1227,7 +1196,6 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
             break
         end
 
-        # ===== Aceleração (Alg. 3) — apenas BUS, usando estados REAIS =====
         if accel
             metric_bus = _accel_metric(res_pri_bus, res_du_bus)
             restarted = fista_update!(fista; metric = metric_bus)
@@ -1245,22 +1213,19 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
             end
         end
 
-        # ===== ρ adaptativo =====
         if adaptive
-            # quando aceleração ON, mantemos ρθ FIXO (paper)
             if !accel
                 adaptive_rho_dc!(ρθ, res_pri_bus, res_du_bus;
                     μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                     τ_incr = config.tau_incr, τ_decr = config.tau_decr)
             end
-            # ρe permanece adaptativo (mesmo com aceleração ON)
             adaptive_rho_dc!(ρe, res_pri_br, res_du_br;
                 μ_incr = config.mu_incr, μ_decr = config.mu_decr,
                 τ_incr = config.tau_incr, τ_decr = config.tau_decr)
         end
     end
 
-    # === Plots / resumo ===
+    # Plots / resumo
     plot_admm_convergence(res_primal_vec, res_dual_vec, eps_primal_vec, eps_dual_vec,
         "plot_convergencia_admm_hybrid.html")
 
@@ -1319,5 +1284,5 @@ function run_admm_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
     println("Iterações realizadas: $iter_done")
     println("Tempo ADMM (hybrid/DC): $(_pretty_time(elapsed_s))")
 
-    return total_real_cost, partitions
+    return total_real_cost, partitions, iter_done, elapsed_s
 end

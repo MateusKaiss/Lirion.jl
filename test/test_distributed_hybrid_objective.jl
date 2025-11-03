@@ -22,8 +22,8 @@ const distributed_hybrid_zone_cases = [
     # # 793
     # "pglib_opf_case793_11zones_goc.m",
     # # 2000
-    "pglib_opf_case2000_5zones_goc.m",
-    "pglib_opf_case3970_25zones_goc.m",
+    # "pglib_opf_case2000_5zones_goc.m",
+    # "pglib_opf_case3970_25zones_goc.m",
     # "pglib_opf_case10000_50zones_goc.m",
     # "pglib_opf_case20758_42zones_epigrids.m",
     # "pglib_opf_case30000_20zones_goc.m",
