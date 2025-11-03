@@ -403,6 +403,11 @@ end
 # uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/03-bus";
 #     strategy=:edgecut, k=3, overwrite=true)
 
+
 # 3 buses cases (forçando k=2)
 uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/03-bus";
+    strategy=:bus, k=2, refine_passes=3, overwrite=true)
+
+# 5 buses cases (forçando k=2)
+uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/05-bus";
     strategy=:bus, k=2, refine_passes=3, overwrite=true)
