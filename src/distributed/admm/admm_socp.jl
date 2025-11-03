@@ -1185,6 +1185,10 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, An
                 dualsP[z], dualsQ[z], ρP[], ρQ[])
             @objective(m, Min, sub["obj_static"] + lin)
             optimize!(m)
+            
+            # ts = MOI.get(m, MOI.TerminationStatus())
+            # @info "[zona=$(z)] status=$(ts)"
+
             sub["generation_cost_model_expr"] = value(m[:generation_cost])
             sub["real_generation_cost"] =
                 compute_real_generation_cost(m, sub["objective_params"])
