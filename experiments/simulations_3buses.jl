@@ -131,6 +131,8 @@ function run_batch(dir::AbstractString; family::Symbol=:dc,
     outcsv = isnothing(outpath) ? joinpath(dir, "admm_results_$(famkey).csv") : outpath
     CSV.write(outcsv, df)
     @info "CSV (ADMM) salvo em: $outcsv"
+    show(df)
+    println()  # pular linha
     return df
 end
 
@@ -185,6 +187,8 @@ function run_batch_centralized(dir::AbstractString; family::Symbol=:dc,
     outcsv = isnothing(outpath) ? joinpath(dir, "centralized_results_$(famkey).csv") : outpath
     CSV.write(outcsv, df)
     @info "CSV (centralizado) salvo em: $outcsv"
+    show(df)
+    println()  # pular linha
     return df
 end
 
@@ -249,7 +253,7 @@ extra_ac = String[
 # run_batch("/home/mateus-kaiss/Projects/experiments/03-bus";
 #     family=:ac, extra_args=extra_ac)
 
-# ----- Rodar AC (centralizado) -----
+# # ----- Rodar AC (centralizado) -----
 # run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
 #     family=:ac, extra_args=["--optimizer","Ipopt.Optimizer"])
 
@@ -286,9 +290,5 @@ run_batch("/home/mateus-kaiss/Projects/experiments/03-bus";
 # ----- SOCP (centralizado) -----
 # Dica: para centralizado só precisamos do --optimizer; as flags ADMM são ignoradas.
 # Clarabel:
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
-#     family=:socp, extra_args=["--optimizer","Clarabel.Optimizer"])
-
-# Gurobi (se disponível com cones de 2ª ordem):
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
-#     family=:socp, extra_args=["--optimizer","Gurobi.Optimizer"])
+run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
+    family=:socp, extra_args=["--optimizer","Clarabel.Optimizer"])
