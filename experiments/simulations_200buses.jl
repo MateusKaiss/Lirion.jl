@@ -195,9 +195,9 @@ end
 # ----------------------- EXEMPLOS (opcional) -----------------------
 # Deixe comentado e rode a partir do REPL.
 extra_dc = String[
-    "--optimizer","Ipopt.Optimizer",
-    "--admm-max-iter","200",
-    "--admm-rho","8e4",
+    "--optimizer","Gurobi.Optimizer",
+    "--admm-max-iter","800",
+    "--admm-rho","1",
     "--admm-rho-v","8e4",
     "--admm-rho-flow-p","8e4",
     "--admm-rho-flow-q","8e4",
@@ -250,13 +250,13 @@ extra_ac = String[
     # "--admm-accel",             # opcional
 ]
 
-# ----- Rodar AC (distribuído: bus/branch/hybrid) -----
-# run_batch("/home/mateus-kaiss/Projects/experiments/03-bus";
-#     family=:ac, extra_args=extra_ac)
+# # ----- Rodar AC (distribuído: bus/branch/hybrid) -----
+run_batch("/home/mateus-kaiss/Projects/experiments/200-bus";
+    family=:ac, extra_args=extra_ac)
 
 # # ----- Rodar AC (centralizado) -----
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
-#     family=:ac, extra_args=["--optimizer","Ipopt.Optimizer"])
+run_batch_centralized("/home/mateus-kaiss/Projects/experiments/200-bus";
+    family=:ac, extra_args=["--optimizer","Ipopt.Optimizer"])
 
 
 # ----- Preset SOCP (distribuído) -----
@@ -284,16 +284,16 @@ extra_socp = String[
 
 # ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
 # Exemplos:
-# run_batch("/home/mateus-kaiss/Projects/experiments/05-bus";
-#     family=:socp, extra_args=extra_socp)
+run_batch("/home/mateus-kaiss/Projects/experiments/200-bus";
+    family=:socp, extra_args=extra_socp)
 
 
 # ----- SOCP (centralizado) -----
 # Dica: para centralizado só precisamos do --optimizer; as flags ADMM são ignoradas.
 # Clarabel:
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/200-bus";
 #     family=:socp, extra_args=["--optimizer","Gurobi.Optimizer"])
 
 # Gurobi (se disponível com cones de 2ª ordem):
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
-#     family=:socp, extra_args=["--optimizer","Gurobi.Optimizer"])
+run_batch_centralized("/home/mateus-kaiss/Projects/experiments/200-bus";
+    family=:socp, extra_args=["--optimizer","Gurobi.Optimizer"])
