@@ -210,9 +210,9 @@ extra_dc = String[
     "--admm-tau-decr","0.95",
 ]
 
-# run_batch("/home/mateus-kaiss/Projects/experiments/118-bus"; family=:dc, extra_args=extra_dc)
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/118-bus";
-#     family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
+run_batch("/home/mateus-kaiss/Projects/experiments/118-bus"; family=:dc, extra_args=extra_dc)
+run_batch_centralized("/home/mateus-kaiss/Projects/experiments/118-bus";
+    family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
 
 # ----- Preset AC (distribuído) -----
 # ----- Preset AC (distribuído) -----
@@ -235,12 +235,12 @@ extra_ac = String[
 ]
 
 # ----- Rodar AC (distribuído: bus/branch/hybrid) -----
-# run_batch("/home/mateus-kaiss/Projects/experiments/118-bus";
-#     family=:ac, extra_args=extra_ac)
+run_batch("/home/mateus-kaiss/Projects/experiments/118-bus";
+    family=:ac, extra_args=extra_ac)
 
-# # # ----- Rodar AC (centralizado) -----
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/118-bus";
-#     family=:ac, extra_args=["--optimizer","Ipopt.Optimizer"])
+# # ----- Rodar AC (centralizado) -----
+run_batch_centralized("/home/mateus-kaiss/Projects/experiments/118-bus";
+    family=:ac, extra_args=["--optimizer","Ipopt.Optimizer"])
 
 
 # ----- Preset SOCP (distribuído) -----
