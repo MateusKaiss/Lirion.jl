@@ -195,8 +195,8 @@ end
 # ----------------------- EXEMPLOS (opcional) -----------------------
 # Deixe comentado e rode a partir do REPL.
 extra_dc = String[
-    # "--optimizer","Gurobi.Optimizer",
-    "--admm-max-iter","700",
+    "--optimizer","Gurobi.Optimizer",
+    "--admm-max-iter","1500",
     "--admm-rho","8e4",
     "--admm-rho-v","8e4",
     "--admm-rho-flow-p","8e4",
@@ -210,52 +210,36 @@ extra_dc = String[
     "--admm-tau-decr","0.95",
 ]
 
-run_batch("/home/mateus-kaiss/Projects/experiments/118-bus"; family=:dc, extra_args=extra_dc)
-run_batch_centralized("/home/mateus-kaiss/Projects/experiments/118-bus";
-    family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
+# run_batch("/home/mateus-kaiss/Projects/experiments/118-bus"; family=:dc, extra_args=extra_dc)
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/118-bus";
+#     family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
 
 # ----- Preset AC (distribuído) -----
+# ----- Preset AC (distribuído) -----
+# ----- Preset AC (distribuído) -----
 extra_ac = String[
-    "--admm-max-iter","700",
+    "--admm-max-iter","1500",
     "--admm-rho","8e3",          # base alto
     "--admm-rho-v","8e3",        # |V|
-    "--admm-rho-flow-p","8e3",   # P_flow
-    "--admm-rho-flow-q","8e3",   # Q_flow
+    "--admm-rho-flow-p","1000",   # P_flow
+    "--admm-rho-flow-q","1000",   # Q_flow
     "--admm-eps-primal","1e-4",
     "--admm-eps-dual","1e-4",
     "--admm-adaptive","on",
     "--admm-mu-incr","3.0",
     "--admm-mu-decr","3.0",
-    "--admm-tau-incr","1.1",
-    "--admm-tau-decr","0.9",
-    # "--admm-warm-start","on",
-    # "--admm-accel",             # opcional
-]
-
-# ----- Preset AC (distribuído) -----
-extra_ac = String[
-    "--admm-max-iter","700",
-    "--admm-rho","8e3",          # base alto
-    "--admm-rho-v","8e3",        # |V|
-    "--admm-rho-flow-p","8e3",   # P_flow
-    "--admm-rho-flow-q","8e3",   # Q_flow
-    "--admm-eps-primal","1e-4",
-    "--admm-eps-dual","1e-4",
-    "--admm-adaptive","on",
-    "--admm-mu-incr","3.0",
-    "--admm-mu-decr","3.0",
-    "--admm-tau-incr","1.1",
-    "--admm-tau-decr","0.9",
+    "--admm-tau-incr","1.05",
+    "--admm-tau-decr","0.95",
     # "--admm-warm-start","on",
     # "--admm-accel",             # opcional
 ]
 
 # ----- Rodar AC (distribuído: bus/branch/hybrid) -----
-# run_batch("/home/mateus-kaiss/Projects/experiments/03-bus";
+# run_batch("/home/mateus-kaiss/Projects/experiments/118-bus";
 #     family=:ac, extra_args=extra_ac)
 
-# # ----- Rodar AC (centralizado) -----
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
+# # # ----- Rodar AC (centralizado) -----
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/118-bus";
 #     family=:ac, extra_args=["--optimizer","Ipopt.Optimizer"])
 
 
@@ -266,7 +250,7 @@ extra_ac = String[
 # - ρ altos ajudam a estabilizar V² e fluxos em SOCP.
 extra_socp = String[
     "--optimizer","Gurobi.Optimizer",  # troque para COSMO.Optimizer ou SCS.Optimizer se preferir
-    "--admm-max-iter","700",
+    "--admm-max-iter","1500",
     "--admm-rho","9e3",                  # base alto
     "--admm-rho-v","9e3",                # V² (bus/hybrid)
     "--admm-rho-flow-p","9e3",           # P (ou Re(W) no híbrido)
@@ -276,24 +260,21 @@ extra_socp = String[
     "--admm-adaptive","on",
     "--admm-mu-incr","5.0",
     "--admm-mu-decr","5.0",
-    "--admm-tau-incr","1.8",
-    "--admm-tau-decr","0.2",
+    "--admm-tau-incr","1.05",
+    "--admm-tau-decr","0.95",
     # "--admm-warm-start","on",
     # "--admm-accel",                    # opcional (aceleração estilo FISTA no bloco BUS)
 ]
 
+
 # ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
 # Exemplos:
-# run_batch("/home/mateus-kaiss/Projects/experiments/05-bus";
-#     family=:socp, extra_args=extra_socp)
+run_batch("/home/mateus-kaiss/Projects/experiments/118-bus";
+    family=:socp, extra_args=extra_socp)
 
 
 # ----- SOCP (centralizado) -----
 # Dica: para centralizado só precisamos do --optimizer; as flags ADMM são ignoradas.
 # Clarabel:
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
-#     family=:socp, extra_args=["--optimizer","Gurobi.Optimizer"])
-
-# Gurobi (se disponível com cones de 2ª ordem):
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
-#     family=:socp, extra_args=["--optimizer","Gurobi.Optimizer"])
+run_batch_centralized("/home/mateus-kaiss/Projects/experiments/118-bus";
+    family=:socp, extra_args=["--optimizer","CLarabel.Optimizer"])
