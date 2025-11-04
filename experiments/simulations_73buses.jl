@@ -209,9 +209,9 @@ extra_dc = String[
     "--admm-tau-incr","1.05",
     "--admm-tau-decr","0.95",
 ]
-# run_batch("/home/mateus-kaiss/Projects/experiments/73-bus"; family=:dc, extra_args=extra_dc)
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/73-bus";
-#     family=:dc, extra_args=["--optimizer","OSQP.Optimizer"])
+run_batch("/home/mateus-kaiss/Projects/experiments/73-bus"; family=:dc, extra_args=extra_dc)
+run_batch_centralized("/home/mateus-kaiss/Projects/experiments/73-bus";
+    family=:dc, extra_args=["--optimizer","OSQP.Optimizer"])
 
 # ----- Preset AC (distribuído) -----
 extra_ac = String[
@@ -284,12 +284,12 @@ extra_socp = String[
 
 # # ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
 # # Exemplos:
-# run_batch("/home/mateus-kaiss/Projects/experiments/73-bus";
-#     family=:socp, extra_args=extra_socp)
+run_batch("/home/mateus-kaiss/Projects/experiments/73-bus";
+    family=:socp, extra_args=extra_socp)
 
 
-# # # ----- SOCP (centralizado) -----
-# # # Dica: para centralizado só precisamos do --optimizer; as flags ADMM são ignoradas.
-# # # Clarabel:
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/73-bus";
-#     family=:socp, extra_args=["--optimizer","Clarabel.Optimizer"])
+# # ----- SOCP (centralizado) -----
+# # Dica: para centralizado só precisamos do --optimizer; as flags ADMM são ignoradas.
+# # Clarabel:
+run_batch_centralized("/home/mateus-kaiss/Projects/experiments/73-bus";
+    family=:socp, extra_args=["--optimizer","Clarabel.Optimizer"])
