@@ -196,7 +196,7 @@ end
 # Deixe comentado e rode a partir do REPL.
 extra_dc = String[
     "--optimizer","Gurobi.Optimizer",
-    "--admm-max-iter","2000",
+    "--admm-max-iter","5000",
     "--admm-rho","1e4",
     "--admm-rho-v","1e4",
     "--admm-rho-flow-p","1e4",
@@ -217,7 +217,7 @@ run_batch_centralized("/home/mateus-kaiss/Projects/experiments/1354-bus";
 
 # ----- Preset AC (distribuído) -----
 extra_ac = String[
-    "--admm-max-iter","2000",
+    "--admm-max-iter","5000",
     "--admm-rho","8e3",          # base alto
     "--admm-rho-v","8e3",        # |V|
     "--admm-rho-flow-p","8e3",   # P_flow
@@ -284,7 +284,7 @@ extra_socp = String[
         "reduced_tol_infeas_rel" => 5e-4,
         "reduced_tol_ktratio"    => 1e-4
     )""",
-    "--admm-max-iter","2000",
+    "--admm-max-iter","5000",
     "--admm-rho","8e8",
     "--admm-rho-v","8e8",
     "--admm-rho-flow-p","8e8",
