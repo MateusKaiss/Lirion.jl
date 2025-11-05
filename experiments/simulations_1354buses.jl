@@ -236,45 +236,125 @@ extra_ac = String[
 ]
 
 # ----- Rodar AC (distribuído: bus/branch/hybrid) -----
-run_batch("/home/mateus-kaiss/Projects/experiments/1354-bus";
-    family=:ac, extra_args=extra_ac)
+# run_batch("/home/mateus-kaiss/Projects/experiments/1354-bus";
+#     family=:ac, extra_args=extra_ac)
 
-# # # # ----- Rodar AC (centralizado) -----
-run_batch_centralized("/home/mateus-kaiss/Projects/experiments/1354-bus";
-    family=:ac, extra_args=["--optimizer","Ipopt.Optimizer"])
+# # # # # ----- Rodar AC (centralizado) -----
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/1354-bus";
+#     family=:ac, extra_args=["--optimizer","Ipopt.Optimizer"])
 
 
 
-# ----- Preset SOCP (distribuído) -----
-# Observações:
-# - Em SOCP usamos consenso em V² (bus) e P/Q ou R/T (branch/hybrid).
-# - Clarabel/COSMO/SCS funcionam; se tiver Gurobi, também aceita cone de segunda ordem.
-# - ρ altos ajudam a estabilizar V² e fluxos em SOCP.
 extra_socp = String[
-    "--optimizer","Gurobi.Optimizer",  # troque para COSMO.Optimizer ou SCS.Optimizer se preferir
+    "--optimizer",
+    """optimizer_with_attributes(Clarabel.Optimizer,
+        "tol_feas" => 1e-4,
+        "tol_gap_abs" => 1e-4,
+        "tol_gap_rel" => 1e-4,
+        "max_iter" => 1200,
+
+        "dynamic_regularization_enable" => true,
+        "dynamic_regularization_eps"   => 1e-10,
+        "dynamic_regularization_delta" => 1e-4,
+
+        "static_regularization_enable" => true,
+
+        "equilibrate_enable" => true,
+        "equilibrate_min_scaling" => 1e-4,
+        "equilibrate_max_scaling" => 1e4,
+
+        "direct_solve_method" => :qdldl,
+
+        "iterative_refinement_reltol" => 1e-9,
+        "iterative_refinement_abstol" => 1e-9,
+
+        "max_step_fraction" => 0.7,
+        "linesearch_backtrack_step" => 0.5,
+
+        "tol_ktratio" => 1e-5,
+        "min_terminate_step_length" => 1e-6,
+        "min_switch_step_length" => 5e-2,
+
+        "reduced_tol_gap_abs" => 5e-4,
+        "reduced_tol_gap_rel" => 5e-4,
+        "reduced_tol_feas"    => 5e-4,
+        "reduced_tol_infeas_abs" => 5e-11,
+        "reduced_tol_infeas_rel" => 5e-4,
+        "reduced_tol_ktratio"    => 1e-4
+    )""",
     "--admm-max-iter","2000",
-    "--admm-rho","1e4",                  # base alto
-    "--admm-rho-v","1e4",                # V² (bus/hybrid)
-    "--admm-rho-flow-p","1e4",           # P (ou Re(W) no híbrido)
-    "--admm-rho-flow-q","1e4",           # Q (ou Im(W) no híbrido)
+    "--admm-rho","1e7",
+    "--admm-rho-v","1e7",
+    "--admm-rho-flow-p","1e7",
+    "--admm-rho-flow-q","1e7",
     "--admm-eps-primal","1e-4",
     "--admm-eps-dual","1e-4",
     "--admm-adaptive","on",
-    "--admm-mu-incr","5.0",
-    "--admm-mu-decr","5.0",
-    "--admm-tau-incr","1.05",
-    "--admm-tau-decr","0.95",
-    # "--admm-warm-start","on",
-    # "--admm-accel",                    # opcional (aceleração estilo FISTA no bloco BUS)
+    "--admm-mu-incr","3.0",
+    "--admm-mu-decr","3.0",
+    "--admm-tau-incr","1.8",
+    "--admm-tau-decr","0.2",
 ]
 
-# ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
-# Exemplos:
-# run_batch("/home/mateus-kaiss/Projects/experiments/1354-bus";
-#     family=:socp, extra_args=extra_socp)
+
+# # ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
+# # Exemplos:
+run_batch("/home/mateus-kaiss/Projects/experiments/588-bus";
+    family=:socp, extra_args=extra_socp)
 
 
 # # ----- SOCP (centralizado) -----
 # # Dica: para centralizado só precisamos do --optimizer; as flags ADMM são ignoradas.
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/1354-bus";
-#     family=:socp, extra_args=["--optimizer","Gurobi.Optimizer"])
+# # Clarabel:
+run_batch_centralized("/home/mateus-kaiss/Projects/experiments/588-bus";
+    family=:socp, extra_args=[
+        "--optimizer",
+        """optimizer_with_attributes(Clarabel.Optimizer,
+            "tol_feas" => 1e-4,
+            "tol_gap_abs" => 1e-4,
+            "tol_gap_rel" => 1e-4,
+            "max_iter" => 1200,
+
+            "dynamic_regularization_enable" => true,
+            "dynamic_regularization_eps"   => 1e-10,
+            "dynamic_regularization_delta" => 1e-4,
+
+            "static_regularization_enable" => true,
+
+            "equilibrate_enable" => true,
+            "equilibrate_min_scaling" => 1e-4,
+            "equilibrate_max_scaling" => 1e4,
+
+            "direct_solve_method" => :qdldl,
+
+            "iterative_refinement_reltol" => 1e-9,
+            "iterative_refinement_abstol" => 1e-9,
+
+            "max_step_fraction" => 0.7,
+            "linesearch_backtrack_step" => 0.5,
+
+            "tol_ktratio" => 1e-5,
+            "min_terminate_step_length" => 1e-6,
+            "min_switch_step_length" => 5e-2,
+
+            "reduced_tol_gap_abs" => 5e-4,
+            "reduced_tol_gap_rel" => 5e-4,
+            "reduced_tol_feas"    => 5e-4,
+            "reduced_tol_infeas_abs" => 5e-11,
+            "reduced_tol_infeas_rel" => 5e-4,
+            "reduced_tol_ktratio"    => 1e-4
+        )"""
+    ])
+
+
+
+# ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
+# Exemplos:
+# run_batch("/home/mateus-kaiss/Projects/experiments/588-bus";
+#     family=:socp, extra_args=extra_socp)
+
+
+# ----- SOCP (centralizado) -----
+# Dica: para centralizado só precisamos do --optimizer; as flags ADMM são ignoradas.
+run_batch_centralized("/home/mateus-kaiss/Projects/experiments/588-bus";
+    family=:socp, extra_args=["--optimizer","Clarabel.Optimizer"])
