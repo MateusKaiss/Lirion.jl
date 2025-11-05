@@ -15,7 +15,13 @@ function resolve_optimizer_dc(config)
                 "warm_start" => true,
             )
         else
-            return opt
+            # Configure IPOPT with HSL if it's the selected optimizer
+            ipopt_linear_solver = try
+                getfield(config, :ipopt_linear_solver)
+            catch
+                "ma57"
+            end
+            return configure_ipopt_with_hsl(opt, ipopt_linear_solver)
         end
     end
 

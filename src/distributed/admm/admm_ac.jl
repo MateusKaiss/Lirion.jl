@@ -19,6 +19,14 @@ function resolve_optimizer_ac(config)
     if hasproperty(config, :optimizer) && getproperty(config, :optimizer) !== nothing
         return getproperty(config, :optimizer)
     else
+        # Get linear solver from config, default to ma57
+        linear_solver = try
+            getfield(config, :ipopt_linear_solver)
+        catch
+            "ma57"
+        end
+        
+        # Build full ADMM-tuned IPOPT configuration with HSL linear solver
         return optimizer_with_attributes(
             Ipopt.Optimizer,
 
@@ -108,9 +116,9 @@ function resolve_optimizer_ac(config)
             # "constraint_violation_norm_type" => "1-norm", # default = "1-norm"
 
             #             # ---------------------------
-            #             # Linear Solver & Refinement
+            #             # Linear Solver & Refinement (uses shared HSL configuration)
             #             # ---------------------------
-            "linear_solver" => "mumps",   # default = "ma27"
+            "linear_solver" => get_ipopt_linear_solver_option(linear_solver),
             # "linear_system_scaling"       => "mc19",    # default = "mc19" (HSL), "none" caso contrário
             "linear_scaling_on_demand" => "yes",     # default = "yes"
             "fast_step_computation" => "no",      # default = "no"
@@ -121,7 +129,7 @@ function resolve_optimizer_ac(config)
             "max_hessian_perturbation" => 1e20,      # default = 1e20
             "min_hessian_perturbation" => 1e-20,     # default = 1e-20
 
-            #             # ---- Parâmetros específicos do MUMPS ----
+                        # ---- Parâmetros específicos do MUMPS (só usado se linear_solver == "mumps") ----
             "mumps_mem_percent" => 500,    # default = 1000
             "mumps_pivtol" => 1e-6,   # default = 1e-6
             "mumps_pivtolmax" => 0.1,    # default = 0.1

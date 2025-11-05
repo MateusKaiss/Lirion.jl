@@ -16,7 +16,7 @@ function main(ARGS)
     end
 
     # --- Build and solve the optimization model ---
-    result_model = build_model(data, args.model_type; optimizer = args.optimizer)
+    result_model = build_model(data, args.model_type; optimizer = args.optimizer, ipopt_linear_solver = args.ipopt_linear_solver)
 
     # --- Post-process and organize results ---
     result_dict = build_result_dict(result_model, data)

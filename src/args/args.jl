@@ -6,6 +6,7 @@ struct Args
     database_path::String
     model_type::Union{Type{<:OPFModel}, DistributedOPFModel}
     optimizer::Any
+    ipopt_linear_solver::String
     plot_outputs::Bool
     write_lp::Bool
     write_outputs::Bool
@@ -27,6 +28,11 @@ struct Args
             "--optimizer"
             help = "Optimizer function, e.g., OSQP.Optimizer (default if omitted), or Ipopt.Optimizer / SCS.Optimizer / Gurobi.Optimizer, etc."
             arg_type = String
+
+            "--ipopt-linear-solver"
+            help = "Linear solver for IPOPT: mumps (default fallback), ma27, ma57 (default), ma77, ma86, ma97"
+            arg_type = String
+            default = "ma57"
 
             "--plot-outputs"
             help = "Generate plots"
@@ -189,6 +195,14 @@ struct Args
             nothing
         end
 
+        # ===== IPOPT linear solver =====
+        ipopt_linear_solver = get(parsed, "ipopt-linear-solver", "ma57")
+        valid_solvers = ["mumps", "ma27", "ma57", "ma77", "ma86", "ma97"]
+        if !(ipopt_linear_solver in valid_solvers)
+            @warn "Invalid IPOPT linear solver: $ipopt_linear_solver. Using default: ma57"
+            ipopt_linear_solver = "ma57"
+        end
+
         # avisos de flags irrelevantes/ignoradas
         local function _warn_irrelevant_rhos(
             method_sym::Symbol,
@@ -296,9 +310,10 @@ struct Args
                         accel_nesterov = accel_flag,
                         optimizer = optimizer,               # <<<<<< AQUI
                         prefer_socp_solver = :auto,          # opcional
+                        ipopt_linear_solver = ipopt_linear_solver,
                     )
                 catch err
-                    @warn "Esta versão de DistributedOPFModel não aceita alguns campos novos (warm_start/adaptive_rho/accel_nesterov). Prosseguindo sem eles." err
+                    @warn "Esta versão de DistributedOPFModel não aceita alguns campos novos (warm_start/adaptive_rho/accel_nesterov/ipopt_linear_solver). Prosseguindo sem eles." err
                     cfg = DistributedOPFModel(
                         base_map[base_str],
                         method_sym,
@@ -326,6 +341,7 @@ struct Args
             path,
             model_type,
             optimizer,
+            ipopt_linear_solver,
             get(parsed, "plot-outputs", false),
             get(parsed, "write-lp", false),
             get(parsed, "outputs", false),

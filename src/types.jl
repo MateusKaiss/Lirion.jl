@@ -23,6 +23,7 @@ mutable struct DistributedOPFModel
     accel_nesterov::Bool
     optimizer::Any                      # << novo (pode ser nothing ou ex.: SCS.Optimizer)
     prefer_socp_solver::Symbol          # << novo (:auto | :gurobi | :cosmo | :scs)
+    ipopt_linear_solver::String         # << novo (ma27, ma57, ma77, ma86, ma97, mumps)
 
     function DistributedOPFModel(
         base_model::Type{<:OPFModel},
@@ -44,6 +45,7 @@ mutable struct DistributedOPFModel
         accel_nesterov::Bool = false,
         optimizer::Any = nothing,                 # << novo
         prefer_socp_solver::Symbol = :auto,       # << novo
+        ipopt_linear_solver::String = "ma57",     # << novo
     )
         max_iter > 0 || throw(ArgumentError("max_iter must be > 0"))
         rho_theta > 0 || throw(ArgumentError("rho_theta must be > 0"))
@@ -68,6 +70,7 @@ mutable struct DistributedOPFModel
             accel_nesterov,
             optimizer,
             prefer_socp_solver,
+            ipopt_linear_solver,
         )
     end
 end
@@ -90,6 +93,7 @@ DistributedOPFModel(
     accel_nesterov::Bool = false,
     optimizer::Any = nothing,                    # << novo
     prefer_socp_solver::Symbol = :auto,          # << novo
+    ipopt_linear_solver::String = "ma57",        # << novo
 ) = DistributedOPFModel(
     base_model, method, max_iter, rho, rho, rho, rho, ε_primal, ε_dual;
     alpha_overrelax = alpha_overrelax,
@@ -102,6 +106,7 @@ DistributedOPFModel(
     accel_nesterov = accel_nesterov,
     optimizer = optimizer,                       # << novo
     prefer_socp_solver = prefer_socp_solver,     # << novo
+    ipopt_linear_solver = ipopt_linear_solver,   # << novo
 )
 
 # ----- construtor keyword-friendly (permite sobrepor rhos específicos) -----
@@ -127,6 +132,7 @@ DistributedOPFModel(
     accel_nesterov::Bool = false,
     optimizer::Any = nothing,                    # << novo
     prefer_socp_solver::Symbol = :auto,          # << novo
+    ipopt_linear_solver::String = "ma57",       # << novo
 ) = DistributedOPFModel(
     base_model, method, max_iter,
     coalesce(rho_theta, rho),
@@ -144,6 +150,7 @@ DistributedOPFModel(
     accel_nesterov = accel_nesterov,
     optimizer = optimizer,                       # << novo
     prefer_socp_solver = prefer_socp_solver,     # << novo
+    ipopt_linear_solver = ipopt_linear_solver,   # << novo
 )
 
 # ---------- SHIM ----------

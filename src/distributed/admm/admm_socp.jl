@@ -174,6 +174,15 @@ function resolve_socp_optimizer(config)
     if Base.hasfield(typeof(config), :optimizer)
         opt = getfield(config, :optimizer)
         if opt !== nothing
+            # Configure IPOPT with HSL if it's the selected optimizer
+            if opt == Ipopt.Optimizer
+                ipopt_linear_solver = try
+                    getfield(config, :ipopt_linear_solver)
+                catch
+                    "ma57"
+                end
+                return configure_ipopt_with_hsl(opt, ipopt_linear_solver)
+            end
             return opt              # ex.: Clarabel.Optimizer, Gurobi.Optimizer, SCS.Optimizer
         end
     end

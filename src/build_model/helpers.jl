@@ -1,4 +1,62 @@
 """
+Returns the validated IPOPT linear solver name.
+
+Validates and logs the linear solver choice. Returns the solver name as a string.
+
+For installation, after downloading the HSL library, run the following commands on your shell:
+
+# on your Downloads folder (or any other folder), extract the tar.gz file:
+tar -xzf HSL_jll.jl.v2025.7.21.tar.gz
+
+# then, run the following command in your Julia's project folder:
+julia --project=. -e 'using Pkg; Pkg.develop(path="/home/username/Downloads/HSL_jll.jl.v2025.7.21")'
+
+Replace the path as appropriate for your system.
+
+Arguments:
+- linear_solver: String - one of "ma27", "ma57", "ma77", "ma86", "ma97", "mumps" (default: "ma57")
+
+Returns:
+- String with the validated linear solver name
+"""
+function get_ipopt_linear_solver_option(linear_solver::String = "ma57")
+    hsl_solvers = ["ma27", "ma57", "ma77", "ma86", "ma97"]
+    
+    if linear_solver in hsl_solvers
+        @info "[IPOPT] Configuring HSL linear solver: $linear_solver"
+        return linear_solver
+    elseif linear_solver == "mumps"
+        @info "[IPOPT] Configuring MUMPS linear solver"
+        return "mumps"
+    else
+        @warn "[IPOPT] Unknown linear solver '$linear_solver'. Using default: ma57"
+        @info "[IPOPT] Configuring HSL linear solver: ma57"
+        return "ma57"
+    end
+end
+
+"""
+Configures IPOPT optimizer with HSL linear solver.
+
+This is the shared function used by all IPOPT configurations (centralized and ADMM).
+It ensures consistent linear solver configuration across the codebase.
+
+Arguments:
+- optimizer: The optimizer (should be Ipopt.Optimizer or nothing)
+- ipopt_linear_solver: String - one of "ma27", "ma57", "ma77", "ma86", "ma97", "mumps" (default: "ma57")
+
+Returns:
+- Configured optimizer with linear solver option, or unchanged optimizer if not IPOPT
+"""
+function configure_ipopt_with_hsl(optimizer, ipopt_linear_solver::String = "ma57")
+    if optimizer !== nothing && optimizer == Ipopt.Optimizer
+        linear_solver_name = get_ipopt_linear_solver_option(ipopt_linear_solver)
+        return optimizer_with_attributes(Ipopt.Optimizer, "linear_solver" => linear_solver_name)
+    end
+    return optimizer
+end
+
+"""
 Selects a heuristic scaling factor for conic constraints (e.g., SOCP)
 based on the voltage magnitude bounds in the system.
 
