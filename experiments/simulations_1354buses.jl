@@ -282,31 +282,30 @@ extra_socp = String[
         "reduced_tol_infeas_rel" => 5e-4,
         "reduced_tol_ktratio"    => 1e-4
     )""",
-    "--admm-max-iter","2000",
-    "--admm-rho","1e7",
-    "--admm-rho-v","1e7",
-    "--admm-rho-flow-p","1e7",
-    "--admm-rho-flow-q","1e7",
+    "--admm-max-iter","200",
+    "--admm-rho","1e5",
+    "--admm-rho-v","1e5",
+    "--admm-rho-flow-p","1e5",
+    "--admm-rho-flow-q","1e5",
     "--admm-eps-primal","1e-4",
     "--admm-eps-dual","1e-4",
     "--admm-adaptive","on",
     "--admm-mu-incr","3.0",
     "--admm-mu-decr","3.0",
-    "--admm-tau-incr","1.8",
-    "--admm-tau-decr","0.2",
+    "--admm-tau-incr","1.1",
+    "--admm-tau-decr","0.9",
 ]
 
-
-# # ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
-# # Exemplos:
-run_batch("/home/mateus-kaiss/Projects/experiments/588-bus";
-    family=:socp, extra_args=extra_socp)
+# ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
+# Exemplos:
+# run_batch("/home/mateus-kaiss/Projects/experiments/1354-bus";
+#     family=:socp, extra_args=extra_socp)
 
 
 # # ----- SOCP (centralizado) -----
 # # Dica: para centralizado só precisamos do --optimizer; as flags ADMM são ignoradas.
 # # Clarabel:
-run_batch_centralized("/home/mateus-kaiss/Projects/experiments/588-bus";
+run_batch_centralized("/home/mateus-kaiss/Projects/experiments/1354-bus";
     family=:socp, extra_args=[
         "--optimizer",
         """optimizer_with_attributes(Clarabel.Optimizer,
@@ -345,16 +344,3 @@ run_batch_centralized("/home/mateus-kaiss/Projects/experiments/588-bus";
             "reduced_tol_ktratio"    => 1e-4
         )"""
     ])
-
-
-
-# ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
-# Exemplos:
-# run_batch("/home/mateus-kaiss/Projects/experiments/588-bus";
-#     family=:socp, extra_args=extra_socp)
-
-
-# ----- SOCP (centralizado) -----
-# Dica: para centralizado só precisamos do --optimizer; as flags ADMM são ignoradas.
-run_batch_centralized("/home/mateus-kaiss/Projects/experiments/588-bus";
-    family=:socp, extra_args=["--optimizer","Clarabel.Optimizer"])
