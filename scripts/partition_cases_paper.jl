@@ -448,9 +448,9 @@ end
 #     strategy=:bus, k=10, refine_passes= 8, overwrite=true)
 
 # 588 buses cases (forçando k=2)
-uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/588-bus";
-    strategy=:bus, k=20, refine_passes= 8, overwrite=true)
-# 793 buses cases (forçando k=2)
+# uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/588-bus";
+#     strategy=:bus, k=20, refine_passes= 8, overwrite=true)
+# # 793 buses cases (forçando k=2)
 # uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/793-bus";
 #     strategy=:bus, k=30, refine_passes=5, overwrite=true)
 
@@ -458,3 +458,6 @@ uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/588-bus";
 # 1354 buses (ADMM-bus, k=20)
 # uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/1354-bus";
 #     strategy=:bus, k=20, refine_passes=5, overwrite=true)
+
+uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/3970-bus";
+    strategy=:bus, k=40, refine_passes=5, overwrite=true)
