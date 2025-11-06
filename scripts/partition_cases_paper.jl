@@ -462,15 +462,20 @@ end
 # uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/1888-bus";
 #     strategy=:bus, k=30, refine_passes=5, overwrite=true)
 
-uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/2848-bus";
-    strategy=:bus, k=35, refine_passes=5, overwrite=true)
-
+# uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/2848-bus";
+#     strategy=:bus, k=35, refine_passes=5, overwrite=true)
 # uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/3970-bus";
 #     strategy=:bus, k=40, refine_passes=5, overwrite=true)
 
 # uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/4020-bus";
 #     strategy=:bus, k=40, refine_passes=5, overwrite=true)
 
-uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/9591-bus";
-    strategy=:bus, k=50, refine_passes=5, overwrite=true)
+# uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/9591-bus";
+#     strategy=:bus, k=50, refine_passes=5, overwrite=true)
 
+# uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/10000-bus";
+#     strategy=:bus, k=100, refine_passes=5, overwrite=true)
+
+
+uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/13659-bus";
+    strategy=:bus, k=200, refine_passes=5, overwrite=true)
