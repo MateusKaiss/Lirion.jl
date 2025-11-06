@@ -470,3 +470,6 @@ end
 
 uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/9591-bus";
     strategy=:bus, k=50, refine_passes=5, overwrite=true)
+
+uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/10000-bus";
+    strategy=:bus, k=100, refine_passes=5, overwrite=true)

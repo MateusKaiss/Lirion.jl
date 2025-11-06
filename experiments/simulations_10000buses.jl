@@ -195,12 +195,12 @@ end
 # ----------------------- EXEMPLOS (opcional) -----------------------
 # Deixe comentado e rode a partir do REPL.
 extra_dc = String[
-    "--optimizer","Ipopt.Optimizer",
-    "--admm-max-iter","300",
-    "--admm-rho","5e8",
-    "--admm-rho-v","5e8",
-    "--admm-rho-flow-p","5e8",
-    "--admm-rho-flow-q","5e8",
+    "--optimizer","Gurobi.Optimizer",
+    "--admm-max-iter","1500",
+    "--admm-rho","5e4",
+    "--admm-rho-v","5e4",
+    "--admm-rho-flow-p","1e4",
+    "--admm-rho-flow-q","1e4",
     "--admm-eps-primal","1e-4",
     "--admm-eps-dual","1e-4",
     "--admm-adaptive","on",
@@ -210,90 +210,126 @@ extra_dc = String[
     "--admm-tau-decr","0.95",
 ]
 
-run_batch("/home/mateus-kaiss/Projects/experiments/793-bus"; family=:dc, extra_args=extra_dc)
-run_batch_centralized("/home/mateus-kaiss/Projects/experiments/793-bus";
-    family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
+
+# run_batch("/home/mateus-kaiss/Projects/experiments/10000-bus"; family=:dc, extra_args=extra_dc)
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/10000-bus";
+#     family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
+
 
 # ----- Preset AC (distribuído) -----
 extra_ac = String[
-    "--admm-max-iter","700",
-    "--admm-rho","8e3",          # base alto
-    "--admm-rho-v","8e3",        # |V|
-    "--admm-rho-flow-p","8e3",   # P_flow
-    "--admm-rho-flow-q","8e3",   # Q_flow
+    "--admm-max-iter","400",
+    "--admm-rho","1e5",          # base alto
+    "--admm-rho-v","1e5",        # |V|
+    "--admm-rho-theta","1e5",        # |V|
+    "--admm-rho-flow-p","1e5",   # P_flow
+    "--admm-rho-flow-q","1e5",   # Q_flow
     "--admm-eps-primal","1e-4",
     "--admm-eps-dual","1e-4",
     "--admm-adaptive","on",
-    "--admm-mu-incr","3.0",
-    "--admm-mu-decr","3.0",
+    "--admm-mu-incr","2.0",
+    "--admm-mu-decr","2.0",
     "--admm-tau-incr","1.1",
     "--admm-tau-decr","0.9",
-    # "--admm-warm-start","on",
+    # "--admm-warm-start","on", 
     # "--admm-accel",             # opcional
 ]
 
-# ----- Preset AC (distribuído) -----
-extra_ac = String[
-    "--admm-max-iter","700",
-    "--admm-rho","8e3",          # base alto
-    "--admm-rho-v","8e3",        # |V|
-    "--admm-rho-flow-p","8e3",   # P_flow
-    "--admm-rho-flow-q","8e3",   # Q_flow
-    "--admm-eps-primal","1e-4",
-    "--admm-eps-dual","1e-4",
-    "--admm-adaptive","on",
-    "--admm-mu-incr","3.0",
-    "--admm-mu-decr","3.0",
-    "--admm-tau-incr","1.1",
-    "--admm-tau-decr","0.9",
-    # "--admm-warm-start","on",
-    # "--admm-accel",             # opcional
-]
-
-# ----- Rodar AC (distribuído: bus/branch/hybrid) -----
-# run_batch("/home/mateus-kaiss/Projects/experiments/300-bus";
+# # ----- Rodar AC (distribuído: bus/branch/hybrid) -----
+# run_batch("/home/mateus-kaiss/Projects/experiments/10000-bus";
 #     family=:ac, extra_args=extra_ac)
 
-# # # ----- Rodar AC (centralizado) -----
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/300-bus";
-    # family=:ac, extra_args=["--optimizer","Ipopt.Optimizer"])
+# # # # # ----- Rodar AC (centralizado) -----
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/10000-bus";
+#     family=:ac, extra_args=["--optimizer","Ipopt.Optimizer"])
 
 
-# ----- Preset SOCP (distribuído) -----
-# Observações:
-# - Em SOCP usamos consenso em V² (bus) e P/Q ou R/T (branch/hybrid).
-# - Clarabel/COSMO/SCS funcionam; se tiver Gurobi, também aceita cone de segunda ordem.
-# - ρ altos ajudam a estabilizar V² e fluxos em SOCP.
 extra_socp = String[
-    "--optimizer","Gurobi.Optimizer",  # troque para COSMO.Optimizer ou SCS.Optimizer se preferir
-    "--admm-max-iter","700",
-    "--admm-rho","9e3",                  # base alto
-    "--admm-rho-v","9e3",                # V² (bus/hybrid)
-    "--admm-rho-flow-p","9e3",           # P (ou Re(W) no híbrido)
-    "--admm-rho-flow-q","9e3",           # Q (ou Im(W) no híbrido)
+    "--optimizer",
+    """optimizer_with_attributes(Clarabel.Optimizer,
+        # mesmas tolerâncias/iters do centralizado (preset antichoque)
+        "tol_feas" => 3e-4,
+        "tol_gap_abs" => 3e-4,
+        "tol_gap_rel" => 3e-4,
+        "max_iter" => 3000,
+
+        # fatoração direta estável para KKT de SOCP
+        "direct_solve_method" => :qdldl,
+
+        # regularização mais forte
+        "static_regularization_enable" => true,
+        "dynamic_regularization_enable" => true,
+        "dynamic_regularization_eps"   => 1e-8,
+        "dynamic_regularization_delta" => 1e-3,
+
+        # busca de linha mais conservadora
+        "max_step_fraction" => 0.5,
+        "linesearch_backtrack_step" => 0.5,
+        "min_terminate_step_length" => 1e-7,
+        "min_switch_step_length" => 5e-2,
+
+        # equilibrate menos agressivo
+        "equilibrate_enable" => true,
+        "equilibrate_min_scaling" => 1e-3,
+        "equilibrate_max_scaling" => 1e3,
+
+        # refinamento iterativo um pouco mais forte
+        "iterative_refinement_reltol" => 5e-10,
+        "iterative_refinement_abstol" => 5e-10
+    )""",
+
+    "--admm-max-iter","200",
+    "--admm-rho","1e5",
+    "--admm-rho-v","1e5",
+    "--admm-rho-flow-p","1e5",
+    "--admm-rho-flow-q","1e5",
     "--admm-eps-primal","1e-4",
     "--admm-eps-dual","1e-4",
     "--admm-adaptive","on",
-    "--admm-mu-incr","5.0",
-    "--admm-mu-decr","5.0",
-    "--admm-tau-incr","1.8",
-    "--admm-tau-decr","0.2",
-    # "--admm-warm-start","on",
-    # "--admm-accel",                    # opcional (aceleração estilo FISTA no bloco BUS)
+    "--admm-mu-incr","3.0",
+    "--admm-mu-decr","3.0",
+    "--admm-tau-incr","1.1",
+    "--admm-tau-decr","0.9",
 ]
 
-# ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
-# Exemplos:
-# run_batch("/home/mateus-kaiss/Projects/experiments/05-bus";
-#     family=:socp, extra_args=extra_socp)
 
+# # ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
+run_batch("/home/mateus-kaiss/Projects/experiments/10000-bus";
+    family=:socp, extra_args=extra_socp)
 
-# ----- SOCP (centralizado) -----
-# Dica: para centralizado só precisamos do --optimizer; as flags ADMM são ignoradas.
-# Clarabel:
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
-#     family=:socp, extra_args=["--optimizer","Gurobi.Optimizer"])
+# # # ----- SOCP (centralizado) -----
+run_batch_centralized("/home/mateus-kaiss/Projects/experiments/10000-bus";
+    family=:socp, extra_args=[
+        "--optimizer",
+        """optimizer_with_attributes(Clarabel.Optimizer,
+            # tolerâncias moderadas e mais iterações
+            "tol_feas" => 3e-4,
+            "tol_gap_abs" => 3e-4,
+            "tol_gap_rel" => 3e-4,
+            "max_iter" => 3000,
 
-# Gurobi (se disponível com cones de 2ª ordem):
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/03-bus";
-#     family=:socp, extra_args=["--optimizer","Gurobi.Optimizer"])
+            # deixe QDLDL (evita ZeroPivot do CHOLMOD)
+            "direct_solve_method" => :qdldl,
+
+            # regularização mais forte
+            "static_regularization_enable" => true,
+            "dynamic_regularization_enable" => true,
+            "dynamic_regularization_eps"   => 1e-8,
+            "dynamic_regularization_delta" => 1e-3,
+
+            # busca de linha mais conservadora
+            "max_step_fraction" => 0.5,
+            "linesearch_backtrack_step" => 0.5,
+            "min_terminate_step_length" => 1e-7,
+            "min_switch_step_length" => 5e-2,
+
+            # equilíbrio menos agressivo
+            "equilibrate_enable" => true,
+            "equilibrate_min_scaling" => 1e-3,
+            "equilibrate_max_scaling" => 1e3,
+
+            # refinamento iterativo mais forte
+            "iterative_refinement_reltol" => 5e-10,
+            "iterative_refinement_abstol" => 5e-10
+        )"""
+    ])
