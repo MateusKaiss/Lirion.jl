@@ -244,7 +244,6 @@ extra_ac = String[
 #     family=:ac, extra_args=["--optimizer","Ipopt.Optimizer"])
 
 
-
 extra_socp = String[
     "--optimizer",
     """optimizer_with_attributes(Clarabel.Optimizer,
@@ -282,7 +281,7 @@ extra_socp = String[
         "reduced_tol_infeas_rel" => 5e-4,
         "reduced_tol_ktratio"    => 1e-4
     )""",
-    "--admm-max-iter","200",
+    "--admm-max-iter","2000",
     "--admm-rho","1e5",
     "--admm-rho-v","1e5",
     "--admm-rho-flow-p","1e5",
@@ -298,8 +297,8 @@ extra_socp = String[
 
 # ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
 # Exemplos:
-# run_batch("/home/mateus-kaiss/Projects/experiments/1354-bus";
-#     family=:socp, extra_args=extra_socp)
+run_batch("/home/mateus-kaiss/Projects/experiments/1354-bus";
+    family=:socp, extra_args=extra_socp)
 
 
 # # ----- SOCP (centralizado) -----

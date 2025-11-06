@@ -196,7 +196,7 @@ end
 # Deixe comentado e rode a partir do REPL.
 extra_dc = String[
     "--optimizer","Gurobi.Optimizer",
-    "--admm-max-iter","1500",
+    "--admm-max-iter","2000",
     "--admm-rho","5e4",
     "--admm-rho-v","5e4",
     "--admm-rho-flow-p","1e4",
@@ -211,14 +211,14 @@ extra_dc = String[
 ]
 
 
-# run_batch("/home/mateus-kaiss/Projects/experiments/9591-bus"; family=:dc, extra_args=extra_dc)
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/9591-bus";
-#     family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
+run_batch("/home/mateus-kaiss/Projects/experiments/9591-bus"; family=:dc, extra_args=extra_dc)
+run_batch_centralized("/home/mateus-kaiss/Projects/experiments/9591-bus";
+    family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
 
 
 # ----- Preset AC (distribuído) -----
 extra_ac = String[
-    "--admm-max-iter","400",
+    "--admm-max-iter","2000",
     "--admm-rho","1e5",          # base alto
     "--admm-rho-v","1e5",        # |V|
     "--admm-rho-theta","1e5",        # |V|
@@ -236,12 +236,12 @@ extra_ac = String[
 ]
 
 # # ----- Rodar AC (distribuído: bus/branch/hybrid) -----
-# run_batch("/home/mateus-kaiss/Projects/experiments/9591-bus";
-#     family=:ac, extra_args=extra_ac)
+run_batch("/home/mateus-kaiss/Projects/experiments/9591-bus";
+    family=:ac, extra_args=extra_ac)
 
-# # # # # ----- Rodar AC (centralizado) -----
-# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/9591-bus";
-#     family=:ac, extra_args=["--optimizer","Ipopt.Optimizer"])
+# # # # ----- Rodar AC (centralizado) -----
+run_batch_centralized("/home/mateus-kaiss/Projects/experiments/9591-bus";
+    family=:ac, extra_args=["--optimizer","Ipopt.Optimizer"])
 
 
 extra_socp = String[
@@ -278,7 +278,7 @@ extra_socp = String[
         "iterative_refinement_abstol" => 5e-10
     )""",
 
-    "--admm-max-iter","200",
+    "--admm-max-iter","2000",
     "--admm-rho","1e5",
     "--admm-rho-v","1e5",
     "--admm-rho-flow-p","1e5",
