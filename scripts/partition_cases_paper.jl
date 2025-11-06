@@ -477,5 +477,8 @@ end
 #     strategy=:bus, k=100, refine_passes=5, overwrite=true)
 
 
-uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/13659-bus";
-    strategy=:bus, k=200, refine_passes=5, overwrite=true)
+# uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/13659-bus";
+#     strategy=:bus, k=200, refine_passes=5, overwrite=true)
+
+uniform_partition_subfolder("/home/mateus-kaiss/Projects/experiments/20758-bus";
+    strategy=:bus, k=250, refine_passes=5, overwrite=true)
