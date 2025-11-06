@@ -247,40 +247,37 @@ extra_ac = String[
 extra_socp = String[
     "--optimizer",
     """optimizer_with_attributes(Clarabel.Optimizer,
-        "tol_feas" => 1e-4,
-        "tol_gap_abs" => 1e-4,
-        "tol_gap_rel" => 1e-4,
-        "max_iter" => 1200,
+        # mesmas tolerâncias/iters do centralizado (preset antichoque)
+        "tol_feas" => 3e-4,
+        "tol_gap_abs" => 3e-4,
+        "tol_gap_rel" => 3e-4,
+        "max_iter" => 3000,
 
-        "dynamic_regularization_enable" => true,
-        "dynamic_regularization_eps"   => 1e-10,
-        "dynamic_regularization_delta" => 1e-4,
-
-        "static_regularization_enable" => true,
-
-        "equilibrate_enable" => true,
-        "equilibrate_min_scaling" => 1e-4,
-        "equilibrate_max_scaling" => 1e4,
-
+        # fatoração direta estável para KKT de SOCP
         "direct_solve_method" => :qdldl,
 
-        "iterative_refinement_reltol" => 1e-9,
-        "iterative_refinement_abstol" => 1e-9,
+        # regularização mais forte
+        "static_regularization_enable" => true,
+        "dynamic_regularization_enable" => true,
+        "dynamic_regularization_eps"   => 1e-8,
+        "dynamic_regularization_delta" => 1e-3,
 
-        "max_step_fraction" => 0.7,
+        # busca de linha mais conservadora
+        "max_step_fraction" => 0.5,
         "linesearch_backtrack_step" => 0.5,
-
-        "tol_ktratio" => 1e-5,
-        "min_terminate_step_length" => 1e-6,
+        "min_terminate_step_length" => 1e-7,
         "min_switch_step_length" => 5e-2,
 
-        "reduced_tol_gap_abs" => 5e-4,
-        "reduced_tol_gap_rel" => 5e-4,
-        "reduced_tol_feas"    => 5e-4,
-        "reduced_tol_infeas_abs" => 5e-11,
-        "reduced_tol_infeas_rel" => 5e-4,
-        "reduced_tol_ktratio"    => 1e-4
+        # equilibrate menos agressivo
+        "equilibrate_enable" => true,
+        "equilibrate_min_scaling" => 1e-3,
+        "equilibrate_max_scaling" => 1e3,
+
+        # refinamento iterativo um pouco mais forte
+        "iterative_refinement_reltol" => 5e-10,
+        "iterative_refinement_abstol" => 5e-10
     )""",
+
     "--admm-max-iter","200",
     "--admm-rho","1e5",
     "--admm-rho-v","1e5",
@@ -297,13 +294,10 @@ extra_socp = String[
 
 
 # # ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
-# # Exemplos:
-# run_batch("/home/mateus-kaiss/Projects/experiments/4020-bus";
-#     family=:socp, extra_args=extra_socp)
+run_batch("/home/mateus-kaiss/Projects/experiments/4020-bus";
+    family=:socp, extra_args=extra_socp)
 
 # # # ----- SOCP (centralizado) -----
-# # Dica: para centralizado só precisamos do --optimizer; as flags ADMM são ignoradas.
-# # Clarabel:
 run_batch_centralized("/home/mateus-kaiss/Projects/experiments/4020-bus";
     family=:socp, extra_args=[
         "--optimizer",
