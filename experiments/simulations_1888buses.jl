@@ -196,9 +196,9 @@ end
 # Deixe comentado e rode a partir do REPL.
 extra_dc = String[
     "--optimizer","Gurobi.Optimizer",
-    "--admm-max-iter","2000",
-    "--admm-rho","5e4",
-    "--admm-rho-v","5e4",
+    "--admm-max-iter","2500",
+    "--admm-rho","1e6",
+    "--admm-rho-v","1e6",
     "--admm-rho-flow-p","1e4",
     "--admm-rho-flow-q","1e4",
     "--admm-eps-primal","1e-4",
@@ -211,24 +211,24 @@ extra_dc = String[
 ]
 
 
-run_batch("/home/mateus-kaiss/Projects/experiments/1888-bus"; family=:dc, extra_args=extra_dc)
-run_batch_centralized("/home/mateus-kaiss/Projects/experiments/1888-bus";
-    family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
+# run_batch("/home/mateus-kaiss/Projects/experiments/1888-bus"; family=:dc, extra_args=extra_dc)
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/1888-bus";
+#     family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
 
 
 # ----- Preset AC (distribuído) -----
 extra_ac = String[
     "--admm-max-iter","2000",
-    "--admm-rho","1e5",          # base alto
-    "--admm-rho-v","1e5",        # |V|
-    "--admm-rho-theta","1e5",        # |V|
-    "--admm-rho-flow-p","1e5",   # P_flow
-    "--admm-rho-flow-q","1e5",   # Q_flow
+    "--admm-rho","1e6",          # base alto
+    "--admm-rho-v","1e6",        # |V|
+    "--admm-rho-theta","1e6",        # |V|
+    "--admm-rho-flow-p","8e3",   # P_flow
+    "--admm-rho-flow-q","8e3",   # Q_flow
     "--admm-eps-primal","1e-4",
     "--admm-eps-dual","1e-4",
     "--admm-adaptive","on",
-    "--admm-mu-incr","2.0",
-    "--admm-mu-decr","2.0",
+    "--admm-mu-incr","3.0",
+    "--admm-mu-decr","3.0",
     "--admm-tau-incr","1.1",
     "--admm-tau-decr","0.9",
     # "--admm-warm-start","on", 
@@ -294,42 +294,42 @@ extra_socp = String[
 
 
 # # ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
-run_batch("/home/mateus-kaiss/Projects/experiments/1888-bus";
-    family=:socp, extra_args=extra_socp)
+# run_batch("/home/mateus-kaiss/Projects/experiments/1888-bus";
+#     family=:socp, extra_args=extra_socp)
 
-# # # ----- SOCP (centralizado) -----
-run_batch_centralized("/home/mateus-kaiss/Projects/experiments/1888-bus";
-    family=:socp, extra_args=[
-        "--optimizer",
-        """optimizer_with_attributes(Clarabel.Optimizer,
-            # tolerâncias moderadas e mais iterações
-            "tol_feas" => 3e-4,
-            "tol_gap_abs" => 3e-4,
-            "tol_gap_rel" => 3e-4,
-            "max_iter" => 3000,
+# # # # ----- SOCP (centralizado) -----
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/1888-bus";
+#     family=:socp, extra_args=[
+#         "--optimizer",
+#         """optimizer_with_attributes(Clarabel.Optimizer,
+#             # tolerâncias moderadas e mais iterações
+#             "tol_feas" => 3e-4,
+#             "tol_gap_abs" => 3e-4,
+#             "tol_gap_rel" => 3e-4,
+#             "max_iter" => 3000,
 
-            # deixe QDLDL (evita ZeroPivot do CHOLMOD)
-            "direct_solve_method" => :qdldl,
+#             # deixe QDLDL (evita ZeroPivot do CHOLMOD)
+#             "direct_solve_method" => :qdldl,
 
-            # regularização mais forte
-            "static_regularization_enable" => true,
-            "dynamic_regularization_enable" => true,
-            "dynamic_regularization_eps"   => 1e-8,
-            "dynamic_regularization_delta" => 1e-3,
+#             # regularização mais forte
+#             "static_regularization_enable" => true,
+#             "dynamic_regularization_enable" => true,
+#             "dynamic_regularization_eps"   => 1e-8,
+#             "dynamic_regularization_delta" => 1e-3,
 
-            # busca de linha mais conservadora
-            "max_step_fraction" => 0.5,
-            "linesearch_backtrack_step" => 0.5,
-            "min_terminate_step_length" => 1e-7,
-            "min_switch_step_length" => 5e-2,
+#             # busca de linha mais conservadora
+#             "max_step_fraction" => 0.5,
+#             "linesearch_backtrack_step" => 0.5,
+#             "min_terminate_step_length" => 1e-7,
+#             "min_switch_step_length" => 5e-2,
 
-            # equilíbrio menos agressivo
-            "equilibrate_enable" => true,
-            "equilibrate_min_scaling" => 1e-3,
-            "equilibrate_max_scaling" => 1e3,
+#             # equilíbrio menos agressivo
+#             "equilibrate_enable" => true,
+#             "equilibrate_min_scaling" => 1e-3,
+#             "equilibrate_max_scaling" => 1e3,
 
-            # refinamento iterativo mais forte
-            "iterative_refinement_reltol" => 5e-10,
-            "iterative_refinement_abstol" => 5e-10
-        )"""
-    ])
+#             # refinamento iterativo mais forte
+#             "iterative_refinement_reltol" => 5e-10,
+#             "iterative_refinement_abstol" => 5e-10
+#         )"""
+#     ])

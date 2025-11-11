@@ -215,6 +215,10 @@ run_batch("/home/mateus-kaiss/Projects/experiments/793-bus"; family=:dc, extra_a
 run_batch_centralized("/home/mateus-kaiss/Projects/experiments/793-bus";
     family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
 
+# run_batch("/home/mateus-kaiss/Projects/experiments/793-bus"; family=:dc, extra_args=extra_dc)
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/793-bus";
+#     family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
+
 
 # ----- Preset AC (distribuído) -----
 extra_ac = String[
@@ -222,8 +226,8 @@ extra_ac = String[
     "--admm-rho","1e5",          # base alto
     "--admm-rho-v","1e5",        # |V|
     "--admm-rho-theta","1e5",        # |V|
-    "--admm-rho-flow-p","1e5",   # P_flow
-    "--admm-rho-flow-q","1e5",   # Q_flow
+    "--admm-rho-flow-p","1e6",   # P_flow
+    "--admm-rho-flow-q","1e6",   # Q_flow
     "--admm-eps-primal","1e-4",
     "--admm-eps-dual","1e-4",
     "--admm-adaptive","on",
@@ -236,100 +240,148 @@ extra_ac = String[
 ]
 
 # ----- Rodar AC (distribuído: bus/branch/hybrid) -----
-run_batch("/home/mateus-kaiss/Projects/experiments/793-bus";
-    family=:ac, extra_args=extra_ac)
+# run_batch("/home/mateus-kaiss/Projects/experiments/793-bus";
+#     family=:ac, extra_args=extra_ac)
 
-# # # # # ----- Rodar AC (centralizado) -----
-run_batch_centralized("/home/mateus-kaiss/Projects/experiments/793-bus";
-    family=:ac, extra_args=["--optimizer","Ipopt.Optimizer"])
-
-
-extra_socp = String[
-    "--optimizer",
-    """optimizer_with_attributes(Clarabel.Optimizer,
-        # mesmas tolerâncias/iters do centralizado (preset antichoque)
-        "tol_feas" => 3e-4,
-        "tol_gap_abs" => 3e-4,
-        "tol_gap_rel" => 3e-4,
-        "max_iter" => 3000,
-
-        # fatoração direta estável para KKT de SOCP
-        "direct_solve_method" => :qdldl,
-
-        # regularização mais forte
-        "static_regularization_enable" => true,
-        "dynamic_regularization_enable" => true,
-        "dynamic_regularization_eps"   => 1e-8,
-        "dynamic_regularization_delta" => 1e-3,
-
-        # busca de linha mais conservadora
-        "max_step_fraction" => 0.5,
-        "linesearch_backtrack_step" => 0.5,
-        "min_terminate_step_length" => 1e-7,
-        "min_switch_step_length" => 5e-2,
-
-        # equilibrate menos agressivo
-        "equilibrate_enable" => true,
-        "equilibrate_min_scaling" => 1e-3,
-        "equilibrate_max_scaling" => 1e3,
-
-        # refinamento iterativo um pouco mais forte
-        "iterative_refinement_reltol" => 5e-10,
-        "iterative_refinement_abstol" => 5e-10
-    )""",
-
-    "--admm-max-iter","2000",
-    "--admm-rho","1e5",
-    "--admm-rho-v","1e5",
-    "--admm-rho-flow-p","1e5",
-    "--admm-rho-flow-q","1e5",
-    "--admm-eps-primal","1e-4",
-    "--admm-eps-dual","1e-4",
-    "--admm-adaptive","on",
-    "--admm-mu-incr","3.0",
-    "--admm-mu-decr","3.0",
-    "--admm-tau-incr","1.1",
-    "--admm-tau-decr","0.9",
-]
+# # # # # # ----- Rodar AC (centralizado) -----
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/793-bus";
+#     family=:ac, extra_args=["--optimizer","Ipopt.Optimizer"])
 
 
-# # ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
-run_batch("/home/mateus-kaiss/Projects/experiments/793-bus";
-    family=:socp, extra_args=extra_socp)
+# # ----- Rodar AC (distribuído: bus/branch/hybrid) -----
+# run_batch("/home/mateus-kaiss/Projects/experiments/793-bus";
+#     family=:ac, extra_args=extra_ac)
 
-# # # # ----- SOCP (centralizado) -----
-run_batch_centralized("/home/mateus-kaiss/Projects/experiments/793-bus";
-    family=:socp, extra_args=[
-        "--optimizer",
-        """optimizer_with_attributes(Clarabel.Optimizer,
-            # tolerâncias moderadas e mais iterações
-            "tol_feas" => 3e-4,
-            "tol_gap_abs" => 3e-4,
-            "tol_gap_rel" => 3e-4,
-            "max_iter" => 3000,
+# # # # # # ----- Rodar AC (centralizado) -----
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/793-bus";
+#     family=:ac, extra_args=["--optimizer","Ipopt.Optimizer"])
 
-            # deixe QDLDL (evita ZeroPivot do CHOLMOD)
-            "direct_solve_method" => :qdldl,
+# extra_socp = String[
+#     "--optimizer",
+#     """optimizer_with_attributes(Clarabel.Optimizer,
+#         # mesmas tolerâncias/iters do centralizado (preset antichoque)
+#         "tol_feas" => 3e-4,
+#         "tol_gap_abs" => 3e-4,
+#         "tol_gap_rel" => 3e-4,
+#         "max_iter" => 3000,
 
-            # regularização mais forte
-            "static_regularization_enable" => true,
-            "dynamic_regularization_enable" => true,
-            "dynamic_regularization_eps"   => 1e-8,
-            "dynamic_regularization_delta" => 1e-3,
+#         # fatoração direta estável para KKT de SOCP
+#         "direct_solve_method" => :qdldl,
 
-            # busca de linha mais conservadora
-            "max_step_fraction" => 0.5,
-            "linesearch_backtrack_step" => 0.5,
-            "min_terminate_step_length" => 1e-7,
-            "min_switch_step_length" => 5e-2,
+#         # regularização mais forte
+#         "static_regularization_enable" => true,
+#         "dynamic_regularization_enable" => true,
+#         "dynamic_regularization_eps"   => 1e-8,
+#         "dynamic_regularization_delta" => 1e-3,
 
-            # equilíbrio menos agressivo
-            "equilibrate_enable" => true,
-            "equilibrate_min_scaling" => 1e-3,
-            "equilibrate_max_scaling" => 1e3,
+#         # busca de linha mais conservadora
+#         "max_step_fraction" => 0.5,
+#         "linesearch_backtrack_step" => 0.5,
+#         "min_terminate_step_length" => 1e-7,
+#         "min_switch_step_length" => 5e-2,
 
-            # refinamento iterativo mais forte
-            "iterative_refinement_reltol" => 5e-10,
-            "iterative_refinement_abstol" => 5e-10
-        )"""
-    ])
+#         # equilibrate menos agressivo
+#         "equilibrate_enable" => true,
+#         "equilibrate_min_scaling" => 1e-3,
+#         "equilibrate_max_scaling" => 1e3,
+
+#         # refinamento iterativo um pouco mais forte
+#         "iterative_refinement_reltol" => 5e-10,
+#         "iterative_refinement_abstol" => 5e-10
+#     )""",
+
+#     "--admm-max-iter","2000",
+#     "--admm-rho","1e5",
+#     "--admm-rho-v","1e5",
+#     "--admm-rho-flow-p","1e5",
+#     "--admm-rho-flow-q","1e5",
+#     "--admm-eps-primal","1e-4",
+#     "--admm-eps-dual","1e-4",
+#     "--admm-adaptive","on",
+#     "--admm-mu-incr","3.0",
+#     "--admm-mu-decr","3.0",
+#     "--admm-tau-incr","1.1",
+#     "--admm-tau-decr","0.9",
+# ]
+
+
+# # # ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
+# run_batch("/home/mateus-kaiss/Projects/experiments/793-bus";
+#     family=:socp, extra_args=extra_socp)
+
+# # # # # ----- SOCP (centralizado) -----
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/793-bus";
+#     family=:socp, extra_args=[
+#         "--optimizer",
+#         """optimizer_with_attributes(Clarabel.Optimizer,
+#             # tolerâncias moderadas e mais iterações
+#             "tol_feas" => 3e-4,
+#             "tol_gap_abs" => 3e-4,
+#             "tol_gap_rel" => 3e-4,
+#             "max_iter" => 3000,
+
+#             # deixe QDLDL (evita ZeroPivot do CHOLMOD)
+#             "direct_solve_method" => :qdldl,
+
+#             # regularização mais forte
+#             "static_regularization_enable" => true,
+#             "dynamic_regularization_enable" => true,
+#             "dynamic_regularization_eps"   => 1e-8,
+#             "dynamic_regularization_delta" => 1e-3,
+
+#             # busca de linha mais conservadora
+#             "max_step_fraction" => 0.5,
+#             "linesearch_backtrack_step" => 0.5,
+#             "min_terminate_step_length" => 1e-7,
+#             "min_switch_step_length" => 5e-2,
+
+#             # equilíbrio menos agressivo
+#             "equilibrate_enable" => true,
+#             "equilibrate_min_scaling" => 1e-3,
+#             "equilibrate_max_scaling" => 1e3,
+
+#             # refinamento iterativo mais forte
+#             "iterative_refinement_reltol" => 5e-10,
+#             "iterative_refinement_abstol" => 5e-10
+#         )"""
+#     ])
+
+# run_batch("/home/mateus-kaiss/Projects/experiments/793-bus";
+#     family=:socp, extra_args=extra_socp)
+
+# # # # # ----- SOCP (centralizado) -----
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/793-bus";
+#     family=:socp, extra_args=[
+#         "--optimizer",
+#         """optimizer_with_attributes(Clarabel.Optimizer,
+#             # tolerâncias moderadas e mais iterações
+#             "tol_feas" => 3e-4,
+#             "tol_gap_abs" => 3e-4,
+#             "tol_gap_rel" => 3e-4,
+#             "max_iter" => 3000,
+
+#             # deixe QDLDL (evita ZeroPivot do CHOLMOD)
+#             "direct_solve_method" => :qdldl,
+
+#             # regularização mais forte
+#             "static_regularization_enable" => true,
+#             "dynamic_regularization_enable" => true,
+#             "dynamic_regularization_eps"   => 1e-8,
+#             "dynamic_regularization_delta" => 1e-3,
+
+#             # busca de linha mais conservadora
+#             "max_step_fraction" => 0.5,
+#             "linesearch_backtrack_step" => 0.5,
+#             "min_terminate_step_length" => 1e-7,
+#             "min_switch_step_length" => 5e-2,
+
+#             # equilíbrio menos agressivo
+#             "equilibrate_enable" => true,
+#             "equilibrate_min_scaling" => 1e-3,
+#             "equilibrate_max_scaling" => 1e3,
+
+#             # refinamento iterativo mais forte
+#             "iterative_refinement_reltol" => 5e-10,
+#             "iterative_refinement_abstol" => 5e-10
+#         )"""
+#     ])

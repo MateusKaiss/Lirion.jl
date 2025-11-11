@@ -197,8 +197,8 @@ end
 extra_dc = String[
     "--optimizer","Gurobi.Optimizer",
     "--admm-max-iter","2000",
-    "--admm-rho","1e5",
-    "--admm-rho-v","1e5",
+    "--admm-rho","1e4",
+    "--admm-rho-v","1e4",
     "--admm-rho-flow-p","1e4",
     "--admm-rho-flow-q","1e4",
     "--admm-eps-primal","1e-4",
@@ -211,19 +211,24 @@ extra_dc = String[
 ]
 
 
-run_batch("/home/mateus-kaiss/Projects/experiments/3970-bus"; family=:dc, extra_args=extra_dc)
-run_batch_centralized("/home/mateus-kaiss/Projects/experiments/3970-bus";
-    family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
+# run_batch("/home/mateus-kaiss/Projects/experiments/3970-bus"; family=:dc, extra_args=extra_dc)
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/3970-bus";
+#     family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
+
+# run_batch("/home/mateus-kaiss/Projects/experiments/3970-bus"; family=:dc, extra_args=extra_dc)
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/3970-bus";
+#     family=:dc, extra_args=["--optimizer","Gurobi.Optimizer"])
 
 
 # ----- Preset AC (distribuído) -----
+# ----- Preset AC (distribuído) -----
 extra_ac = String[
     "--admm-max-iter","2000",
-    "--admm-rho","1e5",          # base alto
-    "--admm-rho-v","1e5",        # |V|
-    "--admm-rho-theta","1e5",        # |V|
-    "--admm-rho-flow-p","1e5",   # P_flow
-    "--admm-rho-flow-q","1e5",   # Q_flow
+    "--admm-rho","5e4",          # base alto
+    "--admm-rho-v","5e4",        # |V|
+    "--admm-rho-theta","5e4",        # |V|
+    "--admm-rho-flow-p","1e4",   # P_flow
+    "--admm-rho-flow-q","1e4",   # Q_flow
     "--admm-eps-primal","1e-4",
     "--admm-eps-dual","1e-4",
     "--admm-adaptive","on",
@@ -236,6 +241,13 @@ extra_ac = String[
 ]
 
 # ----- Rodar AC (distribuído: bus/branch/hybrid) -----
+run_batch("/home/mateus-kaiss/Projects/experiments/3970-bus";
+    family=:ac, extra_args=extra_ac)
+
+# # # # ----- Rodar AC (centralizado) -----
+run_batch_centralized("/home/mateus-kaiss/Projects/experiments/3970-bus";
+    family=:ac, extra_args=["--optimizer","Ipopt.Optimizer"])
+
 run_batch("/home/mateus-kaiss/Projects/experiments/3970-bus";
     family=:ac, extra_args=extra_ac)
 
@@ -298,48 +310,97 @@ extra_socp = String[
 
 # # ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
 # # Exemplos:
-run_batch("/home/mateus-kaiss/Projects/experiments/3970-bus";
-    family=:socp, extra_args=extra_socp)
+# run_batch("/home/mateus-kaiss/Projects/experiments/3970-bus";
+#     family=:socp, extra_args=extra_socp)
 
-# # ----- SOCP (centralizado) -----
-# # Dica: para centralizado só precisamos do --optimizer; as flags ADMM são ignoradas.
-# # Clarabel:
-run_batch_centralized("/home/mateus-kaiss/Projects/experiments/3970-bus";
-    family=:socp, extra_args=[
-        "--optimizer",
-        """optimizer_with_attributes(Clarabel.Optimizer,
-            "tol_feas" => 1e-4,
-            "tol_gap_abs" => 1e-4,
-            "tol_gap_rel" => 1e-4,
-            "max_iter" => 1200,
+# # # ----- SOCP (centralizado) -----
+# # # Dica: para centralizado só precisamos do --optimizer; as flags ADMM são ignoradas.
+# # # Clarabel:
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/3970-bus";
+#     family=:socp, extra_args=[
+#         "--optimizer",
+#         """optimizer_with_attributes(Clarabel.Optimizer,
+#             "tol_feas" => 1e-4,
+#             "tol_gap_abs" => 1e-4,
+#             "tol_gap_rel" => 1e-4,
+#             "max_iter" => 1200,
 
-            "dynamic_regularization_enable" => true,
-            "dynamic_regularization_eps"   => 1e-10,
-            "dynamic_regularization_delta" => 1e-4,
+#             "dynamic_regularization_enable" => true,
+#             "dynamic_regularization_eps"   => 1e-10,
+#             "dynamic_regularization_delta" => 1e-4,
 
-            "static_regularization_enable" => true,
+#             "static_regularization_enable" => true,
 
-            "equilibrate_enable" => true,
-            "equilibrate_min_scaling" => 1e-4,
-            "equilibrate_max_scaling" => 1e4,
+#             "equilibrate_enable" => true,
+#             "equilibrate_min_scaling" => 1e-4,
+#             "equilibrate_max_scaling" => 1e4,
 
-            "direct_solve_method" => :qdldl,
+#             "direct_solve_method" => :qdldl,
 
-            "iterative_refinement_reltol" => 1e-9,
-            "iterative_refinement_abstol" => 1e-9,
+#             "iterative_refinement_reltol" => 1e-9,
+#             "iterative_refinement_abstol" => 1e-9,
 
-            "max_step_fraction" => 0.7,
-            "linesearch_backtrack_step" => 0.5,
+#             "max_step_fraction" => 0.7,
+#             "linesearch_backtrack_step" => 0.5,
 
-            "tol_ktratio" => 1e-5,
-            "min_terminate_step_length" => 1e-6,
-            "min_switch_step_length" => 5e-2,
+#             "tol_ktratio" => 1e-5,
+#             "min_terminate_step_length" => 1e-6,
+#             "min_switch_step_length" => 5e-2,
 
-            "reduced_tol_gap_abs" => 5e-4,
-            "reduced_tol_gap_rel" => 5e-4,
-            "reduced_tol_feas"    => 5e-4,
-            "reduced_tol_infeas_abs" => 5e-11,
-            "reduced_tol_infeas_rel" => 5e-4,
-            "reduced_tol_ktratio"    => 1e-4
-        )"""
-    ])
+#             "reduced_tol_gap_abs" => 5e-4,
+#             "reduced_tol_gap_rel" => 5e-4,
+#             "reduced_tol_feas"    => 5e-4,
+#             "reduced_tol_infeas_abs" => 5e-11,
+#             "reduced_tol_infeas_rel" => 5e-4,
+#             "reduced_tol_ktratio"    => 1e-4
+#         )"""
+#     ])
+
+
+# # ----- Rodar SOCP (distribuído: bus/branch/hybrid) -----
+# # Exemplos:
+# run_batch("/home/mateus-kaiss/Projects/experiments/3970-bus";
+#     family=:socp, extra_args=extra_socp)
+
+# # # ----- SOCP (centralizado) -----
+# # # Dica: para centralizado só precisamos do --optimizer; as flags ADMM são ignoradas.
+# # # Clarabel:
+# run_batch_centralized("/home/mateus-kaiss/Projects/experiments/3970-bus";
+#     family=:socp, extra_args=[
+#         "--optimizer",
+#         """optimizer_with_attributes(Clarabel.Optimizer,
+#             "tol_feas" => 1e-4,
+#             "tol_gap_abs" => 1e-4,
+#             "tol_gap_rel" => 1e-4,
+#             "max_iter" => 1200,
+
+#             "dynamic_regularization_enable" => true,
+#             "dynamic_regularization_eps"   => 1e-10,
+#             "dynamic_regularization_delta" => 1e-4,
+
+#             "static_regularization_enable" => true,
+
+#             "equilibrate_enable" => true,
+#             "equilibrate_min_scaling" => 1e-4,
+#             "equilibrate_max_scaling" => 1e4,
+
+#             "direct_solve_method" => :qdldl,
+
+#             "iterative_refinement_reltol" => 1e-9,
+#             "iterative_refinement_abstol" => 1e-9,
+
+#             "max_step_fraction" => 0.7,
+#             "linesearch_backtrack_step" => 0.5,
+
+#             "tol_ktratio" => 1e-5,
+#             "min_terminate_step_length" => 1e-6,
+#             "min_switch_step_length" => 5e-2,
+
+#             "reduced_tol_gap_abs" => 5e-4,
+#             "reduced_tol_gap_rel" => 5e-4,
+#             "reduced_tol_feas"    => 5e-4,
+#             "reduced_tol_infeas_abs" => 5e-11,
+#             "reduced_tol_infeas_rel" => 5e-4,
+#             "reduced_tol_ktratio"    => 1e-4
+#         )"""
+#     ])

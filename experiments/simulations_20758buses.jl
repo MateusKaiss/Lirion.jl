@@ -222,8 +222,8 @@ extra_ac = String[
     "--admm-rho","1e5",          # base alto
     "--admm-rho-v","1e5",        # |V|
     "--admm-rho-theta","1e5",        # |V|
-    "--admm-rho-flow-p","1e5",   # P_flow
-    "--admm-rho-flow-q","1e5",   # Q_flow
+    "--admm-rho-flow-p","8e3",   # P_flow
+    "--admm-rho-flow-q","8e3",   # Q_flow
     "--admm-eps-primal","1e-4",
     "--admm-eps-dual","1e-4",
     "--admm-adaptive","on",

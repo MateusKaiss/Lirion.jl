@@ -30,7 +30,7 @@ using COSMO
 using Clarabel
 
 const MOI = MathOptInterface
-const _FAST_USE_LOGS = false
+const _FAST_USE_LOGS = true
 
 function __init__()
     if _FAST_USE_LOGS
