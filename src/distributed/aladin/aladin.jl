@@ -30,10 +30,15 @@ end
 Representa uma região (subproblema) no problema de otimização distribuída.
 
 # Campos
-- `id::Int`: Identificador da região
-- `data::Dict`: Dados específicos da região (buses, generators, branches, etc.)
-- `coupling_vars::Vector{Symbol}`: Variáveis que participam das restrições de consenso
-- `A_consensus::Matrix{Float64}`: Matriz de consenso para esta região
+- `id::Int`: Identificador da região (1, 2, 3...)
+- `data::Dict`: com os dados daquela região (barramentos, geradores, ramos, etc.).
+- `coupling_vars::Vector{Symbol}`: variáveis dessa região que participam das restrições de consenso (por exemplo, ângulos/voltagens em barras de fronteira).
+- `A_consensus::Matrix{Float64}`: matriz local de consenso (Aᵢ); pode ser usada para compor a matriz global ∑Aᵢxᵢ = b.
+
+O construtor simplificado (AladinRegion(id, data)) só preenche id e data e deixa coupling_vars vazio 
+e A_consensus = nothing. A divisão da rede em regiões e a montagem de A_consensus não está neste 
+arquivo – isso é feito “fora”, quando você monta o problema.
+
 """
 mutable struct AladinRegion
     id::Int
@@ -52,12 +57,20 @@ end
 Estrutura principal do problema ALADIN.
 
 # Campos
-- `regions::Vector{AladinRegion}`: Lista de regiões (subproblemas)
+- `regions::Vector{AladinRegion}`: Lista de regiões (subproblemas)  ( As regiões da rede)
 - `consensus_matrix::Matrix{Float64}`: Matriz de consenso global ∑Aᵢxᵢ = b
-- `consensus_rhs::Vector{Float64}`: Lado direito da restrição de consenso b
+- `consensus_rhs::Vector{Float64}`: Lado direito da restrição de consenso b  (vetor b da restrição de consenso)
 - `model_type::Type{<:OPFModel}`: Tipo de modelo OPF (DC, AC, SOCP)
-- `optimizer`: Otimizador a ser usado nos subproblemas
+- `optimizer`: Otimizador a ser usado nos subproblemas (o solver de otimização usado pelo JuMP)
 - `options::AladinOptions`: Opções do algoritmo
+
+Variáveis de iteração:
+lambda: 
+x_current[i]: 
+y_current[i]: solução local da região i (saída dos NLPs desacoplados).
+
+O construtor cuida de inicializar lambda com zeros e cria vetores vazios para x_current/y_current.
+
 """
 mutable struct AladinProblem
     regions::Vector{AladinRegion}
@@ -68,9 +81,11 @@ mutable struct AladinProblem
     options::AladinOptions
     
     # Variáveis de iteração
-    lambda::Vector{Float64}  # Multiplicadores de Lagrange
-    x_current::Vector{Vector{Float64}}  # Soluções primais atuais
-    y_current::Vector{Vector{Float64}}  # Soluções dos NLPs desacoplados
+    lambda::Vector{Float64}  # vetor de multiplicadores de Lagrange associados às restrições de consenso.
+    x_current::Vector{Vector{Float64}}  # soluçções primal “consistente” (após o QP) da região i.
+    y_current::Vector{Vector{Float64}}  # local da região i (saída dos NLPs desacoplados).
+
+    #O construtor cuida de inicializar lambda com zeros e cria vetores vazios para x_current/y_current.
     
     function AladinProblem(
         regions::Vector{AladinRegion},
@@ -104,7 +119,12 @@ Resolve o problema de otimização distribuída usando o algoritmo ALADIN.
 
 # Retorna
 - `results::Dict`: Dicionário com resultados da otimização
+
+Esta é uma implementação do ALADIN para OPF distribído
+
 """
+
+#função principal
 function solve_aladin(problem::AladinProblem)
     opts = problem.options
     
@@ -119,14 +139,17 @@ function solve_aladin(problem::AladinProblem)
         println("="^70)
     end
     
+    """
+    """
+
     # Inicialização
-    initialize_aladin!(problem)
+    initialize_aladin!(problem)   # Resolve cada região isoladamente (sem acoplamento) para obter um ponto inicial x_current[i] e y_current[i].
     
     # Loop principal do ALADIN
     converged = false
     iteration = 0
     
-    for k in 1:opts.max_iter
+    for k in 1:opts.max_iter    #loop principal
         iteration = k
         
         if opts.verbose
@@ -134,24 +157,28 @@ function solve_aladin(problem::AladinProblem)
         end
         
         # Passo 1: Resolver NLPs desacoplados
+        # Cada região resolve seu subproblema com Lagrangiano aumentado.
         solve_decoupled_nlps!(problem)
         
-        # Passo 2: Computar gradientes e Hessianas
+        # Passo 2: Calcular gradientes e Hessianas
         gradients, hessians = compute_derivatives!(problem)
         
         # Passo 3: Resolver QP acoplado
+        # Esse QP coordena todas as regiões para satisfazer o consenso.
         solve_coupled_qp!(problem, gradients, hessians)
         
         # Passo 4: Atualizar multiplicadores
         update_multipliers!(problem)
         
         # Passo 5: Verificar convergência
+        # Convergência quando max_i ||yᵢ - xᵢ|| < tol.
         residual = check_convergence(problem)
         
         if opts.verbose
             println("Resíduo de consenso: ", residual)
         end
         
+        #Se atingir tolerância → imprime mensagem de convergência
         if residual < opts.tol
             converged = true
             if opts.verbose
@@ -161,6 +188,7 @@ function solve_aladin(problem::AladinProblem)
         end
     end
     
+    # Se NÃO atingir tolerância → imprime mensagem que chegou em max_iter.
     if !converged && opts.verbose
         println("\n⚠ Número máximo de iterações atingido sem convergência.")
     end
@@ -181,10 +209,16 @@ function initialize_aladin!(problem::AladinProblem)
         println("\nInicializando ALADIN...")
     end
     
-    # Inicializar multiplicadores com zeros
+    # Inicializar multiplicadores com zeros  (lambda)
     problem.lambda = zeros(size(problem.consensus_matrix, 1))
     
     # Resolver cada região independentemente para obter ponto inicial
+    # Para cada região:
+    #       Chama build_and_optimize_model (definida em outro lugar) para montar e resolver o OPF local.
+    #       Extrai a solução primal com extract_primal_solution.
+    #       Usa essa solução como ponto inicial tanto para x_current[i] quanto para y_current[i].
+
+
     for (i, region) in enumerate(problem.regions)
         model = build_and_optimize_model(
             region.data,
@@ -207,7 +241,7 @@ end
     solve_decoupled_nlps!(problem::AladinProblem)
 
 Resolve os NLPs desacoplados com termo de Lagrangiano aumentado.
-Minimiza: fᵢ(yᵢ) + λᵀAᵢyᵢ + (1/2)||yᵢ - xᵢ||²_Σᵢ
+Minimiza: fᵢ(yᵢ) + λᵀAᵢyᵢ + (1/2)||yᵢ - xᵢ||²   (???_Σᵢ)
 """
 function solve_decoupled_nlps!(problem::AladinProblem)
     n_regions = length(problem.regions)
@@ -217,6 +251,9 @@ function solve_decoupled_nlps!(problem::AladinProblem)
         region = problem.regions[i]
         
         # Construir modelo com Lagrangiano aumentado
+        # Esse mecanismo é um esqueleto, que será implementado a adição do tempo de Langragiano 
+        #     aumento na função objetivo
+        # Se o solver local converge, a nova solução local y_current[i] é atualizada.
         model = build_augmented_lagrangian_model(
             region,
             problem.model_type,
@@ -253,9 +290,14 @@ function compute_derivatives!(problem::AladinProblem)
         y_i = problem.y_current[i]
         
         # Computar gradiente: ∇fᵢ(yᵢ) + Aᵢᵀλ
+        # Gradiente do Lagrangiano aumentado (ainda retorna zeros).
         gradients[i] = compute_gradient(region, y_i, problem)
         
         # Computar aproximação Hessiana
+        # Hessiana (exata, Gauss-Newton ou BFGS). No momento, todos esses são placeholders:
+        #       compute_gauss_newton_hessian: retorna identidade.
+        #       compute_exact_hessian: retorna identidade.
+        #       compute_bfgs_hessian: também identidade.
         if problem.options.hessian_approximation == :exact
             hessians[i] = compute_exact_hessian(region, y_i)
         elseif problem.options.hessian_approximation == :gauss_newton
@@ -276,18 +318,22 @@ end
 Resolve o QP acoplado:
 min_Δy ∑ᵢ {(1/2)ΔyᵢᵀHᵢΔyᵢ + gᵢᵀΔyᵢ}
 s.t. ∑ᵢ Aᵢ(yᵢ + Δyᵢ) = b
+
+
 """
 function solve_coupled_qp!(problem::AladinProblem, gradients, hessians)
     n_regions = length(problem.regions)
     
-    # Criar modelo QP
+    # Criar modelo QP no JuMP
     qp_model = JuMP.Model(problem.optimizer)
     
     # Variáveis: incrementos Δy para cada região
+    # Para cada região i, cria variáveis de incremento Δyᵢ
     n_vars = [length(problem.y_current[i]) for i in 1:n_regions]
     @variable(qp_model, Δy[i=1:n_regions, j=1:n_vars[i]])
     
     # Função objetivo quadrática
+    #  
     @objective(qp_model, Min,
         sum(
             0.5 * sum(Δy[i,j] * sum(hessians[i][j,k] * Δy[i,k] for k in 1:n_vars[i]) 
@@ -298,6 +344,8 @@ function solve_coupled_qp!(problem::AladinProblem, gradients, hessians)
     )
     
     # Restrição de consenso: ∑ᵢ Aᵢ(yᵢ + Δyᵢ) = b
+    # consensus_matrix é a matriz A da restrição de consenso
+    # get_global_index(i, j, n_vars) mapeia o índice local (região i, variável j) para o índice global em x_all = vcat(x₁, x₂, ..., x_R)
     n_consensus = size(problem.consensus_matrix, 1)
     @constraint(qp_model, consensus[c=1:n_consensus],
         sum(
@@ -312,6 +360,7 @@ function solve_coupled_qp!(problem::AladinProblem, gradients, hessians)
     JuMP.optimize!(qp_model)
     
     # Atualizar x = y + Δy
+    # se o QP convergir, atualiza x  (verificar se está atualizando corretamente)
     if JuMP.termination_status(qp_model) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
         for i in 1:n_regions
             problem.x_current[i] = problem.y_current[i] + JuMP.value.(Δy[i,:])
@@ -338,7 +387,12 @@ end
     check_convergence(problem::AladinProblem)
 
 Verifica convergência medindo ||yᵢ - xᵢ|| para todas as regiões.
+
+Mede o desacoplamento entre as soluções locais (yᵢ) e a solução coordenada (xᵢ)
+Se isso for pequeno em todas as regiões, considera que o algoritmo convergiu
+
 """
+
 function check_convergence(problem::AladinProblem)
     max_residual = 0.0
     
@@ -358,6 +412,11 @@ end
     extract_primal_solution(model::JuMP.Model, region::AladinRegion)
 
 Extrai a solução primal do modelo JuMP como vetor.
+
+Extrai as variáveis relevantes do modelo JuMP em um único vetor de Float64
+Aqui assume que as variáveis do modelo se chamam :theta, :v_magnitude, :v_magnitude_sq, :p_generation, :q_generation
+A ordem e o tamanho dessas variáveis precisam ser compatíveis com a forma como você monta a consensus_matrix
+
 """
 function extract_primal_solution(model::JuMP.Model, region::AladinRegion)
     solution = Float64[]
@@ -397,7 +456,8 @@ function compute_consensus_violation(problem::AladinProblem)
     violation = zeros(n_consensus)
     
     # Concatenar todas as variáveis primais
-    x_all = vcat(problem.x_current...)
+    # Concatena x_current[1], x_current[2], ..., x_current[R] em um único vetor x_all
+    x_all = reduce(vcat, problem.x_current)
     
     # Calcular Ax - b
     violation = problem.consensus_matrix * x_all - problem.consensus_rhs
@@ -408,7 +468,7 @@ end
 """
     get_global_index(region_id::Int, local_index::Int, n_vars::Vector{Int})
 
-Converte índice local da região para índice global.
+    Converte o índice local (dentro da região) em índice global na concatenação x_all
 """
 function get_global_index(region_id::Int, local_index::Int, n_vars::Vector{Int})
     offset = sum(n_vars[1:region_id-1])
@@ -418,7 +478,14 @@ end
 """
     compile_results(problem::AladinProblem, converged::Bool, iterations::Int)
 
-Compila os resultados finais da otimização.
+    Compila os resultados finais da otimização.
+
+    Junta tudo num dicionário:
+            Se convergiu ou não
+            Quantas iterações
+            Soluções por região
+            Multiplicadores finais
+            Norma da violação de consenso
 """
 function compile_results(problem::AladinProblem, converged::Bool, iterations::Int)
     results = Dict{String, Any}()
