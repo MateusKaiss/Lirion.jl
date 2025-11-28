@@ -11,6 +11,89 @@ Este script demonstra:
 2. Como decompor a rede em regiões
 3. Como configurar e resolver usando ALADIN
 4. Como analisar os resultados
+
+Tem um exemplo centralizado e outro distribuído 
+
+Características da rede:
+6 barras
+7 branches
+2 geradores
+barras com carga:  todas (exceto a 1)
+
+Base de potência: 100 MVA
+
+| Barra | Tipo                              | Tensão inicial | Demanda P (pu) | Demanda Q (pu) |
+| ----- | --------------------------------- | -------------- | -------------- | -------------- |
+| 1     | **Barra de referência** + gerador | 1.0            | 0.0            | 0.0            |
+| 2     | Carga                             | 1.0            | 0.5            | 0.1            |
+| 3     | Carga                             | 1.0            | 0.3            | 0.1            |
+| 4     | Carga + gerador                   | 1.0            | 0.4            | 0.1            |
+| 5     | Carga                             | 1.0            | 0.2            | 0.05           |
+| 6     | Carga                             | 1.0            | 0.3            | 0.05           |
+
+todos os limites de tensão
+0.95 ≤ V ≤ 1.05 pu
+
+
+os geradores, coloquei nas barras 1 e 4
+
+| Gerador | Barra | Pmin–Pmax (pu) | Qmin–Qmax (pu) |
+| ------- | ----- | -------------- | -------------- |
+| G1      | 1     | 0.0 – 2.0      | -0.5 – 0.5     |
+| G2      | 4     | 0.0 – 1.5      | -0.3 – 0.3     |
+
+
+Custo de geração (quadrático):
+
+G1: 10 · Pg
+
+G2: 15 · Pg
+
+como o G2 é mais caro → o OPF prefere acionar mais G1.
+
+
+Linhas de transmissão
+| Linha | De → Para | Capacidade (pu) | R    | X   |
+| ----- | --------- | --------------- | ---- | --- |
+| 1     | 1 → 2     | 1.0             | 0.01 | 0.1 |
+| 2     | 1 → 3     | 1.0             | 0.01 | 0.1 |
+| 3     | 2 → 3     | 0.8             | 0.01 | 0.1 |
+| 4     | 2 → 4     | 1.0             | 0.01 | 0.1 |
+| 5     | 3 → 5     | 0.8             | 0.01 | 0.1 |
+| 6     | 4 → 5     | 1.0             | 0.01 | 0.1 |
+| 7     | 5 → 6     | 0.8             | 0.01 | 0.1 |
+
+
+No exemplo fiz uma distribuição simples e lógica (vou ver com o Daniel), mas acredito que 
+seja o suficiente para este exemplo simples
+
+   Região 1                         Região 2
+───────────────               ─────────────────
+ Barras: 1, 2, 3               Barras: 4, 5, 6
+ Gerador em 1                  Gerador em 4
+ Mais carga nas barras 2-3     Carga nas barra 5-6
+
+ou seja, separei somente em duas regiões. E na barra 5 considerei como sendo 
+a variável de consenso, onde as variáveis são compartilhadas (na barra 5 ocorre o consenso)
+
+Com isso, cada região deve otimizar localmente:
+| Região | Variáveis internas | Variáveis compartilhadas      |
+| ------ | ------------------ | ----------------------------- |
+| 1      | θ₁, θ₂, θ₃, Pg₁    | θ₅ (na fronteira 3–5/2–5)     |
+| 2      | θ₄, θ₅, θ₆, Pg₂    | θ₅ (mas calculado localmente) |
+
+
+Pelo que verifiquei no artigo, o aladin exige:
+θ₅(Região 1) = θ₅(Região 2)
+
+ou seja se não forem iguais vai haver violação de consenso, e o 
+aladin vai interagir té convergir (verificar se é isso mesmo ???)
+
+a principio, o propósito desse exemplo de teste seria para:
+* considerar geração em ambas as regiões
+* haver congestionamento possível entre elas
+* uma única barra de fronte para ajudar a visualizar o consenso
+* seria uma estrutura típica de VPP com dois controladores locais ??? (verificar se posso afirmar isso)
 """
 
 using JuMP
