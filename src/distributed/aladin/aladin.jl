@@ -1,264 +1,526 @@
-# Basic ALADIN (Algorithm 1) — versão em Julia
-# Tradução fiel do código Python fornecido pelo Prof. Laercio
-# Autor(es) originais (Python): Prof. Laercio (adaptado)
+# =========================
+# ALADIN - Augmented Lagrangian based Alternating Direction Inexact Newton
+# =========================
 
-using LinearAlgebra
+"""
+    AladinOptions
 
-# ------------------------------- Tipos básicos -------------------------------
+Opções de configuração para o algoritmo ALADIN.
 
-struct LocalFunction
-    """
-    Representa f_i e (opcionalmente) seu gradiente e Hessiana.
-    - dim: dimensão de x_i
-    - f   : x_i -> escalar
-    - grad: x_i -> vetor (ou nothing)
-    - hess: x_i -> matriz (ou nothing)
-    """
-    dim::Int
-    f::Function
-    grad::Union{Function,Nothing}
-    hess::Union{Function,Nothing}
+# Campos
+- `max_iter::Int`: Número máximo de iterações (padrão: 100)
+- `tol::Float64`: Tolerância para convergência (padrão: 1e-4)
+- `rho::Float64`: Parâmetro de penalidade para o Lagrangiano aumentado (padrão: 1.0)
+- `mu::Float64`: Parâmetro de regularização para o QP (padrão: 1e-3)
+- `verbose::Bool`: Exibir informações de progresso (padrão: true)
+- `hessian_approximation::Symbol`: Tipo de aproximação Hessiana (:exact, :gauss_newton, :bfgs) (padrão: :gauss_newton)
+"""
+Base.@kwdef mutable struct AladinOptions
+    max_iter::Int = 100
+    tol::Float64 = 1e-4
+    rho::Float64 = 1.0
+    mu::Float64 = 1e-3
+    verbose::Bool = true
+    hessian_approximation::Symbol = :gauss_newton
 end
 
-LocalFunction(dim, f; grad=nothing, hess=nothing) = LocalFunction(dim, f, grad, hess)
+"""
+    AladinRegion
 
-Base.@kwdef struct AladinOptions
-    max_iters::Int    = 200
-    tol::Float64      = 1e-6
-    sub_max_iters::Int = 200
-    sub_tol::Float64   = 1e-8
-    bt_beta::Float64   = 0.5
-    bt_c::Float64      = 1e-4
+Representa uma região (subproblema) no problema de otimização distribuída.
+
+# Campos
+- `id::Int`: Identificador da região
+- `data::Dict`: Dados específicos da região (buses, generators, branches, etc.)
+- `coupling_vars::Vector{Symbol}`: Variáveis que participam das restrições de consenso
+- `A_consensus::Matrix{Float64}`: Matriz de consenso para esta região
+"""
+mutable struct AladinRegion
+    id::Int
+    data::Dict
+    coupling_vars::Vector{Symbol}
+    A_consensus::Union{Nothing, Matrix{Float64}}
+    
+    function AladinRegion(id::Int, data::Dict)
+        new(id, data, Symbol[], nothing)
+    end
 end
 
-mutable struct BasicALADIN
-    """
-    Implementação do Algorithm 1 (Basic ALADIN).
-    - f_list: vetor de LocalFunction (f_i, ∇f_i, ∇²f_i)
-    - A_list: vetor de matrizes A_i com shape (m, n_i)
-    - b: vetor do acoplamento (m,)
-    - Sigma_list: vetor de matrizes Σ_i ≻ 0 (se nada, usa identidade)
-    """
-    f_list::Vector{LocalFunction}
-    A_list::Vector{Matrix{Float64}}
-    b::Vector{Float64}
-    m::Int
-    N::Int
-    Sigma_list::Vector{Matrix{Float64}}
-    opts::AladinOptions
+"""
+    AladinProblem
+
+Estrutura principal do problema ALADIN.
+
+# Campos
+- `regions::Vector{AladinRegion}`: Lista de regiões (subproblemas)
+- `consensus_matrix::Matrix{Float64}`: Matriz de consenso global ∑Aᵢxᵢ = b
+- `consensus_rhs::Vector{Float64}`: Lado direito da restrição de consenso b
+- `model_type::Type{<:OPFModel}`: Tipo de modelo OPF (DC, AC, SOCP)
+- `optimizer`: Otimizador a ser usado nos subproblemas
+- `options::AladinOptions`: Opções do algoritmo
+"""
+mutable struct AladinProblem
+    regions::Vector{AladinRegion}
+    consensus_matrix::Matrix{Float64}
+    consensus_rhs::Vector{Float64}
+    model_type::Type{<:OPFModel}
+    optimizer
+    options::AladinOptions
+    
+    # Variáveis de iteração
+    lambda::Vector{Float64}  # Multiplicadores de Lagrange
+    x_current::Vector{Vector{Float64}}  # Soluções primais atuais
+    y_current::Vector{Vector{Float64}}  # Soluções dos NLPs desacoplados
+    
+    function AladinProblem(
+        regions::Vector{AladinRegion},
+        consensus_matrix::Matrix{Float64},
+        consensus_rhs::Vector{Float64},
+        model_type::Type{<:OPFModel},
+        optimizer;
+        options::AladinOptions = AladinOptions()
+    )
+        n_regions = length(regions)
+        lambda = zeros(size(consensus_matrix, 1))
+        x_current = [Float64[] for _ in 1:n_regions]
+        y_current = [Float64[] for _ in 1:n_regions]
+        
+        new(regions, consensus_matrix, consensus_rhs, model_type, optimizer, 
+            options, lambda, x_current, y_current)
+    end
 end
 
-function BasicALADIN(
-    f_list::Vector{LocalFunction},
-    A_list::Vector{Matrix{Float64}},
-    b::Vector{Float64};
-    Sigma_list::Union{Vector{Matrix{Float64}},Nothing}=nothing,
-    opts::AladinOptions=AladinOptions()
-)
-    m = length(b)
-    N = length(f_list)
-    Σ_list = Sigma_list === nothing ? [I*1.0 for fi in f_list] : Sigma_list
+"""
+    solve_aladin(problem::AladinProblem)
 
-    @assert length(A_list) == N "A_list deve ter N elementos"
-    @assert length(Σ_list) == N "Sigma_list deve ter N elementos"
+Resolve o problema de otimização distribuída usando o algoritmo ALADIN.
 
-    # Checagens rápidas de conformidade e SPD de Σ_i
-    for (i, (fi, Ai, Si)) in enumerate(zip(f_list, A_list, Σ_list))
-        @assert size(Ai) == (m, fi.dim) "A_$(i) com shape inválido: $(size(Ai)) ≠ ($(m), $(fi.dim))"
-        # checagem SPD simples
-        try
-            cholesky(Symmetric(Si); check=true)
-        catch
-            error("Σ_$i não é SPD")
+# Algoritmo
+1. Resolver NLPs desacoplados com Lagrangiano aumentado
+2. Computar gradientes e aproximações Hessianas
+3. Resolver QP acoplado para atualização de consenso
+4. Atualizar multiplicadores de Lagrange
+5. Verificar convergência
+
+# Retorna
+- `results::Dict`: Dicionário com resultados da otimização
+"""
+function solve_aladin(problem::AladinProblem)
+    opts = problem.options
+    
+    if opts.verbose
+        println("="^70)
+        println("ALADIN - Augmented Lagrangian based Alternating Direction Inexact Newton")
+        println("="^70)
+        println("Número de regiões: ", length(problem.regions))
+        println("Tipo de modelo: ", problem.model_type)
+        println("Tolerância: ", opts.tol)
+        println("Máximo de iterações: ", opts.max_iter)
+        println("="^70)
+    end
+    
+    # Inicialização
+    initialize_aladin!(problem)
+    
+    # Loop principal do ALADIN
+    converged = false
+    iteration = 0
+    
+    for k in 1:opts.max_iter
+        iteration = k
+        
+        if opts.verbose
+            println("\n--- Iteração $k ---")
         end
-    end
-
-    return BasicALADIN(f_list, A_list, b, m, N, Σ_list, opts)
-end
-
-# -------------------- Utilitários numéricos internos --------------------
-
-_norm_S(y_minus_x::AbstractVector, S::AbstractMatrix) = sqrt(dot(y_minus_x, S * y_minus_x))
-
-function _regularize_SPD(H::AbstractMatrix)
-    # Garante SPD por regularização espectral leve
-    Hsym = Symmetric((H + H')/2)  # força simetria numérica
-    try
-        cholesky(Hsym; check=true)
-        return Matrix(Hsym)
-    catch
-        E = eigen(Hsym)
-        vals = map(v -> max(v, 1e-8), E.values)
-        return E.vectors * Diagonal(vals) * E.vectors'
-    end
-end
-
-# ----------------- Solver de subproblema local (gradiente + BT) -----------------
-
-function _solve_local_subproblem!(
-    M::BasicALADIN,
-    i::Int,
-    x_i::Vector{Float64},
-    lam::Vector{Float64}
-)
-    fi = M.f_list[i]
-    Ai = M.A_list[i]
-    Si = M.Sigma_list[i]  # matriz de ponderação
-
-    F(y) = fi.f(y) + dot(lam, Ai * y) + 0.5 * dot(y .- x_i, Si * (y .- x_i))
-
-    function gradF(y)
-        if fi.grad === nothing
-            error("grad f_i necessário para a variante básica; use deriv-free se não tiver grad.")
+        
+        # Passo 1: Resolver NLPs desacoplados
+        solve_decoupled_nlps!(problem)
+        
+        # Passo 2: Computar gradientes e Hessianas
+        gradients, hessians = compute_derivatives!(problem)
+        
+        # Passo 3: Resolver QP acoplado
+        solve_coupled_qp!(problem, gradients, hessians)
+        
+        # Passo 4: Atualizar multiplicadores
+        update_multipliers!(problem)
+        
+        # Passo 5: Verificar convergência
+        residual = check_convergence(problem)
+        
+        if opts.verbose
+            println("Resíduo de consenso: ", residual)
         end
-        return fi.grad(y) + Ai' * lam + Si * (y .- x_i)
-    end
-
-    # inicialização
-    y = copy(x_i)
-
-    # descida por gradiente com backtracking
-    for _ in 1:M.opts.sub_max_iters
-        g = gradF(y)
-        ng = norm(g)
-        if ng <= M.opts.sub_tol
+        
+        if residual < opts.tol
+            converged = true
+            if opts.verbose
+                println("\n✓ Convergência alcançada!")
+            end
             break
         end
-        d = -g
-        t = 1.0
-        f_y = F(y)
-        while true
-            y_new = y .+ t .* d
-            if F(y_new) <= f_y + M.opts.bt_c * t * dot(g, d)
-                y = y_new
-                break
-            end
-            t *= M.opts.bt_beta
-            if t < 1e-16
-                y = y_new
-                break
-            end
-        end
     end
-
-    gi = fi.grad === nothing ? nothing : fi.grad(y)
-    Hi = fi.hess === nothing ? nothing : fi.hess(y)
-    if Hi === nothing
-        Hi = I * 1.0
-        Hi = Matrix(Hi, fi.dim, fi.dim)
+    
+    if !converged && opts.verbose
+        println("\n⚠ Número máximo de iterações atingido sem convergência.")
     end
-    Hi = _regularize_SPD(Hi)
-
-    return y, gi, Hi
+    
+    # Compilar resultados
+    results = compile_results(problem, converged, iteration)
+    
+    return results
 end
 
-# ------------------------------- Loop principal -------------------------------
+"""
+    initialize_aladin!(problem::AladinProblem)
 
-function solve(
-    M::BasicALADIN,
-    x0_list::Vector{Vector{Float64}};
-    lam0::Union{Vector{Float64},Nothing}=nothing,
-    callback::Union{Function,Nothing}=nothing
+Inicializa as variáveis do ALADIN resolvendo os subproblemas desacoplados.
+"""
+function initialize_aladin!(problem::AladinProblem)
+    if problem.options.verbose
+        println("\nInicializando ALADIN...")
+    end
+    
+    # Inicializar multiplicadores com zeros
+    problem.lambda = zeros(size(problem.consensus_matrix, 1))
+    
+    # Resolver cada região independentemente para obter ponto inicial
+    for (i, region) in enumerate(problem.regions)
+        model = build_and_optimize_model(
+            region.data,
+            problem.model_type;
+            optimizer = problem.optimizer,
+            build_only = false
+        )
+        
+        # Extrair solução primal
+        problem.x_current[i] = extract_primal_solution(model, region)
+        problem.y_current[i] = copy(problem.x_current[i])
+    end
+    
+    if problem.options.verbose
+        println("Inicialização concluída.")
+    end
+end
+
+"""
+    solve_decoupled_nlps!(problem::AladinProblem)
+
+Resolve os NLPs desacoplados com termo de Lagrangiano aumentado.
+Minimiza: fᵢ(yᵢ) + λᵀAᵢyᵢ + (1/2)||yᵢ - xᵢ||²_Σᵢ
+"""
+function solve_decoupled_nlps!(problem::AladinProblem)
+    n_regions = length(problem.regions)
+    
+    # Resolver em paralelo (se disponível)
+    for i in 1:n_regions
+        region = problem.regions[i]
+        
+        # Construir modelo com Lagrangiano aumentado
+        model = build_augmented_lagrangian_model(
+            region,
+            problem.model_type,
+            problem.optimizer,
+            problem.lambda,
+            problem.x_current[i],
+            problem.options.rho
+        )
+        
+        # Otimizar
+        JuMP.optimize!(model)
+        
+        # Extrair solução
+        if JuMP.termination_status(model) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
+            problem.y_current[i] = extract_primal_solution(model, region)
+        else
+            @warn "Região $i não convergiu. Status: $(JuMP.termination_status(model))"
+        end
+    end
+end
+
+"""
+    compute_derivatives!(problem::AladinProblem)
+
+Computa gradientes e aproximações Hessianas para cada subproblema.
+"""
+function compute_derivatives!(problem::AladinProblem)
+    n_regions = length(problem.regions)
+    gradients = Vector{Vector{Float64}}(undef, n_regions)
+    hessians = Vector{Matrix{Float64}}(undef, n_regions)
+    
+    for i in 1:n_regions
+        region = problem.regions[i]
+        y_i = problem.y_current[i]
+        
+        # Computar gradiente: ∇fᵢ(yᵢ) + Aᵢᵀλ
+        gradients[i] = compute_gradient(region, y_i, problem)
+        
+        # Computar aproximação Hessiana
+        if problem.options.hessian_approximation == :exact
+            hessians[i] = compute_exact_hessian(region, y_i)
+        elseif problem.options.hessian_approximation == :gauss_newton
+            hessians[i] = compute_gauss_newton_hessian(region, y_i)
+        elseif problem.options.hessian_approximation == :bfgs
+            hessians[i] = compute_bfgs_hessian(region, y_i, problem)
+        else
+            error("Aproximação Hessiana desconhecida: $(problem.options.hessian_approximation)")
+        end
+    end
+    
+    return gradients, hessians
+end
+
+"""
+    solve_coupled_qp!(problem::AladinProblem, gradients, hessians)
+
+Resolve o QP acoplado:
+min_Δy ∑ᵢ {(1/2)ΔyᵢᵀHᵢΔyᵢ + gᵢᵀΔyᵢ}
+s.t. ∑ᵢ Aᵢ(yᵢ + Δyᵢ) = b
+"""
+function solve_coupled_qp!(problem::AladinProblem, gradients, hessians)
+    n_regions = length(problem.regions)
+    
+    # Criar modelo QP
+    qp_model = JuMP.Model(problem.optimizer)
+    
+    # Variáveis: incrementos Δy para cada região
+    n_vars = [length(problem.y_current[i]) for i in 1:n_regions]
+    @variable(qp_model, Δy[i=1:n_regions, j=1:n_vars[i]])
+    
+    # Função objetivo quadrática
+    @objective(qp_model, Min,
+        sum(
+            0.5 * sum(Δy[i,j] * sum(hessians[i][j,k] * Δy[i,k] for k in 1:n_vars[i]) 
+                     for j in 1:n_vars[i]) +
+            sum(gradients[i][j] * Δy[i,j] for j in 1:n_vars[i])
+            for i in 1:n_regions
+        )
+    )
+    
+    # Restrição de consenso: ∑ᵢ Aᵢ(yᵢ + Δyᵢ) = b
+    n_consensus = size(problem.consensus_matrix, 1)
+    @constraint(qp_model, consensus[c=1:n_consensus],
+        sum(
+            sum(problem.consensus_matrix[c, get_global_index(i, j, n_vars)] * 
+                (problem.y_current[i][j] + Δy[i,j])
+                for j in 1:n_vars[i])
+            for i in 1:n_regions
+        ) == problem.consensus_rhs[c]
+    )
+    
+    # Resolver QP
+    JuMP.optimize!(qp_model)
+    
+    # Atualizar x = y + Δy
+    if JuMP.termination_status(qp_model) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
+        for i in 1:n_regions
+            problem.x_current[i] = problem.y_current[i] + JuMP.value.(Δy[i,:])
+        end
+    else
+        @warn "QP acoplado não convergiu. Status: $(JuMP.termination_status(qp_model))"
+    end
+end
+
+"""
+    update_multipliers!(problem::AladinProblem)
+
+Atualiza os multiplicadores de Lagrange: λ⁺ = λ + ρ(∑Aᵢxᵢ - b)
+"""
+function update_multipliers!(problem::AladinProblem)
+    # Calcular violação de consenso
+    consensus_violation = compute_consensus_violation(problem)
+    
+    # Atualizar multiplicadores
+    problem.lambda += problem.options.rho * consensus_violation
+end
+
+"""
+    check_convergence(problem::AladinProblem)
+
+Verifica convergência medindo ||yᵢ - xᵢ|| para todas as regiões.
+"""
+function check_convergence(problem::AladinProblem)
+    max_residual = 0.0
+    
+    for i in 1:length(problem.regions)
+        residual = norm(problem.y_current[i] - problem.x_current[i])
+        max_residual = max(max_residual, residual)
+    end
+    
+    return max_residual
+end
+
+# =========================
+# Funções auxiliares
+# =========================
+
+"""
+    extract_primal_solution(model::JuMP.Model, region::AladinRegion)
+
+Extrai a solução primal do modelo JuMP como vetor.
+"""
+function extract_primal_solution(model::JuMP.Model, region::AladinRegion)
+    solution = Float64[]
+    
+    # Extrair variáveis relevantes (theta, v_magnitude, p_generation, etc.)
+    if haskey(model, :theta)
+        append!(solution, vec(JuMP.value.(model[:theta])))
+    end
+    
+    if haskey(model, :v_magnitude)
+        append!(solution, vec(JuMP.value.(model[:v_magnitude])))
+    end
+    
+    if haskey(model, :v_magnitude_sq)
+        append!(solution, vec(JuMP.value.(model[:v_magnitude_sq])))
+    end
+    
+    if haskey(model, :p_generation)
+        append!(solution, vec(JuMP.value.(model[:p_generation])))
+    end
+    
+    if haskey(model, :q_generation)
+        append!(solution, vec(JuMP.value.(model[:q_generation])))
+    end
+    
+    return solution
+end
+
+"""
+    compute_consensus_violation(problem::AladinProblem)
+
+Calcula a violação da restrição de consenso: ∑Aᵢxᵢ - b
+"""
+function compute_consensus_violation(problem::AladinProblem)
+    n_regions = length(problem.regions)
+    n_consensus = length(problem.consensus_rhs)
+    violation = zeros(n_consensus)
+    
+    # Concatenar todas as variáveis primais
+    x_all = vcat(problem.x_current...)
+    
+    # Calcular Ax - b
+    violation = problem.consensus_matrix * x_all - problem.consensus_rhs
+    
+    return violation
+end
+
+"""
+    get_global_index(region_id::Int, local_index::Int, n_vars::Vector{Int})
+
+Converte índice local da região para índice global.
+"""
+function get_global_index(region_id::Int, local_index::Int, n_vars::Vector{Int})
+    offset = sum(n_vars[1:region_id-1])
+    return offset + local_index
+end
+
+"""
+    compile_results(problem::AladinProblem, converged::Bool, iterations::Int)
+
+Compila os resultados finais da otimização.
+"""
+function compile_results(problem::AladinProblem, converged::Bool, iterations::Int)
+    results = Dict{String, Any}()
+    
+    results["converged"] = converged
+    results["iterations"] = iterations
+    results["regions"] = length(problem.regions)
+    
+    # Soluções por região
+    results["solutions"] = Dict{Int, Vector{Float64}}()
+    for i in 1:length(problem.regions)
+        results["solutions"][i] = problem.x_current[i]
+    end
+    
+    # Multiplicadores finais
+    results["lambda"] = problem.lambda
+    
+    # Violação de consenso final
+    results["consensus_violation"] = norm(compute_consensus_violation(problem))
+    
+    return results
+end
+
+# =========================
+# Funções específicas do modelo (a serem implementadas)
+# =========================
+
+"""
+    build_augmented_lagrangian_model(region, model_type, optimizer, lambda, x_prev, rho)
+
+Constrói modelo com Lagrangiano aumentado para o subproblema.
+"""
+function build_augmented_lagrangian_model(
+    region::AladinRegion,
+    model_type::Type{<:OPFModel},
+    optimizer,
+    lambda::Vector{Float64},
+    x_prev::Vector{Float64},
+    rho::Float64
 )
-    @assert length(x0_list) == M.N
-    x_list = [copy(xi) for xi in x0_list]
-    lam = lam0 === nothing ? zeros(M.m) : copy(lam0)
-
-    info = Dict{String,Any}("nit"=>0, "converged"=>false, "hist_res"=>Float64[])
-
-    for k in 1:M.opts.max_iters
-        # 1) subproblemas locais
-        y_list = Vector{Vector{Float64}}()
-        g_list = Vector{Union{Vector{Float64},Nothing}}()
-        H_list = Vector{Matrix{Float64}}()
-        for i in 1:M.N
-            y_i, g_i, H_i = _solve_local_subproblem!(M, i, x_list[i], lam)
-            push!(y_list, y_i)
-            push!(g_list, g_i)
-            push!(H_list, H_i)
-        end
-
-        # 2) critério de parada: max_i ||y_i - x_i||_{Σ_i}
-        res = maximum(_norm_S(y_list[i] .- x_list[i], M.Sigma_list[i]) for i in 1:M.N)
-        push!(info["hist_res"], res)
-        if callback !== nothing
-            callback(k, x_list, y_list, lam)
-        end
-        if res <= M.opts.tol
-            info["nit"] = k
-            info["converged"] = true
-            return x_list, lam, info
-        end
-
-        # 3) QP acoplado via forma fechada
-        #    Mmat = sum A_i H_i^{-1} A_i^T
-        #    R    = sum A_i (y_i - H_i^{-1} g_i) - b
-        #    lam⁺ = Mmat^{-1} R
-        #    Δy_i = - H_i^{-1}(g_i + A_i^T lam⁺)
-        Mmat = zeros(M.m, M.m)
-        R = -copy(M.b)
-
-        for i in 1:M.N
-            Ai = M.A_list[i]
-            Hi = H_list[i]
-            gi = g_list[i]
-            invHi_Ait = Hi \ (Ai')               # (n_i x m)
-            Mmat .+= Ai * invHi_Ait                # (m x m)
-            invHi_gi = gi === nothing ? zeros(size(Ai,2)) : (Hi \ gi)
-            R .+= Ai * (y_list[i] .- invHi_gi)
-        end
-
-        lam_plus = Mmat \ R
-
-        # 4) passo primal
-        new_x_list = Vector{Vector{Float64}}(undef, M.N)
-        for i in 1:M.N
-            Ai = M.A_list[i]
-            Hi = H_list[i]
-            gi = g_list[i]
-            rhs = (gi === nothing ? zeros(size(Ai,2)) : gi) .+ (Ai' * lam_plus)
-            delta_y_i = -(Hi \ rhs)
-            new_x_list[i] = y_list[i] .+ delta_y_i
-        end
-
-        x_list = new_x_list
-        lam = lam_plus
-    end
-
-    info["nit"] = M.opts.max_iters
-    return x_list, lam, info
+    # Construir modelo base
+    model = build_and_optimize_model(
+        region.data,
+        model_type;
+        optimizer = optimizer,
+        build_only = true
+    )
+    
+    # Adicionar termos do Lagrangiano aumentado à função objetivo
+    # TODO: Implementar adição dos termos λᵀAᵢyᵢ + (ρ/2)||yᵢ - xᵢ||²
+    
+    return model
 end
 
-# ------------------------- Exemplo mínimo (quadrático) -------------------------
-if abspath(PROGRAM_FILE) == @__FILE__
-    # min 0.5*q1*x1^2 + 0.5*q2*(x2-1)^2  s.t.  x1 - x2 = 0
-    q1, q2 = 0.1, 10.0
-    m = 1
-    A1 = [1.0;;]         # (1 x 1)
-    A2 = [-1.0;;]        # (1 x 1)
-    b  = [0.0]
+"""
+    compute_gradient(region, y, problem)
 
-    f1 = LocalFunction(1, x -> 0.5*q1*(x[1]^2);
-        grad = x -> [q1*x[1]],
-        hess = x -> [q1;;]
-    )
+Computa o gradiente do Lagrangiano aumentado.
+"""
+function compute_gradient(
+    region::AladinRegion,
+    y::Vector{Float64},
+    problem::AladinProblem
+)
+    # TODO: Implementar cálculo do gradiente
+    # Por enquanto, retorna vetor zero
+    return zeros(length(y))
+end
 
-    f2 = LocalFunction(1, x -> 0.5*q2*((x[1]-1.0)^2);
-        grad = x -> [q2*(x[1]-1.0)],
-        hess = x -> [q2;;]
-    )
+"""
+    compute_gauss_newton_hessian(region, y)
 
-    Σ1 = [1.0;;]
-    Σ2 = [1.0;;]
+Computa aproximação Hessiana usando Gauss-Newton.
+"""
+function compute_gauss_newton_hessian(region::AladinRegion, y::Vector{Float64})
+    n = length(y)
+    # Aproximação diagonal simples
+    return Matrix{Float64}(I, n, n)
+end
 
-    model = BasicALADIN([f1, f2], [A1, A2], b; Sigma_list=[Σ1, Σ2], opts=AladinOptions(max_iters=100, tol=1e-10))
+"""
+    compute_exact_hessian(region, y)
 
-    x0 = [[0.0], [0.0]]
-    lam0 = [0.0]
-    x_sol, lam_sol, info = solve(model, x0; lam0=lam0)
+Computa Hessiana exata (se disponível).
+"""
+function compute_exact_hessian(region::AladinRegion, y::Vector{Float64})
+    # TODO: Implementar cálculo da Hessiana exata
+    n = length(y)
+    return Matrix{Float64}(I, n, n)
+end
 
-    x1, x2 = x_sol[1][1], x_sol[2][1]
-    println("x1, x2, λ = ", (x1, x2, lam_sol[1]))
-    println("x* = ", q2/(q1+q2), "  λ* = ", -q1*q2/(q1+q2))
-    println("converged = ", info["converged"], "  iters = ", info["nit"]) 
+"""
+    compute_bfgs_hessian(region, y, problem)
+
+Computa aproximação Hessiana usando BFGS.
+"""
+function compute_bfgs_hessian(
+    region::AladinRegion,
+    y::Vector{Float64},
+    problem::AladinProblem
+)
+    # TODO: Implementar BFGS
+    n = length(y)
+    return Matrix{Float64}(I, n, n)
 end
