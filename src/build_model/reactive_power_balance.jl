@@ -1,110 +1,171 @@
-# ---------------------------------------------------------------------
-# Reactive Balance Expression
-# ---------------------------------------------------------------------
-function compute_reactive_power_balance(model, matpower_data, params, bus_index, t)
-    q_gen = sum(
-        model[:q_generation][g, t] for
-        g in get(params.bus_to_generators, bus_index, Int[])
-        if params.generator_status[g] == 1;
-        init = 0.0,
-    )
-    q_bat = sum(
-        model[:q_battery_injected][b, t] for
-        b in get(params.bus_to_batteries, bus_index, Int[]);
-        init = 0.0,
-    )
-    q_pros = sum(
-        model[:q_prosumer_injected][p, t] for
-        p in get(params.bus_to_prosumers, bus_index, Int[]);
-        init = 0.0,
-    )
-    q_out = sum(
-        model[:q_flow_branches][l, t] for
-        l in get(params.bus_to_branches_from, bus_index, Int[])
-        if params.branch_status[l] == 1;
-        init = 0.0,
-    )
-    q_in = sum(
-        model[:q_reverse_flow_branches][l, t] for
-        l in get(params.bus_to_branches_to, bus_index, Int[])
-        if params.branch_status[l] == 1;
-        init = 0.0,
-    )
+# =====================================================================
+# Reactive Power Balance
+# =====================================================================
+function compute_reactive_power_balance(
+    model::JuMP.Model,
+    sys::SystemData,
+    bus_id::Int,
+    t::Int,
+)
+    pf          = sys.powerflow
+    gen         = sys.gen
+    bus         = sys.bus
+    bus_ts      = sys.bus_ts
+    consumer_ts = sys.consumer_ts
 
-    qd = if params.has_timeseries
-        ts = matpower_data["bus_timeseries"]
+    # --------------------------------------------------------------
+    # Geração reativa
+    # --------------------------------------------------------------
+    q_gen = if haskey(model, :q_generation)
         sum(
-            ts["qd"][i]
-            for i in eachindex(ts["bus"])
-            if ts["bus"][i] == bus_index && ts["time"][i] == t;
-            init = 0.0,
-        )
-    else
-        bus_list = matpower_data["bus"]["bus_i"]
-        qd_list = matpower_data["bus"]["qd"]
-        @inbounds sum(
-            qd_list[i] for i in eachindex(bus_list) if bus_list[i] == bus_index;
-            init = 0.0,
-        )
-    end
-
-    q_cons = if params.has_timeseries && haskey(matpower_data, "consumer_timeseries")
-        tsc = matpower_data["consumer_timeseries"]
-        sum(
-            tsc["q_demand"][i]
-            for i in eachindex(tsc["bus"])
-            if tsc["bus"][i] == bus_index && tsc["time"][i] == t;
-            init = 0.0,
-        )
-    elseif haskey(matpower_data, "consumer")
-        c = matpower_data["consumer"]
-        sum(
-            c["q_demand"][i]
-            for i in eachindex(c["bus"])
-            if c["bus"][i] == bus_index;
+            model[:q_generation][g, t]
+            for g in get(pf.bus_to_generators, bus_id, Int[])
+            if gen.existing[g];
             init = 0.0,
         )
     else
         0.0
     end
+
+    # --------------------------------------------------------------
+    # Baterias
+    # --------------------------------------------------------------
+    q_bat = if haskey(model, :q_battery_injected)
+        sum(
+            model[:q_battery_injected][b, t] for
+            b in get(pf.bus_to_batteries, bus_id, Int[]);
+            init = 0.0,
+        )
+    else
+        0.0
+    end
+
+    # --------------------------------------------------------------
+    # Prosumers
+    # --------------------------------------------------------------
+    q_pros = if haskey(model, :q_prosumer_injected)
+        sum(
+            model[:q_prosumer_injected][p, t] for
+            p in get(pf.bus_to_prosumers, bus_id, Int[]);
+            init = 0.0,
+        )
+    else
+        0.0
+    end
+
+    # --------------------------------------------------------------
+    # Fluxos de ramo
+    # --------------------------------------------------------------
+    q_out = if haskey(model, :q_flow_branches)
+        sum(
+            model[:q_flow_branches][l, t] for
+            l in get(pf.bus_to_branches_from, bus_id, Int[])
+            if pf.branch_status[l] == 1;
+            init = 0.0,
+        )
+    else
+        0.0
+    end
+
+    q_in = if haskey(model, :q_reverse_flow_branches)
+        sum(
+            model[:q_reverse_flow_branches][l, t] for
+            l in get(pf.bus_to_branches_to, bus_id, Int[])
+            if pf.branch_status[l] == 1;
+            init = 0.0,
+        )
+    else
+        0.0
+    end
+
+    # --------------------------------------------------------------
+    # Carga reativa de barra (qd): timeseries ou estática de BusData
+    # --------------------------------------------------------------
+    qd = 0.0
+    if bus_ts.has_timeseries && !isempty(bus_ts.time)
+        @inbounds for i in eachindex(bus_ts.bus)
+            if bus_ts.bus[i] == bus_id && bus_ts.time[i] == t
+                qd += bus_ts.qd[i]
+            end
+        end
+    else
+        idx = pf.bus_idx_map[bus_id]
+        qd  = bus.qd[idx]
+    end
+
+    # --------------------------------------------------------------
+    # Carga reativa adicional de "consumer" (consumer_ts)
+    # --------------------------------------------------------------
+    q_cons = 0.0
+    if consumer_ts.has_timeseries && !isempty(consumer_ts.time)
+        @inbounds for i in eachindex(consumer_ts.bus)
+            if consumer_ts.bus[i] == bus_id && consumer_ts.time[i] == t
+                q_cons += consumer_ts.q_demand[i]
+            end
+        end
+    end
+
     return q_gen - q_bat + q_pros - qd - q_cons - q_out - q_in
 end
 
-# ---------------------------------------------------------------------
-# Reactive Balance Constraints by Model Type
-# ---------------------------------------------------------------------
-function reactive_power_balance!(model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
+# =======================================================================
+# Dispatch by model type (DC / AC / SOCP)
+# =======================================================================
+function reactive_power_balance!(
+    model::JuMP.Model,
+    sys::SystemData,
+    ::Type{DC},
+    ::Type{SubproblemBuild},
+)
     return nothing
 end
 
-function reactive_power_balance!(model, matpower_data, ::Type{AC}, ::Type{SubproblemBuild})
-    params = matpower_data["reactive_balance_params"]
-    T = get(model.ext, :time_periods, 1)
+function reactive_power_balance!(
+    model::JuMP.Model,
+    sys::SystemData,
+    ::Type{AC},
+    ::Type{SubproblemBuild},
+)
+    pf = sys.powerflow
+    T  = get(model.ext, :time_periods, 1)
 
-    valid_bus_ids = filter(b -> !params.is_virtual[params.bus_idx_map[b]], params.bus_ids)
+    valid_bus_ids = [
+        b for b in pf.bus_ids if !pf.is_virtual[pf.bus_idx_map[b]]
+    ]
 
     @inbounds for b in valid_bus_ids, t in 1:T
-        idx = params.bus_idx_map[b]
-        balance = compute_reactive_power_balance(model, matpower_data, params, b, t)
+        idx = pf.bus_idx_map[b]
+        balance = compute_reactive_power_balance(model, sys, b, t)
         @constraint(model,
-            balance + params.shunt_susceptance[idx] * model[:v_magnitude][b, t]^2 == 0
+            balance +
+            pf.shunt_susceptance[idx] * model[:v_magnitude][b, t]^2 == 0
         )
     end
+
+    return nothing
 end
 
 function reactive_power_balance!(
-    model, matpower_data, ::Type{SOCP}, ::Type{SubproblemBuild},
+    model::JuMP.Model,
+    sys::SystemData,
+    ::Type{SOCP},
+    ::Type{SubproblemBuild},
 )
-    params = matpower_data["reactive_balance_params"]
-    T = get(model.ext, :time_periods, 1)
+    pf = sys.powerflow
+    T  = get(model.ext, :time_periods, 1)
 
-    valid_bus_ids = filter(b -> !params.is_virtual[params.bus_idx_map[b]], params.bus_ids)
+    valid_bus_ids = [
+        b for b in pf.bus_ids if !pf.is_virtual[pf.bus_idx_map[b]]
+    ]
 
     @inbounds for b in valid_bus_ids, t in 1:T
-        idx = params.bus_idx_map[b]
-        balance = compute_reactive_power_balance(model, matpower_data, params, b, t)
+        idx = pf.bus_idx_map[b]
+        balance = compute_reactive_power_balance(model, sys, b, t)
         @constraint(model,
-            balance + params.shunt_susceptance[idx] * model[:v_magnitude_sq][b, t] == 0
+            balance +
+            pf.shunt_susceptance[idx] * model[:v_magnitude_sq][b, t] == 0
         )
     end
+
+    return nothing
 end

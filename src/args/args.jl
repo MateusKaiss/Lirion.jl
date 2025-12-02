@@ -6,8 +6,6 @@ struct Args
     database_path::String
     model_type::Union{Type{<:OPFModel}, DistributedOPFModel}
     optimizer::Any
-    plot_outputs::Bool
-    write_lp::Bool
     write_outputs::Bool
 
     function Args(raw_args::Vector{String})
@@ -27,14 +25,6 @@ struct Args
             "--optimizer"
             help = "Optimizer function, e.g., OSQP.Optimizer (default if omitted), or Ipopt.Optimizer / SCS.Optimizer / Gurobi.Optimizer, etc."
             arg_type = String
-
-            "--plot-outputs"
-            help = "Generate plots"
-            action = :store_true
-
-            "--write-lp"
-            help = "Write LP file exported by JuMP/optimizer (if supported)"
-            action = :store_true
 
             "--outputs"
             help = "Generate CSV output files"
@@ -94,7 +84,7 @@ struct Args
             arg_type = String
             default = "on"
 
-            # ----- ADMM: parâmetros do ρ adaptativo -----
+            # ----- ADMM: parameters -----
             "--admm-mu-incr"
             help = "Fator μ_incr para comparar r vs s (default: 3.0)"
             arg_type = Float64
@@ -115,7 +105,7 @@ struct Args
             arg_type = Float64
             default = 0.98
 
-            # ----- ADMM: aceleração (Nesterov) -----
+            # ----- ADMM: Nesterov -----
             "--admm-accel"
             help = "Habilita aceleração tipo Nesterov no ADMM (padrão: desligado)"
             action = :store_true
@@ -130,28 +120,24 @@ struct Args
 
         model_key = lowercase(strip(parsed["model"]))
         base_map = Dict(
-            "dc" => DC,
-            "ac" => AC,
+            "dc"   => DC,
+            "ac"   => AC,
             "socp" => SOCP,
         )
 
         # ===== rhos =====
-        rho_base = parsed["admm-rho"]
-        rho_theta_ = get(parsed, "admm-rho-theta", nothing)
-        rho_v_ = get(parsed, "admm-rho-v", nothing)
-        rho_flow_ = get(parsed, "admm-rho-flow", nothing)
+        rho_base    = parsed["admm-rho"]
+        rho_theta_  = get(parsed, "admm-rho-theta", nothing)
+        rho_v_      = get(parsed, "admm-rho-v", nothing)
+        rho_flow_   = get(parsed, "admm-rho-flow", nothing)
         rho_flow_p_ = get(parsed, "admm-rho-flow-p", nothing)
         rho_flow_q_ = get(parsed, "admm-rho-flow-q", nothing)
 
-        # fallback: específicos > flow genérico > base
-        rho_theta_val = isnothing(rho_theta_) ? rho_base : rho_theta_
-        rho_v_val = isnothing(rho_v_) ? rho_base : rho_v_
-        rho_flow_p_val =
-            isnothing(rho_flow_p_) ? (isnothing(rho_flow_) ? rho_base : rho_flow_) :
-            rho_flow_p_
-        rho_flow_q_val =
-            isnothing(rho_flow_q_) ? (isnothing(rho_flow_) ? rho_base : rho_flow_) :
-            rho_flow_q_
+        # fallback: specific > generic flow > base
+        rho_theta_val  = isnothing(rho_theta_)  ? rho_base : rho_theta_
+        rho_v_val      = isnothing(rho_v_)      ? rho_base : rho_v_
+        rho_flow_p_val = isnothing(rho_flow_p_) ? (isnothing(rho_flow_) ? rho_base : rho_flow_) : rho_flow_p_
+        rho_flow_q_val = isnothing(rho_flow_q_) ? (isnothing(rho_flow_) ? rho_base : rho_flow_) : rho_flow_q_
 
         # ===== alpha (over-relaxation) =====
         alpha_ = get(parsed, "admm-alpha", nothing)
@@ -162,22 +148,16 @@ struct Args
 
         # ===== adaptive rho (on/off) =====
         adaptive_flag_str = lowercase(strip(parsed["admm-adaptive"]))
-        adaptive_flag =
-            adaptive_flag_str == "on" ? true :
-            adaptive_flag_str == "off" ? false :
-            (
-                @warn "Valor inválido para --admm-adaptive=$(parsed["admm-adaptive"]). Usando 'on'."; true
-            )
-
+        adaptive_flag = adaptive_flag_str == "on"  ? true  : adaptive_flag_str == "off" ? false : ( @warn "Valor inválido para --admm-adaptive=$(parsed["admm-adaptive"]). Usando 'on'."; true )
         mu_incr_val = parsed["admm-mu-incr"]
         mu_decr_val = parsed["admm-mu-decr"]
         tau_incr_val = parsed["admm-tau-incr"]
         tau_decr_val = parsed["admm-tau-decr"]
 
-        # ===== aceleração (on/off) =====
+        # ===== acceleration (on/off) =====
         accel_flag = get(parsed, "admm-accel", false)
 
-        # ===== optimizer (avaliado cedo para poder entrar no cfg distribuído) =====
+        # ===== optimizer =====
         optimizer = if haskey(parsed, "optimizer") && !isnothing(parsed["optimizer"])
             try
                 eval(Meta.parse(parsed["optimizer"]))
@@ -188,8 +168,6 @@ struct Args
         else
             nothing
         end
-
-        # avisos de flags irrelevantes/ignoradas
         local function _warn_irrelevant_rhos(
             method_sym::Symbol,
             base_str::AbstractString,
@@ -237,10 +215,6 @@ struct Args
         model_type = begin
             if startswith(model_key, "distributed-")
                 parts = split(model_key, '-')
-                # formatos aceitos:
-                #  - distributed-admm-<base>
-                #  - distributed-admm-branch-<base>
-                #  - distributed-admm-hybrid-<base>
                 if length(parts) == 3
                     _, method_str, base_str = parts
                     variant_str = ""
@@ -250,8 +224,8 @@ struct Args
                     error("Invalid distributed model key: $(parsed["model"])")
                 end
 
-                method_str = String(method_str)
-                base_str = String(base_str)
+                method_str  = String(method_str)
+                base_str    = String(base_str)
                 variant_str = String(variant_str)
 
                 method_str == "admm" ||
@@ -260,7 +234,7 @@ struct Args
                     error("Invalid base model in distributed-* key: $base_str")
 
                 method_sym =
-                    variant_str == "" ? :admm :
+                    variant_str == ""       ? :admm :
                     variant_str == "branch" ? :admm_branch :
                     variant_str == "hybrid" ? :admm_hybrid :
                     error("Unsupported distributed method variant: $variant_str")
@@ -270,7 +244,6 @@ struct Args
                     rho_theta_, rho_v_, rho_flow_, rho_flow_p_, rho_flow_q_,
                 )
 
-                # warm start (pode não existir no tipo -> fallback)
                 warm_start_flag = get(parsed, "admm-warm-start", false)
 
                 local cfg
@@ -282,20 +255,20 @@ struct Args
                         rho = rho_base,
                         rho_theta = rho_theta_val,
                         rho_v = rho_v_val,
-                        rho_flow_p = rho_flow_p_val,   # em SOCP-hybrid vale para P e R
-                        rho_flow_q = rho_flow_q_val,   # em SOCP-hybrid vale para Q e T
+                        rho_flow_p = rho_flow_p_val,
+                        rho_flow_q = rho_flow_q_val,
                         ε_primal = parsed["admm-eps-primal"],
-                        ε_dual = parsed["admm-eps-dual"],
+                        ε_dual   = parsed["admm-eps-dual"],
                         alpha_overrelax = alpha_,
-                        warm_start = warm_start_flag,
+                        warm_start  = warm_start_flag,
                         adaptive_rho = adaptive_flag,
                         mu_incr = mu_incr_val,
                         mu_decr = mu_decr_val,
                         tau_incr = tau_incr_val,
                         tau_decr = tau_decr_val,
                         accel_nesterov = accel_flag,
-                        optimizer = optimizer,               # <<<<<< AQUI
-                        prefer_socp_solver = :auto,          # opcional
+                        optimizer = optimizer,
+                        prefer_socp_solver = :auto,
                     )
                 catch err
                     @warn "Esta versão de DistributedOPFModel não aceita alguns campos novos (warm_start/adaptive_rho/accel_nesterov). Prosseguindo sem eles." err
@@ -309,9 +282,9 @@ struct Args
                         rho_flow_p = rho_flow_p_val,
                         rho_flow_q = rho_flow_q_val,
                         ε_primal = parsed["admm-eps-primal"],
-                        ε_dual = parsed["admm-eps-dual"],
+                        ε_dual   = parsed["admm-eps-dual"],
                         alpha_overrelax = alpha_,
-                        optimizer = optimizer,               # <<<<<< E AQUI
+                        optimizer = optimizer,
                         prefer_socp_solver = :auto,
                     )
                 end
@@ -326,8 +299,6 @@ struct Args
             path,
             model_type,
             optimizer,
-            get(parsed, "plot-outputs", false),
-            get(parsed, "write-lp", false),
             get(parsed, "outputs", false),
         )
     end
