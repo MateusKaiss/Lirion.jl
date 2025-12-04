@@ -1,9 +1,10 @@
-# ================= SOCP Utils (revisado para espelhar DC/AC) =================
-
-# (requer JuMP e MOI já carregados no seu core)
-# using JuMP
-# import MathOptInterface as MOI
-# using Base.Threads: @threads
+# Versão para as partitions (DC / AC / SOCP), usando edge_to_local
+@inline function _zone_cut_edges(
+    sub::Union{PartitionDC, PartitionAC, PartitionSOCP},
+    cut_edges::Vector{Int},
+)
+    return [e for e in cut_edges if haskey(sub.edge_to_local, e)]
+end
 
 # ---- Helper: warm-start on/off (espelha AC/DC) ----
 # Se já existir no seu core (ex.: Core/args.jl), remova esta definição.
@@ -14,16 +15,16 @@ _warm_on(config) =
 is_gurobi(m::JuMP.Model)::Bool = occursin("Gurobi", MOI.get(m, MOI.SolverName()))
 
 "Ridge suave para estabilizar QCP no runner branch (P,Q)."
-function _soft_anchor_branch_expr!(sub::Dict{String, Any};
+function _soft_anchor_branch_expr!(sub::PartitionSOCP;
     κV2::Float64 = 1e-6, κPQ::Float64 = 1e-8,
     use_bus::Bool = true, use_pq::Bool = true,
 )
-    m = sub["model"]
+    m = sub.model::JuMP.Model
     q = zero(JuMP.QuadExpr)
 
     if use_bus && haskey(m, :v_magnitude_sq)
         V2 = m[:v_magnitude_sq]
-        sub["v2_var"] = V2
+        sub.v2_var = V2
         # ancora TODAS as barras da zona (não só compartilhadas)
         for I in keys(V2)
             x = V2[I]
@@ -33,142 +34,20 @@ function _soft_anchor_branch_expr!(sub::Dict{String, Any};
         end
     end
 
-    if use_pq && haskey(sub, "zone_edges")
-        for e in sub["zone_edges"]
-            l = get(sub["edge_to_local"], e, nothing)
+    if use_pq && !isempty(sub.zone_edges)
+        for e in sub.zone_edges
+            l = get(sub.edge_to_local, e, nothing)
             l === nothing && continue
             P, Q = _socp_flow_from_exprs_existing(m, l)   # deve ser AffExpr!
             q += 0.5 * κPQ * (P^2 + Q^2)
         end
     end
 
-    sub["soft_anchor_expr"] = q
+    sub.soft_anchor_expr = q
     return q
 end
 
-# ---- Otimizador: tenta Gurobi -> COSMO -> SCS (com override) ----
-# function resolve_socp_optimizer(config)
-#     # 1) prioridade absoluta: se vier um otimizador explícito no config
-#     if hasproperty(config, :optimizer) && getproperty(config, :optimizer) !== nothing
-#         return getproperty(config, :optimizer)
-#     end
-
-#     # 2) ordem preferida (opcional): :auto | :gurobi | :cosmo | :scs
-#     prefer =
-#         hasproperty(config, :prefer_socp_solver) ?
-#         getproperty(config, :prefer_socp_solver) : :auto
-
-#     # helper para montar a cadeia na ordem desejada
-#     function _chain(prefer_sym)
-#         if prefer_sym == :gurobi
-#             return (:gurobi, :cosmo, :scs)
-#         elseif prefer_sym == :cosmo
-#             return (:cosmo, :gurobi, :scs)
-#         elseif prefer_sym == :scs
-#             return (:scs, :gurobi, :cosmo)
-#         else
-#             return (:gurobi, :cosmo, :scs)  # :auto
-#         end
-#     end
-#     order = _chain(prefer)
-
-#     # 3) factory que instancia o primeiro solver que funcionar
-#     return () -> begin
-#         for s in order
-#             try
-#                 if s === :gurobi
-#                     return Gurobi.Optimizer()
-#                 elseif s === :cosmo
-#                     return COSMO.Optimizer()
-#                 else
-#                     return SCS.Optimizer()
-#                 end
-#             catch
-#                 # falhou criar esse solver? tenta o próximo da cadeia
-#             end
-#         end
-#         # fallback paranoico (improvável chegar aqui)
-#         return SCS.Optimizer()
-#     end
-# end
-
-# ---- Otimizador: tenta Gurobi -> COSMO -> SCS (com override) ----
 # ---- Otimizador: tenta Gurobi -> Clarabel -> SCS (com override) ----
-# function resolve_socp_optimizer(config)
-#     # 1) Prioridade absoluta: se vier explicitamente no config
-#     if Base.hasfield(typeof(config), :optimizer)
-#         opt = getfield(config, :optimizer)
-#         if opt !== nothing
-#             return opt   # pode ser Clarabel.Optimizer, Gurobi.Optimizer, etc.
-#         end
-#     end
-
-#     # 2) Ordem preferida opcional: :auto | :gurobi | :clarabel | :scs
-#     prefer = (
-#         Base.hasfield(typeof(config), :prefer_socp_solver) ?
-#         getfield(config, :prefer_socp_solver) : :auto
-#     )
-
-#     order =
-#         prefer === :gurobi ? (:gurobi, :clarabel, :scs) :
-#         prefer === :clarabel ? (:clarabel, :gurobi, :scs) :
-#         prefer === :scs ? (:scs, :gurobi, :clarabel) :
-#         (:gurobi, :clarabel, :scs)   # :auto
-
-#     # 3) Retorna o primeiro construtor disponível (factory)
-#     for s in order
-#         try
-#             if s === :gurobi
-#                 return Gurobi.Optimizer
-#             elseif s === :clarabel
-#                 # ====== CLARABEL ROBUST DEFAULTS ======
-#                 return optimizer_with_attributes(
-#                     Clarabel.Optimizer,
-#                     "tol_feas" => 1e-4,
-#                     "tol_gap_abs" => 1e-4,
-#                     "tol_gap_rel" => 1e-4,
-#                     "max_iter" => 1200,
-
-#                     "dynamic_regularization_enable" => true,
-#                     "dynamic_regularization_eps"   => 1e-10,
-#                     "dynamic_regularization_delta" => 1e-4,
-
-#                     "static_regularization_enable" => true,
-
-#                     "equilibrate_enable" => true,
-#                     "equilibrate_min_scaling" => 1e-4,
-#                     "equilibrate_max_scaling" => 1e4,
-
-#                     "direct_solve_method" => :qdldl,
-
-#                     "iterative_refinement_reltol" => 1e-9,
-#                     "iterative_refinement_abstol" => 1e-9,
-
-#                     "max_step_fraction" => 0.7,
-#                     "linesearch_backtrack_step" => 0.5,
-
-#                     "tol_ktratio" => 1e-5,
-#                     "min_terminate_step_length" => 1e-6,
-#                     "min_switch_step_length" => 5e-2,
-
-#                     "reduced_tol_gap_abs" => 5e-4,
-#                     "reduced_tol_gap_rel" => 5e-4,
-#                     "reduced_tol_feas"    => 5e-4,
-#                     "reduced_tol_infeas_abs" => 5e-11,
-#                     "reduced_tol_infeas_rel" => 5e-4,
-#                     "reduced_tol_ktratio"    => 1e-4
-#                 )
-#             else
-#                 return SCS.Optimizer
-#             end
-#         catch
-#             # pacote ausente? tenta o próximo
-#         end
-#     end
-#     return SCS.Optimizer
-# end
-
-# ---- Otimizador: tenta Gurobi -> COSMO -> SCS (com override) ----
 function resolve_socp_optimizer(config)
     # 1) Prioridade absoluta ao que veio no config (se existir e não-nothing)
     if Base.hasfield(typeof(config), :optimizer)
@@ -263,21 +142,21 @@ end
 end
 
 # ----------------- Hot-path / buffers (bus) -----------------
-function prepare_socp_hotpaths!(sub::Dict{String, Any}, shared_buses_sorted::Vector{Int})
+function prepare_socp_hotpaths!(sub::PartitionSOCP, shared_buses_sorted::Vector{Int})
     # mapas de índice local para acesso rápido
-    bus_ids = sub["bus"]["bus_i"]
+    bus_ids =  sub.bus.id
     bus_local_index = Dict{Int, Int}()
     @inbounds for (i, b) in enumerate(bus_ids)
         bus_local_index[b] = i
     end
-    sub["bus_local_index"] = bus_local_index
+    sub.bus_local_index = bus_local_index
 
     # filtra shared da zona
-    local_shared = get(sub, "shared_buses_local", Int[])
+    local_shared = sub.shared_buses_local
     if isempty(local_shared)
-        busset = _bus_set(sub)
-        sub["shared_buses_local"] = [b for b in shared_buses_sorted if b in busset]
-        local_shared = sub["shared_buses_local"]
+        busset = Set(bus_ids)
+        sub.shared_buses_local = [b for b in shared_buses_sorted if b in busset]
+        local_shared = sub.shared_buses_local
     end
 
     # posições locais das compartilhadas
@@ -285,115 +164,117 @@ function prepare_socp_hotpaths!(sub::Dict{String, Any}, shared_buses_sorted::Vec
     @inbounds for (k, b) in enumerate(local_shared)
         shared_pos_local[k] = bus_local_index[b]
     end
-    sub["shared_pos_local"] = shared_pos_local
+    sub.shared_pos_local = shared_pos_local
 
     # buffers
-    sub["v2_buf"] = zeros(Float64, length(bus_ids))
-    sub["v2_shared_buf"] = zeros(Float64, length(shared_pos_local))
+    sub.v2_buf = zeros(Float64, length(bus_ids))
+    sub.v2_shared_buf = zeros(Float64, length(shared_pos_local))
     return nothing
 end
 
-@inline function snapshot_v2!(sub::Dict{String, Any})
-    m = sub["model"]
+@inline function snapshot_v2!(sub::PartitionSOCP)
+    m = sub.model::JuMP.Model
     V2 = m[:v_magnitude_sq]
-    buf = sub["v2_buf"]
-    ids = sub["bus"]["bus_i"]
+    buf = sub.v2_buf
+    ids =  sub.bus.id
     @inbounds for i in eachindex(ids)
+        x = V2[ids[i], 1]
         buf[i] =
-            JuMP.has_values(m) ? value(V2[ids[i], 1]) :
+            JuMP.has_values(m) ? value(x) :
             (
-                JuMP.start_value(V2[ids[i], 1]) === nothing ? 1.0 :
-                JuMP.start_value(V2[ids[i], 1])
+                JuMP.start_value(x) === nothing ? 1.0 :
+                JuMP.start_value(x)
             )
     end
     return buf
 end
 
-@inline function snapshot_v2_shared!(sub::Dict{String, Any})
-    m = sub["model"]
+@inline function snapshot_v2_shared!(sub::PartitionSOCP)
+    m = sub.model::JuMP.Model
     V2 = m[:v_magnitude_sq]
-    buf = sub["v2_shared_buf"]
-    pos = sub["shared_pos_local"]
-    ids = sub["bus"]["bus_i"]
+    buf = sub.v2_shared_buf
+    pos = sub.shared_pos_local
+    ids =  sub.bus.id
     @inbounds for i in eachindex(pos)
         bidx = pos[i]
+        x = V2[ids[bidx], 1]
         buf[i] =
-            JuMP.has_values(m) ? value(V2[ids[bidx], 1]) :
+            JuMP.has_values(m) ? value(x) :
             (
-                JuMP.start_value(V2[ids[bidx], 1]) === nothing ? 1.0 :
-                JuMP.start_value(V2[ids[bidx], 1])
+                JuMP.start_value(x) === nothing ? 1.0 :
+                JuMP.start_value(x)
             )
     end
     return buf
 end
 
 # ----------------- Construção de termos (cache de quadrático) -----------------
-function _build_quad_bus_expr_socp!(sub::Dict{String, Any}, ρ::Float64)
-    m = sub["model"]
+function _build_quad_bus_expr_socp!(sub::PartitionSOCP, ρ::Float64)
+    m = sub.model::JuMP.Model
     V2 = m[:v_magnitude_sq]
     q = zero(JuMP.QuadExpr)
     # penaliza APENAS barras compartilhadas (padrão ADMM/DC/AC)
-    for b in sub["shared_buses_local"]
+    for b in sub.shared_buses_local
         q += 0.5 * ρ * V2[b, 1]^2
     end
-    sub["quad_bus_expr"] = q
-    sub["ρ_bus_cached"] = ρ
-    return sub["quad_bus_expr"]
+    sub.quad_bus_expr_socp = q
+    sub.rho_bus_v2_cached = ρ
+    return sub.quad_bus_expr_socp
 end
 
-function _build_quad_branch_rt_expr!(sub::Dict{String, Any}, ρR::Float64, ρT::Float64,
+function _build_quad_branch_rt_expr!(sub::PartitionSOCP, ρR::Float64, ρT::Float64,
     zone_edges::Vector{Int})
-    m = sub["model"]
+    m = sub.model::JuMP.Model
     q = zero(JuMP.QuadExpr)
     @inbounds for e in zone_edges
-        l_local = get(sub["edge_to_local"], e, nothing)
+        l_local = get(sub.edge_to_local, e, nothing)
         l_local === nothing && continue
         Rloc, Tloc = _rt_from_exprs_socp(m, l_local)
         q += 0.5 * ρR * Rloc^2 + 0.5 * ρT * Tloc^2
     end
-    sub["quad_rt_expr"] = q
-    sub["ρR_cached"] = ρR
-    sub["ρT_cached"] = ρT
+    sub.quad_rt_expr_socp = q
+    sub.rho_branch_r_cached = ρR
+    sub.rho_branch_t_cached = ρT
     return q
 end
 
-function _build_quad_branch_pq_expr!(sub::Dict{String, Any}, ρP::Float64, ρQ::Float64,
+function _build_quad_branch_pq_expr!(sub::PartitionSOCP, ρP::Float64, ρQ::Float64,
     zone_edges::Vector{Int})
-    m = sub["model"]
+    m = sub.model::JuMP.Model
     q = zero(JuMP.QuadExpr)
     @inbounds for e in zone_edges
-        l_local = get(sub["edge_to_local"], e, nothing)
+        l_local = get(sub.edge_to_local, e, nothing)
         l_local === nothing && continue
         P_loc, Q_loc = _socp_flow_from_exprs_existing(m, l_local)
         q += 0.5 * ρP * P_loc^2 + 0.5 * ρQ * Q_loc^2
     end
-    sub["quad_pq_expr"] = q
-    sub["ρP_cached"] = ρP
-    sub["ρQ_cached"] = ρQ
+    sub.quad_pq_expr_socp = q
+    sub.rho_branch_p_cached = ρP
+    sub.rho_branch_q_cached = ρQ
     return q
 end
 
 # ----- termos lineares (dependem de λ e consenso) -----
-function _build_linear_bus_expr_socp(sub::Dict{String, Any},
+function _build_linear_bus_expr_socp(sub::PartitionSOCP,
     shared_buses_sorted::Vector{Int}, b2pos::Dict{Int, Int},
     v2bar_vec::Vector{Float64}, λ_vec_zone::Vector{Float64}, ρV2::Float64)
-    m = sub["model"]
+    m = sub.model::JuMP.Model
     V2 = m[:v_magnitude_sq]
     lin = zero(JuMP.AffExpr)
-    for b in sub["shared_buses_local"]
+    for b in sub.shared_buses_local
         j = b2pos[b]
         lin += (λ_vec_zone[j] - ρV2 * v2bar_vec[j]) * V2[b, 1]
     end
     return lin
 end
 
-function _build_linear_branch_rt_expr(sub::Dict{String, Any},
+function _build_linear_branch_rt_expr(sub::PartitionSOCP,
     zone_edges::Vector{Int}, zR::Dict{Int, Float64}, zT::Dict{Int, Float64},
     λR_zone::Dict{Int, Float64}, λT_zone::Dict{Int, Float64}, ρR::Float64, ρT::Float64)
-    m = sub["model"]
+    m = sub.model::JuMP.Model
     lin = zero(JuMP.AffExpr)
     @inbounds for e in zone_edges
-        l_local = get(sub["edge_to_local"], e, nothing)
+        l_local = get(sub.edge_to_local, e, nothing)
         l_local === nothing && continue
         Rloc, Tloc = _rt_from_exprs_socp(m, l_local)
         lin += (get(λR_zone, e, 0.0) - ρR * get(zR, e, 0.0)) * Rloc
@@ -402,13 +283,13 @@ function _build_linear_branch_rt_expr(sub::Dict{String, Any},
     return lin
 end
 
-function _build_linear_branch_pq_expr(sub::Dict{String, Any},
+function _build_linear_branch_pq_expr(sub::PartitionSOCP,
     zone_edges::Vector{Int}, zP::Dict{Int, Float64}, zQ::Dict{Int, Float64},
     λP_zone::Dict{Int, Float64}, λQ_zone::Dict{Int, Float64}, ρP::Float64, ρQ::Float64)
-    m = sub["model"]
+    m = sub.model::JuMP.Model
     lin = zero(JuMP.AffExpr)
     @inbounds for e in zone_edges
-        l_local = get(sub["edge_to_local"], e, nothing)
+        l_local = get(sub.edge_to_local, e, nothing)
         l_local === nothing && continue
         P_loc, Q_loc = _socp_flow_from_exprs_existing(m, l_local)
         lin += (get(λP_zone, e, 0.0) - ρP * get(zP, e, 0.0)) * P_loc
@@ -425,13 +306,13 @@ function prepare_dense_maps_socp(shared_buses::Vector{Int})
 end
 
 function compute_v2_consensus_vec!(v2bar_vec::Vector{Float64},
-    partitions::Dict{Int, Dict{String, Any}},
+    partitions,
     shared_buses_sorted::Vector{Int}, b2pos::Dict{Int, Int})
     fill!(v2bar_vec, 0.0)
     counts = zeros(Int, length(shared_buses_sorted))
     for (_, sub) in partitions
         v2s = snapshot_v2_shared!(sub)
-        lbs = sub["shared_buses_local"]
+        lbs = sub.shared_buses_local
         @inbounds for i in eachindex(lbs)
             j = b2pos[lbs[i]]
             v2bar_vec[j] += v2s[i]
@@ -450,10 +331,11 @@ function compute_rt_consensus!(zR::Dict{Int, Float64}, zT::Dict{Int, Float64},
     sumsT = Dict{Int, Float64}()
     cnts = Dict{Int, Int}()
     for (_, sub) in partitions
+        m = sub.model::JuMP.Model
         @inbounds for e in cut_edges
-            l = get(sub["edge_to_local"], e, nothing)
+            l = get(sub.edge_to_local, e, nothing)
             l === nothing && continue
-            R, T = _rt_from_exprs_socp(sub["model"], l)
+            R, T = _rt_from_exprs_socp(m, l)
             sumsR[e] = get(sumsR, e, 0.0) + value(R)
             sumsT[e] = get(sumsT, e, 0.0) + value(T)
             cnts[e] = get(cnts, e, 0) + 1
@@ -471,10 +353,11 @@ function compute_pq_consensus!(zP::Dict{Int, Float64}, zQ::Dict{Int, Float64},
     sumsQ = Dict{Int, Float64}()
     cnts = Dict{Int, Int}()
     for (_, sub) in partitions
+        m = sub.model::JuMP.Model
         @inbounds for e in cut_edges
-            l = get(sub["edge_to_local"], e, nothing)
+            l = get(sub.edge_to_local, e, nothing)
             l === nothing && continue
-            P, Q = _socp_flow_from_exprs_existing(sub["model"], l)
+            P, Q = _socp_flow_from_exprs_existing(m, l)
             sumsP[e] = get(sumsP, e, 0.0) + value(P)
             sumsQ[e] = get(sumsQ, e, 0.0) + value(Q)
             cnts[e] = get(cnts, e, 0) + 1
@@ -488,12 +371,12 @@ end
 
 # ----------------- Duais (forma vetorial p/ BUS) -----------------
 @inline function update_duals_v2_vec!(dual_vec_zone::Vector{Float64},
-    sub::Dict{String, Any},
+    sub::PartitionSOCP,
     v2bar_vec::Vector{Float64}, v2bar_prev_vec::Vector{Float64},
     ρ::Float64, α::Union{Nothing, Float64},
     shared_buses_sorted::Vector{Int}, b2pos::Dict{Int, Int})
     v2s = snapshot_v2_shared!(sub)
-    lbs = sub["shared_buses_local"]
+    lbs = sub.shared_buses_local
     if isnothing(α)
         @inbounds for i in eachindex(lbs)
             j = b2pos[lbs[i]]
@@ -514,8 +397,8 @@ function primal_residual_bus_socp_vec(partitions, v2bar_vec, shared_buses_sorted
     acc = 0.0
     for (_, sub) in partitions
         v2buf = snapshot_v2!(sub)
-        pos = sub["bus_local_index"]
-        @inbounds for b in sub["shared_buses_local"]
+        pos = sub.bus_local_index
+        @inbounds for b in sub.shared_buses_local
             j = b2pos[b]
             acc += (v2buf[pos[b]] - v2bar_vec[j])^2
         end
@@ -538,8 +421,8 @@ function eps_primal_bus_socp_vec(
     norm_x_sq = 0.0
     for (_, sub) in partitions
         v2buf = snapshot_v2!(sub)
-        pos = sub["bus_local_index"]
-        @inbounds for b in sub["shared_buses_local"]
+        pos = sub.bus_local_index
+        @inbounds for b in sub.shared_buses_local
             norm_x_sq += (v2buf[pos[b]])^2
         end
     end
@@ -558,10 +441,11 @@ end
 function primal_residual_branch_rt_socp(partitions, zR, zT, cut_edges)
     acc = 0.0
     for (_, sub) in partitions
+        m = sub.model::JuMP.Model
         @inbounds for e in cut_edges
-            l = get(sub["edge_to_local"], e, nothing)
+            l = get(sub.edge_to_local, e, nothing)
             l === nothing && continue
-            R, T = _rt_from_exprs_socp(sub["model"], l)
+            R, T = _rt_from_exprs_socp(m, l)
             acc += (value(R) - zR[e])^2 + (value(T) - zT[e])^2
         end
     end
@@ -598,10 +482,11 @@ end
 function primal_residual_branch_pq_socp(partitions, zP, zQ, cut_edges)
     acc = 0.0
     for (_, sub) in partitions
+        m = sub.model::JuMP.Model
         @inbounds for e in cut_edges
-            l = get(sub["edge_to_local"], e, nothing)
+            l = get(sub.edge_to_local, e, nothing)
             l === nothing && continue
-            P, Q = _socp_flow_from_exprs_existing(sub["model"], l)
+            P, Q = _socp_flow_from_exprs_existing(m, l)
             acc += (value(P) - zP[e])^2 + (value(Q) - zQ[e])^2
         end
     end
@@ -750,14 +635,15 @@ end
 # ================== RUNNERS (espelhando DC/AC) ==================
 
 # ---- ADMM-SOCP: BUS (V²) + BRANCH (R,T) com estrutura DC-like ----
-function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
+function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
     @assert config.base_model == SOCP "ADMM-SOCP: base_model deve ser SOCP."
 
     t0_ns = time_ns()
     iter_done = 0
 
-    partitions, shared_buses = prepare_admm_partitions(data)
-    cut_edges = _find_cut_edges(data)
+    partitions = build_socp_partitions(sys)        # Dict{Int,PartitionSOCP}
+    shared_buses = sys.shared_buses
+    cut_edges    = sys.cut_edges
 
     # estados de ρ
     ρV2 = Ref(config.rho_v)
@@ -774,36 +660,40 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
     # mapeamento denso (BUS)
     shared_buses_sorted, b2pos = prepare_dense_maps_socp(shared_buses)
 
-    # build por zona
+    # build por zona (padrão DC/AC: usa SystemData da zona)
     for (z, sub) in partitions
-        m = build_model(sub, SOCP; optimizer = optimizer_factory, build_only = true)
-        sub["model"] = m
-        sub["obj_base"] = m[:generation_cost]
-        sub["v2_var"] = m[:v_magnitude_sq]
+        sys_zone = sys.parts[z]
+
+        m = build_model(sys_zone, SOCP; optimizer = optimizer_factory)
+
+        sub.model = m
+        sub.obj_base = m[:generation_cost]
+        sub.v2_var = m[:v_magnitude_sq]
+        sub.objective_params = sys_zone.objective
         _set_model_silent!(m)
 
         # filtra arestas da zona
-        sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
+        sub.zone_edges = _zone_cut_edges(sub, cut_edges)
 
         # shared locais + buffers
-        busset = _bus_set(sub)
-        sub["shared_buses_local"] = [b for b in shared_buses_sorted if b in busset]
         prepare_socp_hotpaths!(sub, shared_buses_sorted)
 
         # ---- warm-start de variáveis (apenas se warm==true) ----
         if warm
-            for I in keys(sub["v2_var"])
-                set_start_value(sub["v2_var"][I], 1.0)
+            @assert sub.v2_var !== nothing
+            for I in keys(sub.v2_var)
+                set_start_value(sub.v2_var[I], 1.0)
             end
         end
 
         # cache quadráticos
         _build_quad_bus_expr_socp!(sub, ρV2[])
-        _build_quad_branch_rt_expr!(sub, ρR[], ρT[], sub["zone_edges"])
+        _build_quad_branch_rt_expr!(sub, ρR[], ρT[], sub.zone_edges)
 
         # objetivo "estático" = base + quads (lin será somado por iteração)
-        sub["obj_static"] = sub["obj_base"] + sub["quad_bus_expr"] + sub["quad_rt_expr"]
-        @objective(m, Min, sub["obj_static"])
+        sub.obj_static =
+            (sub.obj_base) + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
+        @objective(m, Min, sub.obj_static)
         optimize!(m)
     end
 
@@ -853,7 +743,7 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
         v2bar_hat .= v2bar_vec
         for (z, sub) in partitions
             v2s = snapshot_v2_shared!(sub)
-            lbs = sub["shared_buses_local"]
+            lbs = sub.shared_buses_local
             @inbounds for i in eachindex(lbs)
                 j = b2pos[lbs[i]]
                 duals_v2_dense[z][j] = ρV2[] * (v2s[i] - v2bar_vec[j])
@@ -863,9 +753,9 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
         end
         compute_rt_consensus!(zR, zT, partitions, cut_edges)
         for (z, sub) in partitions
-            m = sub["model"]
+            m = sub.model::JuMP.Model
             for e in cut_edges
-                l = get(sub["edge_to_local"], e, nothing)
+                l = get(sub.edge_to_local, e, nothing)
                 if l !== nothing
                     R, T = _rt_from_exprs_socp(m, l)
                     dualsR[z][e] = ρR[] * (value(R) - zR[e])
@@ -877,8 +767,6 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
         # flat start seguro quando warm==false
         fill!(v2bar_vec, 1.0)
         v2bar_hat .= v2bar_vec
-        # duais já estão zero; zR/zT já zero
-        # λ_prev_real/λ_hat permanecem zero
     end
 
     zone_ids = collect(keys(partitions))
@@ -891,16 +779,16 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
         if ρV2[] != prev_ρV2
             for (_, sub) in partitions
                 _build_quad_bus_expr_socp!(sub, ρV2[])
-                sub["obj_static"] =
-                    sub["obj_base"] + sub["quad_bus_expr"] + sub["quad_rt_expr"]
+                sub.obj_static =
+                    (sub.obj_base) + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
             end
             prev_ρV2 = ρV2[]
         end
         if ρR[] != prev_ρR || ρT[] != prev_ρT
             for (_, sub) in partitions
-                _build_quad_branch_rt_expr!(sub, ρR[], ρT[], sub["zone_edges"])
-                sub["obj_static"] =
-                    sub["obj_base"] + sub["quad_bus_expr"] + sub["quad_rt_expr"]
+                _build_quad_branch_rt_expr!(sub, ρR[], ρT[], sub.zone_edges)
+                sub.obj_static =
+                    (sub.obj_base) + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
             end
             prev_ρR, prev_ρT = ρR[], ρT[]
         end
@@ -914,7 +802,7 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
         @threads for i in 1:nz
             z = zone_ids[i]
             sub = partitions[z]
-            m = sub["model"]
+            m = sub.model::JuMP.Model
 
             # λ para V²: extrapolado quando aceleração ON
             λz = accel ? (λ_zone_buf[z] .= λ_hat[z]) : (λ_zone_buf[z] .= duals_v2_dense[z])
@@ -929,7 +817,7 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
             )
             lin_rt = _build_linear_branch_rt_expr(
                 sub,
-                sub["zone_edges"],
+                sub.zone_edges,
                 zR,
                 zT,
                 dualsR[z],
@@ -937,19 +825,19 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
                 ρR[],
                 ρT[],
             )
-            @objective(m, Min, sub["obj_static"] + (lin_bus + lin_rt))
+            @objective(m, Min, sub.obj_static + (lin_bus + lin_rt))
             optimize!(m)
 
             gen_cost_expr = value(m[:generation_cost])
-            real_cost = compute_real_generation_cost(m, sub["objective_params"])
+            real_cost = compute_real_generation_cost(m, sub.objective_params)
             results[i] = (gen_cost_expr = gen_cost_expr, real_cost = real_cost)
         end
 
         for (i, z) in enumerate(zone_ids)
             sub = partitions[z]
             out = results[i]
-            sub["generation_cost_model_expr"] = out.gen_cost_expr
-            sub["real_generation_cost"] = out.real_cost
+            sub.generation_cost_model_expr = out.gen_cost_expr
+            sub.real_generation_cost = out.real_cost
         end
 
         # ===== consenso + duais (reais) =====
@@ -974,9 +862,9 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
                 ρV2[], α_used, shared_buses_sorted, b2pos)
         end
         for (z, sub) in partitions
-            m = sub["model"]
+            m = sub.model::JuMP.Model
             @inbounds for e in cut_edges
-                l = get(sub["edge_to_local"], e, nothing)
+                l = get(sub.edge_to_local, e, nothing)
                 l === nothing && continue
                 R, T = _rt_from_exprs_socp(m, l)
                 dualsR[z][e] = get(dualsR[z], e, 0.0) + ρR[] * (value(R) - zR[e])
@@ -1067,8 +955,8 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
     save_socp_v2rt_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
         rhoV2_hist, rhoR_hist, rhoT_hist; stem = "admm_socp_no_theta")
 
-    total_real_cost = sum(p["real_generation_cost"] for p in values(partitions))
-    total_expr_cost = sum(p["generation_cost_model_expr"] for p in values(partitions))
+    total_real_cost = sum(p.real_generation_cost for p in values(partitions))
+    total_expr_cost = sum(p.generation_cost_model_expr for p in values(partitions))
 
     println("\n[ADMM-SOCP (V²+R,T)] Resumo:")
     println("→ Total (value(:generation_cost))     = $total_expr_cost")
@@ -1082,14 +970,14 @@ function run_admm_socp(config::DistributedOPFModel, data::Dict{String, Any})
 end
 
 # ---- ADMM-SOCP-branch (P,Q) ----
-function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, Any})
+function run_admm_socp_branch(config::DistributedOPFModel, sys::ADMMSystem)
     @assert config.base_model == SOCP "ADMM-SOCP-branch: base_model deve ser SOCP."
 
     t0_ns = time_ns()
     iter_done = 0
 
-    partitions, _ = prepare_admm_partitions(data)
-    cut_edges = _find_cut_edges(data)
+    partitions = build_socp_partitions(sys)  # Dict{Int,PartitionSOCP}
+    cut_edges  = sys.cut_edges
 
     ρP = Ref(config.rho_flow_p)
     ρQ = Ref(config.rho_flow_q)
@@ -1099,13 +987,16 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, An
 
     optimizer_factory = resolve_socp_optimizer(config)
 
-    # build por zona
+    # build por zona (padrão DC/AC: usa SystemData da zona)
     for (z, sub) in partitions
-        m = build_model(sub, SOCP; optimizer = optimizer_factory, build_only = true)
-        sub["model"] = m
-        sub["obj_base"] = m[:generation_cost]
+        sys_zone = sys.parts[z]
+
+        m = build_model(sys_zone, SOCP; optimizer = optimizer_factory)
+        sub.model = m
+        sub.obj_base = m[:generation_cost]
+        sub.objective_params = sys_zone.objective
         _set_model_silent!(m)
-        sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
+        sub.zone_edges = _zone_cut_edges(sub, cut_edges)
 
         # 🔧 ridge (apenas se Gurobi) — antes de definir obj_static
         if is_gurobi(m)
@@ -1117,15 +1008,16 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, An
                 use_pq = true,
             )
         else
-            sub["soft_anchor_expr"] = zero(JuMP.QuadExpr)
+            sub.soft_anchor_expr = zero(JuMP.QuadExpr)
         end
 
         # quadrático do ADMM (P,Q)
-        _build_quad_branch_pq_expr!(sub, ρP[], ρQ[], sub["zone_edges"])
+        _build_quad_branch_pq_expr!(sub, ρP[], ρQ[], sub.zone_edges)
 
         # 🔧 obj_static inclui SEMPRE o ridge (mesmo se zero)
-        sub["obj_static"] = sub["obj_base"] + sub["quad_pq_expr"] + sub["soft_anchor_expr"]
-        @objective(m, Min, sub["obj_static"])
+        sub.obj_static =
+            (sub.obj_base) + sub.quad_pq_expr_socp + sub.soft_anchor_expr
+        @objective(m, Min, sub.obj_static)
         optimize!(m)
     end
 
@@ -1152,17 +1044,15 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, An
     if warm
         compute_pq_consensus!(zP, zQ, partitions, cut_edges)
         for (z, sub) in partitions
-            m = sub["model"]
+            m = sub.model::JuMP.Model
             @inbounds for e in cut_edges
-                l = get(sub["edge_to_local"], e, nothing)
+                l = get(sub.edge_to_local, e, nothing)
                 l === nothing && continue
                 P, Q = _socp_flow_from_exprs_existing(m, l)
                 dualsP[z][e] = ρP[] * (value(P) - zP[e])
                 dualsQ[z][e] = ρQ[] * (value(Q) - zQ[e])
             end
         end
-    else
-        # zP, zQ já estão zero; duais permanecem zero (flat)
     end
 
     for k in 1:config.max_iter
@@ -1170,24 +1060,24 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, An
 
         if ρP[] != prev_ρP || ρQ[] != prev_ρQ
             for (_, sub) in partitions
-                _build_quad_branch_pq_expr!(sub, ρP[], ρQ[], sub["zone_edges"])
-                sub["obj_static"] =
-                    sub["obj_base"] + sub["quad_pq_expr"] + sub["soft_anchor_expr"]
+                _build_quad_branch_pq_expr!(sub, ρP[], ρQ[], sub.zone_edges)
+                sub.obj_static =
+                    (sub.obj_base) + sub.quad_pq_expr_socp + sub.soft_anchor_expr
             end
             prev_ρP, prev_ρQ = ρP[], ρQ[]
         end
 
         # locais (correto por zona)
         for (z, sub) in partitions
-            m = sub["model"]
-            lin = _build_linear_branch_pq_expr(sub, sub["zone_edges"], zP, zQ,
+            m = sub.model::JuMP.Model
+            lin = _build_linear_branch_pq_expr(sub, sub.zone_edges, zP, zQ,
                 dualsP[z], dualsQ[z], ρP[], ρQ[])
-            @objective(m, Min, sub["obj_static"] + lin)
+            @objective(m, Min, sub.obj_static + lin)
             optimize!(m)
 
-            sub["generation_cost_model_expr"] = value(m[:generation_cost])
-            sub["real_generation_cost"] =
-                compute_real_generation_cost(m, sub["objective_params"])
+            sub.generation_cost_model_expr = value(m[:generation_cost])
+            sub.real_generation_cost =
+                compute_real_generation_cost(m, sub.objective_params)
         end
 
         zP_prev = copy(zP)
@@ -1195,9 +1085,9 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, An
         compute_pq_consensus!(zP, zQ, partitions, cut_edges)
 
         for (z, sub) in partitions
-            m = sub["model"]
+            m = sub.model::JuMP.Model
             @inbounds for e in cut_edges
-                l = get(sub["edge_to_local"], e, nothing)
+                l = get(sub.edge_to_local, e, nothing)
                 l === nothing && continue
                 P, Q = _socp_flow_from_exprs_existing(m, l)
                 dualsP[z][e] = get(dualsP[z], e, 0.0) + ρP[] * (value(P) - zP[e])
@@ -1241,8 +1131,8 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, An
     save_socp_branch_pq_plots(r_hist, s_hist, eps_r_hist, eps_s_hist, rhoP_hist, rhoQ_hist;
         stem = "admm_socp_branch")
 
-    total_real_cost = sum(p["real_generation_cost"] for p in values(partitions))
-    total_expr_cost = sum(p["generation_cost_model_expr"] for p in values(partitions))
+    total_real_cost = sum(p.real_generation_cost for p in values(partitions))
+    total_expr_cost = sum(p.generation_cost_model_expr for p in values(partitions))
     println("\n[ADMM-SOCP-branch (P,Q)] Resumo:")
     println("→ Total (value(:generation_cost))     = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
@@ -1255,14 +1145,15 @@ function run_admm_socp_branch(config::DistributedOPFModel, data::Dict{String, An
 end
 
 # ---- ADMM-SOCP-hybrid (V² + P/Q + R/T) ----
-function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, Any})
+function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     @assert config.base_model == SOCP "ADMM-SOCP-hybrid: base_model deve ser SOCP."
 
     t0_ns = time_ns()
     iter_done = 0
 
-    partitions, shared_buses = prepare_admm_partitions(data)
-    cut_edges = _find_cut_edges(data)
+    partitions = build_socp_partitions(sys)  # Dict{Int,PartitionSOCP}
+    shared_buses = sys.shared_buses
+    cut_edges = sys.cut_edges
 
     ρV2 = Ref(config.rho_v)
     ρP = Ref(config.rho_flow_p)
@@ -1279,31 +1170,33 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, An
     shared_buses_sorted, b2pos = prepare_dense_maps_socp(shared_buses)
 
     for (z, sub) in partitions
-        m = build_model(sub, SOCP; optimizer = optimizer_factory, build_only = true)
-        sub["model"] = m
-        sub["obj_base"] = m[:generation_cost]
-        sub["v2_var"] = m[:v_magnitude_sq]
+        sys_zone = sys.parts[z]
+
+        m = build_model(sys_zone, SOCP; optimizer = optimizer_factory)
+        sub.model = m
+        sub.obj_base = m[:generation_cost]
+        sub.v2_var = m[:v_magnitude_sq]
+        sub.objective_params = sys_zone.objective
         _set_model_silent!(m)
 
-        sub["zone_edges"] = _zone_cut_edges(sub, cut_edges)
-        busset = _bus_set(sub)
-        sub["shared_buses_local"] = [b for b in shared_buses_sorted if b in busset]
+        sub.zone_edges = _zone_cut_edges(sub, cut_edges)
         prepare_socp_hotpaths!(sub, shared_buses_sorted)
 
         # warm-start de variáveis apenas se warm==true
         if warm
-            for I in keys(sub["v2_var"])
-                set_start_value(sub["v2_var"][I], 1.0)
+            @assert sub.v2_var !== nothing
+            for I in keys(sub.v2_var)
+                set_start_value(sub.v2_var[I], 1.0)
             end
         end
 
         _build_quad_bus_expr_socp!(sub, ρV2[])
-        _build_quad_branch_pq_expr!(sub, ρP[], ρQ[], sub["zone_edges"])
-        _build_quad_branch_rt_expr!(sub, ρR[], ρT[], sub["zone_edges"])
-        sub["obj_static"] =
-            sub["obj_base"] + sub["quad_bus_expr"] + sub["quad_pq_expr"] +
-            sub["quad_rt_expr"]
-        @objective(m, Min, sub["obj_static"])
+        _build_quad_branch_pq_expr!(sub, ρP[], ρQ[], sub.zone_edges)
+        _build_quad_branch_rt_expr!(sub, ρR[], ρT[], sub.zone_edges)
+        sub.obj_static =
+            (sub.obj_base) + sub.quad_bus_expr_socp +
+            sub.quad_pq_expr_socp + sub.quad_rt_expr_socp
+        @objective(m, Min, sub.obj_static)
         optimize!(m)
     end
 
@@ -1360,7 +1253,7 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, An
         v2bar_hat .= v2bar_vec
         for (z, sub) in partitions
             v2s = snapshot_v2_shared!(sub)
-            lbs = sub["shared_buses_local"]
+            lbs = sub.shared_buses_local
             @inbounds for i in eachindex(lbs)
                 j = b2pos[lbs[i]]
                 duals_v2_dense[z][j] = ρV2[] * (v2s[i] - v2bar_vec[j])
@@ -1371,9 +1264,9 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, An
         compute_pq_consensus!(zP, zQ, partitions, cut_edges)
         compute_rt_consensus!(zR, zT, partitions, cut_edges)
         for (z, sub) in partitions
-            m = sub["model"]
+            m = sub.model::JuMP.Model
             for e in cut_edges
-                l = get(sub["edge_to_local"], e, nothing)
+                l = get(sub.edge_to_local, e, nothing)
                 if l !== nothing
                     P, Q = _socp_flow_from_exprs_existing(m, l)
                     R, T = _rt_from_exprs_socp(m, l)
@@ -1388,7 +1281,6 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, An
         # flat start seguro quando warm==false
         fill!(v2bar_vec, 1.0)
         v2bar_hat .= v2bar_vec
-        # zP/zQ/zR/zT e todos os duais ficam zerados
     end
 
     prev_ρV2, prev_ρP, prev_ρQ, prev_ρR, prev_ρT = ρV2[], ρP[], ρQ[], ρR[], ρT[]
@@ -1403,12 +1295,12 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, An
             for (_, sub) in partitions
                 (ρV2[] != prev_ρV2) && _build_quad_bus_expr_socp!(sub, ρV2[])
                 (ρP[] != prev_ρP || ρQ[] != prev_ρQ) &&
-                    _build_quad_branch_pq_expr!(sub, ρP[], ρQ[], sub["zone_edges"])
+                    _build_quad_branch_pq_expr!(sub, ρP[], ρQ[], sub.zone_edges)
                 (ρR[] != prev_ρR || ρT[] != prev_ρT) &&
-                    _build_quad_branch_rt_expr!(sub, ρR[], ρT[], sub["zone_edges"])
-                sub["obj_static"] =
-                    sub["obj_base"] + sub["quad_bus_expr"] + sub["quad_pq_expr"] +
-                    sub["quad_rt_expr"]
+                    _build_quad_branch_rt_expr!(sub, ρR[], ρT[], sub.zone_edges)
+                sub.obj_static =
+                    (sub.obj_base) + sub.quad_bus_expr_socp +
+                    sub.quad_pq_expr_socp + sub.quad_rt_expr_socp
             end
             prev_ρV2, prev_ρP, prev_ρQ, prev_ρR, prev_ρT = ρV2[], ρP[], ρQ[], ρR[], ρT[]
         end
@@ -1420,7 +1312,7 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, An
         @threads for i in 1:nz
             z = zone_ids[i]
             sub = partitions[z]
-            m = sub["model"]
+            m = sub.model::JuMP.Model
             λz = accel ? (λ_zone_buf[z] .= λ_hat[z]) : (λ_zone_buf[z] .= duals_v2_dense[z])
 
             lin_bus = _build_linear_bus_expr_socp(
@@ -1433,7 +1325,7 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, An
             )
             lin_pq = _build_linear_branch_pq_expr(
                 sub,
-                sub["zone_edges"],
+                sub.zone_edges,
                 zP,
                 zQ,
                 dualsP[z],
@@ -1443,7 +1335,7 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, An
             )
             lin_rt = _build_linear_branch_rt_expr(
                 sub,
-                sub["zone_edges"],
+                sub.zone_edges,
                 zR,
                 zT,
                 dualsR[z],
@@ -1451,12 +1343,12 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, An
                 ρR[],
                 ρT[],
             )
-            @objective(m, Min, sub["obj_static"] + (lin_bus + lin_pq + lin_rt))
+            @objective(m, Min, sub.obj_static + (lin_bus + lin_pq + lin_rt))
             optimize!(m)
 
-            sub["generation_cost_model_expr"] = value(m[:generation_cost])
-            sub["real_generation_cost"] =
-                compute_real_generation_cost(m, sub["objective_params"])
+            sub.generation_cost_model_expr = value(m[:generation_cost])
+            sub.real_generation_cost =
+                compute_real_generation_cost(m, sub.objective_params)
         end
 
         # consenso + duais reais
@@ -1481,9 +1373,9 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, An
                 ρV2[], α_used, shared_buses_sorted, b2pos)
         end
         for (z, sub) in partitions
-            m = sub["model"]
+            m = sub.model::JuMP.Model
             @inbounds for e in cut_edges
-                l = get(sub["edge_to_local"], e, nothing)
+                l = get(sub.edge_to_local, e, nothing)
                 l === nothing && continue
                 P, Q = _socp_flow_from_exprs_existing(m, l)
                 R, T = _rt_from_exprs_socp(m, l)
@@ -1590,8 +1482,8 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, data::Dict{String, An
     save_socp_hybrid_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
         rhoV2_hist, rhoP_hist, rhoQ_hist, rhoR_hist, rhoT_hist; stem = "admm_socp_hybrid")
 
-    total_real_cost = sum(p["real_generation_cost"] for p in values(partitions))
-    total_expr_cost = sum(p["generation_cost_model_expr"] for p in values(partitions))
+    total_real_cost = sum(p.real_generation_cost for p in values(partitions))
+    total_expr_cost = sum(p.generation_cost_model_expr for p in values(partitions))
     println("\n[ADMM-SOCP-hybrid] Resumo:")
     println("→ Total (value(:generation_cost))     = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
