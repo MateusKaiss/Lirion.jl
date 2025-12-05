@@ -1,33 +1,34 @@
-struct BusData
+struct BusData{T<:Real}
     n::Int
     id::Vector{Int}
     bus_type::Vector{Int}
-    pd::Vector{Float64}
-    qd::Vector{Float64}
-    gs::Vector{Float64}
-    bs::Vector{Float64}
+    pd::Vector{T}
+    qd::Vector{T}
+    gs::Vector{T}
+    bs::Vector{T}
     area::Vector{Int}
-    vm::Vector{Float64}
-    va::Vector{Float64}
-    base_kv::Vector{Float64}
+    vm::Vector{T}
+    va::Vector{T}
+    base_kv::Vector{T}
     zone::Vector{Int}
-    vmax::Vector{Float64}
-    vmin::Vector{Float64}
-    
+    vmax::Vector{T}
+    vmin::Vector{T}
+
     reference_bus::Union{Nothing,Int}
-    vmin_map::Dict{Int,Float64}
-    vmax_map::Dict{Int,Float64}
-    vstart_map::Dict{Int,Union{Nothing,Float64}}
-    vastart_map::Dict{Int,Union{Nothing,Float64}}
+    id_to_idx::Dict{Int,Int}
+    vstart::Vector{Union{Nothing,T}}
+    vastart::Vector{Union{Nothing,T}}
 end
 
-# ---------------------------------------------------------------------
-# Getting Bus Parameters
-# ---------------------------------------------------------------------
 function get_bus_parameters(bus_data)
-    bus_ids = bus_data["bus_i"]
+    bus_ids   = bus_data["bus_i"]
+    bus_type  = bus_data["bus_type"]
+    vm        = bus_data["vm"]
+    va        = bus_data["va"]
+    vmin      = bus_data["vmin"]
+    vmax      = bus_data["vmax"]
 
-    reference_bus_idx = findfirst(==(3), bus_data["bus_type"])
+    reference_bus_idx = findfirst(==(3), bus_type)
     reference_bus = nothing
     if reference_bus_idx !== nothing
         reference_bus = bus_ids[reference_bus_idx]
@@ -35,17 +36,15 @@ function get_bus_parameters(bus_data)
         @info "No reference bus (type 3) found in this zone. Skipping θ_ref constraint."
     end
 
-    vmin    = Dict{Int, Float64}()
-    vmax    = Dict{Int, Float64}()
-    vstart  = Dict{Int, Union{Nothing, Float64}}()
-    vastart = Dict{Int, Union{Nothing, Float64}}()
+    n = length(bus_ids)
+    vstart  = Vector{Union{Nothing,Float64}}(undef, n)
+    vastart = Vector{Union{Nothing,Float64}}(undef, n)
 
-    @inbounds for i in eachindex(bus_ids)
-        b = bus_ids[i]
-        vmin[b]    = bus_data["vmin"][i]
-        vmax[b]    = bus_data["vmax"][i]
-        vstart[b]  = isnan(bus_data["vm"][i]) ? nothing : bus_data["vm"][i]
-        vastart[b] = isnan(bus_data["va"][i]) ? nothing : bus_data["va"][i]
+    @inbounds for i in 1:n
+        v  = vm[i]
+        a  = va[i]
+        vstart[i]  = isnan(v) ? nothing : v
+        vastart[i] = isnan(a) ? nothing : a
     end
 
     return (
@@ -58,13 +57,19 @@ function get_bus_parameters(bus_data)
     )
 end
 
-function build_bus_data(data::Dict{String,Any})::BusData
-    bus = data["bus"]
-    n   = length(bus["bus_i"])
+function build_bus_data(data::Dict{String,Any})::BusData{Float64}
+    bus    = data["bus"]
     params = get_bus_parameters(bus)
-    return BusData(
+    bus_ids = params.bus_ids
+    n = length(bus_ids)
+    id_to_idx = Dict{Int,Int}()
+    @inbounds for (i, b) in pairs(bus_ids)
+        id_to_idx[b] = i
+    end
+
+    return BusData{Float64}(
         n,
-        bus["bus_i"],
+        bus_ids,
         bus["bus_type"],
         bus["pd"],
         bus["qd"],
@@ -79,8 +84,7 @@ function build_bus_data(data::Dict{String,Any})::BusData
         bus["vmin"],
 
         params.reference_bus,
-        params.vmin,
-        params.vmax,
+        id_to_idx,
         params.vstart,
         params.initial_voltage_angle,
     )

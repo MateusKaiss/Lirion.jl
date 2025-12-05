@@ -5,8 +5,9 @@ end
 @inline function initial_bus_angle(bus::BusData)::Float64
     ref = bus.reference_bus
     ref === nothing && return 0.0
+    idx = bus.id_to_idx[ref]
+    va0 = bus.vastart[idx]
 
-    va0 = bus.vastart_map[ref]
     return (va0 === nothing || isnan(va0)) ? 0.0 : va0
 end
 
@@ -21,7 +22,7 @@ end
 function create_voltage_angle_variables!(model::JuMP.Model, bus::BusData)
     T        = get(model.ext, :time_periods, 1)
     bus_ids  = bus.id
-    vastart  = bus.vastart_map
+    va_start = bus.vastart
 
     @variable(model, theta[b in bus_ids, t in 1:T])
 
@@ -33,7 +34,8 @@ function create_voltage_angle_variables!(model::JuMP.Model, bus::BusData)
     theta_start = initial_bus_angle(bus)
 
     @inbounds for b in bus_ids
-        val = normalize_initial_angle(vastart[b], theta_start)
+        idx = bus.id_to_idx[b]
+        val = normalize_initial_angle(va_start[idx], theta_start)
         for t in 1:T
             JuMP.set_start_value(theta[b, t], val)
         end
@@ -43,36 +45,30 @@ function create_voltage_angle_variables!(model::JuMP.Model, bus::BusData)
 end
 
 function create_voltage_magnitude_variables!(model::JuMP.Model, bus::BusData)
-    T        = get(model.ext, :time_periods, 1)
-    bus_ids  = bus.id
-    vmin_map = bus.vmin_map
-    vmax_map = bus.vmax_map
-    vstart   = bus.vstart_map
+    T       = get(model.ext, :time_periods, 1)
+    bus_ids = bus.id
 
     @variable(
         model,
         v_magnitude[b in bus_ids, t in 1:T],
-        lower_bound = vmin_map[b],
-        upper_bound = vmax_map[b],
-        start = something(vstart[b], 1.0),
+        lower_bound = bus.vmin[bus.id_to_idx[b]],
+        upper_bound = bus.vmax[bus.id_to_idx[b]],
+        start       = something(bus.vstart[bus.id_to_idx[b]], 1.0),
     )
 
     return nothing
 end
 
 function create_socp_bus_variables!(model::JuMP.Model, bus::BusData)
-    T        = get(model.ext, :time_periods, 1)
-    bus_ids  = bus.id
-    vmin_map = bus.vmin_map
-    vmax_map = bus.vmax_map
-    vstart   = bus.vstart_map
+    T       = get(model.ext, :time_periods, 1)
+    bus_ids = bus.id
 
     @variable(
         model,
         v_magnitude_sq[b in bus_ids, t in 1:T],
-        lower_bound = vmin_map[b]^2,
-        upper_bound = vmax_map[b]^2,
-        start       = (something(vstart[b], 1.0))^2,
+        lower_bound = bus.vmin[bus.id_to_idx[b]]^2,
+        upper_bound = bus.vmax[bus.id_to_idx[b]]^2,
+        start       = (something(bus.vstart[bus.id_to_idx[b]], 1.0))^2,
     )
 
     return nothing

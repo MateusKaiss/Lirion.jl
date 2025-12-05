@@ -151,15 +151,18 @@ end
     T_max = fill( Inf, L)
 
     @inbounds for l in 1:L
-        i = bf[l]
-        j = bt[l]
+        bus_i = bf[l]
+        bus_j = bt[l]
+        idx_i = bus.id_to_idx[bus_i]
+        idx_j = bus.id_to_idx[bus_j]
 
-        vm_fr_min = bus.vmin_map[i]
-        vm_fr_max = bus.vmax_map[i]
-        vm_to_min = bus.vmin_map[j]
-        vm_to_max = bus.vmax_map[j]
-        amin      = angmin[l]
-        amax      = angmax[l]
+        vm_fr_min = bus.vmin[idx_i]
+        vm_fr_max = bus.vmax[idx_i]
+        vm_to_min = bus.vmin[idx_j]
+        vm_to_max = bus.vmax[idx_j]
+
+        amin = angmin[l]
+        amax = angmax[l]
 
         if amin >= 0
             R_max[l] = min(R_max[l], vm_fr_max * vm_to_max * cos(amin))
@@ -170,7 +173,7 @@ end
         if amax <= 0
             R_max[l] = min(R_max[l], vm_fr_max * vm_to_max * cos(amax))
             R_min[l] = max(R_min[l], vm_fr_min * vm_to_min * cos(amin))
-            T_max[l] = min(T_max[l], vm_fr_min * vm_to_min * sin(amax))
+            T_max[l] = min(T_max[l], vm_fr_min * vm_to_max * sin(amax))
             T_min[l] = max(T_min[l], vm_fr_max * vm_to_max * sin(amin))
         end
         if amin < 0 && amax > 0
@@ -196,18 +199,21 @@ function create_rt_variables_with_bounds!(
     @variable(model, R[l in active, t in 1:T],     base_name = "R")
     @variable(model, T_var[l in active, t in 1:T], base_name = "T_var")
 
-    Vm_map = bus.vstart_map
-    Va_map = bus.vastart_map
-    shf    = br.tap_angle
+    vm_start = bus.vstart
+    va_start = bus.vastart
+    shf      = br.tap_angle
 
     @inbounds for l in active, t in 1:T
         bus_i = br.from[l]
         bus_j = br.to[l]
 
-        Vm_i = get(Vm_map, bus_i, nothing)
-        Vm_j = get(Vm_map, bus_j, nothing)
-        Va_i = get(Va_map, bus_i, nothing)
-        Va_j = get(Va_map, bus_j, nothing)
+        idx_i = bus.id_to_idx[bus_i]
+        idx_j = bus.id_to_idx[bus_j]
+
+        Vm_i = vm_start[idx_i]
+        Vm_j = vm_start[idx_j]
+        Va_i = va_start[idx_i]
+        Va_j = va_start[idx_j]
 
         if !(
             Vm_i === nothing || Vm_j === nothing ||
