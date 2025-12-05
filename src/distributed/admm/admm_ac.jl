@@ -1,4 +1,3 @@
-
 ###########################
 # HELPERS GENÉRICOS AC    #
 ###########################
@@ -67,10 +66,12 @@ function resolve_optimizer_ac(config)
             "neg_curv_test_tol" => 1e-12,
             "neg_curv_test_reg" => "yes",
             "max_hessian_perturbation" => 1e20,
-            "min_hessian_perturbation" => 1e-20, "mumps_mem_percent" => 500,
+            "min_hessian_perturbation" => 1e-20,
+            "mumps_mem_percent" => 500,
             "mumps_pivtol" => 1e-6,
             "mumps_pivtolmax" => 0.1,
-            "mumps_pivot_order" => 7, "hessian_approximation" => "exact",
+            "mumps_pivot_order" => 7,
+            "hessian_approximation" => "exact",
             "limited_memory_max_history" => 6,
         )
     end
@@ -106,95 +107,19 @@ end
     end
 end
 
-@inline _theta_val_ac(m::JuMP.Model,
+@inline _theta_val_ac(
+    m::JuMP.Model,
     θ::JuMP.Containers.DenseAxisArray,
     b::Int,
-    t::Int) = _val_or_start_ac(m, θ[b, t])
+    t::Int,
+) = _val_or_start_ac(m, θ[b, t])
 
-@inline _vmag_val(m::JuMP.Model,
+@inline _vmag_val(
+    m::JuMP.Model,
     V::JuMP.Containers.DenseAxisArray,
     b::Int,
-    t::Int) = _val_or_start_ac(m, V[b, t])
-
-@inline function _alpha_schedule_ac(k::Int, α_cfg::Union{Nothing, Float64}; k_on::Int = 10)
-    if α_cfg === nothing || !(1.0 < α_cfg < 2.0)
-        return nothing
-    end
-    return k >= k_on ? α_cfg : nothing
-end
-
-mutable struct FISTAStateAC
-    β::Float64
-    α::Float64
-    prev_metric::Float64
-end
-FISTAStateAC() = FISTAStateAC(1.0, 0.0, Inf)
-
-function fista_update!(st::FISTAStateAC; metric::Float64)
-    if metric <= st.prev_metric
-        βnext = (1.0 + sqrt(1.0 + 4.0 * st.β^2)) / 2.0
-        st.α = (st.β - 1.0) / βnext
-        st.β = βnext
-        st.prev_metric = metric
-        return false
-    else
-        st.β = 1.0
-        st.α = 0.0
-        st.prev_metric = metric
-        return true
-    end
-end
-
-@inline function _extrapolateac!(
-    y_hat::AbstractVector{T},
-    y::AbstractVector{T},
-    y_prev::AbstractVector{T},
-    γ::T,
-) where {T <: Real}
-    @inbounds @simd for i in eachindex(y)
-        y_hat[i] = y[i] + γ * (y[i] - y_prev[i])
-    end
-    return nothing
-end
-
-#############################
-# WARM START AC             #
-#############################
-
-function _warm_start_ac_base!(part::PartitionAC)
-    @assert part.model !== nothing
-    @assert part.theta_var !== nothing
-    @assert part.vmag_var !== nothing
-
-    m = part.model::JuMP.Model
-    θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
-    V = part.vmag_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
-
-    @objective(m, Min, part.obj_base)
-    optimize!(m)
-
-    if !JuMP.has_values(m)
-        @warn "Warm start (AC) ignorado: optimize! não retornou valores (status=$(JuMP.termination_status(m)))."
-        return
-    end
-
-    θ_vals = Dict{Any, Float64}()
-    for I in keys(θ)
-        θ_vals[I] = JuMP.value(θ[I])
-    end
-    V_vals = Dict{Any, Float64}()
-    for I in keys(V)
-        V_vals[I] = JuMP.value(V[I])
-    end
-
-    for (I, v) in θ_vals
-        set_start_value(θ[I], v)
-    end
-    for (I, v) in V_vals
-        set_start_value(V[I], v)
-    end
-    return nothing
-end
+    t::Int,
+) = _val_or_start_ac(m, V[b, t])
 
 #############################
 # HOTPATHS & SNAPSHOTS AC   #
@@ -358,6 +283,7 @@ function _build_linear_branch_expr_ac!(
     end
     return lin
 end
+
 function compute_ac_bus_consensus_vec!(
     θ̄_vec::Vector{Float64},
     V̄_vec::Vector{Float64},
@@ -777,8 +703,10 @@ function save_ac_bus_plots(
                 p.layout.yaxis.title = "ρθ";
                 p.layout.yaxis.type = "log";
                 p
-            ))(),
-        "plot_rho_theta_$(stem).html")
+            )
+        )(),
+        "plot_rho_theta_$(stem).html",
+    )
     PlotlyLight.save(
         (
             () -> (
@@ -795,13 +723,22 @@ function save_ac_bus_plots(
                 p.layout.yaxis.title = "ρV";
                 p.layout.yaxis.type = "log";
                 p
-            ))(),
-        "plot_rho_vmag_$(stem).html")
+            )
+        )(),
+        "plot_rho_vmag_$(stem).html",
+    )
     return plot_theta_avg_heatmap(θ_avg_hist, "plot_theta_avg_heatmap_$(stem).html")
 end
 
-function save_ac_branch_plots(res_pri, res_du, eps_pri, eps_du, rhoP_hist, rhoQ_hist;
-    stem::String = "admm_ac_branch")
+function save_ac_branch_plots(
+    res_pri,
+    res_du,
+    eps_pri,
+    eps_du,
+    rhoP_hist,
+    rhoQ_hist;
+    stem::String = "admm_ac_branch",
+)
     plot_admm_convergence(
         res_pri,
         res_du,
@@ -825,8 +762,10 @@ function save_ac_branch_plots(res_pri, res_du, eps_pri, eps_du, rhoP_hist, rhoQ_
                 p.layout.yaxis.title = "ρP";
                 p.layout.yaxis.type = "log";
                 p
-            ))(),
-        "plot_rhoP_$(stem).html")
+            )
+        )(),
+        "plot_rhoP_$(stem).html",
+    )
     return PlotlyLight.save(
         (
             () -> (
@@ -843,13 +782,16 @@ function save_ac_branch_plots(res_pri, res_du, eps_pri, eps_du, rhoP_hist, rhoQ_
                 p.layout.yaxis.title = "ρQ";
                 p.layout.yaxis.type = "log";
                 p
-            ))(),
-        "plot_rhoQ_$(stem).html")
+            )
+        )(),
+        "plot_rhoQ_$(stem).html",
+    )
 end
 
 #################################
 # ADMM: BUS (AC) – usando sys   #
 #################################
+
 function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
     t0 = time_ns()
     @assert config.base_model == AC "ADMM-AC: base_model deve ser AC."
@@ -861,11 +803,6 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
     ρV = Ref(config.rho_v)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
     adaptive = _adaptive_on(config)
-    accel = _accel_on(config)
-
-    if accel
-        adaptive = false
-    end
 
     for (_, part) in partitions
         prepare_hotpaths_ac!(part)
@@ -883,25 +820,6 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
     V̄_vec = ones(Float64, length(shared_buses_sorted))
     θ̄_prev = similar(θ̄_vec)
     V̄_prev = similar(V̄_vec)
-    θ̄_hat = similar(θ̄_vec)
-    fill!(θ̄_hat, 0.0)
-    V̄_hat = similar(V̄_vec)
-    fill!(V̄_hat, 1.0)
-
-    fista = FISTAStateAC()
-
-    λθ_prev_real = Dict{Int, Vector{Float64}}(
-        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
-    )
-    λV_prev_real = Dict{Int, Vector{Float64}}(
-        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
-    )
-    λθ_hat = Dict{Int, Vector{Float64}}(
-        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
-    )
-    λV_hat = Dict{Int, Vector{Float64}}(
-        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
-    )
 
     res_pri_hist = Float64[]
     res_du_hist = Float64[]
@@ -913,13 +831,7 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
 
     optimizer_factory = resolve_optimizer_ac(config)
 
-    warm = try
-        getfield(config, :warm_start)
-    catch
-        false
-    end
-
-    # build inicial + quad bus
+    # build inicial + termo quadrático em bus
     for (zone_id, part) in partitions
         sys_zone = sys.parts[zone_id]
 
@@ -927,7 +839,6 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
             sys_zone,
             AC;
             optimizer = optimizer_factory,
-            # build_only = true,
         )
 
         part.model = m
@@ -944,39 +855,8 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
             set_start_value(part.vmag_var[I], 1.0)
         end
 
-        if warm
-            _warm_start_ac_base!(part)
-        end
-
         _build_quad_bus_expr_ac!(part, ρθ[], ρV[])
         @objective(m, Min, part.obj_base + part.quad_bus_expr_ac)
-    end
-
-    if warm
-        compute_ac_bus_consensus_vec!(
-            θ̄_vec,
-            V̄_vec,
-            partitions,
-            shared_buses_sorted,
-            b2pos,
-        )
-        θ̄_hat .= θ̄_vec
-        V̄_hat .= V̄_vec
-
-        for (z, part) in partitions
-            θs = snapshot_theta_ac_shared!(part)
-            Vs = snapshot_vmag_shared!(part)
-            lbs = part.shared_buses_local
-            @inbounds for i in eachindex(lbs)
-                j = b2pos[lbs[i]]
-                dualsθ_dense[z][j] = ρθ[] * _wrap_angle_diff(θs[i] - θ̄_vec[j])
-                dualsV_dense[z][j] = ρV[] * (Vs[i] - V̄_vec[j])
-            end
-            λθ_prev_real[z] .= dualsθ_dense[z]
-            λθ_hat[z] .= dualsθ_dense[z]
-            λV_prev_real[z] .= dualsV_dense[z]
-            λV_hat[z] .= dualsV_dense[z]
-        end
     end
 
     prev_ρθ, prev_ρV = ρθ[], ρV[]
@@ -1001,9 +881,10 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
             prev_ρθ, prev_ρV = ρθ[], ρV[]
         end
 
-        α_used = accel ? nothing : _alpha_schedule_ac(k, config.alpha_overrelax; k_on = 10)
-        θ̄_target = accel ? θ̄_hat : θ̄_vec
-        V̄_target = accel ? V̄_hat : V̄_vec
+        # sem over-relaxation / FISTA
+        α_used = nothing
+        θ̄_target = θ̄_vec
+        V̄_target = V̄_vec
 
         nz = length(zone_ids)
         results = Vector{Any}(undef, nz)
@@ -1012,10 +893,8 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
             z = zone_ids[i]
             part = partitions[z]
 
-            λθ = accel ? (λθ_zone_buf[z] .= λθ_hat[z]) :
-                 (λθ_zone_buf[z] .= dualsθ_dense[z])
-            λV = accel ? (λV_zone_buf[z] .= λV_hat[z]) :
-                 (λV_zone_buf[z] .= dualsV_dense[z])
+            λθ = (λθ_zone_buf[z] .= dualsθ_dense[z])
+            λV = (λV_zone_buf[z] .= dualsV_dense[z])
 
             lin = _build_linear_bus_expr_ac!(
                 part,
@@ -1059,13 +938,6 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
         @inbounds for b in shared_buses_sorted
             j = b2pos[b]
             push!(get!(θ_avg_hist, b, Float64[]), θ̄_vec[j])
-        end
-
-        if accel
-            for z in zone_ids
-                λθ_prev_real[z] .= dualsθ_dense[z]
-                λV_prev_real[z] .= dualsV_dense[z]
-            end
         end
 
         for z in zone_ids
@@ -1141,26 +1013,6 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
             break
         end
 
-        if accel
-            metric = _accel_metric(r, s)
-            restarted = fista_update!(fista; metric = metric)
-            if restarted
-                θ̄_hat .= θ̄_vec
-                V̄_hat .= V̄_vec
-                for z in zone_ids
-                    λθ_hat[z] .= dualsθ_dense[z]
-                    λV_hat[z] .= dualsV_dense[z]
-                end
-            else
-                _extrapolateac!(θ̄_hat, θ̄_vec, θ̄_prev, fista.α)
-                _extrapolateac!(V̄_hat, V̄_vec, V̄_prev, fista.α)
-                for z in zone_ids
-                    _extrapolateac!(λθ_hat[z], dualsθ_dense[z], λθ_prev_real[z], fista.α)
-                    _extrapolateac!(λV_hat[z], dualsV_dense[z], λV_prev_real[z], fista.α)
-                end
-            end
-        end
-
         if adaptive
             adaptive_rho_ac!(
                 ρθ,
@@ -1232,13 +1084,6 @@ function run_admm_ac_branch(
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
     adaptive = _adaptive_on(config)
 
-    warm_cfg = try
-        getfield(config, :warm_start)
-    catch
-        false
-    end
-    warm = warm_start || warm_cfg
-
     dualsP =
         Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in keys(partitions))
     dualsQ =
@@ -1257,7 +1102,7 @@ function run_admm_ac_branch(
 
     optimizer_factory = resolve_optimizer_ac(config)
 
-    # build inicial + quad branch
+    # build inicial + termo quadrático em branch
     for (zone_id, part) in partitions
         sys_zone = sys.parts[zone_id]
 
@@ -1265,7 +1110,6 @@ function run_admm_ac_branch(
             sys_zone,
             AC;
             optimizer = optimizer_factory,
-            # build_only = true,
         )
         part.model = m
         part.obj_base = m[:generation_cost]
@@ -1281,32 +1125,8 @@ function run_admm_ac_branch(
             set_start_value(part.vmag_var[I], 1.0)
         end
 
-        if warm
-            _warm_start_ac_base!(part)
-        end
-
         _build_quad_branch_expr_ac!(part, ρP[], ρQ[], part.zone_edges)
         @objective(m, Min, part.obj_base + part.quad_branch_expr_ac)
-    end
-
-    if warm
-        compute_ac_branch_consensus!(zP, zQ, partitions, cut_edges)
-        for (z, part) in partitions
-            m = part.model::JuMP.Model
-            for e in cut_edges
-                l_local = get(part.edge_to_local, e, nothing)
-                l_local === nothing && continue
-                P_loc, Q_loc = _ac_flow_from_exprs_existing(part, l_local)
-                pval = JuMP.value(P_loc)
-                qval = JuMP.value(Q_loc)
-                if isfinite(pval)
-                    dualsP[z][e] = ρP[] * (pval - get(zP, e, 0.0))
-                end
-                if isfinite(qval)
-                    dualsQ[z][e] = ρQ[] * (qval - get(zQ, e, 0.0))
-                end
-            end
-        end
     end
 
     prev_ρP, prev_ρQ = ρP[], ρQ[]
@@ -1324,7 +1144,8 @@ function run_admm_ac_branch(
             prev_ρP, prev_ρQ = ρP[], ρQ[]
         end
 
-        α_used = _alpha_schedule_ac(k, config.alpha_overrelax; k_on = 10)
+        # sem over-relaxation
+        α_used = nothing
 
         nz = length(zone_ids)
         results = Vector{Any}(undef, nz)
@@ -1467,9 +1288,8 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     ρQ = Ref(config.rho_flow_q)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
     adaptive = _adaptive_on(config)
-    accel = _accel_on(config)
 
-    adaptive_bus = adaptive && !accel
+    adaptive_bus = adaptive
     adaptive_br = adaptive
 
     shared_buses_sorted, b2pos = prepare_dense_maps_ac(shared_buses)
@@ -1495,25 +1315,6 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     zP_prev = Dict{Int, Float64}()
     zQ_prev = Dict{Int, Float64}()
 
-    θ̄_hat = similar(θ̄_vec)
-    fill!(θ̄_hat, 0.0)
-    V̄_hat = similar(V̄_vec)
-    fill!(V̄_hat, 1.0)
-    fista = FISTAStateAC()
-
-    λθ_prev_real = Dict{Int, Vector{Float64}}(
-        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
-    )
-    λV_prev_real = Dict{Int, Vector{Float64}}(
-        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
-    )
-    λθ_hat = Dict{Int, Vector{Float64}}(
-        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
-    )
-    λV_hat = Dict{Int, Vector{Float64}}(
-        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
-    )
-
     res_pri_hist = Float64[]
     res_du_hist = Float64[]
     eps_pri_hist = Float64[]
@@ -1526,12 +1327,6 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
 
     optimizer_factory = resolve_optimizer_ac(config)
 
-    warm = try
-        getfield(config, :warm_start)
-    catch
-        false
-    end
-
     # build inicial + termos quadráticos
     for (zone_id, part) in partitions
         sys_zone = sys.parts[zone_id]
@@ -1539,7 +1334,6 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             sys_zone,
             AC;
             optimizer = optimizer_factory,
-            # build_only = true,
         )
         part.model = m
         part.obj_base = m[:generation_cost]
@@ -1555,10 +1349,6 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             set_start_value(part.vmag_var[I], 1.0)
         end
 
-        if warm
-            _warm_start_ac_base!(part)
-        end
-
         _build_quad_bus_expr_ac!(part, ρθ[], ρV[])
         _build_quad_branch_expr_ac!(part, ρP[], ρQ[], part.zone_edges)
         @objective(
@@ -1566,50 +1356,6 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             Min,
             part.obj_base + part.quad_bus_expr_ac + part.quad_branch_expr_ac,
         )
-    end
-
-    if warm
-        compute_ac_bus_consensus_vec!(
-            θ̄_vec,
-            V̄_vec,
-            partitions,
-            shared_buses_sorted,
-            b2pos,
-        )
-        θ̄_hat .= θ̄_vec
-        V̄_hat .= V̄_vec
-        for z in keys(partitions)
-            part = partitions[z]
-            θs = snapshot_theta_ac_shared!(part)
-            Vs = snapshot_vmag_shared!(part)
-            lbs = part.shared_buses_local
-            @inbounds for i in eachindex(lbs)
-                j = b2pos[lbs[i]]
-                dualsθ_dense[z][j] = ρθ[] * _wrap_angle_diff(θs[i] - θ̄_vec[j])
-                dualsV_dense[z][j] = ρV[] * (Vs[i] - V̄_vec[j])
-            end
-            λθ_prev_real[z] .= dualsθ_dense[z]
-            λθ_hat[z] .= dualsθ_dense[z]
-            λV_prev_real[z] .= dualsV_dense[z]
-            λV_hat[z] .= dualsV_dense[z]
-        end
-        compute_ac_branch_consensus!(zP, zQ, partitions, cut_edges)
-        for (z, part) in partitions
-            m = part.model::JuMP.Model
-            for e in cut_edges
-                l_local = get(part.edge_to_local, e, nothing)
-                l_local === nothing && continue
-                P_loc, Q_loc = _ac_flow_from_exprs_existing(part, l_local)
-                p = JuMP.value(P_loc)
-                q = JuMP.value(Q_loc)
-                if isfinite(p)
-                    dualsP[z][e] = ρP[] * (p - get(zP, e, 0.0))
-                end
-                if isfinite(q)
-                    dualsQ[z][e] = ρQ[] * (q - get(zQ, e, 0.0))
-                end
-            end
-        end
     end
 
     prev_ρθ, prev_ρV = ρθ[], ρV[]
@@ -1641,9 +1387,10 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             prev_ρP, prev_ρQ = ρP[], ρQ[]
         end
 
-        α_used = accel ? nothing : _alpha_schedule_ac(k, config.alpha_overrelax; k_on = 10)
-        θ̄_target = accel ? θ̄_hat : θ̄_vec
-        V̄_target = accel ? V̄_hat : V̄_vec
+        # sem over-relaxation / aceleração
+        α_used = nothing
+        θ̄_target = θ̄_vec
+        V̄_target = V̄_vec
 
         nz = length(zone_ids)
         results = Vector{Any}(undef, nz)
@@ -1651,10 +1398,8 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             z = zone_ids[i]
             part = partitions[z]
 
-            λθ = accel ? (λθ_zone_buf[z] .= λθ_hat[z]) :
-                 (λθ_zone_buf[z] .= dualsθ_dense[z])
-            λV = accel ? (λV_zone_buf[z] .= λV_hat[z]) :
-                 (λV_zone_buf[z] .= dualsV_dense[z])
+            λθ = (λθ_zone_buf[z] .= dualsθ_dense[z])
+            λV = (λV_zone_buf[z] .= dualsV_dense[z])
 
             lin_bus = _build_linear_bus_expr_ac!(
                 part,
@@ -1797,26 +1542,6 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             break
         end
 
-        if accel
-            metric_bus = _accel_metric(r_bus, s_bus)
-            restarted = fista_update!(fista; metric = metric_bus)
-            if restarted
-                θ̄_hat .= θ̄_vec
-                V̄_hat .= V̄_vec
-                for z in zone_ids
-                    λθ_hat[z] .= dualsθ_dense[z]
-                    λV_hat[z] .= dualsV_dense[z]
-                end
-            else
-                _extrapolateac!(θ̄_hat, θ̄_vec, θ̄_prev, fista.α)
-                _extrapolateac!(V̄_hat, V̄_vec, V̄_prev, fista.α)
-                for z in zone_ids
-                    _extrapolateac!(λθ_hat[z], dualsθ_dense[z], λθ_prev_real[z], fista.α)
-                    _extrapolateac!(λV_hat[z], dualsV_dense[z], λV_prev_real[z], fista.α)
-                end
-            end
-        end
-
         if adaptive_bus
             rθ, rV = primal_residual_bus_ac_components(
                 partitions,
@@ -1896,7 +1621,9 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
                 p.layout.yaxis.type = "log";
                 p
             )
-        )(), "plot_rho_theta_ac_hybrid.html")
+        )(),
+        "plot_rho_theta_ac_hybrid.html",
+    )
     PlotlyLight.save(
         (
             () -> (
@@ -1914,7 +1641,9 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
                 p.layout.yaxis.type = "log";
                 p
             )
-        )(), "plot_rho_v_ac_hybrid.html")
+        )(),
+        "plot_rho_v_ac_hybrid.html",
+    )
     PlotlyLight.save(
         (
             () -> (
@@ -1932,7 +1661,9 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
                 p.layout.yaxis.type = "log";
                 p
             )
-        )(), "plot_rho_p_ac_hybrid.html")
+        )(),
+        "plot_rho_p_ac_hybrid.html",
+    )
     PlotlyLight.save(
         (
             () -> (
@@ -1950,7 +1681,9 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
                 p.layout.yaxis.type = "log";
                 p
             )
-        )(), "plot_rho_q_ac_hybrid.html")
+        )(),
+        "plot_rho_q_ac_hybrid.html",
+    )
 
     plot_theta_avg_heatmap(θ_avg_hist, "plot_theta_avg_heatmap_ac_hybrid.html")
 

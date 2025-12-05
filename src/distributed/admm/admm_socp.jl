@@ -6,11 +6,6 @@
     return [e for e in cut_edges if haskey(sub.edge_to_local, e)]
 end
 
-# ---- Helper: warm-start on/off (espelha AC/DC) ----
-# Se já existir no seu core (ex.: Core/args.jl), remova esta definição.
-_warm_on(config) =
-    (hasproperty(config, :warm_start) && getproperty(config, :warm_start) == true)
-
 "Retorna true se o modelo `m` está usando Gurobi."
 is_gurobi(m::JuMP.Model)::Bool = occursin("Gurobi", MOI.get(m, MOI.SolverName()))
 
@@ -107,37 +102,6 @@ function set_socp_defaults!(m; eps_abs = 1e-6, eps_rel = 1e-6, max_iters = 200_0
     safe_set_optimizer_attr!(m, "alpha", alpha)
     safe_set_optimizer_attr!(m, "normalize", normalize)
     safe_set_optimizer_attr!(m, "scale", scale)
-    return nothing
-end
-
-# ----------------- Helpers (paridade com DC/AC) -----------------
-mutable struct FISTAStateSOCP
-    β::Float64
-    α::Float64
-    prev_metric::Float64
-end
-FISTAStateSOCP() = FISTAStateSOCP(1.0, 0.0, Inf)
-
-function fista_update_socp!(st::FISTAStateSOCP; metric::Float64)
-    if metric <= st.prev_metric
-        βnext = (1.0 + sqrt(1.0 + 4.0 * st.β^2)) / 2.0
-        st.α = (st.β - 1.0) / βnext
-        st.β = βnext
-        st.prev_metric = metric
-        return false
-    else
-        st.β = 1.0
-        st.α = 0.0
-        st.prev_metric = metric
-        return true
-    end
-end
-
-@inline function _extrapolate_socp!(y_hat::AbstractVector{T}, y::AbstractVector{T},
-    y_prev::AbstractVector{T}, γ::T) where {T <: Real}
-    @inbounds @simd for i in eachindex(y)
-        y_hat[i] = y[i] + γ * (y[i] - y_prev[i])
-    end
     return nothing
 end
 
@@ -651,8 +615,6 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
     ρT = Ref(config.rho_flow_q)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
     adaptive = _adaptive_on(config)
-    accel = _accel_on(config)   # aceleração estilo DC: só no bloco BUS
-    warm = _warm_on(config)
 
     # construtor de modelos
     optimizer_factory = resolve_socp_optimizer(config)
@@ -678,14 +640,6 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
         # shared locais + buffers
         prepare_socp_hotpaths!(sub, shared_buses_sorted)
 
-        # ---- warm-start de variáveis (apenas se warm==true) ----
-        if warm
-            @assert sub.v2_var !== nothing
-            for I in keys(sub.v2_var)
-                set_start_value(sub.v2_var[I], 1.0)
-            end
-        end
-
         # cache quadráticos
         _build_quad_bus_expr_socp!(sub, ρV2[])
         _build_quad_branch_rt_expr!(sub, ρR[], ρT[], sub.zone_edges)
@@ -698,20 +652,11 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
     end
 
     # vetores densos (BUS)
-    v2bar_vec = zeros(Float64, length(shared_buses_sorted))
+    v2bar_vec = ones(Float64, length(shared_buses_sorted))
     v2bar_prev_vec = similar(v2bar_vec)
-    v2bar_hat = similar(v2bar_vec)
-    fill!(v2bar_hat, 0.0)
-    fista = FISTAStateSOCP()
 
     # duais densos por zona (BUS)
     duals_v2_dense = Dict{Int, Vector{Float64}}(
-        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
-    )
-    λ_prev_real = Dict{Int, Vector{Float64}}(
-        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
-    )
-    λ_hat = Dict{Int, Vector{Float64}}(
         z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
     )
     λ_zone_buf = Dict{Int, Vector{Float64}}(
@@ -737,45 +682,13 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
     rhoR_hist = Float64[]
     rhoT_hist = Float64[]
 
-    # -------- warm-start ADMM (apenas se warm==true) --------
-    if warm
-        compute_v2_consensus_vec!(v2bar_vec, partitions, shared_buses_sorted, b2pos)
-        v2bar_hat .= v2bar_vec
-        for (z, sub) in partitions
-            v2s = snapshot_v2_shared!(sub)
-            lbs = sub.shared_buses_local
-            @inbounds for i in eachindex(lbs)
-                j = b2pos[lbs[i]]
-                duals_v2_dense[z][j] = ρV2[] * (v2s[i] - v2bar_vec[j])
-            end
-            λ_prev_real[z] .= duals_v2_dense[z]
-            λ_hat[z] .= duals_v2_dense[z]
-        end
-        compute_rt_consensus!(zR, zT, partitions, cut_edges)
-        for (z, sub) in partitions
-            m = sub.model::JuMP.Model
-            for e in cut_edges
-                l = get(sub.edge_to_local, e, nothing)
-                if l !== nothing
-                    R, T = _rt_from_exprs_socp(m, l)
-                    dualsR[z][e] = ρR[] * (value(R) - zR[e])
-                    dualsT[z][e] = ρT[] * (value(T) - zT[e])
-                end
-            end
-        end
-    else
-        # flat start seguro quando warm==false
-        fill!(v2bar_vec, 1.0)
-        v2bar_hat .= v2bar_vec
-    end
-
     zone_ids = collect(keys(partitions))
     prev_ρV2, prev_ρR, prev_ρT = ρV2[], ρR[], ρT[]
 
     for k in 1:config.max_iter
         _FAST_USE_LOGS && println("\n[ADMM-SOCP (V²+R,T)] Iteração $k")
 
-        # se ρ mudou, só reconstroi os quadráticos (como no DC)
+        # se ρ mudou, só reconstroi os quadráticos
         if ρV2[] != prev_ρV2
             for (_, sub) in partitions
                 _build_quad_bus_expr_socp!(sub, ρV2[])
@@ -793,8 +706,8 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
             prev_ρR, prev_ρT = ρR[], ρT[]
         end
 
-        α_used = accel ? nothing : _alpha_schedule(k, config.alpha_overrelax; k_on = 10)
-        v2_target = accel ? v2bar_hat : v2bar_vec
+        α_used = nothing
+        v2_target = v2bar_vec
 
         # resolve local (paralelizável)
         nz = length(zone_ids)
@@ -804,8 +717,7 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
             sub = partitions[z]
             m = sub.model::JuMP.Model
 
-            # λ para V²: extrapolado quando aceleração ON
-            λz = accel ? (λ_zone_buf[z] .= λ_hat[z]) : (λ_zone_buf[z] .= duals_v2_dense[z])
+            λz = (λ_zone_buf[z] .= duals_v2_dense[z])
 
             lin_bus = _build_linear_bus_expr_socp(
                 sub,
@@ -840,7 +752,7 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
             sub.real_generation_cost = out.real_cost
         end
 
-        # ===== consenso + duais (reais) =====
+        # ===== consenso + duais =====
         v2bar_prev_vec .= v2bar_vec
         zR_prev = copy(zR)
         zT_prev = copy(zT)
@@ -848,14 +760,6 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
         compute_v2_consensus_vec!(v2bar_vec, partitions, shared_buses_sorted, b2pos)
         compute_rt_consensus!(zR, zT, partitions, cut_edges)
 
-        # guardar λ reais antes do update (para FISTA)
-        if accel
-            for z in zone_ids
-                λ_prev_real[z] .= duals_v2_dense[z]
-            end
-        end
-
-        # duais reais
         for z in zone_ids
             update_duals_v2_vec!(duals_v2_dense[z], partitions[z], v2bar_vec,
                 v2bar_prev_vec,
@@ -918,24 +822,7 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
             break
         end
 
-        # aceleração FISTA (só BUS), usando estados reais
-        if accel
-            metric_bus = _accel_metric(r_bus, s_bus)
-            restarted = fista_update_socp!(fista; metric = metric_bus)
-            if restarted
-                v2bar_hat .= v2bar_vec
-                for z in zone_ids
-                    λ_hat[z] .= duals_v2_dense[z]
-                end
-            else
-                _extrapolate_socp!(v2bar_hat, v2bar_vec, v2bar_prev_vec, fista.α)
-                for z in zone_ids
-                    _extrapolate_socp!(λ_hat[z], duals_v2_dense[z], λ_prev_real[z], fista.α)
-                end
-            end
-        end
-
-        # === Atualização totalmente independente dos ρ (somente blocos presentes) ===
+        # atualização adaptativa de ρ
         if adaptive
             # --- BUS (V²) ---
             adaptive_rho!(ρV2, r_bus, s_bus;
@@ -983,7 +870,6 @@ function run_admm_socp_branch(config::DistributedOPFModel, sys::ADMMSystem)
     ρQ = Ref(config.rho_flow_q)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
     adaptive = _adaptive_on(config)
-    warm = _warm_on(config)
 
     optimizer_factory = resolve_socp_optimizer(config)
 
@@ -1039,21 +925,6 @@ function run_admm_socp_branch(config::DistributedOPFModel, sys::ADMMSystem)
     rhoQ_hist = Float64[]
 
     prev_ρP, prev_ρQ = ρP[], ρQ[]
-
-    # ---- warm-start ADMM (somente se warm==true) ----
-    if warm
-        compute_pq_consensus!(zP, zQ, partitions, cut_edges)
-        for (z, sub) in partitions
-            m = sub.model::JuMP.Model
-            @inbounds for e in cut_edges
-                l = get(sub.edge_to_local, e, nothing)
-                l === nothing && continue
-                P, Q = _socp_flow_from_exprs_existing(m, l)
-                dualsP[z][e] = ρP[] * (value(P) - zP[e])
-                dualsQ[z][e] = ρQ[] * (value(Q) - zQ[e])
-            end
-        end
-    end
 
     for k in 1:config.max_iter
         _FAST_USE_LOGS && println("\n[ADMM-SOCP-branch (P,Q)] Iteração $k")
@@ -1162,8 +1033,6 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     ρT = Ref(config.rho_flow_q)
     ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
     adaptive = _adaptive_on(config)
-    accel = _accel_on(config)    # aceleração só em BUS
-    warm = _warm_on(config)
 
     optimizer_factory = resolve_socp_optimizer(config)
 
@@ -1182,14 +1051,6 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         sub.zone_edges = _zone_cut_edges(sub, cut_edges)
         prepare_socp_hotpaths!(sub, shared_buses_sorted)
 
-        # warm-start de variáveis apenas se warm==true
-        if warm
-            @assert sub.v2_var !== nothing
-            for I in keys(sub.v2_var)
-                set_start_value(sub.v2_var[I], 1.0)
-            end
-        end
-
         _build_quad_bus_expr_socp!(sub, ρV2[])
         _build_quad_branch_pq_expr!(sub, ρP[], ρQ[], sub.zone_edges)
         _build_quad_branch_rt_expr!(sub, ρR[], ρT[], sub.zone_edges)
@@ -1201,18 +1062,9 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     end
 
     # BUS (denso) + EDGES (dict)
-    v2bar_vec = zeros(Float64, length(shared_buses_sorted))
+    v2bar_vec = ones(Float64, length(shared_buses_sorted))
     v2bar_prev_vec = similar(v2bar_vec)
-    v2bar_hat = similar(v2bar_vec)
-    fill!(v2bar_hat, 0.0)
-    fista = FISTAStateSOCP()
     duals_v2_dense = Dict{Int, Vector{Float64}}(
-        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
-    )
-    λ_prev_real = Dict{Int, Vector{Float64}}(
-        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
-    )
-    λ_hat = Dict{Int, Vector{Float64}}(
         z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
     )
     λ_zone_buf = Dict{Int, Vector{Float64}}(
@@ -1247,42 +1099,6 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     rhoR_hist = Float64[]
     rhoT_hist = Float64[]
 
-    # ---- warm-start ADMM (somente se warm==true) ----
-    if warm
-        compute_v2_consensus_vec!(v2bar_vec, partitions, shared_buses_sorted, b2pos)
-        v2bar_hat .= v2bar_vec
-        for (z, sub) in partitions
-            v2s = snapshot_v2_shared!(sub)
-            lbs = sub.shared_buses_local
-            @inbounds for i in eachindex(lbs)
-                j = b2pos[lbs[i]]
-                duals_v2_dense[z][j] = ρV2[] * (v2s[i] - v2bar_vec[j])
-            end
-            λ_prev_real[z] .= duals_v2_dense[z]
-            λ_hat[z] .= duals_v2_dense[z]
-        end
-        compute_pq_consensus!(zP, zQ, partitions, cut_edges)
-        compute_rt_consensus!(zR, zT, partitions, cut_edges)
-        for (z, sub) in partitions
-            m = sub.model::JuMP.Model
-            for e in cut_edges
-                l = get(sub.edge_to_local, e, nothing)
-                if l !== nothing
-                    P, Q = _socp_flow_from_exprs_existing(m, l)
-                    R, T = _rt_from_exprs_socp(m, l)
-                    dualsP[z][e] = ρP[] * (value(P) - zP[e])
-                    dualsQ[z][e] = ρQ[] * (value(Q) - zQ[e])
-                    dualsR[z][e] = ρR[] * (value(R) - zR[e])
-                    dualsT[z][e] = ρT[] * (value(T) - zT[e])
-                end
-            end
-        end
-    else
-        # flat start seguro quando warm==false
-        fill!(v2bar_vec, 1.0)
-        v2bar_hat .= v2bar_vec
-    end
-
     prev_ρV2, prev_ρP, prev_ρQ, prev_ρR, prev_ρT = ρV2[], ρP[], ρQ[], ρR[], ρT[]
     zone_ids = collect(keys(partitions))
 
@@ -1305,15 +1121,15 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             prev_ρV2, prev_ρP, prev_ρQ, prev_ρR, prev_ρT = ρV2[], ρP[], ρQ[], ρR[], ρT[]
         end
 
-        α_used = accel ? nothing : _alpha_schedule(k, config.alpha_overrelax; k_on = 10)
-        v2_target = accel ? v2bar_hat : v2bar_vec
+        α_used = nothing
+        v2_target = v2bar_vec
 
         nz = length(zone_ids)
         @threads for i in 1:nz
             z = zone_ids[i]
             sub = partitions[z]
             m = sub.model::JuMP.Model
-            λz = accel ? (λ_zone_buf[z] .= λ_hat[z]) : (λ_zone_buf[z] .= duals_v2_dense[z])
+            λz = (λ_zone_buf[z] .= duals_v2_dense[z])
 
             lin_bus = _build_linear_bus_expr_socp(
                 sub,
@@ -1362,11 +1178,6 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         compute_pq_consensus!(zP, zQ, partitions, cut_edges)
         compute_rt_consensus!(zR, zT, partitions, cut_edges)
 
-        if accel
-            for z in zone_ids
-                λ_prev_real[z] .= duals_v2_dense[z]
-            end
-        end
         for z in zone_ids
             update_duals_v2_vec!(duals_v2_dense[z], partitions[z], v2bar_vec,
                 v2bar_prev_vec,
@@ -1436,22 +1247,6 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         if r < ε_pri && s < ε_du
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
-        end
-
-        if accel
-            metric_bus = _accel_metric(r_bus, s_bus)
-            restarted = fista_update_socp!(fista; metric = metric_bus)
-            if restarted
-                v2bar_hat .= v2bar_vec
-                for z in zone_ids
-                    λ_hat[z] .= duals_v2_dense[z]
-                end
-            else
-                _extrapolate_socp!(v2bar_hat, v2bar_vec, v2bar_prev_vec, fista.α)
-                for z in zone_ids
-                    _extrapolate_socp!(λ_hat[z], duals_v2_dense[z], λ_prev_real[z], fista.α)
-                end
-            end
         end
 
         # === Atualização totalmente independente dos ρ (todos os blocos) ===
