@@ -8,7 +8,7 @@ function run_lirion(inputs::LirionInputs)
         return result
     else
         result_model = solve_model(inputs)
-        sys  = inputs.system
+        sys = inputs.system
         data = sys.raw
 
         result_dict = build_result_dict(result_model, data)
@@ -22,7 +22,7 @@ function run_lirion(inputs::LirionInputs)
 end
 
 function main(ARGS)
-    args   = Args(ARGS)
+    args = Args(ARGS)
     inputs = build_inputs(args)
     return run_lirion(inputs)
 end

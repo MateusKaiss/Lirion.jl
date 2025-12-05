@@ -7,10 +7,10 @@ function compute_reactive_power_balance(
     bus_id::Int,
     t::Int,
 )
-    pf          = sys.powerflow
-    gen         = sys.gen
-    bus         = sys.bus
-    bus_ts      = sys.bus_ts
+    pf = sys.powerflow
+    gen = sys.gen
+    bus = sys.bus
+    bus_ts = sys.bus_ts
     consumer_ts = sys.consumer_ts
     bus_idx = pf.bus_idx_map[bus_id]
 
@@ -127,7 +127,7 @@ function reactive_power_balance!(
     ::Type{SubproblemBuild},
 )
     pf = sys.powerflow
-    T  = get(model.ext, :time_periods, 1)
+    T = get(model.ext, :time_periods, 1)
 
     valid_bus_ids = [
         b for b in pf.bus_ids if !pf.is_virtual[pf.bus_idx_map[b]]
@@ -152,7 +152,7 @@ function reactive_power_balance!(
     ::Type{SubproblemBuild},
 )
     pf = sys.powerflow
-    T  = get(model.ext, :time_periods, 1)
+    T = get(model.ext, :time_periods, 1)
 
     valid_bus_ids = [
         b for b in pf.bus_ids if !pf.is_virtual[pf.bus_idx_map[b]]

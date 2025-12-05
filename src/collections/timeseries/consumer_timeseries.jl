@@ -6,11 +6,10 @@ struct ConsumerTimeseriesData
     q_demand::Vector{Float64}
 end
 
-function build_consumer_timeseries_data(data::Dict{String,Any})::ConsumerTimeseriesData
+function build_consumer_timeseries_data(data::Dict{String, Any})::ConsumerTimeseriesData
     if !haskey(data, "consumer_timeseries") ||
        !haskey(data["consumer_timeseries"], "time") ||
        isempty(data["consumer_timeseries"]["time"])
-
         return ConsumerTimeseriesData(
             false,
             Int[],
@@ -26,7 +25,7 @@ function build_consumer_timeseries_data(data::Dict{String,Any})::ConsumerTimeser
         true,
         ts["time"],
         ts["bus"],
-        get(ts, "demand",   zeros(Float64, length(ts["bus"]))),
+        get(ts, "demand", zeros(Float64, length(ts["bus"]))),
         get(ts, "q_demand", zeros(Float64, length(ts["bus"]))),
     )
 end

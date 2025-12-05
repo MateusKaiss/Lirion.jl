@@ -11,11 +11,10 @@ struct GencostTimeseriesData
     feed_in_tariff::Vector{Float64}
 end
 
-function build_gencost_timeseries_data(data::Dict{String,Any})::GencostTimeseriesData
+function build_gencost_timeseries_data(data::Dict{String, Any})::GencostTimeseriesData
     if !haskey(data, "gencost_timeseries") ||
        !haskey(data["gencost_timeseries"], "time") ||
        isempty(data["gencost_timeseries"]["time"])
-
         return GencostTimeseriesData(
             false,
             Int[],
@@ -41,7 +40,7 @@ function build_gencost_timeseries_data(data::Dict{String,Any})::GencostTimeserie
         ts["shutdown"],
         ts["ncost"],
         ts["cost_coefficients"],
-        get(ts, "tou",           ones(Float64, length(ts["time"]))),
+        get(ts, "tou", ones(Float64, length(ts["time"]))),
         get(ts, "feed_in_tariff", zeros(Float64, length(ts["time"]))),
     )
 end

@@ -10,7 +10,7 @@ function create_battery_variables!(model::JuMP.Model, bat::BatteryData)
         storage[b in 1:B, t in 1:T],
         lower_bound = 0.0,
         upper_bound = bat.max_storage[b],
-        start       = bat.initial_storage[b],
+        start = bat.initial_storage[b],
     )
 
     @variable(
@@ -18,7 +18,7 @@ function create_battery_variables!(model::JuMP.Model, bat::BatteryData)
         charge[b in 1:B, t in 1:T],
         lower_bound = 0.0,
         upper_bound = bat.charge_ramp[b],
-        start       = 0.0,
+        start = 0.0,
     )
 
     @variable(
@@ -26,15 +26,15 @@ function create_battery_variables!(model::JuMP.Model, bat::BatteryData)
         discharge[b in 1:B, t in 1:T],
         lower_bound = 0.0,
         upper_bound = bat.discharge_ramp[b],
-        start       = 0.0,
+        start = 0.0,
     )
 
     @variable(
         model,
         p_battery_injected[b in 1:B, t in 1:T],
         lower_bound = -bat.thermal_limit[b],
-        upper_bound =  bat.thermal_limit[b],
-        start       = 0.0,
+        upper_bound = bat.thermal_limit[b],
+        start = 0.0,
     )
 
     @variable(
@@ -42,7 +42,7 @@ function create_battery_variables!(model::JuMP.Model, bat::BatteryData)
         q_battery_injected[b in 1:B, t in 1:T],
         lower_bound = bat.qmin[b],
         upper_bound = bat.qmax[b],
-        start       = 0.0,
+        start = 0.0,
     )
 
     @variable(
@@ -50,7 +50,7 @@ function create_battery_variables!(model::JuMP.Model, bat::BatteryData)
         qsc[b in 1:B, t in 1:T],
         lower_bound = bat.qmin[b],
         upper_bound = bat.qmax[b],
-        start       = 0.0,
+        start = 0.0,
     )
 
     return nothing
@@ -65,7 +65,7 @@ function _battery_energy_balance!(model::JuMP.Model, bat::BatteryData)
     @constraint(model, [b in 1:B],
         model[:storage][b, 1] ==
         bat.initial_storage[b] +
-        model[:charge][b, 1]    * bat.charge_efficiency[b] -
+        model[:charge][b, 1] * bat.charge_efficiency[b] -
         model[:discharge][b, 1] / bat.discharge_efficiency[b]
     )
 
@@ -73,7 +73,7 @@ function _battery_energy_balance!(model::JuMP.Model, bat::BatteryData)
     @constraint(model, [b in 1:B, t in 2:T],
         model[:storage][b, t] ==
         model[:storage][b, t-1] +
-        model[:charge][b, t]    * bat.charge_efficiency[b] -
+        model[:charge][b, t] * bat.charge_efficiency[b] -
         model[:discharge][b, t] / bat.discharge_efficiency[b]
     )
 
@@ -103,7 +103,6 @@ function _battery_thermal_limit!(model::JuMP.Model, bat::BatteryData)
     return nothing
 end
 
-
 # =======================================================================
 # DC battery constraints
 # =======================================================================
@@ -123,7 +122,6 @@ function create_dc_battery_constraints!(model::JuMP.Model, bat::BatteryData)
 
     return nothing
 end
-
 
 # =======================================================================
 # AC battery constraints
@@ -158,7 +156,6 @@ function create_ac_battery_constraints!(model::JuMP.Model, bat::BatteryData)
     return nothing
 end
 
-
 # =======================================================================
 # SOCP battery constraints
 # =======================================================================
@@ -172,7 +169,7 @@ function create_socp_battery_constraints!(model::JuMP.Model, bat::BatteryData)
         model,
         ccms[b in 1:B, t in 1:T],
         lower_bound = 0.0,
-        start       = 0.0,
+        start = 0.0,
     )
 
     vmin_global = get(model.ext, :vmin, 0.9)

@@ -120,24 +120,28 @@ struct Args
 
         model_key = lowercase(strip(parsed["model"]))
         base_map = Dict(
-            "dc"   => DC,
-            "ac"   => AC,
+            "dc" => DC,
+            "ac" => AC,
             "socp" => SOCP,
         )
 
         # ===== rhos =====
-        rho_base    = parsed["admm-rho"]
-        rho_theta_  = get(parsed, "admm-rho-theta", nothing)
-        rho_v_      = get(parsed, "admm-rho-v", nothing)
-        rho_flow_   = get(parsed, "admm-rho-flow", nothing)
+        rho_base = parsed["admm-rho"]
+        rho_theta_ = get(parsed, "admm-rho-theta", nothing)
+        rho_v_ = get(parsed, "admm-rho-v", nothing)
+        rho_flow_ = get(parsed, "admm-rho-flow", nothing)
         rho_flow_p_ = get(parsed, "admm-rho-flow-p", nothing)
         rho_flow_q_ = get(parsed, "admm-rho-flow-q", nothing)
 
         # fallback: specific > generic flow > base
-        rho_theta_val  = isnothing(rho_theta_)  ? rho_base : rho_theta_
-        rho_v_val      = isnothing(rho_v_)      ? rho_base : rho_v_
-        rho_flow_p_val = isnothing(rho_flow_p_) ? (isnothing(rho_flow_) ? rho_base : rho_flow_) : rho_flow_p_
-        rho_flow_q_val = isnothing(rho_flow_q_) ? (isnothing(rho_flow_) ? rho_base : rho_flow_) : rho_flow_q_
+        rho_theta_val = isnothing(rho_theta_) ? rho_base : rho_theta_
+        rho_v_val = isnothing(rho_v_) ? rho_base : rho_v_
+        rho_flow_p_val =
+            isnothing(rho_flow_p_) ? (isnothing(rho_flow_) ? rho_base : rho_flow_) :
+            rho_flow_p_
+        rho_flow_q_val =
+            isnothing(rho_flow_q_) ? (isnothing(rho_flow_) ? rho_base : rho_flow_) :
+            rho_flow_q_
 
         # ===== alpha (over-relaxation) =====
         alpha_ = get(parsed, "admm-alpha", nothing)
@@ -148,7 +152,12 @@ struct Args
 
         # ===== adaptive rho (on/off) =====
         adaptive_flag_str = lowercase(strip(parsed["admm-adaptive"]))
-        adaptive_flag = adaptive_flag_str == "on"  ? true  : adaptive_flag_str == "off" ? false : ( @warn "Valor inválido para --admm-adaptive=$(parsed["admm-adaptive"]). Usando 'on'."; true )
+        adaptive_flag =
+            adaptive_flag_str == "on" ? true :
+            adaptive_flag_str == "off" ? false :
+            (
+                @warn "Valor inválido para --admm-adaptive=$(parsed["admm-adaptive"]). Usando 'on'."; true
+            )
         mu_incr_val = parsed["admm-mu-incr"]
         mu_decr_val = parsed["admm-mu-decr"]
         tau_incr_val = parsed["admm-tau-incr"]
@@ -224,8 +233,8 @@ struct Args
                     error("Invalid distributed model key: $(parsed["model"])")
                 end
 
-                method_str  = String(method_str)
-                base_str    = String(base_str)
+                method_str = String(method_str)
+                base_str = String(base_str)
                 variant_str = String(variant_str)
 
                 method_str == "admm" ||
@@ -234,7 +243,7 @@ struct Args
                     error("Invalid base model in distributed-* key: $base_str")
 
                 method_sym =
-                    variant_str == ""       ? :admm :
+                    variant_str == "" ? :admm :
                     variant_str == "branch" ? :admm_branch :
                     variant_str == "hybrid" ? :admm_hybrid :
                     error("Unsupported distributed method variant: $variant_str")
@@ -258,9 +267,9 @@ struct Args
                         rho_flow_p = rho_flow_p_val,
                         rho_flow_q = rho_flow_q_val,
                         ε_primal = parsed["admm-eps-primal"],
-                        ε_dual   = parsed["admm-eps-dual"],
+                        ε_dual = parsed["admm-eps-dual"],
                         alpha_overrelax = alpha_,
-                        warm_start  = warm_start_flag,
+                        warm_start = warm_start_flag,
                         adaptive_rho = adaptive_flag,
                         mu_incr = mu_incr_val,
                         mu_decr = mu_decr_val,
@@ -282,7 +291,7 @@ struct Args
                         rho_flow_p = rho_flow_p_val,
                         rho_flow_q = rho_flow_q_val,
                         ε_primal = parsed["admm-eps-primal"],
-                        ε_dual   = parsed["admm-eps-dual"],
+                        ε_dual = parsed["admm-eps-dual"],
                         alpha_overrelax = alpha_,
                         optimizer = optimizer,
                         prefer_socp_solver = :auto,

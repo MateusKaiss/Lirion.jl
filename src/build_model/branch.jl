@@ -1,11 +1,11 @@
 function create_dc_branch_expressions!(model::JuMP.Model, br::BranchData)
-    T      = get(model.ext, :time_periods, 1)
+    T = get(model.ext, :time_periods, 1)
     active = br.active
 
     @expression(model, p_flow_branches[i in active, t in 1:T],
         br.b[i] * (
             model[:theta][br.from[i], t] -
-            model[:theta][br.to[i],   t]
+            model[:theta][br.to[i], t]
         )
     )
 
@@ -20,7 +20,7 @@ function create_dc_branch_expressions!(model::JuMP.Model, br::BranchData)
 end
 
 function create_dc_branch_constraints!(model::JuMP.Model, br::BranchData)
-    T      = get(model.ext, :time_periods, 1)
+    T = get(model.ext, :time_periods, 1)
     active = br.active
 
     @constraint(model, capacity[i in active, t in 1:T],
@@ -43,20 +43,21 @@ function create_dc_branch_constraints!(model::JuMP.Model, br::BranchData)
 end
 
 function create_ac_branch_expressions!(model::JuMP.Model, br::BranchData)
-    T      = get(model.ext, :time_periods, 1)
+    T = get(model.ext, :time_periods, 1)
     active = br.active
 
     @expression(model, p_flow_branches[l in active, t in 1:T],
         br.g[l] * (br.inv_tap[l] * model[:v_magnitude][br.from[l], t])^2 -
         br.inv_tap[l] * model[:v_magnitude][br.from[l], t] *
-        model[:v_magnitude][br.to[l], t] * (
+        model[:v_magnitude][br.to[l], t] *
+        (
             br.g[l] * cos(
                 model[:theta][br.from[l], t] -
-                model[:theta][br.to[l],   t] - br.tap_angle[l],
+                model[:theta][br.to[l], t] - br.tap_angle[l],
             ) +
             br.b[l] * sin(
                 model[:theta][br.from[l], t] -
-                model[:theta][br.to[l],   t] - br.tap_angle[l],
+                model[:theta][br.to[l], t] - br.tap_angle[l],
             )
         )
     )
@@ -64,14 +65,15 @@ function create_ac_branch_expressions!(model::JuMP.Model, br::BranchData)
     @expression(model, p_reverse_flow_branches[l in active, t in 1:T],
         br.g[l] * model[:v_magnitude][br.to[l], t]^2 -
         br.inv_tap[l] * model[:v_magnitude][br.to[l], t] *
-        model[:v_magnitude][br.from[l], t] * (
+        model[:v_magnitude][br.from[l], t] *
+        (
             br.g[l] * cos(
                 model[:theta][br.from[l], t] -
-                model[:theta][br.to[l],   t] - br.tap_angle[l],
+                model[:theta][br.to[l], t] - br.tap_angle[l],
             ) -
             br.b[l] * sin(
                 model[:theta][br.from[l], t] -
-                model[:theta][br.to[l],   t] - br.tap_angle[l],
+                model[:theta][br.to[l], t] - br.tap_angle[l],
             )
         )
     )
@@ -80,14 +82,15 @@ function create_ac_branch_expressions!(model::JuMP.Model, br::BranchData)
         -(br.b[l] + br.b_sh[l] / 2) *
         (br.inv_tap[l] * model[:v_magnitude][br.from[l], t])^2 -
         br.inv_tap[l] * model[:v_magnitude][br.from[l], t] *
-        model[:v_magnitude][br.to[l], t] * (
+        model[:v_magnitude][br.to[l], t] *
+        (
             -br.b[l] * cos(
                 model[:theta][br.from[l], t] -
-                model[:theta][br.to[l],   t] - br.tap_angle[l],
+                model[:theta][br.to[l], t] - br.tap_angle[l],
             ) +
             br.g[l] * sin(
                 model[:theta][br.from[l], t] -
-                model[:theta][br.to[l],   t] - br.tap_angle[l],
+                model[:theta][br.to[l], t] - br.tap_angle[l],
             )
         )
     )
@@ -96,14 +99,15 @@ function create_ac_branch_expressions!(model::JuMP.Model, br::BranchData)
         -(br.b[l] + br.b_sh[l] / 2) *
         model[:v_magnitude][br.to[l], t]^2 -
         br.inv_tap[l] * model[:v_magnitude][br.to[l], t] *
-        model[:v_magnitude][br.from[l], t] * (
+        model[:v_magnitude][br.from[l], t] *
+        (
             -br.b[l] * cos(
                 model[:theta][br.from[l], t] -
-                model[:theta][br.to[l],   t] - br.tap_angle[l],
+                model[:theta][br.to[l], t] - br.tap_angle[l],
             ) -
             br.g[l] * sin(
                 model[:theta][br.from[l], t] -
-                model[:theta][br.to[l],   t] - br.tap_angle[l],
+                model[:theta][br.to[l], t] - br.tap_angle[l],
             )
         )
     )
@@ -111,7 +115,7 @@ function create_ac_branch_expressions!(model::JuMP.Model, br::BranchData)
 end
 
 function create_ac_branch_constraints!(model::JuMP.Model, br::BranchData)
-    T      = get(model.ext, :time_periods, 1)
+    T = get(model.ext, :time_periods, 1)
     active = br.active
 
     @constraint(model, [l in active, t in 1:T],
@@ -141,14 +145,14 @@ end
 @inline function _rt_product_bounds(bus::BusData, br::BranchData)
     angmin = br.angmin
     angmax = br.angmax
-    bf     = br.from
-    bt     = br.to
-    L      = br.n
+    bf = br.from
+    bt = br.to
+    L = br.n
 
     R_min = fill(-Inf, L)
-    R_max = fill( Inf, L)
+    R_max = fill(Inf, L)
     T_min = fill(-Inf, L)
-    T_max = fill( Inf, L)
+    T_max = fill(Inf, L)
 
     @inbounds for l in 1:L
         bus_i = bf[l]
@@ -193,15 +197,15 @@ function create_rt_variables_with_bounds!(
     br::BranchData;
     bounded::Bool = true,
 )
-    T      = get(model.ext, :time_periods, 1)
+    T = get(model.ext, :time_periods, 1)
     active = br.active
 
-    @variable(model, R[l in active, t in 1:T],     base_name = "R")
+    @variable(model, R[l in active, t in 1:T], base_name = "R")
     @variable(model, T_var[l in active, t in 1:T], base_name = "T_var")
 
     vm_start = bus.vstart
     va_start = bus.vastart
-    shf      = br.tap_angle
+    shf = br.tap_angle
 
     @inbounds for l in active, t in 1:T
         bus_i = br.from[l]
@@ -219,7 +223,7 @@ function create_rt_variables_with_bounds!(
             Vm_i === nothing || Vm_j === nothing ||
             Va_i === nothing || Va_j === nothing
         ) && !any(isnan.((Vm_i, Vm_j, Va_i, Va_j, shf[l])))
-            set_start_value(R[l, t],     Vm_i * Vm_j * cos(Va_i - Va_j - shf[l]))
+            set_start_value(R[l, t], Vm_i * Vm_j * cos(Va_i - Va_j - shf[l]))
             set_start_value(T_var[l, t], Vm_i * Vm_j * sin(Va_i - Va_j - shf[l]))
         end
     end
@@ -227,8 +231,8 @@ function create_rt_variables_with_bounds!(
     if bounded
         R_min, R_max, T_min, T_max = _rt_product_bounds(bus, br)
         @inbounds for l in active, t in 1:T
-            isfinite(R_min[l]) && set_lower_bound(R[l, t],     R_min[l])
-            isfinite(R_max[l]) && set_upper_bound(R[l, t],     R_max[l])
+            isfinite(R_min[l]) && set_lower_bound(R[l, t], R_min[l])
+            isfinite(R_max[l]) && set_upper_bound(R[l, t], R_max[l])
             isfinite(T_min[l]) && set_lower_bound(T_var[l, t], T_min[l])
             isfinite(T_max[l]) && set_upper_bound(T_var[l, t], T_max[l])
         end
@@ -243,10 +247,10 @@ end
 end
 
 function add_rt_tangent_angle_cuts!(model::JuMP.Model, br::BranchData)
-    T      = get(model.ext, :time_periods, 1)
+    T = get(model.ext, :time_periods, 1)
     active = br.active
 
-    R     = model[:R]
+    R = model[:R]
     T_var = model[:T_var]
 
     @constraint(model, [l in active, t in 1:T; !isnan(br.angmax[l])],
@@ -259,15 +263,15 @@ function add_rt_tangent_angle_cuts!(model::JuMP.Model, br::BranchData)
 end
 
 function create_socp_branch_expressions!(model::JuMP.Model, br::BranchData)
-    T      = get(model.ext, :time_periods, 1)
+    T = get(model.ext, :time_periods, 1)
     active = br.active
 
     inv_tap = br.inv_tap
-    R       = model[:R]
-    Tv      = model[:T_var]
+    R = model[:R]
+    Tv = model[:T_var]
 
     tr = br.tr
-    ti = br.ti 
+    ti = br.ti
 
     @expression(model, p_flow_branches[l in active, t in 1:T],
         br.g[l] * inv_tap[l]^2 * model[:v_magnitude_sq][br.from[l], t] +
@@ -297,7 +301,7 @@ function create_socp_branch_expressions!(model::JuMP.Model, br::BranchData)
 end
 
 function create_socp_branch_constraints!(model::JuMP.Model, br::BranchData)
-    T      = get(model.ext, :time_periods, 1)
+    T = get(model.ext, :time_periods, 1)
     active = br.active
 
     @constraint(model, branch_angle_lb[i in active, t in 1:T; !isnan(br.angmin[i])],
@@ -312,7 +316,7 @@ function create_socp_branch_constraints!(model::JuMP.Model, br::BranchData)
     @constraint(model, [l in active, t in 1:T],
         [
             model[:v_magnitude_sq][br.from[l], t] / sqrt(2),
-            model[:v_magnitude_sq][br.to[l],   t] / sqrt(2),
+            model[:v_magnitude_sq][br.to[l], t] / sqrt(2),
             model[:R][l, t],
             model[:T_var][l, t],
         ] in JuMP.RotatedSecondOrderCone()
@@ -372,7 +376,7 @@ function branches!(
     ::Type{SubproblemBuild},
 )
     bus = sys.bus
-    br  = sys.branch
+    br = sys.branch
 
     create_rt_variables_with_bounds!(model, bus, br)
     create_socp_branch_expressions!(model, br)

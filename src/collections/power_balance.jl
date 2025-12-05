@@ -1,6 +1,6 @@
 struct PowerFlowData
     bus_ids::Vector{Int}
-    bus_idx_map::Dict{Int,Int}
+    bus_idx_map::Dict{Int, Int}
 
     generator_bus_index::Vector{Int}
     battery_bus_index::Vector{Int}
@@ -30,8 +30,8 @@ end
 
 function dict_to_busvec(
     bus_ids::AbstractVector{Int},
-    bus_idx_map::Dict{Int,Int},
-    mapping::Dict{Int,<:AbstractVector{Int}},
+    bus_idx_map::Dict{Int, Int},
+    mapping::Dict{Int, <:AbstractVector{Int}},
 )
     nbus = length(bus_ids)
     result = [Int[] for _ in 1:nbus]
@@ -44,33 +44,33 @@ function dict_to_busvec(
     return result
 end
 
-function get_power_flow_parameters(matpower_data::Dict{String,Any})
+function get_power_flow_parameters(matpower_data::Dict{String, Any})
     bus_data = matpower_data["bus"]
-    branch   = matpower_data["branch"]
-    gen      = matpower_data["gen"]
+    branch = matpower_data["branch"]
+    gen = matpower_data["gen"]
 
     # Garante que seja Vector{Int}
-    bus_ids    = Int.(bus_data["bus_i"])
+    bus_ids = Int.(bus_data["bus_i"])
     bus_idx_map = get_bus_index_map(bus_ids)
-    nbus        = length(bus_ids)
+    nbus = length(bus_ids)
 
     # Índices de barramento por tipo de elemento
     generator_bus_index = Int.(gen["gen_bus"])
-    battery_bus_index   = getfieldsafe(
+    battery_bus_index = getfieldsafe(
         getfieldsafe(matpower_data, "storage", Dict()),
         "storage_bus",
         Int[],
     )
-    prosumer_bus_index  = getfieldsafe(
+    prosumer_bus_index = getfieldsafe(
         getfieldsafe(matpower_data, "prosumer", Dict()),
         "bus",
         Int[],
     )
-    demand_bus_index    = bus_ids
+    demand_bus_index = bus_ids
 
     branch_bus_from = Int.(branch["f_bus"])
-    branch_bus_to   = Int.(branch["t_bus"])
-    branch_status   = Int.(branch["br_status"])
+    branch_bus_to = Int.(branch["t_bus"])
+    branch_status = Int.(branch["br_status"])
 
     shunt_conductance = Float64.(bus_data["gs"])
     shunt_susceptance = Float64.(bus_data["bs"])
@@ -91,7 +91,7 @@ function get_power_flow_parameters(matpower_data::Dict{String,Any})
     raw_bus_to_gens = getfieldsafe(
         matpower_data,
         "bus_to_gens",
-        Dict{Int,Vector{Int}}(),
+        Dict{Int, Vector{Int}}(),
     )
 
     bus_to_generators =
@@ -111,7 +111,7 @@ function get_power_flow_parameters(matpower_data::Dict{String,Any})
     raw_bus_to_bat = getfieldsafe(
         matpower_data,
         "bus_to_batteries",
-        Dict{Int,Vector{Int}}(),
+        Dict{Int, Vector{Int}}(),
     )
     bus_to_batteries =
         if !isempty(raw_bus_to_bat)
@@ -129,7 +129,7 @@ function get_power_flow_parameters(matpower_data::Dict{String,Any})
     raw_bus_to_pros = getfieldsafe(
         matpower_data,
         "bus_to_prosumers",
-        Dict{Int,Vector{Int}}(),
+        Dict{Int, Vector{Int}}(),
     )
     bus_to_prosumers =
         if !isempty(raw_bus_to_pros)
@@ -147,7 +147,7 @@ function get_power_flow_parameters(matpower_data::Dict{String,Any})
     raw_bus_to_br_from = getfieldsafe(
         matpower_data,
         "bus_to_branches_from",
-        Dict{Int,Vector{Int}}(),
+        Dict{Int, Vector{Int}}(),
     )
     bus_to_branches_from =
         if !isempty(raw_bus_to_br_from)
@@ -165,7 +165,7 @@ function get_power_flow_parameters(matpower_data::Dict{String,Any})
     raw_bus_to_br_to = getfieldsafe(
         matpower_data,
         "bus_to_branches_to",
-        Dict{Int,Vector{Int}}(),
+        Dict{Int, Vector{Int}}(),
     )
     bus_to_branches_to =
         if !isempty(raw_bus_to_br_to)
@@ -181,7 +181,7 @@ function get_power_flow_parameters(matpower_data::Dict{String,Any})
     raw_inter_in = getfieldsafe(
         matpower_data,
         "bus_to_inter_in_branches",
-        Dict{Int,Vector{Int}}(),
+        Dict{Int, Vector{Int}}(),
     )
     bus_to_inter_in_branches =
         isempty(raw_inter_in) ? [Int[] for _ in 1:nbus] :
@@ -190,38 +190,38 @@ function get_power_flow_parameters(matpower_data::Dict{String,Any})
     raw_inter_out = getfieldsafe(
         matpower_data,
         "bus_to_inter_out_branches",
-        Dict{Int,Vector{Int}}(),
+        Dict{Int, Vector{Int}}(),
     )
     bus_to_inter_out_branches =
         isempty(raw_inter_out) ? [Int[] for _ in 1:nbus] :
         dict_to_busvec(bus_ids, bus_idx_map, raw_inter_out)
 
     return (
-        bus_ids                = bus_ids,
-        bus_idx_map            = bus_idx_map,
-        generator_bus_index    = generator_bus_index,
-        battery_bus_index      = battery_bus_index,
-        prosumer_bus_index     = prosumer_bus_index,
-        demand_bus_index       = demand_bus_index,
-        branch_bus_from        = branch_bus_from,
-        branch_bus_to          = branch_bus_to,
-        branch_status          = branch_status,
-        shunt_conductance      = shunt_conductance,
-        shunt_susceptance      = shunt_susceptance,
-        generator_status       = generator_status,
-        is_virtual             = is_virtual,
-        has_timeseries         = has_timeseries,
-        bus_to_generators      = bus_to_generators,
-        bus_to_batteries       = bus_to_batteries,
-        bus_to_prosumers       = bus_to_prosumers,
-        bus_to_branches_from   = bus_to_branches_from,
-        bus_to_branches_to     = bus_to_branches_to,
-        bus_to_inter_in_branches  = bus_to_inter_in_branches,
+        bus_ids = bus_ids,
+        bus_idx_map = bus_idx_map,
+        generator_bus_index = generator_bus_index,
+        battery_bus_index = battery_bus_index,
+        prosumer_bus_index = prosumer_bus_index,
+        demand_bus_index = demand_bus_index,
+        branch_bus_from = branch_bus_from,
+        branch_bus_to = branch_bus_to,
+        branch_status = branch_status,
+        shunt_conductance = shunt_conductance,
+        shunt_susceptance = shunt_susceptance,
+        generator_status = generator_status,
+        is_virtual = is_virtual,
+        has_timeseries = has_timeseries,
+        bus_to_generators = bus_to_generators,
+        bus_to_batteries = bus_to_batteries,
+        bus_to_prosumers = bus_to_prosumers,
+        bus_to_branches_from = bus_to_branches_from,
+        bus_to_branches_to = bus_to_branches_to,
+        bus_to_inter_in_branches = bus_to_inter_in_branches,
         bus_to_inter_out_branches = bus_to_inter_out_branches,
     )
 end
 
-function build_power_flow_data(data::Dict{String,Any})::PowerFlowData
+function build_power_flow_data(data::Dict{String, Any})::PowerFlowData
     p = get_power_flow_parameters(data)
 
     return PowerFlowData(

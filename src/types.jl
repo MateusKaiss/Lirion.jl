@@ -1,6 +1,6 @@
 abstract type OPFModel end
-struct DC   <: OPFModel end
-struct AC   <: OPFModel end
+struct DC <: OPFModel end
+struct AC <: OPFModel end
 struct SOCP <: OPFModel end
 
 mutable struct DistributedOPFModel
@@ -95,14 +95,14 @@ DistributedOPFModel(
 ) = DistributedOPFModel(
     base_model, method, max_iter, rho, rho, rho, rho, ε_primal, ε_dual;
     alpha_overrelax = alpha_overrelax,
-    warm_start      = warm_start,
-    adaptive_rho    = adaptive_rho,
-    mu_incr         = mu_incr,
-    mu_decr         = mu_decr,
-    tau_incr        = tau_incr,
-    tau_decr        = tau_decr,
-    accel_nesterov  = accel_nesterov,
-    optimizer       = optimizer,
+    warm_start = warm_start,
+    adaptive_rho = adaptive_rho,
+    mu_incr = mu_incr,
+    mu_decr = mu_decr,
+    tau_incr = tau_incr,
+    tau_decr = tau_decr,
+    accel_nesterov = accel_nesterov,
+    optimizer = optimizer,
     prefer_socp_solver = prefer_socp_solver,
 )
 
@@ -118,7 +118,7 @@ DistributedOPFModel(
     rho_flow_p::Union{Nothing, Float64} = nothing,
     rho_flow_q::Union{Nothing, Float64} = nothing,
     ε_primal::Float64 = 1e-7,
-    ε_dual::Float64   = 1e-7,
+    ε_dual::Float64 = 1e-7,
     alpha_overrelax::Union{Nothing, Float64} = nothing,
     warm_start::Bool = false,
     adaptive_rho::Bool = true,
@@ -132,22 +132,21 @@ DistributedOPFModel(
 ) = DistributedOPFModel(
     base_model, method, max_iter,
     coalesce(rho_theta, rho),
-    coalesce(rho_v,     rho),
+    coalesce(rho_v, rho),
     coalesce(rho_flow_p, rho_flow, rho),
     coalesce(rho_flow_q, rho_flow, rho),
     ε_primal, ε_dual;
     alpha_overrelax = alpha_overrelax,
-    warm_start      = warm_start,
-    adaptive_rho    = adaptive_rho,
-    mu_incr         = mu_incr,
-    mu_decr         = mu_decr,
-    tau_incr        = tau_incr,
-    tau_decr        = tau_decr,
-    accel_nesterov  = accel_nesterov,
-    optimizer       = optimizer,
+    warm_start = warm_start,
+    adaptive_rho = adaptive_rho,
+    mu_incr = mu_incr,
+    mu_decr = mu_decr,
+    tau_incr = tau_incr,
+    tau_decr = tau_decr,
+    accel_nesterov = accel_nesterov,
+    optimizer = optimizer,
     prefer_socp_solver = prefer_socp_solver,
 )
-
 
 @inline is_distributed_model(::Type{<:OPFModel}) = false
 @inline is_distributed_model(::DistributedOPFModel) = true
@@ -158,25 +157,25 @@ rho(c::DistributedOPFModel) = c.rho_theta
 const ρ = rho
 
 Base.getproperty(c::DistributedOPFModel, s::Symbol) =
-    s === :rho      ? c.rho_theta  :
+    s === :rho ? c.rho_theta :
     s === :rho_flow ? c.rho_flow_p :
     getfield(c, s)
 
 Base.setproperty!(c::DistributedOPFModel, s::Symbol, v) =
     s === :rho ? (c.rho_theta = v;
-                  c.rho_v     = v;
-                  c.rho_flow_p = v;
-                  c.rho_flow_q = v) :
+    c.rho_v = v;
+    c.rho_flow_p = v;
+    c.rho_flow_q = v) :
     s === :rho_flow ? (c.rho_flow_p = v;
-                       c.rho_flow_q = v) :
+    c.rho_flow_q = v) :
     Base.setfield!(c, s, v)
 
 Base.propertynames(c::DistributedOPFModel, private::Bool = false) =
     (propertynames(typeof(c), private)..., :rho, :rho_flow)
 
 abstract type SubproblemAction end
-struct SubproblemBuild                  <: SubproblemAction end
-struct SubproblemUpdate                 <: SubproblemAction end
-struct SubproblemGetResult              <: SubproblemAction end
+struct SubproblemBuild <: SubproblemAction end
+struct SubproblemUpdate <: SubproblemAction end
+struct SubproblemGetResult <: SubproblemAction end
 struct SubproblemNameElementsDimensions <: SubproblemAction end
-struct SubproblemWriteResult            <: SubproblemAction end
+struct SubproblemWriteResult <: SubproblemAction end

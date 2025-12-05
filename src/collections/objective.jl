@@ -1,7 +1,7 @@
 struct ObjectiveData
     number_of_generators::Int
     number_of_batteries::Int
-    generator_costs::Dict{Int,Dict{Int,Vector{Float64}}}
+    generator_costs::Dict{Int, Dict{Int, Vector{Float64}}}
     num_polynomial_coefs::Vector
     curtailment_cost::Vector
     plant_type::Vector
@@ -26,8 +26,8 @@ function get_objective_parameters(
     generator_costs = Dict{Int, Dict{Int, Vector{Float64}}}()
 
     if has_timeseries && gencost_timeseries !== nothing
-        gen_ids     = gencost_timeseries["gen_id"]
-        times       = gencost_timeseries["time"]
+        gen_ids = gencost_timeseries["gen_id"]
+        times = gencost_timeseries["time"]
         cost_coeffs = gencost_timeseries["cost_coefficients"]
 
         for i in eachindex(gen_ids)
@@ -49,19 +49,19 @@ function get_objective_parameters(
 
     return (
         number_of_generators = getfieldsafe(gen_data, "gen_bus", []) |> length,
-        number_of_batteries  = getfieldsafe(battery_data, "storage_bus", []) |> length,
-        generator_costs      = generator_costs,
+        number_of_batteries = getfieldsafe(battery_data, "storage_bus", []) |> length,
+        generator_costs = generator_costs,
         num_polynomial_coefs = getfieldsafe(gencost_data, "ncost", []),
-        curtailment_cost     = getfieldsafe(gen_data, "curtailment_cost", []),
-        plant_type           = getfieldsafe(gen_data, "plant_type", []),
-        generator_status     = getfieldsafe(gen_data, "gen_status", []),
-        number_of_prosumers  = getfieldsafe(prosumer_data, "bus", []) |> length,
-        prosumer_costs       = getfieldsafe(prosumer_data, "cost_injection", []),
-        has_timeseries       = has_timeseries,
+        curtailment_cost = getfieldsafe(gen_data, "curtailment_cost", []),
+        plant_type = getfieldsafe(gen_data, "plant_type", []),
+        generator_status = getfieldsafe(gen_data, "gen_status", []),
+        number_of_prosumers = getfieldsafe(prosumer_data, "bus", []) |> length,
+        prosumer_costs = getfieldsafe(prosumer_data, "cost_injection", []),
+        has_timeseries = has_timeseries,
     )
 end
 
-function build_objective_data(data::Dict{String,Any})::ObjectiveData
+function build_objective_data(data::Dict{String, Any})::ObjectiveData
     params = get_objective_parameters(
         data,
         data["gen"],

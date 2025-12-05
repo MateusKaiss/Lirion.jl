@@ -1,4 +1,4 @@
-struct BusData{T<:Real}
+struct BusData{T <: Real}
     n::Int
     id::Vector{Int}
     bus_type::Vector{Int}
@@ -14,19 +14,19 @@ struct BusData{T<:Real}
     vmax::Vector{T}
     vmin::Vector{T}
 
-    reference_bus::Union{Nothing,Int}
-    id_to_idx::Dict{Int,Int}
-    vstart::Vector{Union{Nothing,T}}
-    vastart::Vector{Union{Nothing,T}}
+    reference_bus::Union{Nothing, Int}
+    id_to_idx::Dict{Int, Int}
+    vstart::Vector{Union{Nothing, T}}
+    vastart::Vector{Union{Nothing, T}}
 end
 
 function get_bus_parameters(bus_data)
-    bus_ids   = bus_data["bus_i"]
-    bus_type  = bus_data["bus_type"]
-    vm        = bus_data["vm"]
-    va        = bus_data["va"]
-    vmin      = bus_data["vmin"]
-    vmax      = bus_data["vmax"]
+    bus_ids = bus_data["bus_i"]
+    bus_type = bus_data["bus_type"]
+    vm = bus_data["vm"]
+    va = bus_data["va"]
+    vmin = bus_data["vmin"]
+    vmax = bus_data["vmax"]
 
     reference_bus_idx = findfirst(==(3), bus_type)
     reference_bus = nothing
@@ -37,13 +37,13 @@ function get_bus_parameters(bus_data)
     end
 
     n = length(bus_ids)
-    vstart  = Vector{Union{Nothing,Float64}}(undef, n)
-    vastart = Vector{Union{Nothing,Float64}}(undef, n)
+    vstart = Vector{Union{Nothing, Float64}}(undef, n)
+    vastart = Vector{Union{Nothing, Float64}}(undef, n)
 
     @inbounds for i in 1:n
-        v  = vm[i]
-        a  = va[i]
-        vstart[i]  = isnan(v) ? nothing : v
+        v = vm[i]
+        a = va[i]
+        vstart[i] = isnan(v) ? nothing : v
         vastart[i] = isnan(a) ? nothing : a
     end
 
@@ -57,12 +57,12 @@ function get_bus_parameters(bus_data)
     )
 end
 
-function build_bus_data(data::Dict{String,Any})::BusData{Float64}
-    bus    = data["bus"]
+function build_bus_data(data::Dict{String, Any})::BusData{Float64}
+    bus = data["bus"]
     params = get_bus_parameters(bus)
     bus_ids = params.bus_ids
     n = length(bus_ids)
-    id_to_idx = Dict{Int,Int}()
+    id_to_idx = Dict{Int, Int}()
     @inbounds for (i, b) in pairs(bus_ids)
         id_to_idx[b] = i
     end
@@ -81,9 +81,7 @@ function build_bus_data(data::Dict{String,Any})::BusData{Float64}
         bus["base_kv"],
         bus["zone"],
         bus["vmax"],
-        bus["vmin"],
-
-        params.reference_bus,
+        bus["vmin"], params.reference_bus,
         id_to_idx,
         params.vstart,
         params.initial_voltage_angle,

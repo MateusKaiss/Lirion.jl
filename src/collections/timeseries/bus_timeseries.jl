@@ -8,11 +8,10 @@ struct BusTimeseriesData
     bs::Vector{Float64}
 end
 
-function build_bus_timeseries_data(data::Dict{String,Any})::BusTimeseriesData
+function build_bus_timeseries_data(data::Dict{String, Any})::BusTimeseriesData
     if !haskey(data, "bus_timeseries") ||
        !haskey(data["bus_timeseries"], "time") ||
        isempty(data["bus_timeseries"]["time"])
-
         return BusTimeseriesData(
             false,
             Int[],

@@ -22,26 +22,26 @@ end
 # ---------------------------------------------------------------------
 function get_battery_parameters(battery_data)
     return (
-        number_of_batteries     = length(battery_data["storage_bus"]),
-        min_storage             = battery_data["energy"],
-        max_storage             = battery_data["energy_rating"],
-        charge_ramp             = battery_data["charge_rating"],
-        discharge_ramp          = battery_data["discharge_rating"],
-        initial_storage         = battery_data["energy"],
-        qmin                    = battery_data["qmin"],
-        qmax                    = battery_data["qmax"],
-        thermal_limit           = battery_data["thermal_rating"],
-        charge_efficiency       = battery_data["charge_efficiency"],
-        discharge_efficiency    = battery_data["discharge_efficiency"],
-        r                       = battery_data["r"],
-        x                       = battery_data["x"],
-        p_loss                  = battery_data["p_loss"],
-        q_loss                  = battery_data["q_loss"],
-        bus                     = battery_data["storage_bus"],
+        number_of_batteries = length(battery_data["storage_bus"]),
+        min_storage = battery_data["energy"],
+        max_storage = battery_data["energy_rating"],
+        charge_ramp = battery_data["charge_rating"],
+        discharge_ramp = battery_data["discharge_rating"],
+        initial_storage = battery_data["energy"],
+        qmin = battery_data["qmin"],
+        qmax = battery_data["qmax"],
+        thermal_limit = battery_data["thermal_rating"],
+        charge_efficiency = battery_data["charge_efficiency"],
+        discharge_efficiency = battery_data["discharge_efficiency"],
+        r = battery_data["r"],
+        x = battery_data["x"],
+        p_loss = battery_data["p_loss"],
+        q_loss = battery_data["q_loss"],
+        bus = battery_data["storage_bus"],
     )
 end
 
-function build_battery_data(data::Dict{String,Any})::BatteryData
+function build_battery_data(data::Dict{String, Any})::BatteryData
     if !haskey(data, "storage")
         return BatteryData(
             0,
@@ -58,7 +58,7 @@ function build_battery_data(data::Dict{String,Any})::BatteryData
     end
 
     params = get_battery_parameters(data["storage"])
-    n      = params.number_of_batteries
+    n = params.number_of_batteries
 
     return BatteryData(
         n,

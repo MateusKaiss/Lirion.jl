@@ -9,9 +9,9 @@ function has_curtailment(gen::GenData, g::Int)
 end
 
 function _build_start_vector(
-    initial_vec::AbstractVector{Union{Nothing,T}},
+    initial_vec::AbstractVector{Union{Nothing, T}},
     fallback::AbstractVector{T},
-) where {T<:Real}
+) where {T <: Real}
     n = length(fallback)
     @assert length(initial_vec) == n "initial_vec e fallback devem ter o mesmo comprimento"
 
@@ -38,7 +38,7 @@ function create_active_generation_variables!(model::JuMP.Model, gen::GenData)
         p_generation[g = 1:G, t = 1:T; gen.existing[g]],
         lower_bound = gen.pmin[g],
         upper_bound = gen.pmax[g],
-        start       = pg_start[g],
+        start = pg_start[g],
     )
 
     model[:p_generation] = p_generation
@@ -56,7 +56,7 @@ function create_reactive_generation_variables!(model::JuMP.Model, gen::GenData)
         q_generation[g = 1:G, t = 1:T; gen.existing[g]],
         lower_bound = gen.qmin[g],
         upper_bound = gen.qmax[g],
-        start       = qg_start[g],
+        start = qg_start[g],
     )
 
     model[:q_generation] = q_generation

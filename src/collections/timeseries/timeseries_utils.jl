@@ -2,7 +2,7 @@
 # Timeseries helpers for Lirion.jl
 # ===============================================================
 
-function get_model_times(data::Dict{String,Any})
+function get_model_times(data::Dict{String, Any})
     time_vecs = Vector{Vector{Int}}()
 
     if haskey(data, "bus_timeseries") && !isempty(data["bus_timeseries"])
@@ -27,7 +27,7 @@ function get_model_times(data::Dict{String,Any})
     return all_times
 end
 
-function check_time_alignment(data::Dict{String,Any})
+function check_time_alignment(data::Dict{String, Any})
     time_sets = Dict{String, Set{Int}}()
 
     for key in (
@@ -59,16 +59,16 @@ function ensure_bus_timeseries!(data::Dict{String, Any}, T::Int)
 
     @info "Creating bus_timeseries based on static table bus."
 
-    b  = data["bus"]
+    b = data["bus"]
     nb = length(b["bus_i"])
 
     data["bus_timeseries"] = Dict(
         "time" => ones(Int, nb),
-        "bus"  => copy(b["bus_i"]),
-        "pd"   => copy(b["pd"]),
-        "qd"   => copy(b["qd"]),
-        "gs"   => copy(b["gs"]),
-        "bs"   => copy(b["bs"]),
+        "bus" => copy(b["bus_i"]),
+        "pd" => copy(b["pd"]),
+        "qd" => copy(b["qd"]),
+        "gs" => copy(b["gs"]),
+        "bs" => copy(b["bs"]),
     )
     return
 end
@@ -87,18 +87,18 @@ function ensure_gencost_timeseries!(data::Dict{String, Any}, T::Int)
     @info "Creating gencost_timeseries based on fixed gencost table."
 
     gencost = data["gencost"]
-    ng      = length(gencost["cost_coefficients"])
-    ts      = Dict{String, Vector}()
+    ng = length(gencost["cost_coefficients"])
+    ts = Dict{String, Vector}()
 
-    ts["time"]              = Int[]
-    ts["gen_id"]            = Int[]
-    ts["model"]             = Int[]
-    ts["startup"]           = Float64[]
-    ts["shutdown"]          = Float64[]
-    ts["ncost"]             = Int[]
+    ts["time"] = Int[]
+    ts["gen_id"] = Int[]
+    ts["model"] = Int[]
+    ts["startup"] = Float64[]
+    ts["shutdown"] = Float64[]
+    ts["ncost"] = Int[]
     ts["cost_coefficients"] = Vector{Vector{Float64}}()
-    ts["tou"]               = Float64[]
-    ts["feed_in_tariff"]    = Float64[]
+    ts["tou"] = Float64[]
+    ts["feed_in_tariff"] = Float64[]
 
     for g in 1:ng
         push!(ts["time"], 1)
@@ -124,14 +124,14 @@ function ensure_prosumer_timeseries!(data::Dict{String, Any}, T::Int)
 
     @info "Creating prosumer_timeseries based on static table prosumer."
 
-    s  = data["prosumer"]
+    s = data["prosumer"]
     nb = length(s["bus"])
 
     data["prosumer_timeseries"] = Dict(
-        "time"      => ones(Int, nb),
-        "bus"       => copy(s["bus"]),
-        "p_pv"      => copy(s["generation"]),
-        "p_load"    => copy(s["demand"]),
+        "time" => ones(Int, nb),
+        "bus" => copy(s["bus"]),
+        "p_pv" => copy(s["generation"]),
+        "p_load" => copy(s["demand"]),
         "p_curtail" => fill(0.0, nb),
     )
     return
@@ -145,13 +145,13 @@ function ensure_consumer_timeseries!(data::Dict{String, Any}, T::Int)
 
     @info "Creating consumer_timeseries based on static table consumer."
 
-    c  = data["consumer"]
+    c = data["consumer"]
     nb = length(c["bus"])
 
     data["consumer_timeseries"] = Dict(
-        "time"     => ones(Int, nb),
-        "bus"      => copy(c["bus"]),
-        "demand"   => copy(c["demand"]),
+        "time" => ones(Int, nb),
+        "bus" => copy(c["bus"]),
+        "demand" => copy(c["demand"]),
         "q_demand" => copy(c["q_demand"]),
     )
 
@@ -163,16 +163,16 @@ function extend_bus_timeseries!(data::Dict{String, Any}, T::Int)
         return
     end
 
-    ts     = data["bus_timeseries"]
-    times  = ts["time"]
-    buses  = ts["bus"]
+    ts = data["bus_timeseries"]
+    times = ts["time"]
+    buses = ts["bus"]
 
     if isempty(times)
         return
     end
 
     last_time = maximum(times)
-    bus_ids   = unique(buses)
+    bus_ids = unique(buses)
 
     if last_time >= T
         return
@@ -202,16 +202,16 @@ function extend_gencost_timeseries!(data::Dict{String, Any}, T::Int)
         return
     end
 
-    ts    = data["gencost_timeseries"]
+    ts = data["gencost_timeseries"]
     times = ts["time"]
-    gens  = ts["gen_id"]
+    gens = ts["gen_id"]
 
     if isempty(times)
         return
     end
 
     last_time = maximum(times)
-    gen_ids   = unique(gens)
+    gen_ids = unique(gens)
 
     if last_time >= T
         return
@@ -241,16 +241,16 @@ function extend_prosumer_timeseries!(data::Dict{String, Any}, T::Int)
         return
     end
 
-    ts        = data["prosumer_timeseries"]
-    times     = ts["time"]
+    ts = data["prosumer_timeseries"]
+    times = ts["time"]
     prosumers = ts["bus"]
 
     if isempty(times)
         return
     end
 
-    last_time     = maximum(times)
-    prosumer_ids  = unique(prosumers)
+    last_time = maximum(times)
+    prosumer_ids = unique(prosumers)
 
     if last_time >= T
         return
@@ -281,16 +281,16 @@ function extend_consumer_timeseries!(data::Dict{String, Any}, T::Int)
         return
     end
 
-    ts        = data["consumer_timeseries"]
-    times     = ts["time"]
+    ts = data["consumer_timeseries"]
+    times = ts["time"]
     consumers = ts["bus"]
 
     if isempty(times)
         return
     end
 
-    last_time     = maximum(times)
-    consumer_ids  = unique(consumers)
+    last_time = maximum(times)
+    consumer_ids = unique(consumers)
 
     if last_time >= T
         return
@@ -320,10 +320,10 @@ end
 
 function sort_timeseries_by_time_and_id!(data::Dict{String, Any})
     id_fields = Dict(
-        "bus_timeseries"       => "bus",
-        "gencost_timeseries"   => "gen_id",
-        "prosumer_timeseries"  => "bus",
-        "consumer_timeseries"  => "bus",
+        "bus_timeseries" => "bus",
+        "gencost_timeseries" => "gen_id",
+        "prosumer_timeseries" => "bus",
+        "consumer_timeseries" => "bus",
     )
 
     for (key, id_field) in id_fields

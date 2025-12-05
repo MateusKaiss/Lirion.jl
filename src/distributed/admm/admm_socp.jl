@@ -144,7 +144,7 @@ end
 # ----------------- Hot-path / buffers (bus) -----------------
 function prepare_socp_hotpaths!(sub::PartitionSOCP, shared_buses_sorted::Vector{Int})
     # mapas de índice local para acesso rápido
-    bus_ids =  sub.bus.id
+    bus_ids = sub.bus.id
     bus_local_index = Dict{Int, Int}()
     @inbounds for (i, b) in enumerate(bus_ids)
         bus_local_index[b] = i
@@ -176,7 +176,7 @@ end
     m = sub.model::JuMP.Model
     V2 = m[:v_magnitude_sq]
     buf = sub.v2_buf
-    ids =  sub.bus.id
+    ids = sub.bus.id
     @inbounds for i in eachindex(ids)
         x = V2[ids[i], 1]
         buf[i] =
@@ -194,7 +194,7 @@ end
     V2 = m[:v_magnitude_sq]
     buf = sub.v2_shared_buf
     pos = sub.shared_pos_local
-    ids =  sub.bus.id
+    ids = sub.bus.id
     @inbounds for i in eachindex(pos)
         bidx = pos[i]
         x = V2[ids[bidx], 1]
@@ -643,7 +643,7 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
 
     partitions = build_socp_partitions(sys)        # Dict{Int,PartitionSOCP}
     shared_buses = sys.shared_buses
-    cut_edges    = sys.cut_edges
+    cut_edges = sys.cut_edges
 
     # estados de ρ
     ρV2 = Ref(config.rho_v)
@@ -977,7 +977,7 @@ function run_admm_socp_branch(config::DistributedOPFModel, sys::ADMMSystem)
     iter_done = 0
 
     partitions = build_socp_partitions(sys)  # Dict{Int,PartitionSOCP}
-    cut_edges  = sys.cut_edges
+    cut_edges = sys.cut_edges
 
     ρP = Ref(config.rho_flow_p)
     ρQ = Ref(config.rho_flow_q)

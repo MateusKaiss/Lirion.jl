@@ -4,10 +4,10 @@ function compute_power_balance(
     bus_id::Int,
     t::Int,
 )
-    pf          = sys.powerflow
-    gen         = sys.gen
-    bus         = sys.bus
-    bus_ts      = sys.bus_ts
+    pf = sys.powerflow
+    gen = sys.gen
+    bus = sys.bus
+    bus_ts = sys.bus_ts
     consumer_ts = sys.consumer_ts
     bus_idx = pf.bus_idx_map[bus_id]
 
@@ -100,7 +100,7 @@ function compute_power_balance(
 
     if haskey(model.ext, :p_virtual) &&
        bus_id in axes(model.ext[:p_virtual], 1) &&
-       t      in axes(model.ext[:p_virtual], 2)
+       t in axes(model.ext[:p_virtual], 2)
         p_virt = model.ext[:p_virtual][bus_id, t]
     else
         p_virt = 0.0
@@ -119,7 +119,7 @@ function active_power_balance!(
     ::Type{SubproblemBuild},
 )
     pf = sys.powerflow
-    T  = get(model.ext, :time_periods, 1)
+    T = get(model.ext, :time_periods, 1)
 
     valid_bus_ids = [
         b for b in pf.bus_ids if !pf.is_virtual[pf.bus_idx_map[b]]
@@ -140,7 +140,7 @@ function active_power_balance!(
     ::Type{SubproblemBuild},
 )
     pf = sys.powerflow
-    T  = get(model.ext, :time_periods, 1)
+    T = get(model.ext, :time_periods, 1)
 
     valid_bus_ids = [
         b for b in pf.bus_ids if !pf.is_virtual[pf.bus_idx_map[b]]
@@ -162,7 +162,7 @@ function active_power_balance!(
     ::Type{SubproblemBuild},
 )
     pf = sys.powerflow
-    T  = get(model.ext, :time_periods, 1)
+    T = get(model.ext, :time_periods, 1)
 
     valid_bus_ids = [
         b for b in pf.bus_ids if !pf.is_virtual[pf.bus_idx_map[b]]

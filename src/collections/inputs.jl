@@ -1,8 +1,8 @@
 struct ADMMSystem
-    full::SystemData     
-    parts::Dict{Int, SystemData}  
-    shared_buses::Vector{Int}         
-    cut_edges::Vector{Int} 
+    full::SystemData
+    parts::Dict{Int, SystemData}
+    shared_buses::Vector{Int}
+    cut_edges::Vector{Int}
 end
 
 struct LirionInputs
@@ -41,8 +41,8 @@ function load_input_data(path::String)
 end
 
 function _find_cut_edges(full::Dict{String, Any})
-    zones    = full["bus"]["zone"]
-    bus_ids  = full["bus"]["bus_i"]
+    zones = full["bus"]["zone"]
+    bus_ids = full["bus"]["bus_i"]
     bus2zone = Dict(bus_ids[i] => zones[i] for i in eachindex(bus_ids))
 
     f_bus = full["branch"]["f_bus"]
@@ -61,9 +61,9 @@ function _find_cut_edges(full::Dict{String, Any})
 end
 
 function prepare_admm_partitions(data::Dict{String, Any})
-    bus      = data["bus"]
-    bus_ids  = bus["bus_i"]
-    zones    = bus["zone"]
+    bus = data["bus"]
+    bus_ids = bus["bus_i"]
+    zones = bus["zone"]
     unique_zones = unique(zones)
 
     partitions = Dict{Int, Dict{String, Any}}()
@@ -72,7 +72,7 @@ function prepare_admm_partitions(data::Dict{String, Any})
     if has_branch
         f_bus_full = data["branch"]["f_bus"]
         t_bus_full = data["branch"]["t_bus"]
-        br_status  =
+        br_status =
             haskey(data["branch"], "br_status") ?
             data["branch"]["br_status"] :
             ones(Int, length(f_bus_full))
@@ -81,7 +81,7 @@ function prepare_admm_partitions(data::Dict{String, Any})
     end
 
     for zone in unique_zones
-        zone_mask    = findall(==(zone), zones)
+        zone_mask = findall(==(zone), zones)
         zone_bus_ids = @views bus_ids[zone_mask]
         zone_bus_set = Set(zone_bus_ids)
 
@@ -97,14 +97,14 @@ function prepare_admm_partitions(data::Dict{String, Any})
         end
 
         all_bus_set = union(zone_bus_set, extra)
-        bus_mask    = findall(b -> in(b, all_bus_set), bus_ids)
+        bus_mask = findall(b -> in(b, all_bus_set), bus_ids)
 
         sub = Dict{String, Any}()
-        sub["baseMVA"]        = data["baseMVA"]
-        sub["T"]              = get(data, "T", 1)
-        sub["source_type"]    = get(data, "source_type", "matpower")
+        sub["baseMVA"] = data["baseMVA"]
+        sub["T"] = get(data, "T", 1)
+        sub["source_type"] = get(data, "source_type", "matpower")
         sub["source_version"] = get(data, "source_version", "")
-        sub["name"]           = "$(get(data,"name","case"))_zone_$zone"
+        sub["name"] = "$(get(data,"name","case"))_zone_$zone"
 
         sub["bus"] = Dict(
             k => v[bus_mask] for (k, v) in data["bus"] if length(v) == length(bus_ids)
@@ -115,8 +115,8 @@ function prepare_admm_partitions(data::Dict{String, Any})
         sub["bus"]["is_virtual"] = is_virtual
         @inbounds for (i, b) in enumerate(sub["bus"]["bus_i"])
             if is_virtual[i]
-                sub["bus"]["pd"][i]       = 0.0
-                sub["bus"]["qd"][i]       = 0.0
+                sub["bus"]["pd"][i] = 0.0
+                sub["bus"]["qd"][i] = 0.0
                 sub["bus"]["bus_type"][i] = 1
             end
         end
@@ -125,8 +125,8 @@ function prepare_admm_partitions(data::Dict{String, Any})
             if haskey(data, key)
                 tbl = data[key]
                 bus_key =
-                    haskey(tbl, "bus")         ? "bus"         :
-                    haskey(tbl, "gen_bus")     ? "gen_bus"     :
+                    haskey(tbl, "bus") ? "bus" :
+                    haskey(tbl, "gen_bus") ? "gen_bus" :
                     haskey(tbl, "storage_bus") ? "storage_bus" : nothing
                 if bus_key !== nothing
                     keep = findall(
@@ -150,7 +150,10 @@ function prepare_admm_partitions(data::Dict{String, Any})
             keep_all = findall(
                 i ->
                     (active_mask_full[i]) &&
-                    (in(f_bus_full[i], zone_bus_set) || in(t_bus_full[i], zone_bus_set)),
+                        (
+                            in(f_bus_full[i], zone_bus_set) ||
+                            in(t_bus_full[i], zone_bus_set)
+                        ),
                 eachindex(f_bus_full),
             )
 
@@ -159,7 +162,7 @@ function prepare_admm_partitions(data::Dict{String, Any})
                 (k, v) in data["branch"] if length(v) == length(f_bus_full)
             )
 
-            sub["branch_full"]          = data["branch"]
+            sub["branch_full"] = data["branch"]
             sub["branch_local_indices"] = keep_all
 
             edge_to_local = Dict{Int, Int}()
@@ -171,7 +174,7 @@ function prepare_admm_partitions(data::Dict{String, Any})
 
         for key in ("bus_timeseries", "prosumer_timeseries", "consumer_timeseries")
             if haskey(data, key)
-                ts   = data[key]
+                ts = data[key]
                 keep = findall(i -> in(ts["bus"][i], zone_bus_set), eachindex(ts["bus"]))
                 sub[key] =
                     Dict(k => v[keep] for (k, v) in ts if length(v) == length(ts["bus"]))
@@ -198,8 +201,8 @@ function prepare_admm_partitions(data::Dict{String, Any})
                 )
             end
         else
-            sub["gen"]                = Dict{String, Vector{Any}}()
-            sub["gencost"]            = Dict{String, Vector{Any}}()
+            sub["gen"] = Dict{String, Vector{Any}}()
+            sub["gencost"] = Dict{String, Vector{Any}}()
             sub["gencost_timeseries"] = Dict{String, Vector{Any}}()
         end
 
@@ -214,7 +217,7 @@ function prepare_admm_partitions(data::Dict{String, Any})
         push!(get!(bus_zone_appearance, b, Set{Int}()), zone_id)
     end
     shared_buses = [b for (b, zs) in bus_zone_appearance if length(zs) > 1]
-    shared_set   = Set(shared_buses)
+    shared_set = Set(shared_buses)
 
     for (_, sub) in partitions
         local_b = sub["bus"]["bus_i"]

@@ -12,7 +12,6 @@ struct ProsumerData
     inverter_capacity::Vector{Float64}
 end
 
-
 function get_prosumer_parameters(data)
     has_ts = haskey(data, "prosumer_timeseries")
     T = get(data, "T", 1)
@@ -54,7 +53,7 @@ function get_prosumer_parameters(data)
     )
 end
 
-function build_prosumer_data(data::Dict{String,Any})::ProsumerData
+function build_prosumer_data(data::Dict{String, Any})::ProsumerData
     params = get_prosumer_parameters(data)
 
     return ProsumerData(

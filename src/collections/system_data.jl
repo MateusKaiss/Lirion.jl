@@ -16,23 +16,23 @@ struct SystemData
     powerflow::PowerFlowData
     objective::ObjectiveData
 
-    raw::Dict{String,Any}
+    raw::Dict{String, Any}
 end
 
-function build_system_data(data::Dict{String,Any})::SystemData
-    bus_data        = build_bus_data(data)
-    branch_data     = build_branch_data(data)
-    gen_data        = build_gen_data(data)
-    battery_data    = build_battery_data(data)
-    prosumer_data   = build_prosumer_data(data)
+function build_system_data(data::Dict{String, Any})::SystemData
+    bus_data = build_bus_data(data)
+    branch_data = build_branch_data(data)
+    gen_data = build_gen_data(data)
+    battery_data = build_battery_data(data)
+    prosumer_data = build_prosumer_data(data)
 
-    bus_ts_data      = build_bus_timeseries_data(data)
+    bus_ts_data = build_bus_timeseries_data(data)
     prosumer_ts_data = build_prosumer_timeseries_data(data)
     consumer_ts_data = build_consumer_timeseries_data(data)
-    gencost_ts_data  = build_gencost_timeseries_data(data)
+    gencost_ts_data = build_gencost_timeseries_data(data)
 
-    powerflow_data  = build_power_flow_data(data)
-    objective_data  = build_objective_data(data)
+    powerflow_data = build_power_flow_data(data)
+    objective_data = build_objective_data(data)
 
     return SystemData(
         data["baseMVA"],

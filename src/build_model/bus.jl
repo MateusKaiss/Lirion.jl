@@ -11,7 +11,7 @@ end
     return (va0 === nothing || isnan(va0)) ? 0.0 : va0
 end
 
-@inline function normalize_initial_angle(va_b::Union{Nothing,Float64}, theta_ref::Float64)
+@inline function normalize_initial_angle(va_b::Union{Nothing, Float64}, theta_ref::Float64)
     if va_b === nothing || isnan(va_b)
         return 0.0
     else
@@ -20,8 +20,8 @@ end
 end
 
 function create_voltage_angle_variables!(model::JuMP.Model, bus::BusData)
-    T        = get(model.ext, :time_periods, 1)
-    bus_ids  = bus.id
+    T = get(model.ext, :time_periods, 1)
+    bus_ids = bus.id
     va_start = bus.vastart
 
     @variable(model, theta[b in bus_ids, t in 1:T])
@@ -45,7 +45,7 @@ function create_voltage_angle_variables!(model::JuMP.Model, bus::BusData)
 end
 
 function create_voltage_magnitude_variables!(model::JuMP.Model, bus::BusData)
-    T       = get(model.ext, :time_periods, 1)
+    T = get(model.ext, :time_periods, 1)
     bus_ids = bus.id
 
     @variable(
@@ -53,14 +53,14 @@ function create_voltage_magnitude_variables!(model::JuMP.Model, bus::BusData)
         v_magnitude[b in bus_ids, t in 1:T],
         lower_bound = bus.vmin[bus.id_to_idx[b]],
         upper_bound = bus.vmax[bus.id_to_idx[b]],
-        start       = something(bus.vstart[bus.id_to_idx[b]], 1.0),
+        start = something(bus.vstart[bus.id_to_idx[b]], 1.0),
     )
 
     return nothing
 end
 
 function create_socp_bus_variables!(model::JuMP.Model, bus::BusData)
-    T       = get(model.ext, :time_periods, 1)
+    T = get(model.ext, :time_periods, 1)
     bus_ids = bus.id
 
     @variable(
@@ -68,7 +68,7 @@ function create_socp_bus_variables!(model::JuMP.Model, bus::BusData)
         v_magnitude_sq[b in bus_ids, t in 1:T],
         lower_bound = bus.vmin[bus.id_to_idx[b]]^2,
         upper_bound = bus.vmax[bus.id_to_idx[b]]^2,
-        start       = (something(bus.vstart[bus.id_to_idx[b]], 1.0))^2,
+        start = (something(bus.vstart[bus.id_to_idx[b]], 1.0))^2,
     )
 
     return nothing

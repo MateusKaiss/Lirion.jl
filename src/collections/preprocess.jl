@@ -23,7 +23,7 @@ function add_case_index_maps!(case::Dict{String, Any})
         t_bus = case["branch"]["t_bus"] # posição linha to -> barra
 
         case["bus_to_branches_from"] = map_items_by_bus(f_bus) # barras -> linhas
-        case["bus_to_branches_to"]   = map_items_by_bus(t_bus) # barras -> linhas
+        case["bus_to_branches_to"] = map_items_by_bus(t_bus) # barras -> linhas
 
         bus_to_neighbors = Dict{Int, Vector{Int}}()
         for (f, t) in zip(f_bus, t_bus)

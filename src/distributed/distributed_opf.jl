@@ -1,6 +1,6 @@
 function get_method_runner(config::DistributedOPFModel)::Function
     method = config.method
-    base   = config.base_model
+    base = config.base_model
 
     if method === :admm
         if base === DC
@@ -30,7 +30,7 @@ function get_method_runner(config::DistributedOPFModel)::Function
         end
     end
 
-    error("Distributed method $(method) with base model $(base) not implemented.")
+    return error("Distributed method $(method) with base model $(base) not implemented.")
 end
 
 function run_distributed(inputs::LirionInputs)
@@ -50,9 +50,9 @@ function run_distributed(inputs::LirionInputs)
         total_cost = total_real_cost,
         partitions = partitions,
         iterations = iter_done,
-        elapsed_s  = elapsed_s,
-        config     = config,
-        system     = inputs.system,
-        database   = inputs.database_path,
+        elapsed_s = elapsed_s,
+        config = config,
+        system = inputs.system,
+        database = inputs.database_path,
     )
 end

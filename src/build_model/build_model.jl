@@ -1,7 +1,7 @@
 # =========================
 # BUILD ENTRYPOINT
 # =========================
-@inline _select_default_optimizer(::Type{DC})   = OSQP.Optimizer
+@inline _select_default_optimizer(::Type{DC}) = OSQP.Optimizer
 @inline _select_default_optimizer(::Type{SOCP}) = SCS.Optimizer
 @inline _select_default_optimizer(::Type{<:OPFModel}) = Ipopt.Optimizer
 
@@ -21,7 +21,7 @@ function build_model(
 end
 
 function build_model(inputs::LirionInputs; optimizer = nothing)
-    sys        = inputs.system
+    sys = inputs.system
     model_type = inputs.model_type::Type{<:OPFModel}
 
     opt =
@@ -71,7 +71,7 @@ function _build_singleperiod_model(
     model = JuMP.Model(optimizer)
 
     model.ext[:time_periods] = 1
-    model.ext[:times]        = [1]
+    model.ext[:times] = [1]
 
     process_subproblem(model, sys, model_type, SubproblemBuild)
 
@@ -91,7 +91,7 @@ function _build_multiperiod_model(
     model = JuMP.Model(optimizer)
 
     model.ext[:time_periods] = length(times)
-    model.ext[:times]        = collect(times)
+    model.ext[:times] = collect(times)
 
     process_subproblem(model, sys, model_type, SubproblemBuild)
 

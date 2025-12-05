@@ -5,14 +5,14 @@ mutable struct PartitionDC
     gen::GenData
     branch_local_indices::Vector{Int}
     shared_buses_local::Vector{Int}
-    edge_to_local::Dict{Int,Int}
-    bus_local_index::Dict{Int,Int}
+    edge_to_local::Dict{Int, Int}
+    bus_local_index::Dict{Int, Int}
     shared_pos_local::Vector{Int}
     theta_buf::Vector{Float64}
     theta_shared_buf::Vector{Float64}
-    model::Union{Nothing,JuMP.Model}
-    theta_var::Union{Nothing,JuMP.Containers.DenseAxisArray{JuMP.VariableRef,2}}
-    obj_base::Union{Nothing,Float64,JuMP.AffExpr,JuMP.QuadExpr}
+    model::Union{Nothing, JuMP.Model}
+    theta_var::Union{Nothing, JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}}
+    obj_base::Union{Nothing, Float64, JuMP.AffExpr, JuMP.QuadExpr}
     quad_bus_expr::JuMP.QuadExpr
     rho_bus_cached::Float64
     quad_branch_expr::JuMP.QuadExpr
@@ -29,23 +29,23 @@ mutable struct PartitionAC
     bus::BusData
     branch::BranchData
     gen::GenData
-    branch_local_indices::Vector{Int}       
+    branch_local_indices::Vector{Int}
     shared_buses_local::Vector{Int}
-    edge_to_local::Dict{Int,Int}         
-    bus_local_index::Dict{Int,Int}         
-    shared_pos_local::Vector{Int}         
-    theta_buf::Vector{Float64}       
-    vmag_buf::Vector{Float64}             
-    theta_shared_buf::Vector{Float64}     
-    vmag_shared_buf::Vector{Float64}    
-    model::Union{Nothing,JuMP.Model}
-    theta_var::Union{Nothing,JuMP.Containers.DenseAxisArray{JuMP.VariableRef,2}}
-    vmag_var::Union{Nothing,JuMP.Containers.DenseAxisArray{JuMP.VariableRef,2}}
-    obj_base::Union{Nothing,Float64,JuMP.AffExpr,JuMP.QuadExpr,JuMP.NonlinearExpr}
+    edge_to_local::Dict{Int, Int}
+    bus_local_index::Dict{Int, Int}
+    shared_pos_local::Vector{Int}
+    theta_buf::Vector{Float64}
+    vmag_buf::Vector{Float64}
+    theta_shared_buf::Vector{Float64}
+    vmag_shared_buf::Vector{Float64}
+    model::Union{Nothing, JuMP.Model}
+    theta_var::Union{Nothing, JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}}
+    vmag_var::Union{Nothing, JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}}
+    obj_base::Union{Nothing, Float64, JuMP.AffExpr, JuMP.QuadExpr, JuMP.NonlinearExpr}
     quad_bus_expr_ac::JuMP.NonlinearExpr
     rho_bus_theta_cached::Float64
     rho_bus_v_cached::Float64
-    quad_branch_expr_ac::Union{ JuMP.QuadExpr,JuMP.NonlinearExpr}
+    quad_branch_expr_ac::Union{JuMP.QuadExpr, JuMP.NonlinearExpr}
     rho_branch_p_cached::Float64
     rho_branch_q_cached::Float64
     objective_params::ObjectiveData
@@ -61,16 +61,16 @@ mutable struct PartitionSOCP
     branch::BranchData
     gen::GenData
     branch_local_indices::Vector{Int}
-    shared_buses_local::Vector{Int}    
-    edge_to_local::Dict{Int,Int}      
-    bus_local_index::Dict{Int,Int}  
-    shared_pos_local::Vector{Int}      
-    v2_buf::Vector{Float64} 
+    shared_buses_local::Vector{Int}
+    edge_to_local::Dict{Int, Int}
+    bus_local_index::Dict{Int, Int}
+    shared_pos_local::Vector{Int}
+    v2_buf::Vector{Float64}
     v2_shared_buf::Vector{Float64}
-    model::Union{Nothing,JuMP.Model}
-    v2_var::Union{Nothing,JuMP.Containers.DenseAxisArray{JuMP.VariableRef,2}}
-    obj_base::Union{Nothing,Float64,JuMP.AffExpr,JuMP.QuadExpr,JuMP.NonlinearExpr}
-    obj_static::Union{JuMP.AffExpr,Float64,JuMP.QuadExpr}
+    model::Union{Nothing, JuMP.Model}
+    v2_var::Union{Nothing, JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}}
+    obj_base::Union{Nothing, Float64, JuMP.AffExpr, JuMP.QuadExpr, JuMP.NonlinearExpr}
+    obj_static::Union{JuMP.AffExpr, Float64, JuMP.QuadExpr}
     quad_bus_expr_socp::JuMP.QuadExpr
     rho_bus_v2_cached::Float64
     quad_rt_expr_socp::JuMP.QuadExpr
@@ -94,14 +94,14 @@ function build_ac_partitions(sys::ADMMSystem)::Dict{Int, PartitionAC}
     parts = Dict{Int, PartitionAC}()
 
     for (zone, s) in sys.parts
-        bus    = s.bus
+        bus = s.bus
         branch = s.branch
-        gen    = s.gen
+        gen = s.gen
 
         raw = s.raw
         branch_local_indices = raw["branch_local_indices"]::Vector{Int}
-        edge_to_local        = raw["edge_to_local"]::Dict{Int,Int}
-        shared_buses_local   = raw["shared_buses_local"]::Vector{Int}
+        edge_to_local = raw["edge_to_local"]::Dict{Int, Int}
+        shared_buses_local = raw["shared_buses_local"]::Vector{Int}
 
         zone_edges = Int[]
 
@@ -113,16 +113,16 @@ function build_ac_partitions(sys::ADMMSystem)::Dict{Int, PartitionAC}
             branch_local_indices,
             shared_buses_local,
             edge_to_local,
-            Dict{Int,Int}(),   
-            Int[],           
-            Float64[],         
-            Float64[],         
-            Float64[],         
-            Float64[],         
-            nothing,           
-            nothing,           
-            nothing,        
-            nothing,          
+            Dict{Int, Int}(),
+            Int[],
+            Float64[],
+            Float64[],
+            Float64[],
+            Float64[],
+            nothing,
+            nothing,
+            nothing,
+            nothing,
             zero(JuMP.QuadExpr),
             0.0,
             0.0,
@@ -144,14 +144,14 @@ function build_dc_partitions(sys::ADMMSystem)::Dict{Int, PartitionDC}
     parts = Dict{Int, PartitionDC}()
 
     for (zone, s) in sys.parts
-        bus    = s.bus
+        bus = s.bus
         branch = s.branch
-        gen    = s.gen
+        gen = s.gen
 
         raw = s.raw
         branch_local_indices = raw["branch_local_indices"]::Vector{Int}
-        edge_to_local        = raw["edge_to_local"]::Dict{Int,Int}
-        shared_buses_local   = raw["shared_buses_local"]::Vector{Int}
+        edge_to_local = raw["edge_to_local"]::Dict{Int, Int}
+        shared_buses_local = raw["shared_buses_local"]::Vector{Int}
 
         zone_edges = Int[]
 
@@ -163,13 +163,13 @@ function build_dc_partitions(sys::ADMMSystem)::Dict{Int, PartitionDC}
             branch_local_indices,
             shared_buses_local,
             edge_to_local,
-            Dict{Int,Int}(),  
-            Int[],             
-            Float64[],       
-            Float64[],         
-            nothing,           
-            nothing,           
-            nothing,       
+            Dict{Int, Int}(),
+            Int[],
+            Float64[],
+            Float64[],
+            nothing,
+            nothing,
+            nothing,
             zero(JuMP.QuadExpr),
             0.0,
             zero(JuMP.QuadExpr),
@@ -185,19 +185,18 @@ function build_dc_partitions(sys::ADMMSystem)::Dict{Int, PartitionDC}
     return parts
 end
 
-
 function build_socp_partitions(sys::ADMMSystem)::Dict{Int, PartitionSOCP}
     parts = Dict{Int, PartitionSOCP}()
 
     for (zone, s) in sys.parts
-        bus    = s.bus
+        bus = s.bus
         branch = s.branch
-        gen    = s.gen
+        gen = s.gen
 
         raw = s.raw
         branch_local_indices = raw["branch_local_indices"]::Vector{Int}
-        edge_to_local        = raw["edge_to_local"]::Dict{Int,Int}
-        shared_buses_local   = raw["shared_buses_local"]::Vector{Int}
+        edge_to_local = raw["edge_to_local"]::Dict{Int, Int}
+        shared_buses_local = raw["shared_buses_local"]::Vector{Int}
 
         zone_edges = Int[]
 
@@ -209,13 +208,13 @@ function build_socp_partitions(sys::ADMMSystem)::Dict{Int, PartitionSOCP}
             branch_local_indices,
             shared_buses_local,
             edge_to_local,
-            Dict{Int,Int}(),   
-            Int[],            
-            Float64[],         
-            Float64[],         
-            nothing,           
-            nothing,           
-            nothing,           
+            Dict{Int, Int}(),
+            Int[],
+            Float64[],
+            Float64[],
+            nothing,
+            nothing,
+            nothing,
             zero(JuMP.AffExpr),
             zero(JuMP.QuadExpr),
             0.0,
