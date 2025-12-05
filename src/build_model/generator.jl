@@ -8,20 +8,17 @@ function has_curtailment(gen::GenData, g::Int)
     return gen.existing[g] && gen.plant_type[g] == "R"
 end
 
-"Constrói vetor de start a partir do Dict de iniciais, caindo para fallback se nothing/NaN."
 function _build_start_vector(
-    initial_dict::Dict{Int,Union{Nothing,Float64}},
-    fallback::AbstractVector{<:Real},
-)
+    initial_vec::AbstractVector{Union{Nothing,T}},
+    fallback::AbstractVector{T},
+) where {T<:Real}
     n = length(fallback)
-    starts = zeros(Float64, n)
+    @assert length(initial_vec) == n "initial_vec e fallback devem ter o mesmo comprimento"
+
+    starts = similar(fallback)
     @inbounds for g in 1:n
-        v = get(initial_dict, g, nothing)
-        if v === nothing || isnan(v)
-            starts[g] = fallback[g]
-        else
-            starts[g] = v
-        end
+        v = initial_vec[g]
+        starts[g] = (v === nothing) ? fallback[g] : v
     end
     return starts
 end
