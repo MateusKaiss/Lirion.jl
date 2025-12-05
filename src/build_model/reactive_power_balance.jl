@@ -12,6 +12,7 @@ function compute_reactive_power_balance(
     bus         = sys.bus
     bus_ts      = sys.bus_ts
     consumer_ts = sys.consumer_ts
+    bus_idx = pf.bus_idx_map[bus_id]
 
     # --------------------------------------------------------------
     # Geração reativa
@@ -19,7 +20,7 @@ function compute_reactive_power_balance(
     q_gen = if haskey(model, :q_generation)
         sum(
             model[:q_generation][g, t]
-            for g in get(pf.bus_to_generators, bus_id, Int[])
+            for g in pf.bus_to_generators[bus_idx]
             if gen.existing[g];
             init = 0.0,
         )
@@ -33,7 +34,7 @@ function compute_reactive_power_balance(
     q_bat = if haskey(model, :q_battery_injected)
         sum(
             model[:q_battery_injected][b, t] for
-            b in get(pf.bus_to_batteries, bus_id, Int[]);
+            b in pf.bus_to_batteries[bus_idx];
             init = 0.0,
         )
     else
@@ -46,7 +47,7 @@ function compute_reactive_power_balance(
     q_pros = if haskey(model, :q_prosumer_injected)
         sum(
             model[:q_prosumer_injected][p, t] for
-            p in get(pf.bus_to_prosumers, bus_id, Int[]);
+            p in pf.bus_to_prosumers[bus_idx];
             init = 0.0,
         )
     else
@@ -59,7 +60,7 @@ function compute_reactive_power_balance(
     q_out = if haskey(model, :q_flow_branches)
         sum(
             model[:q_flow_branches][l, t] for
-            l in get(pf.bus_to_branches_from, bus_id, Int[])
+            l in pf.bus_to_branches_from[bus_idx]
             if pf.branch_status[l] == 1;
             init = 0.0,
         )
@@ -70,7 +71,7 @@ function compute_reactive_power_balance(
     q_in = if haskey(model, :q_reverse_flow_branches)
         sum(
             model[:q_reverse_flow_branches][l, t] for
-            l in get(pf.bus_to_branches_to, bus_id, Int[])
+            l in pf.bus_to_branches_to[bus_idx]
             if pf.branch_status[l] == 1;
             init = 0.0,
         )
@@ -89,8 +90,7 @@ function compute_reactive_power_balance(
             end
         end
     else
-        idx = pf.bus_idx_map[bus_id]
-        qd  = bus.qd[idx]
+        qd = bus.qd[bus_idx]
     end
 
     # --------------------------------------------------------------

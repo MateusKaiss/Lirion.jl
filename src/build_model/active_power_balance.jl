@@ -9,13 +9,14 @@ function compute_power_balance(
     bus         = sys.bus
     bus_ts      = sys.bus_ts
     consumer_ts = sys.consumer_ts
+    bus_idx = pf.bus_idx_map[bus_id]
 
     # --------------------------------------------------------------
     # Geração Ativa
     # --------------------------------------------------------------
     p_gen = sum(
         model[:p_generation][g, t]
-        for g in get(pf.bus_to_generators, bus_id, Int[])
+        for g in pf.bus_to_generators[bus_idx]
         if gen.existing[g];
         init = 0.0,
     )
@@ -26,7 +27,7 @@ function compute_power_balance(
     p_bat = if haskey(model, :p_battery_injected)
         sum(
             model[:p_battery_injected][b, t] for
-            b in get(pf.bus_to_batteries, bus_id, Int[]);
+            b in pf.bus_to_batteries[bus_idx];
             init = 0.0,
         )
     else
@@ -39,7 +40,7 @@ function compute_power_balance(
     p_pros = if haskey(model, :p_prosumer_injected)
         sum(
             model[:p_prosumer_injected][p, t] for
-            p in get(pf.bus_to_prosumers, bus_id, Int[]);
+            p in pf.bus_to_prosumers[bus_idx];
             init = 0.0,
         )
     else
@@ -52,7 +53,7 @@ function compute_power_balance(
     p_out = if haskey(model, :p_flow_branches)
         sum(
             model[:p_flow_branches][l, t] for
-            l in get(pf.bus_to_branches_from, bus_id, Int[])
+            l in pf.bus_to_branches_from[bus_idx]
             if pf.branch_status[l] == 1;
             init = 0.0,
         )
@@ -63,7 +64,7 @@ function compute_power_balance(
     p_in = if haskey(model, :p_reverse_flow_branches)
         sum(
             model[:p_reverse_flow_branches][l, t] for
-            l in get(pf.bus_to_branches_to, bus_id, Int[])
+            l in pf.bus_to_branches_to[bus_idx]
             if pf.branch_status[l] == 1;
             init = 0.0,
         )
@@ -82,8 +83,7 @@ function compute_power_balance(
             end
         end
     else
-        idx = pf.bus_idx_map[bus_id]
-        pd  = bus.pd[idx]
+        pd = bus.pd[bus_idx]
     end
 
     # --------------------------------------------------------------
