@@ -1,9 +1,3 @@
-function prepare_dense_maps(shared_buses::Vector{Int})
-    shared_buses_sorted = sort(shared_buses)
-    b2pos = Dict{Int, Int}(b => i for (i, b) in enumerate(shared_buses_sorted))
-    return shared_buses_sorted, b2pos
-end
-
 function prepare_hotpaths!(part::PartitionDC)
     # mapa id de barra -> posição local no vetor (1..n_local)
 
@@ -35,33 +29,32 @@ end
 
 
 # ----------------- Hot-path / buffers (bus) -----------------
-function prepare_socp_hotpaths!(sub::PartitionSOCP, shared_buses_sorted::Vector{Int})
-    # mapas de índice local para acesso rápido
-    bus_ids = sub.bus.id
-    bus_local_index = Dict{Int, Int}()
-    @inbounds for (i, b) in enumerate(bus_ids)
-        bus_local_index[b] = i
-    end
-    sub.bus_local_index = bus_local_index
+# =========================
+# HOTPATHS: SOCP (V²)
+# =========================
+# HOTPATHS: SOCP (V²)
+# =========================
+function prepare_hotpaths_socp!(part::PartitionSOCP)
+    # map bus global id -> posição local
+    ids = part.bus.id
+    nbus = length(ids)
 
-    # filtra shared da zona
-    local_shared = sub.shared_buses_local
-    if isempty(local_shared)
-        busset = Set(bus_ids)
-        sub.shared_buses_local = [b for b in shared_buses_sorted if b in busset]
-        local_shared = sub.shared_buses_local
+    if isempty(part.bus_local_index)
+        part.bus_local_index = Dict{Int, Int}(ids[i] => i for i in 1:nbus)
     end
 
-    # posições locais das compartilhadas
-    shared_pos_local = Vector{Int}(undef, length(local_shared))
-    @inbounds for (k, b) in enumerate(local_shared)
-        shared_pos_local[k] = bus_local_index[b]
-    end
-    sub.shared_pos_local = shared_pos_local
+    lbs = part.shared_buses_local
+    nshared = length(lbs)
 
-    # buffers
-    sub.v2_buf = zeros(Float64, length(bus_ids))
-    sub.v2_shared_buf = zeros(Float64, length(shared_pos_local))
+    part.shared_pos_local = Vector{Int}(undef, nshared)
+    @inbounds for i in 1:nshared
+        b = lbs[i]
+        part.shared_pos_local[i] = part.bus_local_index[b]
+    end
+
+    part.v2_buf = zeros(Float64, nbus)
+    part.v2_shared_buf = zeros(Float64, nshared)
+
     return nothing
 end
 
@@ -85,6 +78,12 @@ function prepare_hotpaths_ac!(part::PartitionAC)
     part.theta_shared_buf = zeros(Float64, length(shared_pos_local))
     part.vmag_shared_buf = ones(Float64, length(shared_pos_local))
     return nothing
+end
+
+function prepare_dense_maps(shared_buses::Vector{Int})
+    shared_buses_sorted = sort(shared_buses)
+    b2pos = Dict{Int, Int}(b => i for (i, b) in enumerate(shared_buses_sorted))
+    return shared_buses_sorted, b2pos
 end
 
 
