@@ -46,15 +46,6 @@ end
 # PEQUENOS HELPERS #
 ####################
 
-@inline function _pretty_time(sec::Real)
-    if sec < 60
-        return "$(round(sec; digits = 3)) s"
-    elseif sec < 3600
-        return "$(round(sec/60; digits = 2)) min"
-    else
-        return "$(round(sec/3600; digits = 2)) h"
-    end
-end
 
 @inline function _val_or_start(m::JuMP.Model, x::JuMP.VariableRef)
     if JuMP.has_values(m)
@@ -72,39 +63,6 @@ end
     t::Int,
 )
     return _val_or_start(m, θ[b, t])
-end
-
-#############################
-# PARTITIONDC: HOTPATHS     #
-# SNAPSHOTS                 #
-#############################
-function prepare_hotpaths!(part::PartitionDC)
-    # mapa id de barra -> posição local no vetor (1..n_local)
-
-    # pega o bus_id e salva em bus_local index sua posição
-    bus_ids = part.bus.id
-    bus_local_index = Dict{Int, Int}()
-    @inbounds for (i, b) in enumerate(bus_ids)
-        bus_local_index[b] = i
-    end
-    part.bus_local_index = bus_local_index
-
-    # vetor das posições locais das barras compartilhadas
-
-    # pega o bus_compartilhado e salva em bus_local index sua posição
-
-    local_shared = part.shared_buses_local
-    shared_pos_local = Vector{Int}(undef, length(local_shared))
-    @inbounds for (k, b) in enumerate(local_shared)
-        shared_pos_local[k] = bus_local_index[b]
-    end
-    part.shared_pos_local = shared_pos_local
-
-    # buffers para snapshots
-    #guarda os buffers
-    part.theta_buf = zeros(Float64, length(bus_ids))
-    part.theta_shared_buf = zeros(Float64, length(shared_pos_local))
-    return nothing
 end
 
 @inline function snapshot_theta!(part::PartitionDC)
@@ -240,15 +198,7 @@ function _build_linear_branch_expr(
     return lin
 end
 
-#############################
-# MAPAS DENSOS E CONSENSO   #
-#############################
 
-function prepare_dense_maps(shared_buses::Vector{Int})
-    shared_buses_sorted = sort(shared_buses)
-    b2pos = Dict{Int, Int}(b => i for (i, b) in enumerate(shared_buses_sorted))
-    return shared_buses_sorted, b2pos
-end
 
 function compute_theta_consensus_vec!(
     θ̄_vec::Vector{Float64},
@@ -396,10 +346,6 @@ end
 # RESÍDUOS (BRANCH)         #
 #############################
 
-# helper p/ saber quais cut_edges aparecem em cada zona
-@inline function _zone_cut_edges(part::PartitionDC, cut_edges::Vector{Int})
-    return [e for e in cut_edges if haskey(part.edge_to_local, e)]
-end
 
 function primal_residual_branch_dc(
     partitions::Dict{Int, PartitionDC},

@@ -112,8 +112,14 @@ include("build_results/build_results.jl")
 # Métodos distribuídos (ADMM, etc.)
 # ------------------------------------------------------------------
 include("distributed/distributed_opf.jl")
-include("distributed/admm/partitions.jl")
+
+include("distributed/admm/utils.jl")
+include("distributed/admm/preparation.jl")
 include("distributed/admm/admm_core.jl")
+
+include("distributed/admm/terms_bus.jl")
+include("distributed/admm/terms_branch.jl")
+
 include("distributed/admm/admm_dc.jl")
 include("distributed/admm/admm_ac.jl")
 include("distributed/admm/admm_socp.jl")
