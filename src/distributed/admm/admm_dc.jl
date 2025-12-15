@@ -78,9 +78,10 @@ end
 # PARTITIONDC: HOTPATHS     #
 # SNAPSHOTS                 #
 #############################
-
 function prepare_hotpaths!(part::PartitionDC)
     # mapa id de barra -> posição local no vetor (1..n_local)
+
+    # pega o bus_id e salva em bus_local index sua posição
     bus_ids = part.bus.id
     bus_local_index = Dict{Int, Int}()
     @inbounds for (i, b) in enumerate(bus_ids)
@@ -89,6 +90,9 @@ function prepare_hotpaths!(part::PartitionDC)
     part.bus_local_index = bus_local_index
 
     # vetor das posições locais das barras compartilhadas
+
+    # pega o bus_compartilhado e salva em bus_local index sua posição
+
     local_shared = part.shared_buses_local
     shared_pos_local = Vector{Int}(undef, length(local_shared))
     @inbounds for (k, b) in enumerate(local_shared)
@@ -97,6 +101,7 @@ function prepare_hotpaths!(part::PartitionDC)
     part.shared_pos_local = shared_pos_local
 
     # buffers para snapshots
+    #guarda os buffers
     part.theta_buf = zeros(Float64, length(bus_ids))
     part.theta_shared_buf = zeros(Float64, length(shared_pos_local))
     return nothing
@@ -201,10 +206,9 @@ function _build_linear_bus_expr(
     λ_vec_zone::Vector{Float64},
     ρ::Float64,
 )
-    # soma_{b compartilhada} ( λ_b - ρ θ̄_b ) θ_b
-    m = part.model::JuMP.Model
+    m = part.model::JuMP.Model 
     θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
-    lin = zero(JuMP.AffExpr)
+    lin = zero(JuMP.AffExpr) #cria expressão linear vazia
     for b in part.shared_buses_local
         j = b2pos[b]
         lin += (λ_vec_zone[j] - ρ * θ̄_vec[j]) * θ[b, 1]
@@ -487,47 +491,6 @@ function update_duals_flow!(
     return nothing
 end
 
-##########################
-# WRAPPERS DE PLOT       #
-##########################
-
-function save_dc_bus_plots(
-    res_pri,
-    res_du,
-    eps_pri,
-    eps_du,
-    ρ_hist,
-    θ_avg_history;
-    stem::String = "admm",
-)
-    plot_admm_convergence(
-        res_pri,
-        res_du,
-        eps_pri,
-        eps_du,
-        "plot_convergencia_$(stem)_dc.html",
-    )
-    plot_rho(ρ_hist, "plot_rho_$(stem)_dc.html")
-    return plot_theta_avg_heatmap(θ_avg_history, "plot_theta_avg_heatmap_$(stem)_dc.html")
-end
-
-function save_dc_branch_plots(
-    res_pri,
-    res_du,
-    eps_pri,
-    eps_du,
-    ρ_hist;
-    stem::String = "admm_branch",
-)
-    plot_admm_convergence(
-        res_pri,
-        res_du,
-        eps_pri,
-        eps_du,
-        "plot_convergencia_$(stem).html",
-    )
-    return plot_rho(ρ_hist, "plot_rho_$(stem).html")
-end
 
 ##########################
 # FLAGS DE CONFIG        #
@@ -575,10 +538,8 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     rho_vec = Float64[]
     θ_avg_history = Dict{Int, Vector{Float64}}()
     θ_local_history = Dict{Int, Dict{Int, Vector{Float64}}}()
-
     optimizer_factory = resolve_optimizer_dc(config)
 
-    # build modelo base de cada zona
     for (zone_id, part) in partitions
         sys_zone = sys.parts[zone_id]
 
@@ -655,6 +616,20 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
             part.generation_cost_model_expr = out.gen_cost_expr
             part.real_generation_cost = out.real_cost
             @inbounds for (b, θb) in out.θsnap
+
+                # nível 1: zona
+            # if !haskey(θ_local_history, z)
+            #     θ_local_history[z] = Dict{Int, Vector{Float64}}()
+            # end
+
+            # # nível 2: barra
+            # if !haskey(θ_local_history[z], b)
+            #     θ_local_history[z][b] = Float64[]
+            # end
+
+            # # guarda o valor
+            # push!(θ_local_history[z][b], θb)
+
                 push!(
                     get!(
                         get!(θ_local_history, z, Dict{Int, Vector{Float64}}()),

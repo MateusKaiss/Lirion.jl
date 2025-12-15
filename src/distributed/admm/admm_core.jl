@@ -195,3 +195,46 @@ function plot_theta_local_heatmaps(
         println(" Heatmap local salvo em $path")
     end
 end
+
+
+##########################
+# WRAPPERS DE PLOT       #
+##########################
+
+function save_dc_bus_plots(
+    res_pri,
+    res_du,
+    eps_pri,
+    eps_du,
+    ρ_hist,
+    θ_avg_history;
+    stem::String = "admm",
+)
+    plot_admm_convergence(
+        res_pri,
+        res_du,
+        eps_pri,
+        eps_du,
+        "plot_convergencia_$(stem)_dc.html",
+    )
+    plot_rho(ρ_hist, "plot_rho_$(stem)_dc.html")
+    return plot_theta_avg_heatmap(θ_avg_history, "plot_theta_avg_heatmap_$(stem)_dc.html")
+end
+
+function save_dc_branch_plots(
+    res_pri,
+    res_du,
+    eps_pri,
+    eps_du,
+    ρ_hist;
+    stem::String = "admm_branch",
+)
+    plot_admm_convergence(
+        res_pri,
+        res_du,
+        eps_pri,
+        eps_du,
+        "plot_convergencia_$(stem).html",
+    )
+    return plot_rho(ρ_hist, "plot_rho_$(stem).html")
+end
