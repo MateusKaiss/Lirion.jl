@@ -262,12 +262,6 @@ function _build_linear_branch_pq_expr(sub::PartitionSOCP,
     return lin
 end
 
-# ----------------- Consensos (forma densa p/ BUS) -----------------
-function prepare_dense_maps_socp(shared_buses::Vector{Int})
-    shared_buses_sorted = sort(shared_buses)
-    b2pos = Dict{Int, Int}(b => i for (i, b) in enumerate(shared_buses_sorted))
-    return shared_buses_sorted, b2pos
-end
 
 function compute_v2_consensus_vec!(v2bar_vec::Vector{Float64},
     partitions,
@@ -494,108 +488,6 @@ function adaptive_rho!(ρ::Base.RefValue{Float64}, r::Float64, s::Float64;
     end
 end
 
-# ---------- Plots (wrappers) ----------
-function save_socp_v2rt_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
-    rhoV2_hist, rhoR_hist, rhoT_hist; stem = "admm_socp_v2rt")
-    plot_admm_convergence(r_hist, s_hist, eps_r_hist, eps_s_hist,
-        "plot_convergencia_$(stem).html")
-    PlotlyLight.save(
-        (
-            () -> (
-                p = Plot();
-                p(; x = 1:length(rhoV2_hist), y = rhoV2_hist, type = :scatter,
-                    mode = "lines+markers", name = "ρ(V²)");
-                p.layout.title = "Evolução de ρ(V²)";
-                p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρ(V²)";
-                p.layout.yaxis.type = "log";
-                p
-            )
-        )(), "plot_rho_v2_$(stem).html")
-    PlotlyLight.save(
-        (
-            () -> (
-                p = Plot();
-                p(; x = 1:length(rhoR_hist), y = rhoR_hist, type = :scatter,
-                    mode = "lines+markers", name = "ρR");
-                p.layout.title = "Evolução de ρR";
-                p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρR";
-                p.layout.yaxis.type = "log";
-                p
-            )
-        )(), "plot_rhoR_$(stem).html")
-    return PlotlyLight.save(
-        (
-            () -> (
-                p = Plot();
-                p(; x = 1:length(rhoT_hist), y = rhoT_hist, type = :scatter,
-                    mode = "lines+markers", name = "ρT");
-                p.layout.title = "Evolução de ρT";
-                p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρT";
-                p.layout.yaxis.type = "log";
-                p
-            )
-        )(), "plot_rhoT_$(stem).html")
-end
-
-function save_socp_branch_pq_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
-    rhoP_hist, rhoQ_hist; stem = "admm_socp_branch")
-    plot_admm_convergence(r_hist, s_hist, eps_r_hist, eps_s_hist,
-        "plot_convergencia_$(stem).html")
-    PlotlyLight.save(
-        (
-            () -> (
-                p = Plot();
-                p(; x = 1:length(rhoP_hist), y = rhoP_hist, type = :scatter,
-                    mode = "lines+markers", name = "ρP");
-                p.layout.title = "Evolução de ρP";
-                p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρP";
-                p.layout.yaxis.type = "log";
-                p
-            )
-        )(), "plot_rhoP_$(stem).html")
-    return PlotlyLight.save(
-        (
-            () -> (
-                p = Plot();
-                p(; x = 1:length(rhoQ_hist), y = rhoQ_hist, type = :scatter,
-                    mode = "lines+markers", name = "ρQ");
-                p.layout.title = "Evolução de ρQ";
-                p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρQ";
-                p.layout.yaxis.type = "log";
-                p
-            )
-        )(), "plot_rhoQ_$(stem).html")
-end
-
-function save_socp_hybrid_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
-    rhoV2_hist, rhoP_hist, rhoQ_hist, rhoR_hist, rhoT_hist;
-    stem = "admm_socp_hybrid")
-    plot_admm_convergence(r_hist, s_hist, eps_r_hist, eps_s_hist,
-        "plot_convergencia_$(stem).html")
-    for (lab, hist) in [("ρ(V²)", rhoV2_hist), ("ρP", rhoP_hist), ("ρQ", rhoQ_hist),
-        ("ρR", rhoR_hist), ("ρT", rhoT_hist)]
-        fname = replace(lab, "/" => "") |> x -> lowercase(replace(x, "ρ" => "rho"))
-        PlotlyLight.save(
-            (
-                () -> (
-                    p = Plot();
-                    p(; x = 1:length(hist), y = hist, type = :scatter,
-                        mode = "lines+markers", name = lab);
-                    p.layout.title = "Evolução de $(lab)";
-                    p.layout.xaxis.title = "Iterações";
-                    p.layout.yaxis.title = lab;
-                    p.layout.yaxis.type = "log";
-                    p
-                )
-            )(), "plot_$(fname)_$(stem).html")
-    end
-end
-
 # ================== RUNNERS (espelhando DC/AC) ==================
 
 # ---- ADMM-SOCP: BUS (V²) + BRANCH (R,T) com estrutura DC-like ----
@@ -620,7 +512,7 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
     optimizer_factory = resolve_socp_optimizer(config)
 
     # mapeamento denso (BUS)
-    shared_buses_sorted, b2pos = prepare_dense_maps_socp(shared_buses)
+    shared_buses_sorted, b2pos =  prepare_dense_maps(shared_buses)
 
     # build por zona (padrão DC/AC: usa SystemData da zona)
     for (z, sub) in partitions
@@ -1036,7 +928,7 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
 
     optimizer_factory = resolve_socp_optimizer(config)
 
-    shared_buses_sorted, b2pos = prepare_dense_maps_socp(shared_buses)
+    shared_buses_sorted, b2pos =  prepare_dense_maps(shared_buses)
 
     for (z, sub) in partitions
         sys_zone = sys.parts[z]

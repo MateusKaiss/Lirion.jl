@@ -238,3 +238,227 @@ function save_dc_branch_plots(
     )
     return plot_rho(ρ_hist, "plot_rho_$(stem).html")
 end
+
+##########################
+# WRAPPERS DE PLOT       #
+##########################
+
+function save_ac_bus_plots(
+    res_pri,
+    res_du,
+    eps_pri,
+    eps_du,
+    rhoθ_hist,
+    rhoV_hist,
+    θ_avg_hist;
+    stem::String = "admm_ac",
+)
+    plot_admm_convergence(
+        res_pri,
+        res_du,
+        eps_pri,
+        eps_du,
+        "plot_convergencia_$(stem).html",
+    )
+    PlotlyLight.save(
+        (
+            () -> (
+                p = Plot();
+                p(;
+                    x = 1:length(rhoθ_hist),
+                    y = rhoθ_hist,
+                    type = :scatter,
+                    mode = "lines+markers",
+                    name = "ρθ",
+                );
+                p.layout.title = "Evolução de ρθ";
+                p.layout.xaxis.title = "Iterações";
+                p.layout.yaxis.title = "ρθ";
+                p.layout.yaxis.type = "log";
+                p
+            )
+        )(),
+        "plot_rho_theta_$(stem).html",
+    )
+    PlotlyLight.save(
+        (
+            () -> (
+                p = Plot();
+                p(;
+                    x = 1:length(rhoV_hist),
+                    y = rhoV_hist,
+                    type = :scatter,
+                    mode = "lines+markers",
+                    name = "ρV",
+                );
+                p.layout.title = "Evolução de ρV";
+                p.layout.xaxis.title = "Iterações";
+                p.layout.yaxis.title = "ρV";
+                p.layout.yaxis.type = "log";
+                p
+            )
+        )(),
+        "plot_rho_vmag_$(stem).html",
+    )
+    return plot_theta_avg_heatmap(θ_avg_hist, "plot_theta_avg_heatmap_$(stem).html")
+end
+
+function save_ac_branch_plots(
+    res_pri,
+    res_du,
+    eps_pri,
+    eps_du,
+    rhoP_hist,
+    rhoQ_hist;
+    stem::String = "admm_ac_branch",
+)
+    plot_admm_convergence(
+        res_pri,
+        res_du,
+        eps_pri,
+        eps_du,
+        "plot_convergencia_$(stem).html",
+    )
+    PlotlyLight.save(
+        (
+            () -> (
+                p = Plot();
+                p(;
+                    x = 1:length(rhoP_hist),
+                    y = rhoP_hist,
+                    type = :scatter,
+                    mode = "lines+markers",
+                    name = "ρP",
+                );
+                p.layout.title = "Evolução de ρP";
+                p.layout.xaxis.title = "Iterações";
+                p.layout.yaxis.title = "ρP";
+                p.layout.yaxis.type = "log";
+                p
+            )
+        )(),
+        "plot_rhoP_$(stem).html",
+    )
+    return PlotlyLight.save(
+        (
+            () -> (
+                p = Plot();
+                p(;
+                    x = 1:length(rhoQ_hist),
+                    y = rhoQ_hist,
+                    type = :scatter,
+                    mode = "lines+markers",
+                    name = "ρQ",
+                );
+                p.layout.title = "Evolução de ρQ";
+                p.layout.xaxis.title = "Iterações";
+                p.layout.yaxis.title = "ρQ";
+                p.layout.yaxis.type = "log";
+                p
+            )
+        )(),
+        "plot_rhoQ_$(stem).html",
+    )
+end
+
+# ---------- Plots (wrappers) ----------
+function save_socp_v2rt_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
+    rhoV2_hist, rhoR_hist, rhoT_hist; stem = "admm_socp_v2rt")
+    plot_admm_convergence(r_hist, s_hist, eps_r_hist, eps_s_hist,
+        "plot_convergencia_$(stem).html")
+    PlotlyLight.save(
+        (
+            () -> (
+                p = Plot();
+                p(; x = 1:length(rhoV2_hist), y = rhoV2_hist, type = :scatter,
+                    mode = "lines+markers", name = "ρ(V²)");
+                p.layout.title = "Evolução de ρ(V²)";
+                p.layout.xaxis.title = "Iterações";
+                p.layout.yaxis.title = "ρ(V²)";
+                p.layout.yaxis.type = "log";
+                p
+            )
+        )(), "plot_rho_v2_$(stem).html")
+    PlotlyLight.save(
+        (
+            () -> (
+                p = Plot();
+                p(; x = 1:length(rhoR_hist), y = rhoR_hist, type = :scatter,
+                    mode = "lines+markers", name = "ρR");
+                p.layout.title = "Evolução de ρR";
+                p.layout.xaxis.title = "Iterações";
+                p.layout.yaxis.title = "ρR";
+                p.layout.yaxis.type = "log";
+                p
+            )
+        )(), "plot_rhoR_$(stem).html")
+    return PlotlyLight.save(
+        (
+            () -> (
+                p = Plot();
+                p(; x = 1:length(rhoT_hist), y = rhoT_hist, type = :scatter,
+                    mode = "lines+markers", name = "ρT");
+                p.layout.title = "Evolução de ρT";
+                p.layout.xaxis.title = "Iterações";
+                p.layout.yaxis.title = "ρT";
+                p.layout.yaxis.type = "log";
+                p
+            )
+        )(), "plot_rhoT_$(stem).html")
+end
+
+function save_socp_branch_pq_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
+    rhoP_hist, rhoQ_hist; stem = "admm_socp_branch")
+    plot_admm_convergence(r_hist, s_hist, eps_r_hist, eps_s_hist,
+        "plot_convergencia_$(stem).html")
+    PlotlyLight.save(
+        (
+            () -> (
+                p = Plot();
+                p(; x = 1:length(rhoP_hist), y = rhoP_hist, type = :scatter,
+                    mode = "lines+markers", name = "ρP");
+                p.layout.title = "Evolução de ρP";
+                p.layout.xaxis.title = "Iterações";
+                p.layout.yaxis.title = "ρP";
+                p.layout.yaxis.type = "log";
+                p
+            )
+        )(), "plot_rhoP_$(stem).html")
+    return PlotlyLight.save(
+        (
+            () -> (
+                p = Plot();
+                p(; x = 1:length(rhoQ_hist), y = rhoQ_hist, type = :scatter,
+                    mode = "lines+markers", name = "ρQ");
+                p.layout.title = "Evolução de ρQ";
+                p.layout.xaxis.title = "Iterações";
+                p.layout.yaxis.title = "ρQ";
+                p.layout.yaxis.type = "log";
+                p
+            )
+        )(), "plot_rhoQ_$(stem).html")
+end
+
+function save_socp_hybrid_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
+    rhoV2_hist, rhoP_hist, rhoQ_hist, rhoR_hist, rhoT_hist;
+    stem = "admm_socp_hybrid")
+    plot_admm_convergence(r_hist, s_hist, eps_r_hist, eps_s_hist,
+        "plot_convergencia_$(stem).html")
+    for (lab, hist) in [("ρ(V²)", rhoV2_hist), ("ρP", rhoP_hist), ("ρQ", rhoQ_hist),
+        ("ρR", rhoR_hist), ("ρT", rhoT_hist)]
+        fname = replace(lab, "/" => "") |> x -> lowercase(replace(x, "ρ" => "rho"))
+        PlotlyLight.save(
+            (
+                () -> (
+                    p = Plot();
+                    p(; x = 1:length(hist), y = hist, type = :scatter,
+                        mode = "lines+markers", name = lab);
+                    p.layout.title = "Evolução de $(lab)";
+                    p.layout.xaxis.title = "Iterações";
+                    p.layout.yaxis.title = lab;
+                    p.layout.yaxis.type = "log";
+                    p
+                )
+            )(), "plot_$(fname)_$(stem).html")
+    end
+end

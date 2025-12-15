@@ -195,11 +195,6 @@ end
     return buf
 end
 
-function prepare_dense_maps_ac(shared_buses::Vector{Int})
-    shared_buses_sorted = sort(shared_buses)
-    b2pos = Dict{Int, Int}(b => i for (i, b) in enumerate(shared_buses_sorted))
-    return shared_buses_sorted, b2pos
-end
 
 function _build_quad_bus_expr_ac!(part::PartitionAC, ρθ::Float64, ρV::Float64)
     m = part.model::JuMP.Model
@@ -666,127 +661,6 @@ function eps_dual_branch_ac(
     return sqrt(dim) * ϵ_abs + ϵ_rel * s
 end
 
-##########################
-# WRAPPERS DE PLOT       #
-##########################
-
-function save_ac_bus_plots(
-    res_pri,
-    res_du,
-    eps_pri,
-    eps_du,
-    rhoθ_hist,
-    rhoV_hist,
-    θ_avg_hist;
-    stem::String = "admm_ac",
-)
-    plot_admm_convergence(
-        res_pri,
-        res_du,
-        eps_pri,
-        eps_du,
-        "plot_convergencia_$(stem).html",
-    )
-    PlotlyLight.save(
-        (
-            () -> (
-                p = Plot();
-                p(;
-                    x = 1:length(rhoθ_hist),
-                    y = rhoθ_hist,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρθ",
-                );
-                p.layout.title = "Evolução de ρθ";
-                p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρθ";
-                p.layout.yaxis.type = "log";
-                p
-            )
-        )(),
-        "plot_rho_theta_$(stem).html",
-    )
-    PlotlyLight.save(
-        (
-            () -> (
-                p = Plot();
-                p(;
-                    x = 1:length(rhoV_hist),
-                    y = rhoV_hist,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρV",
-                );
-                p.layout.title = "Evolução de ρV";
-                p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρV";
-                p.layout.yaxis.type = "log";
-                p
-            )
-        )(),
-        "plot_rho_vmag_$(stem).html",
-    )
-    return plot_theta_avg_heatmap(θ_avg_hist, "plot_theta_avg_heatmap_$(stem).html")
-end
-
-function save_ac_branch_plots(
-    res_pri,
-    res_du,
-    eps_pri,
-    eps_du,
-    rhoP_hist,
-    rhoQ_hist;
-    stem::String = "admm_ac_branch",
-)
-    plot_admm_convergence(
-        res_pri,
-        res_du,
-        eps_pri,
-        eps_du,
-        "plot_convergencia_$(stem).html",
-    )
-    PlotlyLight.save(
-        (
-            () -> (
-                p = Plot();
-                p(;
-                    x = 1:length(rhoP_hist),
-                    y = rhoP_hist,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρP",
-                );
-                p.layout.title = "Evolução de ρP";
-                p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρP";
-                p.layout.yaxis.type = "log";
-                p
-            )
-        )(),
-        "plot_rhoP_$(stem).html",
-    )
-    return PlotlyLight.save(
-        (
-            () -> (
-                p = Plot();
-                p(;
-                    x = 1:length(rhoQ_hist),
-                    y = rhoQ_hist,
-                    type = :scatter,
-                    mode = "lines+markers",
-                    name = "ρQ",
-                );
-                p.layout.title = "Evolução de ρQ";
-                p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρQ";
-                p.layout.yaxis.type = "log";
-                p
-            )
-        )(),
-        "plot_rhoQ_$(stem).html",
-    )
-end
 
 #################################
 # ADMM: BUS (AC) – usando sys   #
@@ -807,7 +681,7 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
     for (_, part) in partitions
         prepare_hotpaths_ac!(part)
     end
-    shared_buses_sorted, b2pos = prepare_dense_maps_ac(shared_buses)
+    shared_buses_sorted, b2pos = prepare_dense_maps(shared_buses)
 
     dualsθ_dense = Dict{Int, Vector{Float64}}(
         z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
@@ -1292,7 +1166,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     adaptive_bus = adaptive
     adaptive_br = adaptive
 
-    shared_buses_sorted, b2pos = prepare_dense_maps_ac(shared_buses)
+    shared_buses_sorted, b2pos = prepare_dense_maps(shared_buses)
 
     dualsθ_dense = Dict{Int, Vector{Float64}}(
         z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
