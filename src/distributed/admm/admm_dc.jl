@@ -1,52 +1,3 @@
-function resolve_optimizer_dc(config)
-    opt = try
-        getfield(config, :optimizer)
-    catch
-        nothing
-    end
-
-    if opt !== nothing
-        if opt == COSMO.Optimizer
-            return optimizer_with_attributes(
-                COSMO.Optimizer,
-                "eps_abs" => 1e-6,
-                "eps_rel" => 1e-6,
-                "max_iter" => 10_000,
-                "verbose" => false,
-                "decompose" => true,
-            )
-        else
-            return opt
-        end
-    end
-
-    eps_abs = try
-        getfield(config, Symbol("ε_primal"))
-    catch
-        1e-6
-    end
-    eps_rel = try
-        getfield(config, Symbol("ε_dual"))
-    catch
-        1e-6
-    end
-
-    return optimizer_with_attributes(
-        OSQP.Optimizer,
-        "eps_abs" => eps_abs,
-        "eps_rel" => eps_rel,
-        "max_iter" => 50_000,
-        "verbose" => false,
-        "adaptive_rho" => true,
-        "linsys_solver" => "qdldl",
-    )
-end
-
-####################
-# PEQUENOS HELPERS #
-####################
-
-
 @inline function _val_or_start(m::JuMP.Model, x::JuMP.VariableRef)
     if JuMP.has_values(m)
         return JuMP.value(x)
@@ -436,22 +387,6 @@ function update_duals_flow!(
     end
     return nothing
 end
-
-
-##########################
-# FLAGS DE CONFIG        #
-##########################
-
-@inline _adaptive_on(config) =
-    hasfield(typeof(config), :adaptive_rho) ? getfield(config, :adaptive_rho) : true
-
-# =======================================================================
-# Runners
-# =======================================================================
-
-##########################
-# ADMM: BUS / DC         #
-##########################
 
 function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     t0_ns = time_ns()

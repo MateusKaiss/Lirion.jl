@@ -1,8 +1,3 @@
-
-
-"Retorna true se o modelo `m` está usando Gurobi."
-is_gurobi(m::JuMP.Model)::Bool = occursin("Gurobi", MOI.get(m, MOI.SolverName()))
-
 "Ridge suave para estabilizar QCP no runner branch (P,Q)."
 function _soft_anchor_branch_expr!(sub::PartitionSOCP;
     κV2::Float64 = 1e-6, κPQ::Float64 = 1e-8,
@@ -36,67 +31,14 @@ function _soft_anchor_branch_expr!(sub::PartitionSOCP;
     return q
 end
 
-# ---- Otimizador: tenta Gurobi -> Clarabel -> SCS (com override) ----
-function resolve_socp_optimizer(config)
-    # 1) Prioridade absoluta ao que veio no config (se existir e não-nothing)
-    if Base.hasfield(typeof(config), :optimizer)
-        opt = getfield(config, :optimizer)
-        if opt !== nothing
-            return opt              # ex.: Clarabel.Optimizer, Gurobi.Optimizer, SCS.Optimizer
-        end
-    end
-
-    # 2) Ordem preferida opcional: :auto | :gurobi | :clarabel | :scs
-    prefer = (
-        Base.hasfield(typeof(config), :prefer_socp_solver) ?
-        getfield(config, :prefer_socp_solver) : :auto
-    )
-
-    order =
-        prefer === :gurobi ? (:gurobi, :clarabel, :scs) :
-        prefer === :clarabel ? (:clarabel, :gurobi, :scs) :
-        prefer === :scs ? (:scs, :gurobi, :clarabel) :
-        (:gurobi, :clarabel, :scs)   # :auto
-
-    # 3) Retorna o primeiro construtor disponível (factory), sem instanciar aqui
-    for s in order
-        try
-            if s === :gurobi
-                return Gurobi.Optimizer
-            elseif s === :clarabel
-                return Clarabel.Optimizer
-            else
-                return SCS.Optimizer
-            end
-        catch
-            # pacote ausente? tenta o próximo
-        end
-    end
-    return SCS.Optimizer
+@inline function _socp_flow_from_exprs_existing(
+    model::Model, l_local::Int; t::Int = 1,
+)
+    return model[:p_flow_branches][l_local, t], model[:q_flow_branches][l_local, t]
 end
 
-# (mantido, mas sem forçar nada além do que você já usa)
-safe_set_optimizer_attr!(m, key, val) = (
-    try
-        set_optimizer_attribute(m, key, val)
-    catch
-        nothing
-    end
-)
-
-"Configura tolerâncias/accel do SCS (mantido; use se quiser)."
-function set_socp_defaults!(m; eps_abs = 1e-6, eps_rel = 1e-6, max_iters = 200_000,
-    acceleration_lookback = 10, acceleration_interval = 10,
-    alpha = 1.8, normalize = true, scale = 1.0)
-    safe_set_optimizer_attr!(m, "eps_abs", eps_abs)
-    safe_set_optimizer_attr!(m, "eps_rel", eps_rel)
-    safe_set_optimizer_attr!(m, "max_iters", max_iters)
-    safe_set_optimizer_attr!(m, "acceleration_lookback", acceleration_lookback)
-    safe_set_optimizer_attr!(m, "acceleration_interval", acceleration_interval)
-    safe_set_optimizer_attr!(m, "alpha", alpha)
-    safe_set_optimizer_attr!(m, "normalize", normalize)
-    safe_set_optimizer_attr!(m, "scale", scale)
-    return nothing
+@inline function _rt_from_exprs_socp(model::Model, l_local::Int; t::Int = 1)
+    return model[:R][l_local, t], model[:T_var][l_local, t]
 end
 
 @inline function snapshot_v2!(sub::PartitionSOCP)

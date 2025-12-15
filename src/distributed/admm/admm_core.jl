@@ -16,27 +16,6 @@ function compute_real_generation_cost(model, params)
     return total_cost
 end
 
-@inline function _socp_flow_from_exprs_existing(
-    model::Model, l_local::Int; t::Int = 1,
-)
-    return model[:p_flow_branches][l_local, t], model[:q_flow_branches][l_local, t]
-end
-
-@inline function _rt_from_exprs_socp(model::Model, l_local::Int; t::Int = 1)
-    return model[:R][l_local, t], model[:T_var][l_local, t]
-end
-
-function _dc_flow_expr(model::Model, subdata::Dict{String, Any}, l_local::Int; t::Int = 1)
-    l_global = subdata["branch_local_indices"][l_local]
-    f = subdata["branch_full"]["f_bus"][l_global]
-    tbus = subdata["branch_full"]["t_bus"][l_global]
-    x = subdata["branch_full"]["br_x"][l_global]
-
-    θf = model[:theta][f, t]
-    θt = model[:theta][tbus, t]
-    return (θf - θt) / x
-end
-
 function plot_admm_convergence(
     res_primal::Vector{Float64},
     res_dual::Vector{Float64},
