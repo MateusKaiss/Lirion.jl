@@ -239,24 +239,6 @@ function set_socp_defaults!(m; eps_abs = 1e-6, eps_rel = 1e-6, max_iters = 200_0
     return nothing
 end
 
-
-@inline function _zone_cut_edges(part::PartitionAC, cut_edges::Vector{Int})
-    return [e for e in cut_edges if haskey(part.edge_to_local, e)]
-end
-
-@inline function _zone_cut_edges(part::PartitionDC, cut_edges::Vector{Int})
-    return [e for e in cut_edges if haskey(part.edge_to_local, e)]
-end
-
-@inline function _zone_cut_edges(
-    sub::Union{PartitionDC, PartitionAC, PartitionSOCP},
-    cut_edges::Vector{Int},
-)
-    return [e for e in cut_edges if haskey(sub.edge_to_local, e)]
-end
-
-@inline _wrap_angle_diff(Δ::Float64) = atan(sin(Δ), cos(Δ))
-
 @inline function _pretty_time(sec::Real)
     if sec < 60
         return "$(round(sec; digits = 3)) s"
@@ -266,3 +248,53 @@ end
         return "$(round(sec/3600; digits = 2)) h"
     end
 end
+
+# ---------- ρ adaptativo (paridade com DC) ----------
+function adaptive_rho!(ρ::Base.RefValue{Float64}, r::Float64, s::Float64;
+    μ_incr = 2.0, μ_decr = 2.0, τ_incr = 1.05, τ_decr = 0.98)
+    if r > μ_incr * s
+        ρ[] *= τ_incr
+    elseif s > μ_decr * r
+        ρ[] *= τ_decr
+    end
+end
+##########################
+# ρ ADAPTATIVO           #
+##########################
+
+#############################
+# ρ ADAPTATIVO AC           #
+#############################
+
+function adaptive_rho_ac!(
+    ρ::Base.RefValue{Float64},
+    r::Float64,
+    s::Float64;
+    μ_incr = 2.0,
+    μ_decr = 2.0,
+    τ_incr = 1.05,
+    τ_decr = 0.98,
+)
+    if r > μ_incr * s
+        ρ[] *= τ_incr
+    elseif s > μ_decr * r
+        ρ[] *= τ_decr
+    end
+end
+
+function adaptive_rho_dc!(
+    ρ::Base.RefValue{Float64},
+    r::Float64,
+    s::Float64;
+    μ_incr = 3.0,
+    μ_decr = 3.0,
+    τ_incr = 1.05,
+    τ_decr = 0.98,
+)
+    if r > μ_incr * s
+        ρ[] *= τ_incr
+    elseif s > μ_decr * r
+        ρ[] *= τ_decr
+    end
+end
+

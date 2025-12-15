@@ -113,12 +113,11 @@ include("build_results/build_results.jl")
 # ------------------------------------------------------------------
 include("distributed/distributed_opf.jl")
 
-include("distributed/admm/utils.jl")
-include("distributed/admm/preparation.jl")
+include("distributed/admm/admm_support.jl")
+include("distributed/admm/admm_hotpaths.jl")
+include("distributed/admm/admm_terms.jl")
+include("distributed/admm/admm_kernels.jl")
 include("distributed/admm/admm_core.jl")
-
-include("distributed/admm/terms_bus.jl")
-include("distributed/admm/terms_branch.jl")
 
 include("distributed/admm/admm_dc.jl")
 include("distributed/admm/admm_ac.jl")
