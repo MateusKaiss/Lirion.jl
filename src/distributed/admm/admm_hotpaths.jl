@@ -34,7 +34,7 @@ end
 # =========================
 # HOTPATHS: SOCP (V²)
 # =========================
-function prepare_hotpaths_socp!(part::PartitionSOCP)
+function prepare_hotpaths!(part::PartitionSOCP)
     # map bus global id -> posição local
     ids = part.bus.id
     nbus = length(ids)

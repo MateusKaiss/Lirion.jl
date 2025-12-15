@@ -1,5 +1,3 @@
-prepare_hotpaths!(p::PartitionSOCP) = prepare_hotpaths_socp!(p)
-
 function init_socp_v2rt_partition!(
     sub::PartitionSOCP,
     sys_zone,
