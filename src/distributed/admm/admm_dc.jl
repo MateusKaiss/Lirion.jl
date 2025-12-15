@@ -4,7 +4,6 @@ function init_dc_bus_partition!(
     optimizer_factory,
     ρθ::Float64,
 )
-
     prepare_hotpaths!(part)
     m = build_model(sys_zone, DC; optimizer = optimizer_factory)
     part.model = m
@@ -53,7 +52,6 @@ function init_dc_branch_partition!(
     return nothing
 end
 
-# HYBRID/DC init (θ shared + p_flow on cut edges)
 function init_dc_hybrid_partition!(
     part::PartitionDC,
     sys_zone,
@@ -85,11 +83,6 @@ function init_dc_hybrid_partition!(
     return nothing
 end
 
-
-############################
-# ADMM: BUS/DC             #
-############################
-
 function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     t0_ns = time_ns()
     iter_done = 0
@@ -97,10 +90,8 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     @assert config.base_model == DC "ADMM bus/DC requer base_model == DC."
 
     partitions = build_dc_partitions(sys)
-    shared_buses = sys.shared_buses
-
-    # mapas densos (BUS)
-    shared_buses_sorted, b2pos = prepare_dense_maps(shared_buses)
+    consensus_buses = sys.shared_buses
+    consensus_buses_sorted, consensus_buses_idx = prepare_dense_maps(consensus_buses)
 
     ρ = Ref(config.rho_theta)
     ϵ_abs = config.ε_primal
@@ -109,7 +100,6 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
 
     optimizer_factory = resolve_optimizer_dc(config)
 
-    # init por zona (hotpaths + model + quad)
     for (zone_id, part) in partitions
         init_dc_bus_partition!(
             part,
@@ -122,13 +112,13 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     zone_ids = collect(keys(partitions))
 
     duals_dense = Dict{Int, Vector{Float64}}(
-        z => zeros(Float64, length(shared_buses_sorted)) for z in zone_ids
+        z => zeros(Float64, length(consensus_buses_sorted)) for z in zone_ids
     )
     λ_zone_buf = Dict{Int, Vector{Float64}}(
-        z => zeros(Float64, length(shared_buses_sorted)) for z in zone_ids
+        z => zeros(Float64, length(consensus_buses_sorted)) for z in zone_ids
     )
 
-    θ̄_vec = zeros(Float64, length(shared_buses_sorted))
+    θ̄_vec = zeros(Float64, length(consensus_buses_sorted))
     θ̄_prev_vec = similar(θ̄_vec)
 
     res_primal_vec = Float64[]
@@ -162,8 +152,8 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
 
             lin = _build_linear_bus_expr(
                 part,
-                shared_buses_sorted,
-                b2pos,
+                consensus_buses_sorted,
+                consensus_buses_idx,
                 θ̄_vec,
                 λz,
                 ρ[],
@@ -206,9 +196,9 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
         end
 
         θ̄_prev_vec .= θ̄_vec
-        compute_theta_consensus_vec!(θ̄_vec, partitions, shared_buses_sorted, b2pos)
-        @inbounds for b in shared_buses_sorted
-            j = b2pos[b]
+        compute_theta_consensus_vec!(θ̄_vec, partitions, consensus_buses_sorted, consensus_buses_idx)
+        @inbounds for b in consensus_buses_sorted
+            j = consensus_buses_idx[b]
             push!(get!(θ_avg_history, b, Float64[]), θ̄_vec[j])
         end
 
@@ -218,17 +208,17 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
                 partitions[z],
                 θ̄_vec,
                 ρ[],
-                shared_buses_sorted,
-                b2pos,
+                consensus_buses_sorted,
+                consensus_buses_idx,
             )
         end
 
-        res_primal = primal_residual_bus_dc(partitions, θ̄_vec, shared_buses_sorted, b2pos)
+        res_primal = primal_residual_bus_dc(partitions, θ̄_vec, consensus_buses_sorted, consensus_buses_idx)
         res_dual = dual_residual_bus_dc(θ̄_vec, θ̄_prev_vec)
         push!(res_primal_vec, res_primal)
         push!(res_dual_vec, res_dual)
 
-        ϵ_pri = eps_primal_bus_dc(partitions, θ̄_vec, shared_buses_sorted, b2pos, ϵ_abs, ϵ_rel)
+        ϵ_pri = eps_primal_bus_dc(partitions, θ̄_vec, consensus_buses_sorted, consensus_buses_idx, ϵ_abs, ϵ_rel)
         ϵ_du = eps_dual_bus_dc(θ̄_vec, θ̄_prev_vec, ϵ_abs, ϵ_rel)
         push!(eps_primal_vec, ϵ_pri)
         push!(eps_dual_vec, ϵ_du)
@@ -458,10 +448,10 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     @assert config.base_model == DC "Hybrid ADMM/DC requer DC."
 
     partitions = build_dc_partitions(sys)
-    shared_buses = sys.shared_buses
+    consensus_buses = sys.shared_buses
     cut_edges = sys.cut_edges
 
-    shared_buses_sorted, b2pos = prepare_dense_maps(shared_buses)
+    consensus_buses_sorted, consensus_buses_idx = prepare_dense_maps(consensus_buses)
 
     ρθ = Ref(config.rho_theta)
     ρe = Ref(config.rho_flow)
@@ -469,14 +459,14 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     ϵ_rel = config.ε_dual
     adaptive = _adaptive_on(config)
 
-    θ̄_vec = zeros(Float64, length(shared_buses_sorted))
+    θ̄_vec = zeros(Float64, length(consensus_buses_sorted))
     θ̄_prev_vec = similar(θ̄_vec)
 
     z_flow = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     z_flow_prev = Dict{Int, Float64}()
 
     duals_theta = Dict{Int, Vector{Float64}}(
-        z => zeros(Float64, length(shared_buses_sorted)) for z in keys(partitions)
+        z => zeros(Float64, length(consensus_buses_sorted)) for z in keys(partitions)
     )
     duals_flow = Dict{Int, Dict{Int, Float64}}(
         z => Dict{Int, Float64}() for z in keys(partitions)
@@ -506,7 +496,7 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
 
     zone_ids = collect(keys(partitions))
     λθ_zone_buf = Dict{Int, Vector{Float64}}(
-        z => zeros(Float64, length(shared_buses_sorted)) for z in zone_ids
+        z => zeros(Float64, length(consensus_buses_sorted)) for z in zone_ids
     )
 
     prev_ρθ = ρθ[]
@@ -539,8 +529,8 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
 
             lin_bus = _build_linear_bus_expr(
                 part,
-                shared_buses_sorted,
-                b2pos,
+                consensus_buses_sorted,
+                consensus_buses_idx,
                 θ̄_vec,
                 λθ,
                 ρθ[],
@@ -578,9 +568,9 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         θ̄_prev_vec .= θ̄_vec
         z_flow_prev = copy(z_flow)
 
-        compute_theta_consensus_vec!(θ̄_vec, partitions, shared_buses_sorted, b2pos)
-        @inbounds for b in shared_buses_sorted
-            j = b2pos[b]
+        compute_theta_consensus_vec!(θ̄_vec, partitions, consensus_buses_sorted, consensus_buses_idx)
+        @inbounds for b in consensus_buses_sorted
+            j = consensus_buses_idx[b]
             push!(get!(θ_avg_history, b, Float64[]), θ̄_vec[j])
         end
         compute_z_flow_consensus!(z_flow, partitions, cut_edges)
@@ -591,13 +581,13 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
                 partitions[z],
                 θ̄_vec,
                 ρθ[],
-                shared_buses_sorted,
-                b2pos,
+                consensus_buses_sorted,
+                consensus_buses_idx,
             )
         end
         update_duals_flow!(duals_flow, partitions, z_flow, cut_edges, ρe[])
 
-        res_pri_bus = primal_residual_bus_dc(partitions, θ̄_vec, shared_buses_sorted, b2pos)
+        res_pri_bus = primal_residual_bus_dc(partitions, θ̄_vec, consensus_buses_sorted, consensus_buses_idx)
         res_pri_br = primal_residual_branch_dc(partitions, z_flow, cut_edges)
         res_primal = hypot(res_pri_bus, res_pri_br)
 
@@ -608,7 +598,7 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         push!(res_primal_vec, res_primal)
         push!(res_dual_vec, res_dual)
 
-        ϵb_pri = eps_primal_bus_dc(partitions, θ̄_vec, shared_buses_sorted, b2pos, ϵ_abs, ϵ_rel)
+        ϵb_pri = eps_primal_bus_dc(partitions, θ̄_vec, consensus_buses_sorted, consensus_buses_idx, ϵ_abs, ϵ_rel)
         ϵe_pri = eps_primal_branch_dc(partitions, z_flow, cut_edges, ϵ_abs, ϵ_rel)
         push!(eps_primal_vec, hypot(ϵb_pri, ϵe_pri))
 

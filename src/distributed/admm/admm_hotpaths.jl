@@ -86,7 +86,6 @@ function prepare_dense_maps(shared_buses::Vector{Int})
     return shared_buses_sorted, b2pos
 end
 
-
 @inline function _zone_cut_edges(part::PartitionAC, cut_edges::Vector{Int})
     return [e for e in cut_edges if haskey(part.edge_to_local, e)]
 end
