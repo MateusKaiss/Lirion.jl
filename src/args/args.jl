@@ -32,28 +32,28 @@ struct Args
 
             # ======= ADMM =======
             "--admm-rho"
-            help = "Default ρ used if a specific rho (theta/v/flow) is not provided (default: 1000.0)"
+            help = "Default rho used if a specific rho (theta/v/flow) is not provided (default: 1000.0)"
             arg_type = Float64
             default = 1_000.0
 
             "--admm-rho-theta"
-            help = "ρθ (consensus penalty for bus angles; ignored for SOCP-hybrid)"
+            help = "rhoθ (consensus penalty for bus angles; ignored for SOCP-hybrid)"
             arg_type = Float64
 
             "--admm-rho-v"
-            help = "ρV (consensus penalty for voltage magnitudes; AC usa |V|, SOCP usa V^2)"
+            help = "rhoV (consensus penalty for voltage magnitudes; AC usa |V|, SOCP usa V^2)"
             arg_type = Float64
 
             "--admm-rho-flow"
-            help = "ρe (consensus penalty for branch flows; applies to P and Q if specifics are absent)"
+            help = "rhoe (consensus penalty for branch flows; applies to P and Q if specifics are absent)"
             arg_type = Float64
 
             "--admm-rho-flow-p"
-            help = "ρP (consensus penalty for active power flow in branch consensus; em SOCP-hybrid também usado para R=Re(W))"
+            help = "rhoP (consensus penalty for active power flow in branch consensus; em SOCP-hybrid também usado para R=Re(W))"
             arg_type = Float64
 
             "--admm-rho-flow-q"
-            help = "ρQ (consensus penalty for reactive power flow in branch consensus; em SOCP-hybrid também usado para T=Im(W))"
+            help = "rhoQ (consensus penalty for reactive power flow in branch consensus; em SOCP-hybrid também usado para T=Im(W))"
             arg_type = Float64
 
             "--admm-max-iter"
@@ -80,7 +80,7 @@ struct Args
             action = :store_true
 
             "--admm-adaptive"
-            help = "Liga/desliga o ajuste adaptativo de ρ no ADMM: on | off (padrão: on)"
+            help = "Liga/desliga o ajuste adaptativo de rho no ADMM: on | off (padrão: on)"
             arg_type = String
             default = "on"
 

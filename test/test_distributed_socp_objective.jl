@@ -263,7 +263,7 @@ function run_distributed_socp_objective_tests(;
         admm_eps_dual_case = admm_eps_dual
 
         @info "[$label] Rodando caso $i de $n: $case_name " *
-              "(max_iter=$(admm_max_iter_case), ρV²=$(rho_v_case), ρP=$(rho_flow_p_case), ρQ=$(rho_flow_q_case), " *
+              "(max_iter=$(admm_max_iter_case), rhoV²=$(rho_v_case), rhoP=$(rho_flow_p_case), rhoQ=$(rho_flow_q_case), " *
               "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"
 
         @testset "$(label) - $(case_name)" begin

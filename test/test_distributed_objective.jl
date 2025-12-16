@@ -252,8 +252,8 @@ function run_distributed_objective_tests(;
             admm_mu_decr_case = 3.0
             admm_tau_incr_case = 1.0         # neutro (sem adaptação efetiva)
             admm_tau_decr_case = 1.0
-            admm_accel_case = true           # liga aceleração (θ̄ e λ extrapolados)
-            admm_adaptive_case = "off"       # ρ fixo no BUS
+            admm_accel_case = true           # liga aceleração (θ̄ e lambda extrapolados)
+            admm_adaptive_case = "off"       # rho fixo no BUS
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name " *

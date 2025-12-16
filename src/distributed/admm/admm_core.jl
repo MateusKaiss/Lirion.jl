@@ -75,13 +75,13 @@ function plot_rho(rho_vec::Vector{Float64}, path::String)
         y = rho_vec,
         type = :scatter,
         mode = "lines+markers",
-        name = "ρ",
+        name = "rho",
         line = (; color = "green"),
     )
 
-    p.layout.title = "Evolução de ρ (rho) no ADMM"
+    p.layout.title = "Evolução de rho (rho) no ADMM"
     p.layout.xaxis.title = "Iterações k"
-    p.layout.yaxis.title = "ρ"
+    p.layout.yaxis.title = "rho"
     p.layout.yaxis.type = "log"
 
     PlotlyLight.save(p, path)
@@ -148,7 +148,7 @@ function save_dc_bus_plots(
     res_du,
     eps_pri,
     eps_du,
-    ρ_hist,
+    rho_hist,
     θ_avg_history;
     stem::String = "admm",
 )
@@ -159,7 +159,7 @@ function save_dc_bus_plots(
         eps_du,
         "plot_convergencia_$(stem)_dc.html",
     )
-    plot_rho(ρ_hist, "plot_rho_$(stem)_dc.html")
+    plot_rho(rho_hist, "plot_rho_$(stem)_dc.html")
     return plot_theta_avg_heatmap(θ_avg_history, "plot_theta_avg_heatmap_$(stem)_dc.html")
 end
 
@@ -168,7 +168,7 @@ function save_dc_branch_plots(
     res_du,
     eps_pri,
     eps_du,
-    ρ_hist;
+    rho_hist;
     stem::String = "admm_branch",
 )
     plot_admm_convergence(
@@ -178,7 +178,7 @@ function save_dc_branch_plots(
         eps_du,
         "plot_convergencia_$(stem).html",
     )
-    return plot_rho(ρ_hist, "plot_rho_$(stem).html")
+    return plot_rho(rho_hist, "plot_rho_$(stem).html")
 end
 
 ##########################
@@ -211,11 +211,11 @@ function save_ac_bus_plots(
                     y = rhoθ_hist,
                     type = :scatter,
                     mode = "lines+markers",
-                    name = "ρθ",
+                    name = "rhoθ",
                 );
-                p.layout.title = "Evolução de ρθ";
+                p.layout.title = "Evolução de rhoθ";
                 p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρθ";
+                p.layout.yaxis.title = "rhoθ";
                 p.layout.yaxis.type = "log";
                 p
             )
@@ -231,11 +231,11 @@ function save_ac_bus_plots(
                     y = rhoV_hist,
                     type = :scatter,
                     mode = "lines+markers",
-                    name = "ρV",
+                    name = "rhoV",
                 );
-                p.layout.title = "Evolução de ρV";
+                p.layout.title = "Evolução de rhoV";
                 p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρV";
+                p.layout.yaxis.title = "rhoV";
                 p.layout.yaxis.type = "log";
                 p
             )
@@ -270,11 +270,11 @@ function save_ac_branch_plots(
                     y = rhoP_hist,
                     type = :scatter,
                     mode = "lines+markers",
-                    name = "ρP",
+                    name = "rhoP",
                 );
-                p.layout.title = "Evolução de ρP";
+                p.layout.title = "Evolução de rhoP";
                 p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρP";
+                p.layout.yaxis.title = "rhoP";
                 p.layout.yaxis.type = "log";
                 p
             )
@@ -290,11 +290,11 @@ function save_ac_branch_plots(
                     y = rhoQ_hist,
                     type = :scatter,
                     mode = "lines+markers",
-                    name = "ρQ",
+                    name = "rhoQ",
                 );
-                p.layout.title = "Evolução de ρQ";
+                p.layout.title = "Evolução de rhoQ";
                 p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρQ";
+                p.layout.yaxis.title = "rhoQ";
                 p.layout.yaxis.type = "log";
                 p
             )
@@ -313,10 +313,10 @@ function save_socp_v2rt_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
             () -> (
                 p = Plot();
                 p(; x = 1:length(rhoV2_hist), y = rhoV2_hist, type = :scatter,
-                    mode = "lines+markers", name = "ρ(V²)");
-                p.layout.title = "Evolução de ρ(V²)";
+                    mode = "lines+markers", name = "rho(V²)");
+                p.layout.title = "Evolução de rho(V²)";
                 p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρ(V²)";
+                p.layout.yaxis.title = "rho(V²)";
                 p.layout.yaxis.type = "log";
                 p
             )
@@ -326,10 +326,10 @@ function save_socp_v2rt_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
             () -> (
                 p = Plot();
                 p(; x = 1:length(rhoR_hist), y = rhoR_hist, type = :scatter,
-                    mode = "lines+markers", name = "ρR");
-                p.layout.title = "Evolução de ρR";
+                    mode = "lines+markers", name = "rhoR");
+                p.layout.title = "Evolução de rhoR";
                 p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρR";
+                p.layout.yaxis.title = "rhoR";
                 p.layout.yaxis.type = "log";
                 p
             )
@@ -339,10 +339,10 @@ function save_socp_v2rt_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
             () -> (
                 p = Plot();
                 p(; x = 1:length(rhoT_hist), y = rhoT_hist, type = :scatter,
-                    mode = "lines+markers", name = "ρT");
-                p.layout.title = "Evolução de ρT";
+                    mode = "lines+markers", name = "rhoT");
+                p.layout.title = "Evolução de rhoT";
                 p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρT";
+                p.layout.yaxis.title = "rhoT";
                 p.layout.yaxis.type = "log";
                 p
             )
@@ -358,10 +358,10 @@ function save_socp_branch_pq_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
             () -> (
                 p = Plot();
                 p(; x = 1:length(rhoP_hist), y = rhoP_hist, type = :scatter,
-                    mode = "lines+markers", name = "ρP");
-                p.layout.title = "Evolução de ρP";
+                    mode = "lines+markers", name = "rhoP");
+                p.layout.title = "Evolução de rhoP";
                 p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρP";
+                p.layout.yaxis.title = "rhoP";
                 p.layout.yaxis.type = "log";
                 p
             )
@@ -371,10 +371,10 @@ function save_socp_branch_pq_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
             () -> (
                 p = Plot();
                 p(; x = 1:length(rhoQ_hist), y = rhoQ_hist, type = :scatter,
-                    mode = "lines+markers", name = "ρQ");
-                p.layout.title = "Evolução de ρQ";
+                    mode = "lines+markers", name = "rhoQ");
+                p.layout.title = "Evolução de rhoQ";
                 p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρQ";
+                p.layout.yaxis.title = "rhoQ";
                 p.layout.yaxis.type = "log";
                 p
             )
@@ -386,9 +386,9 @@ function save_socp_hybrid_plots(r_hist, s_hist, eps_r_hist, eps_s_hist,
     stem = "admm_socp_hybrid")
     plot_admm_convergence(r_hist, s_hist, eps_r_hist, eps_s_hist,
         "plot_convergencia_$(stem).html")
-    for (lab, hist) in [("ρ(V²)", rhoV2_hist), ("ρP", rhoP_hist), ("ρQ", rhoQ_hist),
-        ("ρR", rhoR_hist), ("ρT", rhoT_hist)]
-        fname = replace(lab, "/" => "") |> x -> lowercase(replace(x, "ρ" => "rho"))
+    for (lab, hist) in [("rho(V²)", rhoV2_hist), ("rhoP", rhoP_hist), ("rhoQ", rhoQ_hist),
+        ("rhoR", rhoR_hist), ("rhoT", rhoT_hist)]
+        fname = replace(lab, "/" => "") |> x -> lowercase(replace(x, "rho" => "rho"))
         PlotlyLight.save(
             (
                 () -> (

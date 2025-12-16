@@ -157,7 +157,7 @@ function compare_distributed_branch_socp_vs_centralized(
     #   - Distribuído (Branch-ADMM-SOCP): Clarabel + args solicitados
     # ================================================================
     if case_name == "pglib_opf_case2000_5zones_goc.m"
-        @info "⚙️ [BRANCH-SOCP] Caso especial $case_name com Clarabel robusto (central) e Clarabel com ρ=1e8 (distribuído)."
+        @info "⚙️ [BRANCH-SOCP] Caso especial $case_name com Clarabel robusto (central) e Clarabel com rho=1e8 (distribuído)."
 
         # --- SOCP centralizado (Clarabel robusto) ---
         cent_obj = try
@@ -242,7 +242,7 @@ function compare_distributed_branch_socp_vs_centralized(
         return
     end
 
-    @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-branch-SOCP = $(round(dist_obj, digits=6)) | max_iter=$(admm_max_iter), ρV²=$(rho_v), ρP=$(rho_flow_p), ρQ=$(rho_flow_q)"
+    @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-branch-SOCP = $(round(dist_obj, digits=6)) | max_iter=$(admm_max_iter), rhoV²=$(rho_v), rhoP=$(rho_flow_p), rhoQ=$(rho_flow_q)"
     @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
 end
 
@@ -278,7 +278,7 @@ function run_distributed_branch_socp_objective_tests(;
         admm_eps_primal_case = admm_eps_primal
         admm_eps_dual_case = admm_eps_dual
 
-        # regras simples por tamanho/zonas (mantém ρs)
+        # regras simples por tamanho/zonas (mantém rhos)
         if occursin("_3zones_", case_name) || occursin("_4zones_", case_name)
             admm_max_iter_case = max(admm_max_iter_case, 1200)
         end
@@ -287,7 +287,7 @@ function run_distributed_branch_socp_objective_tests(;
         end
 
         @info "[$label] Rodando caso $i/$n: $case_name " *
-              "(max_iter=$(admm_max_iter_case), ρV²=$(rho_v_case), ρP=$(rho_flow_p_case), ρQ=$(rho_flow_q_case), " *
+              "(max_iter=$(admm_max_iter_case), rhoV²=$(rho_v_case), rhoP=$(rho_flow_p_case), rhoQ=$(rho_flow_q_case), " *
               "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"
 
         @testset "$(label) - $(case_name)" begin

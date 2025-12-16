@@ -83,8 +83,8 @@ end
     part::PartitionAC,
     θ̄_vec::Vector{Float64},
     V̄_vec::Vector{Float64},
-    ρθ::Float64,
-    ρV::Float64,
+    rhoθ::Float64,
+    rhoV::Float64,
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int};
     α::Union{Nothing, Float64} = nothing,
@@ -100,8 +100,8 @@ end
             j = b2pos[lbs[i]]
             dθ = _wrap_angle_diff(θs[i] - θ̄_vec[j])
             dV = (Vs[i] - V̄_vec[j])
-            dualsθ_vec_zone[j] += ρθ * dθ
-            dualsV_vec_zone[j] += ρV * dV
+            dualsθ_vec_zone[j] += rhoθ * dθ
+            dualsV_vec_zone[j] += rhoV * dV
         end
     else
         αv = something(α, 1.0)
@@ -109,8 +109,8 @@ end
             j = b2pos[lbs[i]]
             θrel = _wrap_angle_diff(αv * θs[i] + (1 - αv) * θ̄_prev[j] - θ̄_vec[j])
             Vrel = αv * Vs[i] + (1 - αv) * V̄_prev[j] - V̄_vec[j]
-            dualsθ_vec_zone[j] += ρθ * θrel
-            dualsV_vec_zone[j] += ρV * Vrel
+            dualsθ_vec_zone[j] += rhoθ * θrel
+            dualsV_vec_zone[j] += rhoV * Vrel
         end
     end
     return nothing
@@ -123,16 +123,16 @@ function update_duals_branch_ac!(
     zP::Dict{Int, Float64},
     zQ::Dict{Int, Float64},
     cut_edges::Vector{Int},
-    ρP::Float64,
-    ρQ::Float64;
+    rhoP::Float64,
+    rhoQ::Float64;
     α::Union{Nothing, Float64} = nothing,
     zP_prev::Union{Nothing, Dict{Int, Float64}} = nothing,
     zQ_prev::Union{Nothing, Dict{Int, Float64}} = nothing,
 )
     for (z, part) in partitions
         m = part.model::JuMP.Model
-        λPz = get!(dualsP, z, Dict{Int, Float64}())
-        λQz = get!(dualsQ, z, Dict{Int, Float64}())
+        lambdaPz = get!(dualsP, z, Dict{Int, Float64}())
+        lambdaQz = get!(dualsQ, z, Dict{Int, Float64}())
 
         for e in part.zone_edges
             l_local = get(part.edge_to_local, e, nothing)
@@ -143,20 +143,20 @@ function update_duals_branch_ac!(
 
             if α === nothing
                 if isfinite(pval)
-                    λPz[e] = get(λPz, e, 0.0) + ρP * (pval - get(zP, e, 0.0))
+                    lambdaPz[e] = get(lambdaPz, e, 0.0) + rhoP * (pval - get(zP, e, 0.0))
                 end
                 if isfinite(qval)
-                    λQz[e] = get(λQz, e, 0.0) + ρQ * (qval - get(zQ, e, 0.0))
+                    lambdaQz[e] = get(lambdaQz, e, 0.0) + rhoQ * (qval - get(zQ, e, 0.0))
                 end
             else
                 αv = something(α, 1.0)
                 if isfinite(pval)
                     p_rel = αv * pval + (1 - αv) * get(zP_prev, e, get(zP, e, 0.0))
-                    λPz[e] = get(λPz, e, 0.0) + ρP * (p_rel - get(zP, e, 0.0))
+                    lambdaPz[e] = get(lambdaPz, e, 0.0) + rhoP * (p_rel - get(zP, e, 0.0))
                 end
                 if isfinite(qval)
                     q_rel = αv * qval + (1 - αv) * get(zQ_prev, e, get(zQ, e, 0.0))
-                    λQz[e] = get(λQz, e, 0.0) + ρQ * (q_rel - get(zQ, e, 0.0))
+                    lambdaQz[e] = get(lambdaQz, e, 0.0) + rhoQ * (q_rel - get(zQ, e, 0.0))
                 end
             end
         end
@@ -416,7 +416,7 @@ end
     dual_vec_zone::Vector{Float64},
     part::PartitionDC,
     θ̄_vec::Vector{Float64},
-    ρ::Float64,
+    rho::Float64,
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
 )
@@ -425,17 +425,17 @@ end
 
     @inbounds for i in eachindex(lbs)
         j = b2pos[lbs[i]]
-        dual_vec_zone[j] += ρ * (θs[i] - θ̄_vec[j])
+        dual_vec_zone[j] += rho * (θs[i] - θ̄_vec[j])
     end
     return nothing
 end
 
 @inline function gather_zone_lambda!(
-    λ_vec_zone::Vector{Float64},
+    lambda_vec_zone::Vector{Float64},
     duals_dense_zone::Vector{Float64},
 )
-    λ_vec_zone .= duals_dense_zone
-    return λ_vec_zone
+    lambda_vec_zone .= duals_dense_zone
+    return lambda_vec_zone
 end
 
 #############################
@@ -558,7 +558,7 @@ function update_duals_flow!(
     partitions::Dict{Int, PartitionDC},
     z_flow::Dict{Int, Float64},
     cut_edges::Vector{Int},
-    ρ::Float64,
+    rho::Float64,
 )
     for (z, part) in partitions
         m = part.model::JuMP.Model
@@ -566,7 +566,7 @@ function update_duals_flow!(
             l_local = get(part.edge_to_local, e, nothing)
             if l_local !== nothing
                 p_val = _dc_flow_val_model(m, part, l_local)
-                duals[z][e] = get(duals[z], e, 0.0) + ρ * (p_val - z_flow[e])
+                duals[z][e] = get(duals[z], e, 0.0) + rho * (p_val - z_flow[e])
             end
         end
     end
@@ -643,21 +643,21 @@ end
 @inline function update_duals_v2_vec!(dual_vec_zone::Vector{Float64},
     sub::PartitionSOCP,
     v2bar_vec::Vector{Float64}, v2bar_prev_vec::Vector{Float64},
-    ρ::Float64, α::Union{Nothing, Float64},
+    rho::Float64, α::Union{Nothing, Float64},
     shared_buses_sorted::Vector{Int}, b2pos::Dict{Int, Int})
     v2s = snapshot_v2_shared!(sub)
     lbs = sub.shared_buses_local
     if isnothing(α)
         @inbounds for i in eachindex(lbs)
             j = b2pos[lbs[i]]
-            dual_vec_zone[j] += ρ * (v2s[i] - v2bar_vec[j])
+            dual_vec_zone[j] += rho * (v2s[i] - v2bar_vec[j])
         end
     else
         αv = something(α, 1.0)
         @inbounds for i in eachindex(lbs)
             j = b2pos[lbs[i]]
             v_rel = αv * v2s[i] + (1 - αv) * v2bar_prev_vec[j]
-            dual_vec_zone[j] += ρ * (v_rel - v2bar_vec[j])
+            dual_vec_zone[j] += rho * (v_rel - v2bar_vec[j])
         end
     end
 end

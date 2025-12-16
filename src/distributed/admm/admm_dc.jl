@@ -2,7 +2,7 @@ function init_dc_bus_partition!(
     part::PartitionDC,
     sys_zone,
     optimizer_factory,
-    ρθ::Float64,
+    rhoθ::Float64,
 )
     prepare_hotpaths!(part)
     m = build_model(sys_zone, DC; optimizer = optimizer_factory)
@@ -17,7 +17,7 @@ function init_dc_bus_partition!(
         set_start_value(part.theta_var[I], 0.0)
     end
 
-    _build_quad_bus_expr!(part, ρθ)
+    _build_quad_bus_expr!(part, rhoθ)
     @objective(m, Min, part.obj_base + part.quad_bus_expr)
 
     return nothing
@@ -28,7 +28,7 @@ function init_dc_branch_partition!(
     part::PartitionDC,
     sys_zone,
     optimizer_factory,
-    ρe::Float64,
+    rhoe::Float64,
     cut_edges,
 )
     prepare_hotpaths!(part)
@@ -46,7 +46,7 @@ function init_dc_branch_partition!(
         set_start_value(part.theta_var[I], 0.0)
     end
 
-    _build_quad_branch_expr!(part, ρe, part.zone_edges)
+    _build_quad_branch_expr!(part, rhoe, part.zone_edges)
     @objective(m, Min, part.obj_base + part.quad_branch_expr)
 
     return nothing
@@ -56,8 +56,8 @@ function init_dc_hybrid_partition!(
     part::PartitionDC,
     sys_zone,
     optimizer_factory,
-    ρθ::Float64,
-    ρe::Float64,
+    rhoθ::Float64,
+    rhoe::Float64,
     cut_edges,
 )
     prepare_hotpaths!(part)
@@ -75,8 +75,8 @@ function init_dc_hybrid_partition!(
         set_start_value(part.theta_var[I], 0.0)
     end
 
-    _build_quad_bus_expr!(part, ρθ)
-    _build_quad_branch_expr!(part, ρe, part.zone_edges)
+    _build_quad_bus_expr!(part, rhoθ)
+    _build_quad_branch_expr!(part, rhoe, part.zone_edges)
 
     @objective(m, Min, part.obj_base + part.quad_bus_expr + part.quad_branch_expr)
 
@@ -93,7 +93,7 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     consensus_buses = sys.shared_buses
     consensus_buses_sorted, consensus_buses_idx = prepare_dense_maps(consensus_buses)
 
-    ρ = Ref(config.rho_theta)
+    rho = Ref(config.rho_theta)
     ϵ_abs = config.ε_primal
     ϵ_rel = config.ε_dual
     adaptive = _adaptive_on(config)
@@ -105,7 +105,7 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
             part,
             sys.parts[zone_id],
             optimizer_factory,
-            ρ[],
+            rho[],
         )
     end
 
@@ -114,7 +114,7 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     duals_dense = Dict{Int, Vector{Float64}}(
         z => zeros(Float64, length(consensus_buses_sorted)) for z in zone_ids
     )
-    λ_zone_buf = Dict{Int, Vector{Float64}}(
+    lambda_zone_buf = Dict{Int, Vector{Float64}}(
         z => zeros(Float64, length(consensus_buses_sorted)) for z in zone_ids
     )
 
@@ -129,16 +129,16 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     θ_avg_history = Dict{Int, Vector{Float64}}()
     θ_local_history = Dict{Int, Dict{Int, Vector{Float64}}}()
 
-    prev_rho = ρ[]
+    prev_rho = rho[]
 
     for k in 1:config.max_iter
         _FAST_USE_LOGS && println("\nIteração $k (bus/DC)")
 
-        if ρ[] != prev_rho
+        if rho[] != prev_rho
             for (_, part) in partitions
-                _build_quad_bus_expr!(part, ρ[])
+                _build_quad_bus_expr!(part, rho[])
             end
-            prev_rho = ρ[]
+            prev_rho = rho[]
         end
 
         nz = length(zone_ids)
@@ -148,15 +148,15 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
             z = zone_ids[i]
             part = partitions[z]
 
-            λz = gather_zone_lambda!(λ_zone_buf[z], duals_dense[z])
+            lambdaz = gather_zone_lambda!(lambda_zone_buf[z], duals_dense[z])
 
             lin = _build_linear_bus_expr(
                 part,
                 consensus_buses_sorted,
                 consensus_buses_idx,
                 θ̄_vec,
-                λz,
-                ρ[],
+                lambdaz,
+                rho[],
             )
 
             m = part.model::JuMP.Model
@@ -207,7 +207,7 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
                 duals_dense[z],
                 partitions[z],
                 θ̄_vec,
-                ρ[],
+                rho[],
                 consensus_buses_sorted,
                 consensus_buses_idx,
             )
@@ -226,7 +226,7 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
         _FAST_USE_LOGS && println("‖r‖ = $res_primal | ε_pri = $ϵ_pri")
         _FAST_USE_LOGS && println("‖s‖ = $res_dual   | ε_du  = $ϵ_du")
 
-        push!(rho_vec, ρ[])
+        push!(rho_vec, rho[])
 
         iter_done = k
         if res_primal < ϵ_pri && res_dual < ϵ_du
@@ -236,7 +236,7 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
 
         if adaptive
             adaptive_rho_dc!(
-                ρ,
+                rho,
                 res_primal,
                 res_dual;
                 μ_incr = config.mu_incr,
@@ -263,7 +263,7 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     println("\nResumo (bus/DC):")
     println("→ Total (value(:generation_cost)) = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
-    println("ρθ inicial: $(config.rho_theta) | ρθ final: $(ρ[])")
+    println("rhoθ inicial: $(config.rho_theta) | rhoθ final: $(rho[])")
     elapsed_s = (time_ns() - t0_ns) / 1e9
     println("Iterações realizadas: $iter_done")
     println("Tempo ADMM (bus/DC): $(_pretty_time(elapsed_s))")
@@ -293,7 +293,7 @@ function run_admm_branch(
     partitions = build_dc_partitions(sys)
     cut_edges = sys.cut_edges
 
-    ρ = Ref(config.rho_flow)
+    rho = Ref(config.rho_flow)
     ϵ_abs = config.ε_primal
     ϵ_rel = config.ε_dual
     adaptive = _adaptive_on(config)
@@ -322,22 +322,22 @@ function run_admm_branch(
             part,
             sys.parts[zone_id],
             optimizer_factory,
-            ρ[],
+            rho[],
             cut_edges,
         )
     end
 
     zone_ids = collect(keys(partitions))
-    prev_rho = ρ[]
+    prev_rho = rho[]
 
     for k in 1:config.max_iter
         _FAST_USE_LOGS && println("\n[ADMM-branch/DC] Iteração $k")
 
-        if ρ[] != prev_rho
+        if rho[] != prev_rho
             for (_, part) in partitions
-                _build_quad_branch_expr!(part, ρ[], part.zone_edges)
+                _build_quad_branch_expr!(part, rho[], part.zone_edges)
             end
-            prev_rho = ρ[]
+            prev_rho = rho[]
         end
 
         nz = length(zone_ids)
@@ -347,7 +347,7 @@ function run_admm_branch(
             z = zone_ids[i]
             part = partitions[z]
 
-            lin = _build_linear_branch_expr(part, part.zone_edges, z_flow, duals[z], ρ[])
+            lin = _build_linear_branch_expr(part, part.zone_edges, z_flow, duals[z], rho[])
 
             m = part.model::JuMP.Model
             @objective(m, Min, part.obj_base + part.quad_branch_expr + lin)
@@ -369,7 +369,7 @@ function run_admm_branch(
 
         z_flow_prev = copy(z_flow)
         compute_z_flow_consensus!(z_flow, partitions, cut_edges)
-        update_duals_flow!(duals, partitions, z_flow, cut_edges, ρ[])
+        update_duals_flow!(duals, partitions, z_flow, cut_edges, rho[])
 
         res_primal = primal_residual_branch_dc(partitions, z_flow, cut_edges)
         res_dual = dual_residual_branch_dc(z_flow, z_flow_prev)
@@ -384,7 +384,7 @@ function run_admm_branch(
         _FAST_USE_LOGS && println("‖r‖ = $res_primal | ε_pri = $ϵ_pri")
         _FAST_USE_LOGS && println("‖s‖ = $res_dual   | ε_dual = $ϵ_du")
 
-        push!(rho_vec, ρ[])
+        push!(rho_vec, rho[])
 
         iter_done = k
         if res_primal < ϵ_pri && res_dual < ϵ_du
@@ -395,13 +395,13 @@ function run_admm_branch(
         if adaptive
             if use_legacy_rho
                 if res_primal > μ_incr * res_dual
-                    ρ[] *= τ_incr
+                    rho[] *= τ_incr
                 elseif res_dual > μ_decr * res_primal
-                    ρ[] *= τ_decr
+                    rho[] *= τ_decr
                 end
             else
                 adaptive_rho_dc!(
-                    ρ,
+                    rho,
                     res_primal,
                     res_dual;
                     μ_incr = μ_incr,
@@ -428,7 +428,7 @@ function run_admm_branch(
     println("\n[ADMM-branch/DC] Resumo:")
     println("→ Total (value(:generation_cost))     = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
-    println("ρe_final = $(ρ[])")
+    println("rhoe_final = $(rho[])")
     elapsed_s = (time_ns() - t0_ns) / 1e9
     println("Iterações realizadas: $iter_done")
     println("Tempo ADMM (branch/DC): $(_pretty_time(elapsed_s))")
@@ -453,8 +453,8 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
 
     consensus_buses_sorted, consensus_buses_idx = prepare_dense_maps(consensus_buses)
 
-    ρθ = Ref(config.rho_theta)
-    ρe = Ref(config.rho_flow)
+    rhoθ = Ref(config.rho_theta)
+    rhoe = Ref(config.rho_flow)
     ϵ_abs = config.ε_primal
     ϵ_rel = config.ε_dual
     adaptive = _adaptive_on(config)
@@ -488,34 +488,34 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             part,
             sys.parts[zone_id],
             optimizer_factory,
-            ρθ[],
-            ρe[],
+            rhoθ[],
+            rhoe[],
             cut_edges,
         )
     end
 
     zone_ids = collect(keys(partitions))
-    λθ_zone_buf = Dict{Int, Vector{Float64}}(
+    lambdaθ_zone_buf = Dict{Int, Vector{Float64}}(
         z => zeros(Float64, length(consensus_buses_sorted)) for z in zone_ids
     )
 
-    prev_ρθ = ρθ[]
-    prev_ρe = ρe[]
+    prev_rhoθ = rhoθ[]
+    prev_rhoe = rhoe[]
 
     for k in 1:config.max_iter
         _FAST_USE_LOGS && println("\n[ADMM-hybrid/DC] Iteração $k")
 
-        if ρθ[] != prev_ρθ
+        if rhoθ[] != prev_rhoθ
             for (_, part) in partitions
-                _build_quad_bus_expr!(part, ρθ[])
+                _build_quad_bus_expr!(part, rhoθ[])
             end
-            prev_ρθ = ρθ[]
+            prev_rhoθ = rhoθ[]
         end
-        if ρe[] != prev_ρe
+        if rhoe[] != prev_rhoe
             for (_, part) in partitions
-                _build_quad_branch_expr!(part, ρe[], part.zone_edges)
+                _build_quad_branch_expr!(part, rhoe[], part.zone_edges)
             end
-            prev_ρe = ρe[]
+            prev_rhoe = rhoe[]
         end
 
         nz = length(zone_ids)
@@ -525,22 +525,22 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             z = zone_ids[i]
             part = partitions[z]
 
-            λθ = gather_zone_lambda!(λθ_zone_buf[z], duals_theta[z])
+            lambdaθ = gather_zone_lambda!(lambdaθ_zone_buf[z], duals_theta[z])
 
             lin_bus = _build_linear_bus_expr(
                 part,
                 consensus_buses_sorted,
                 consensus_buses_idx,
                 θ̄_vec,
-                λθ,
-                ρθ[],
+                lambdaθ,
+                rhoθ[],
             )
             lin_branch = _build_linear_branch_expr(
                 part,
                 part.zone_edges,
                 z_flow,
                 duals_flow[z],
-                ρe[],
+                rhoe[],
             )
 
             m = part.model::JuMP.Model
@@ -580,12 +580,12 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
                 duals_theta[z],
                 partitions[z],
                 θ̄_vec,
-                ρθ[],
+                rhoθ[],
                 consensus_buses_sorted,
                 consensus_buses_idx,
             )
         end
-        update_duals_flow!(duals_flow, partitions, z_flow, cut_edges, ρe[])
+        update_duals_flow!(duals_flow, partitions, z_flow, cut_edges, rhoe[])
 
         res_pri_bus = primal_residual_bus_dc(partitions, θ̄_vec, consensus_buses_sorted, consensus_buses_idx)
         res_pri_br = primal_residual_branch_dc(partitions, z_flow, cut_edges)
@@ -609,8 +609,8 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         _FAST_USE_LOGS && println("‖r‖ = $(last(res_primal_vec)) | ε_pri = $(last(eps_primal_vec))")
         _FAST_USE_LOGS && println("‖s‖ = $(last(res_dual_vec))   | ε_du  = $(last(eps_dual_vec))")
 
-        push!(rhoθ_vec, ρθ[])
-        push!(rhoe_vec, ρe[])
+        push!(rhoθ_vec, rhoθ[])
+        push!(rhoe_vec, rhoe[])
 
         iter_done = k
         if res_primal < last(eps_primal_vec) && res_dual < last(eps_dual_vec)
@@ -620,7 +620,7 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
 
         if adaptive
             adaptive_rho_dc!(
-                ρθ,
+                rhoθ,
                 res_pri_bus,
                 res_du_bus;
                 μ_incr = config.mu_incr,
@@ -629,7 +629,7 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
                 τ_decr = config.tau_decr,
             )
             adaptive_rho_dc!(
-                ρe,
+                rhoe,
                 res_pri_br,
                 res_du_br;
                 μ_incr = config.mu_incr,
@@ -653,10 +653,10 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         (
             () -> (
                 p = Plot();
-                p(; x = 1:length(rhoe_vec), y = rhoe_vec, type = :scatter, mode = "lines+markers", name = "ρe");
-                p.layout.title = "Evolução de ρe";
+                p(; x = 1:length(rhoe_vec), y = rhoe_vec, type = :scatter, mode = "lines+markers", name = "rhoe");
+                p.layout.title = "Evolução de rhoe";
                 p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "ρe";
+                p.layout.yaxis.title = "rhoe";
                 p.layout.yaxis.type = "log";
                 p
             )
@@ -672,7 +672,7 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     println("\n[ADMM-hybrid/DC] Resumo:")
     println("→ Total (value(:generation_cost))     = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
-    println("ρθ_final = $(ρθ[]) | ρe_final = $(ρe[])")
+    println("rhoθ_final = $(rhoθ[]) | rhoe_final = $(rhoe[])")
     elapsed_s = (time_ns() - t0_ns) / 1e9
     println("Iterações realizadas: $iter_done")
     println("Tempo ADMM (hybrid/DC): $(_pretty_time(elapsed_s))")

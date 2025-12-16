@@ -1,27 +1,27 @@
-function _build_quad_bus_expr!(part::PartitionDC, ρ::Float64)
+function _build_quad_bus_expr!(part::PartitionDC, rho::Float64)
     m = part.model::JuMP.Model
     θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     q = zero(JuMP.QuadExpr)
 
-    # termo (ρ/2)*‖θ_shared‖² pra cada barra compartilhada
+    # termo (rho/2)*‖θ_shared‖² pra cada barra compartilhada
     for b in part.shared_buses_local
-        q += 0.5 * ρ * θ[b, 1]^2
+        q += 0.5 * rho * θ[b, 1]^2
     end
     part.quad_bus_expr = q
-    part.rho_bus_cached = ρ
+    part.rho_bus_cached = rho
     return q
 end
 
 function _build_quad_branch_expr!(
     part::PartitionDC,
-    ρ::Float64,
+    rho::Float64,
     zone_edges::Vector{Int},
 )
     m = part.model::JuMP.Model
     θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     q = zero(JuMP.QuadExpr)
 
-    # termo (ρ/2)*‖p_flow(e)‖² para cada ramo de corte da zona
+    # termo (rho/2)*‖p_flow(e)‖² para cada ramo de corte da zona
     for e in zone_edges
         l_local = get(part.edge_to_local, e, nothing)
         l_local === nothing && continue
@@ -30,10 +30,10 @@ function _build_quad_branch_expr!(
         x = part.branch.x[l_local]
         @assert abs(x) > 1e-10 "x≈0 no ramo global $e (DC)."
         p = (θ[f, 1] - θ[t, 1]) / x
-        q += 0.5 * ρ * p^2
+        q += 0.5 * rho * p^2
     end
     part.quad_branch_expr = q
-    part.rho_branch_cached = ρ
+    part.rho_branch_cached = rho
     return q
 end
 
@@ -46,15 +46,15 @@ function _build_linear_bus_expr(
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
     θ̄_vec::Vector{Float64},
-    λ_vec_zone::Vector{Float64},
-    ρ::Float64,
+    lambda_vec_zone::Vector{Float64},
+    rho::Float64,
 )
     m = part.model::JuMP.Model 
     θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     lin = zero(JuMP.AffExpr) #cria expressão linear vazia
     for b in part.shared_buses_local
         j = b2pos[b]
-        lin += (λ_vec_zone[j] - ρ * θ̄_vec[j]) * θ[b, 1]
+        lin += (lambda_vec_zone[j] - rho * θ̄_vec[j]) * θ[b, 1]
     end
     return lin
 end
@@ -63,10 +63,10 @@ function _build_linear_branch_expr(
     part::PartitionDC,
     zone_edges::Vector{Int},
     z_flow::Dict{Int, Float64},
-    λe_zone::Dict{Int, Float64},
-    ρ::Float64,
+    lambdae_zone::Dict{Int, Float64},
+    rho::Float64,
 )
-    # soma_e ( λ_e - ρ z_e ) p_flow_e(θ)
+    # soma_e ( lambda_e - rho z_e ) p_flow_e(θ)
     m = part.model::JuMP.Model
     θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     lin = zero(JuMP.AffExpr)
@@ -77,23 +77,23 @@ function _build_linear_branch_expr(
         t = part.branch.to[l_local]
         x = part.branch.x[l_local]
         @assert abs(x) > 1e-10 "x≈0 no ramo global $e (DC)."
-        coef = get(λe_zone, e, 0.0) - ρ * z_flow[e]
+        coef = get(lambdae_zone, e, 0.0) - rho * z_flow[e]
         lin += coef * (θ[f, 1] - θ[t, 1]) / x
     end
     return lin
 end
 
-function _build_quad_bus_expr_ac!(part::PartitionAC, ρθ::Float64, ρV::Float64)
+function _build_quad_bus_expr_ac!(part::PartitionAC, rhoθ::Float64, rhoV::Float64)
     m = part.model::JuMP.Model
     θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     V = part.vmag_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     q = zero(JuMP.QuadExpr)
     for b in part.shared_buses_local
-        q += 0.5 * ρθ * θ[b, 1]^2 + 0.5 * ρV * V[b, 1]^2
+        q += 0.5 * rhoθ * θ[b, 1]^2 + 0.5 * rhoV * V[b, 1]^2
     end
     part.quad_bus_expr_ac = q
-    part.rho_bus_theta_cached = ρθ
-    part.rho_bus_v_cached = ρV
+    part.rho_bus_theta_cached = rhoθ
+    part.rho_bus_v_cached = rhoV
     return q
 end
 
@@ -103,10 +103,10 @@ function _build_linear_bus_expr_ac!(
     b2pos::Dict{Int, Int},
     θ̄_vec::Vector{Float64},
     V̄_vec::Vector{Float64},
-    λθ_zone::Vector{Float64},
-    λV_zone::Vector{Float64},
-    ρθ::Float64,
-    ρV::Float64,
+    lambdaθ_zone::Vector{Float64},
+    lambdaV_zone::Vector{Float64},
+    rhoθ::Float64,
+    rhoV::Float64,
 )
     m = part.model::JuMP.Model
     θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
@@ -114,16 +114,16 @@ function _build_linear_bus_expr_ac!(
     lin = zero(JuMP.AffExpr)
     for b in part.shared_buses_local
         j = b2pos[b]
-        lin += (λθ_zone[j] - ρθ * θ̄_vec[j]) * θ[b, 1]
-        lin += (λV_zone[j] - ρV * V̄_vec[j]) * V[b, 1]
+        lin += (lambdaθ_zone[j] - rhoθ * θ̄_vec[j]) * θ[b, 1]
+        lin += (lambdaV_zone[j] - rhoV * V̄_vec[j]) * V[b, 1]
     end
     return lin
 end
 
 function _build_quad_branch_expr_ac!(
     part::PartitionAC,
-    ρP::Float64,
-    ρQ::Float64,
+    rhoP::Float64,
+    rhoQ::Float64,
     zone_edges::Vector{Int},
 )
     m = part.model::JuMP.Model
@@ -132,11 +132,11 @@ function _build_quad_branch_expr_ac!(
         l_local = get(part.edge_to_local, e, nothing)
         l_local === nothing && continue
         P_loc, Q_loc = _ac_flow_from_exprs_existing(part, l_local)
-        q += 0.5 * ρP * P_loc^2 + 0.5 * ρQ * Q_loc^2
+        q += 0.5 * rhoP * P_loc^2 + 0.5 * rhoQ * Q_loc^2
     end
     part.quad_branch_expr_ac = q
-    part.rho_branch_p_cached = ρP
-    part.rho_branch_q_cached = ρQ
+    part.rho_branch_p_cached = rhoP
+    part.rho_branch_q_cached = rhoQ
     return q
 end
 
@@ -147,8 +147,8 @@ function _build_linear_branch_expr_ac!(
     zQ::Dict{Int, Float64},
     dualsP_zone::Dict{Int, Float64},
     dualsQ_zone::Dict{Int, Float64},
-    ρP::Float64,
-    ρQ::Float64,
+    rhoP::Float64,
+    rhoQ::Float64,
 )
     m = part.model::JuMP.Model
     lin = zero(JuMP.AffExpr)
@@ -156,12 +156,12 @@ function _build_linear_branch_expr_ac!(
         l_local = get(part.edge_to_local, e, nothing)
         l_local === nothing && continue
         P_loc, Q_loc = _ac_flow_from_exprs_existing(part, l_local)
-        λP = get(dualsP_zone, e, 0.0)
-        λQ = get(dualsQ_zone, e, 0.0)
+        lambdaP = get(dualsP_zone, e, 0.0)
+        lambdaQ = get(dualsQ_zone, e, 0.0)
         zPe = get(zP, e, 0.0)
         zQe = get(zQ, e, 0.0)
-        lin += λP * (P_loc - zPe) + λQ * (Q_loc - zQe) -
-               ρP * zPe * P_loc - ρQ * zQe * Q_loc
+        lin += lambdaP * (P_loc - zPe) + lambdaQ * (Q_loc - zQe) -
+               rhoP * zPe * P_loc - rhoQ * zQe * Q_loc
     end
     return lin
 end
@@ -211,20 +211,20 @@ end
 end
 
 # ----------------- Construção de termos (cache de quadrático) -----------------
-function _build_quad_bus_expr_socp!(sub::PartitionSOCP, ρ::Float64)
+function _build_quad_bus_expr_socp!(sub::PartitionSOCP, rho::Float64)
     m = sub.model::JuMP.Model
     V2 = m[:v_magnitude_sq]
     q = zero(JuMP.QuadExpr)
     # penaliza APENAS barras compartilhadas (padrão ADMM/DC/AC)
     for b in sub.shared_buses_local
-        q += 0.5 * ρ * V2[b, 1]^2
+        q += 0.5 * rho * V2[b, 1]^2
     end
     sub.quad_bus_expr_socp = q
-    sub.rho_bus_v2_cached = ρ
+    sub.rho_bus_v2_cached = rho
     return sub.quad_bus_expr_socp
 end
 
-function _build_quad_branch_rt_expr!(sub::PartitionSOCP, ρR::Float64, ρT::Float64,
+function _build_quad_branch_rt_expr!(sub::PartitionSOCP, rhoR::Float64, rhoT::Float64,
     zone_edges::Vector{Int})
     m = sub.model::JuMP.Model
     q = zero(JuMP.QuadExpr)
@@ -232,15 +232,15 @@ function _build_quad_branch_rt_expr!(sub::PartitionSOCP, ρR::Float64, ρT::Floa
         l_local = get(sub.edge_to_local, e, nothing)
         l_local === nothing && continue
         Rloc, Tloc = _rt_from_exprs_socp(m, l_local)
-        q += 0.5 * ρR * Rloc^2 + 0.5 * ρT * Tloc^2
+        q += 0.5 * rhoR * Rloc^2 + 0.5 * rhoT * Tloc^2
     end
     sub.quad_rt_expr_socp = q
-    sub.rho_branch_r_cached = ρR
-    sub.rho_branch_t_cached = ρT
+    sub.rho_branch_r_cached = rhoR
+    sub.rho_branch_t_cached = rhoT
     return q
 end
 
-function _build_quad_branch_pq_expr!(sub::PartitionSOCP, ρP::Float64, ρQ::Float64,
+function _build_quad_branch_pq_expr!(sub::PartitionSOCP, rhoP::Float64, rhoQ::Float64,
     zone_edges::Vector{Int})
     m = sub.model::JuMP.Model
     q = zero(JuMP.QuadExpr)
@@ -248,53 +248,53 @@ function _build_quad_branch_pq_expr!(sub::PartitionSOCP, ρP::Float64, ρQ::Floa
         l_local = get(sub.edge_to_local, e, nothing)
         l_local === nothing && continue
         P_loc, Q_loc = _socp_flow_from_exprs_existing(m, l_local)
-        q += 0.5 * ρP * P_loc^2 + 0.5 * ρQ * Q_loc^2
+        q += 0.5 * rhoP * P_loc^2 + 0.5 * rhoQ * Q_loc^2
     end
     sub.quad_pq_expr_socp = q
-    sub.rho_branch_p_cached = ρP
-    sub.rho_branch_q_cached = ρQ
+    sub.rho_branch_p_cached = rhoP
+    sub.rho_branch_q_cached = rhoQ
     return q
 end
 
 function _build_linear_bus_expr_socp(sub::PartitionSOCP,
     shared_buses_sorted::Vector{Int}, b2pos::Dict{Int, Int},
-    v2bar_vec::Vector{Float64}, λ_vec_zone::Vector{Float64}, ρV2::Float64)
+    v2bar_vec::Vector{Float64}, lambda_vec_zone::Vector{Float64}, rhoV2::Float64)
     m = sub.model::JuMP.Model
     V2 = m[:v_magnitude_sq]
     lin = zero(JuMP.AffExpr)
     for b in sub.shared_buses_local
         j = b2pos[b]
-        lin += (λ_vec_zone[j] - ρV2 * v2bar_vec[j]) * V2[b, 1]
+        lin += (lambda_vec_zone[j] - rhoV2 * v2bar_vec[j]) * V2[b, 1]
     end
     return lin
 end
 
 function _build_linear_branch_rt_expr(sub::PartitionSOCP,
     zone_edges::Vector{Int}, zR::Dict{Int, Float64}, zT::Dict{Int, Float64},
-    λR_zone::Dict{Int, Float64}, λT_zone::Dict{Int, Float64}, ρR::Float64, ρT::Float64)
+    lambdaR_zone::Dict{Int, Float64}, lambdaT_zone::Dict{Int, Float64}, rhoR::Float64, rhoT::Float64)
     m = sub.model::JuMP.Model
     lin = zero(JuMP.AffExpr)
     @inbounds for e in zone_edges
         l_local = get(sub.edge_to_local, e, nothing)
         l_local === nothing && continue
         Rloc, Tloc = _rt_from_exprs_socp(m, l_local)
-        lin += (get(λR_zone, e, 0.0) - ρR * get(zR, e, 0.0)) * Rloc
-        lin += (get(λT_zone, e, 0.0) - ρT * get(zT, e, 0.0)) * Tloc
+        lin += (get(lambdaR_zone, e, 0.0) - rhoR * get(zR, e, 0.0)) * Rloc
+        lin += (get(lambdaT_zone, e, 0.0) - rhoT * get(zT, e, 0.0)) * Tloc
     end
     return lin
 end
 
 function _build_linear_branch_pq_expr(sub::PartitionSOCP,
     zone_edges::Vector{Int}, zP::Dict{Int, Float64}, zQ::Dict{Int, Float64},
-    λP_zone::Dict{Int, Float64}, λQ_zone::Dict{Int, Float64}, ρP::Float64, ρQ::Float64)
+    lambdaP_zone::Dict{Int, Float64}, lambdaQ_zone::Dict{Int, Float64}, rhoP::Float64, rhoQ::Float64)
     m = sub.model::JuMP.Model
     lin = zero(JuMP.AffExpr)
     @inbounds for e in zone_edges
         l_local = get(sub.edge_to_local, e, nothing)
         l_local === nothing && continue
         P_loc, Q_loc = _socp_flow_from_exprs_existing(m, l_local)
-        lin += (get(λP_zone, e, 0.0) - ρP * get(zP, e, 0.0)) * P_loc
-        lin += (get(λQ_zone, e, 0.0) - ρQ * get(zQ, e, 0.0)) * Q_loc
+        lin += (get(lambdaP_zone, e, 0.0) - rhoP * get(zP, e, 0.0)) * P_loc
+        lin += (get(lambdaQ_zone, e, 0.0) - rhoQ * get(zQ, e, 0.0)) * Q_loc
     end
     return lin
 end

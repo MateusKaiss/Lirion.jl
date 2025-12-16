@@ -7,10 +7,10 @@ mutable struct DistributedOPFModel
     base_model::Type{<:OPFModel}
     method::Symbol
     max_iter::Int
-    rho_theta::Float64     # ρθ (consenso de ângulo)     [AC-bus; DC-bus]
-    rho_v::Float64         # ρV  (consenso de |V| ou V²) [AC/SOCP-bus]
-    rho_flow_p::Float64    # ρP  (consenso de P_flow / Re(W))
-    rho_flow_q::Float64    # ρQ  (consenso de Q_flow / Im(W))
+    rho_theta::Float64     # rhoθ (consenso de ângulo)     [AC-bus; DC-bus]
+    rho_v::Float64         # rhoV  (consenso de |V| ou V²) [AC/SOCP-bus]
+    rho_flow_p::Float64    # rhoP  (consenso de P_flow / Re(W))
+    rho_flow_q::Float64    # rhoQ  (consenso de Q_flow / Im(W))
     ε_primal::Float64
     ε_dual::Float64
     alpha_overrelax::Union{Nothing, Float64}
@@ -74,7 +74,7 @@ mutable struct DistributedOPFModel
     end
 end
 
-# ----- construtor compacto com ρ único -----
+# ----- construtor compacto com rho único -----
 DistributedOPFModel(
     base_model::Type{<:OPFModel},
     method::Symbol,
@@ -154,7 +154,7 @@ DistributedOPFModel(
 
 # ---------- SHIM ----------
 rho(c::DistributedOPFModel) = c.rho_theta
-const ρ = rho
+const rho = rho
 
 Base.getproperty(c::DistributedOPFModel, s::Symbol) =
     s === :rho ? c.rho_theta :

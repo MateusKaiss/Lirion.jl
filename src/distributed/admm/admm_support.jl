@@ -249,25 +249,25 @@ end
     end
 end
 
-# ---------- ρ adaptativo (paridade com DC) ----------
-function adaptive_rho!(ρ::Base.RefValue{Float64}, r::Float64, s::Float64;
+# ---------- rho adaptativo (paridade com DC) ----------
+function adaptive_rho!(rho::Base.RefValue{Float64}, r::Float64, s::Float64;
     μ_incr = 2.0, μ_decr = 2.0, τ_incr = 1.05, τ_decr = 0.98)
     if r > μ_incr * s
-        ρ[] *= τ_incr
+        rho[] *= τ_incr
     elseif s > μ_decr * r
-        ρ[] *= τ_decr
+        rho[] *= τ_decr
     end
 end
 ##########################
-# ρ ADAPTATIVO           #
+# rho ADAPTATIVO           #
 ##########################
 
 #############################
-# ρ ADAPTATIVO AC           #
+# rho ADAPTATIVO AC           #
 #############################
 
 function adaptive_rho_ac!(
-    ρ::Base.RefValue{Float64},
+    rho::Base.RefValue{Float64},
     r::Float64,
     s::Float64;
     μ_incr = 2.0,
@@ -276,14 +276,14 @@ function adaptive_rho_ac!(
     τ_decr = 0.98,
 )
     if r > μ_incr * s
-        ρ[] *= τ_incr
+        rho[] *= τ_incr
     elseif s > μ_decr * r
-        ρ[] *= τ_decr
+        rho[] *= τ_decr
     end
 end
 
 function adaptive_rho_dc!(
-    ρ::Base.RefValue{Float64},
+    rho::Base.RefValue{Float64},
     r::Float64,
     s::Float64;
     μ_incr = 3.0,
@@ -292,9 +292,9 @@ function adaptive_rho_dc!(
     τ_decr = 0.98,
 )
     if r > μ_incr * s
-        ρ[] *= τ_incr
+        rho[] *= τ_incr
     elseif s > μ_decr * r
-        ρ[] *= τ_decr
+        rho[] *= τ_decr
     end
 end
 
