@@ -86,22 +86,22 @@ struct Args
 
             # ----- ADMM: parameters -----
             "--admm-mu-incr"
-            help = "Fator μ_incr para comparar r vs s (default: 3.0)"
+            help = "Fator mu_incr para comparar r vs s (default: 3.0)"
             arg_type = Float64
             default = 3.0
 
             "--admm-mu-decr"
-            help = "Fator μ_decr para comparar s vs r (default: 3.0)"
+            help = "Fator mu_decr para comparar s vs r (default: 3.0)"
             arg_type = Float64
             default = 3.0
 
             "--admm-tau-incr"
-            help = "Fator multiplicativo τ_incr quando r >> s (default: 1.05)"
+            help = "Fator multiplicativo tau_incr quando r >> s (default: 1.05)"
             arg_type = Float64
             default = 1.05
 
             "--admm-tau-decr"
-            help = "Fator multiplicativo τ_decr quando s >> r (default: 0.98)"
+            help = "Fator multiplicativo tau_decr quando s >> r (default: 0.98)"
             arg_type = Float64
             default = 0.98
 

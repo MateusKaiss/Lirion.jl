@@ -158,10 +158,10 @@ function run_distributed_branch_ac_objective_tests(;
             end
         admm_eps_primal_case = admm_eps_primal
         admm_eps_dual_case = admm_eps_dual
-        μ_incr_case = admm_mu_incr
-        μ_decr_case = admm_mu_decr
-        τ_incr_case = admm_tau_incr
-        τ_decr_case = admm_tau_decr
+        mu_incr_case = admm_mu_incr
+        mu_decr_case = admm_mu_decr
+        tau_incr_case = admm_tau_incr
+        tau_decr_case = admm_tau_decr
         adaptive_case = nothing
         extra_flags = String[]
 
@@ -175,8 +175,8 @@ function run_distributed_branch_ac_objective_tests(;
             admm_eps_dual_case = 1e-4
             admm_rho_case = 1.0e5
             adaptive_case = "on"
-            μ_incr_case, μ_decr_case = 2.0, 2.0
-            τ_incr_case, τ_decr_case = 1.05, 0.95
+            mu_incr_case, mu_decr_case = 2.0, 2.0
+            tau_incr_case, tau_decr_case = 1.05, 0.95
         end
         if case_name in
            ("pglib_opf_case118_5zones_ieee.m", "pglib_opf_case118_3zones_ieee.m")
@@ -185,8 +185,8 @@ function run_distributed_branch_ac_objective_tests(;
             admm_eps_dual_case = 1e-4
             admm_rho_case = 1.0e5
             adaptive_case = "on"
-            μ_incr_case, μ_decr_case = 3.0, 3.0
-            τ_incr_case, τ_decr_case = 1.1, 0.9
+            mu_incr_case, mu_decr_case = 3.0, 3.0
+            tau_incr_case, tau_decr_case = 1.1, 0.9
         end
 
         if case_name == "pglib_opf_case500_3zones_goc.m" ||
@@ -195,8 +195,8 @@ function run_distributed_branch_ac_objective_tests(;
             admm_eps_primal_case = 1e-4
             admm_eps_dual_case = 1e-4
             adaptive_case = "on"
-            μ_incr_case, μ_decr_case = 3.0, 3.0
-            τ_incr_case, τ_decr_case = 1.3, 0.7
+            mu_incr_case, mu_decr_case = 3.0, 3.0
+            tau_incr_case, tau_decr_case = 1.3, 0.7
             extra_flags = String[
                 "--admm-rho-theta", "1e5",
                 "--admm-rho-v", "1e5",
@@ -209,8 +209,8 @@ function run_distributed_branch_ac_objective_tests(;
             admm_eps_dual_case = 1e-4
             admm_rho_case = 1.0e4   # rho único (P e Q)
             adaptive_case = "on"
-            μ_incr_case, μ_decr_case = 3.0, 3.0
-            τ_incr_case, τ_decr_case = 1.1, 0.9
+            mu_incr_case, mu_decr_case = 3.0, 3.0
+            tau_incr_case, tau_decr_case = 1.1, 0.9
         end
 
         if case_name == "pglib_opf_case3970_25zones_goc.m"
@@ -219,8 +219,8 @@ function run_distributed_branch_ac_objective_tests(;
             admm_eps_dual_case = 3e-4
             admm_rho_case = 1.0e4   # rho único (P e Q)
             adaptive_case = "on"
-            μ_incr_case, μ_decr_case = 3.0, 3.0
-            τ_incr_case, τ_decr_case = 1.1, 0.9
+            mu_incr_case, mu_decr_case = 3.0, 3.0
+            tau_incr_case, tau_decr_case = 1.1, 0.9
         end
 
         if case_name == "pglib_opf_case10000_goc.m"
@@ -229,15 +229,15 @@ function run_distributed_branch_ac_objective_tests(;
             admm_eps_dual_case = 3e-4
             admm_rho_case = 1.0e3   # rho único (P e Q). 
             adaptive_case = "on"
-            μ_incr_case, μ_decr_case = 3.0, 3.0
-            τ_incr_case, τ_decr_case = 1.05, 0.95
+            mu_incr_case, mu_decr_case = 3.0, 3.0
+            tau_incr_case, tau_decr_case = 1.05, 0.95
         end
 
         @info "[$label] Rodando caso $i de $n: $case_name " *
               "(max_iter=$(admm_max_iter_case), rho_flow=$(admm_rho_case), " *
               "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), " *
-              "μ=(incr=$(μ_incr_case),decr=$(μ_decr_case)), " *
-              "τ=(incr=$(τ_incr_case),decr=$(τ_decr_case)), " *
+              "mu=(incr=$(mu_incr_case),decr=$(mu_decr_case)), " *
+              "tau=(incr=$(tau_incr_case),decr=$(tau_decr_case)), " *
               "adaptive=$(adaptive_case))"
 
         @testset "$(label) - $(case_name)" begin
@@ -252,10 +252,10 @@ function run_distributed_branch_ac_objective_tests(;
                 admm_max_iter = admm_max_iter_case,
                 admm_eps_primal = admm_eps_primal_case,
                 admm_eps_dual = admm_eps_dual_case,
-                admm_mu_incr = μ_incr_case,
-                admm_mu_decr = μ_decr_case,
-                admm_tau_incr = τ_incr_case,
-                admm_tau_decr = τ_decr_case,
+                admm_mu_incr = mu_incr_case,
+                admm_mu_decr = mu_decr_case,
+                admm_tau_incr = tau_incr_case,
+                admm_tau_decr = tau_decr_case,
                 admm_adaptive = adaptive_case,
                 additional_flags = extra_flags,
             )

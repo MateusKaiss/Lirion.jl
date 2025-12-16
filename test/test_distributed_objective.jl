@@ -259,8 +259,8 @@ function run_distributed_objective_tests(;
         @info "[$label] Rodando caso $i de $n: $case_name " *
               "(max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), " *
               "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), " *
-              "alpha=$(admm_alpha_case), μ_incr=$(admm_mu_incr_case), μ_decr=$(admm_mu_decr_case), " *
-              "τ_incr=$(admm_tau_incr_case), τ_decr=$(admm_tau_decr_case), " *
+              "alpha=$(admm_alpha_case), mu_incr=$(admm_mu_incr_case), mu_decr=$(admm_mu_decr_case), " *
+              "tau_incr=$(admm_tau_incr_case), tau_decr=$(admm_tau_decr_case), " *
               "accel=$(admm_accel_case), adaptive=$(admm_adaptive_case), " *
               "CENTRAL_SOLVER=$(typeof(central_optimizer_case)))"
 

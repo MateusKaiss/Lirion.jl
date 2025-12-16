@@ -251,11 +251,11 @@ end
 
 # ---------- rho adaptativo (paridade com DC) ----------
 function adaptive_rho!(rho::Base.RefValue{Float64}, r::Float64, s::Float64;
-    μ_incr = 2.0, μ_decr = 2.0, τ_incr = 1.05, τ_decr = 0.98)
-    if r > μ_incr * s
-        rho[] *= τ_incr
-    elseif s > μ_decr * r
-        rho[] *= τ_decr
+    mu_incr = 2.0, mu_decr = 2.0, tau_incr = 1.05, tau_decr = 0.98)
+    if r > mu_incr * s
+        rho[] *= tau_incr
+    elseif s > mu_decr * r
+        rho[] *= tau_decr
     end
 end
 ##########################
@@ -270,15 +270,15 @@ function adaptive_rho_ac!(
     rho::Base.RefValue{Float64},
     r::Float64,
     s::Float64;
-    μ_incr = 2.0,
-    μ_decr = 2.0,
-    τ_incr = 1.05,
-    τ_decr = 0.98,
+    mu_incr = 2.0,
+    mu_decr = 2.0,
+    tau_incr = 1.05,
+    tau_decr = 0.98,
 )
-    if r > μ_incr * s
-        rho[] *= τ_incr
-    elseif s > μ_decr * r
-        rho[] *= τ_decr
+    if r > mu_incr * s
+        rho[] *= tau_incr
+    elseif s > mu_decr * r
+        rho[] *= tau_decr
     end
 end
 
@@ -286,15 +286,15 @@ function adaptive_rho_dc!(
     rho::Base.RefValue{Float64},
     r::Float64,
     s::Float64;
-    μ_incr = 3.0,
-    μ_decr = 3.0,
-    τ_incr = 1.05,
-    τ_decr = 0.98,
+    mu_incr = 3.0,
+    mu_decr = 3.0,
+    tau_incr = 1.05,
+    tau_decr = 0.98,
 )
-    if r > μ_incr * s
-        rho[] *= τ_incr
-    elseif s > μ_decr * r
-        rho[] *= τ_decr
+    if r > mu_incr * s
+        rho[] *= tau_incr
+    elseif s > mu_decr * r
+        rho[] *= tau_decr
     end
 end
 

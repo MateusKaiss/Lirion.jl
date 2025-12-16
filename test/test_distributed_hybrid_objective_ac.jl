@@ -244,8 +244,8 @@ function run_distributed_hybrid_ac_objective_tests(;
         @info "[$label] Rodando caso $i de $n: $case_name " *
               "(max_iter=$(admm_max_iter_case), rho_theta/rhoV=$(rho_bus_base), rho_flow=$(rho_flow_base), " *
               "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), " *
-              "μ=(incr=$(admm_mu_incr_case),decr=$(admm_mu_decr_case)), " *
-              "τ=(incr=$(admm_tau_incr_case),decr=$(admm_tau_decr_case)), " *
+              "mu=(incr=$(admm_mu_incr_case),decr=$(admm_mu_decr_case)), " *
+              "tau=(incr=$(admm_tau_incr_case),decr=$(admm_tau_decr_case)), " *
               "adaptive=$(admm_adaptive_case))"
 
         @testset "$(label) - $(case_name)" begin

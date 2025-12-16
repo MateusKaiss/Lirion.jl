@@ -277,8 +277,8 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
         end
 
         if adaptive
-            adaptive_rho_ac!(rho_theta, rtheta, stheta; μ_incr=config.mu_incr, μ_decr=config.mu_decr, τ_incr=config.tau_incr, τ_decr=config.tau_decr)
-            adaptive_rho_ac!(rhoV, rV, sV; μ_incr=config.mu_incr, μ_decr=config.mu_decr, τ_incr=config.tau_incr, τ_decr=config.tau_decr)
+            adaptive_rho_ac!(rho_theta, rtheta, stheta; mu_incr=config.mu_incr, mu_decr=config.mu_decr, tau_incr=config.tau_incr, tau_decr=config.tau_decr)
+            adaptive_rho_ac!(rhoV, rV, sV; mu_incr=config.mu_incr, mu_decr=config.mu_decr, tau_incr=config.tau_incr, tau_decr=config.tau_decr)
         end
     end
 
@@ -444,8 +444,8 @@ function run_admm_ac_branch(
         end
 
         if adaptive
-            adaptive_rho_ac!(rhoP, r, s; μ_incr=config.mu_incr, μ_decr=config.mu_decr, τ_incr=config.tau_incr, τ_decr=config.tau_decr)
-            adaptive_rho_ac!(rhoQ, r, s; μ_incr=config.mu_incr, μ_decr=config.mu_decr, τ_incr=config.tau_incr, τ_decr=config.tau_decr)
+            adaptive_rho_ac!(rhoP, r, s; mu_incr=config.mu_incr, mu_decr=config.mu_decr, tau_incr=config.tau_incr, tau_decr=config.tau_decr)
+            adaptive_rho_ac!(rhoQ, r, s; mu_incr=config.mu_incr, mu_decr=config.mu_decr, tau_incr=config.tau_incr, tau_decr=config.tau_decr)
         end
     end
 
@@ -705,11 +705,11 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             rtheta, rV = primal_residual_bus_ac_components(partitions, theta_consensus_vec, vmag_consensus_vec, shared_buses_sorted, shared_buses_idx)
             stheta, sV = dual_residual_bus_ac_components(theta_consensus_vec, vmag_consensus_vec, theta_consensus_prev, vmag_consensus_prev)
 
-            adaptive_rho_ac!(rho_theta, rtheta, stheta; μ_incr=config.mu_incr, μ_decr=config.mu_decr, τ_incr=config.tau_incr, τ_decr=config.tau_decr)
-            adaptive_rho_ac!(rhoV, rV, sV; μ_incr=config.mu_incr, μ_decr=config.mu_decr, τ_incr=config.tau_incr, τ_decr=config.tau_decr)
+            adaptive_rho_ac!(rho_theta, rtheta, stheta; mu_incr=config.mu_incr, mu_decr=config.mu_decr, tau_incr=config.tau_incr, tau_decr=config.tau_decr)
+            adaptive_rho_ac!(rhoV, rV, sV; mu_incr=config.mu_incr, mu_decr=config.mu_decr, tau_incr=config.tau_incr, tau_decr=config.tau_decr)
 
-            adaptive_rho_ac!(rhoP, r_br, s_br; μ_incr=config.mu_incr, μ_decr=config.mu_decr, τ_incr=config.tau_incr, τ_decr=config.tau_decr)
-            adaptive_rho_ac!(rhoQ, r_br, s_br; μ_incr=config.mu_incr, μ_decr=config.mu_decr, τ_incr=config.tau_incr, τ_decr=config.tau_decr)
+            adaptive_rho_ac!(rhoP, r_br, s_br; mu_incr=config.mu_incr, mu_decr=config.mu_decr, tau_incr=config.tau_incr, tau_decr=config.tau_decr)
+            adaptive_rho_ac!(rhoQ, r_br, s_br; mu_incr=config.mu_incr, mu_decr=config.mu_decr, tau_incr=config.tau_incr, tau_decr=config.tau_decr)
         end
     end
 

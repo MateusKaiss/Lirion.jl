@@ -1,6 +1,5 @@
 @inline _wrap_angle_diff(Δ::Float64) = atan(sin(Δ), cos(Δ))
 
-
 function compute_ac_bus_consensus_vec!(
     theta_consensus_vec::Vector{Float64},
     vmag_consensus_vec::Vector{Float64},

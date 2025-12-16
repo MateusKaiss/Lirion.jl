@@ -23,7 +23,6 @@ function init_dc_bus_partition!(
     return nothing
 end
 
-# BRANCH/DC init (p_flow on cut edges only)
 function init_dc_branch_partition!(
     part::PartitionDC,
     sys_zone,
@@ -239,10 +238,10 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
                 rho,
                 res_primal,
                 res_dual;
-                μ_incr = config.mu_incr,
-                μ_decr = config.mu_decr,
-                τ_incr = config.tau_incr,
-                τ_decr = config.tau_decr,
+                mu_incr = config.mu_incr,
+                mu_decr = config.mu_decr,
+                tau_incr = config.tau_incr,
+                tau_decr = config.tau_decr,
             )
         end
     end
@@ -280,10 +279,10 @@ function run_admm_branch(
     config::DistributedOPFModel,
     sys::ADMMSystem;
     use_legacy_rho::Bool = false,
-    μ_incr::Float64 = 2.0,
-    μ_decr::Float64 = 2.0,
-    τ_incr::Float64 = 1.05,
-    τ_decr::Float64 = 0.98,
+    mu_incr::Float64 = 2.0,
+    mu_decr::Float64 = 2.0,
+    tau_incr::Float64 = 1.05,
+    tau_decr::Float64 = 0.98,
 )
     t0_ns = time_ns()
     iter_done = 0
@@ -299,10 +298,10 @@ function run_admm_branch(
     adaptive = _adaptive_on(config)
 
     # usa o que está no config (mantém seu comportamento original)
-    μ_incr = config.mu_incr
-    μ_decr = config.mu_decr
-    τ_incr = config.tau_incr
-    τ_decr = config.tau_decr
+    mu_incr = config.mu_incr
+    mu_decr = config.mu_decr
+    tau_incr = config.tau_incr
+    tau_decr = config.tau_decr
 
     z_flow = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     z_flow_prev = Dict{Int, Float64}()
@@ -394,20 +393,20 @@ function run_admm_branch(
 
         if adaptive
             if use_legacy_rho
-                if res_primal > μ_incr * res_dual
-                    rho[] *= τ_incr
-                elseif res_dual > μ_decr * res_primal
-                    rho[] *= τ_decr
+                if res_primal > mu_incr * res_dual
+                    rho[] *= tau_incr
+                elseif res_dual > mu_decr * res_primal
+                    rho[] *= tau_decr
                 end
             else
                 adaptive_rho_dc!(
                     rho,
                     res_primal,
                     res_dual;
-                    μ_incr = μ_incr,
-                    μ_decr = μ_decr,
-                    τ_incr = τ_incr,
-                    τ_decr = τ_decr,
+                    mu_incr = mu_incr,
+                    mu_decr = mu_decr,
+                    tau_incr = tau_incr,
+                    tau_decr = tau_decr,
                 )
             end
         end
@@ -623,19 +622,19 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
                 rho_theta,
                 res_pri_bus,
                 res_du_bus;
-                μ_incr = config.mu_incr,
-                μ_decr = config.mu_decr,
-                τ_incr = config.tau_incr,
-                τ_decr = config.tau_decr,
+                mu_incr = config.mu_incr,
+                mu_decr = config.mu_decr,
+                tau_incr = config.tau_incr,
+                tau_decr = config.tau_decr,
             )
             adaptive_rho_dc!(
                 rhoe,
                 res_pri_br,
                 res_du_br;
-                μ_incr = config.mu_incr,
-                μ_decr = config.mu_decr,
-                τ_incr = config.tau_incr,
-                τ_decr = config.tau_decr,
+                mu_incr = config.mu_incr,
+                mu_decr = config.mu_decr,
+                tau_incr = config.tau_incr,
+                tau_decr = config.tau_decr,
             )
         end
     end
