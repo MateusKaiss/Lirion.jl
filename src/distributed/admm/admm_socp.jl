@@ -25,14 +25,42 @@ function init_socp_v2rt_partition!(
     _build_quad_bus_expr_socp!(sub, rhoV2)
     _build_quad_branch_rt_expr!(sub, rhoR, rhoT, sub.zone_edges)
 
-    sub.obj_static = (sub.obj_base) + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
+    sub.obj_static = sub.obj_base + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
     @objective(m, Min, sub.obj_static)
     optimize!(m)
 
     return nothing
 end
 
-# BRANCH (P,Q)
+# V² + R/T — todas as partições (some o for do runner)
+function init_socp_v2rt_partition!(
+    partitions::Dict{Int,PartitionSOCP},
+    sys::ADMMSystem,
+    zone_ids::Vector{Int},
+    optimizer_factory,
+    rhoV2::Float64,
+    rhoR::Float64,
+    rhoT::Float64,
+    cut_edges,
+)
+    for z in zone_ids
+        init_socp_v2rt_partition!(
+            partitions[z],
+            sys.parts[z],
+            optimizer_factory,
+            rhoV2,
+            rhoR,
+            rhoT,
+            cut_edges,
+        )
+    end
+    return nothing
+end
+
+
+# ------------------------------------------------------------
+# BRANCH (P,Q) — uma partição
+# ------------------------------------------------------------
 function init_socp_pq_partition!(
     sub::PartitionSOCP,
     sys_zone,
@@ -64,14 +92,40 @@ function init_socp_pq_partition!(
     end
 
     _build_quad_branch_pq_expr!(sub, rhoP, rhoQ, sub.zone_edges)
-    sub.obj_static = (sub.obj_base) + sub.quad_pq_expr_socp + sub.soft_anchor_expr
+    sub.obj_static = sub.obj_base + sub.quad_pq_expr_socp + sub.soft_anchor_expr
     @objective(m, Min, sub.obj_static)
     optimize!(m)
 
     return nothing
 end
 
-# HYBRID (V² + P/Q + R/T)
+# BRANCH (P,Q) — todas as partições
+function init_socp_pq_partition!(
+    partitions::Dict{Int,PartitionSOCP},
+    sys::ADMMSystem,
+    zone_ids::Vector{Int},
+    optimizer_factory,
+    rhoP::Float64,
+    rhoQ::Float64,
+    cut_edges,
+)
+    for z in zone_ids
+        init_socp_pq_partition!(
+            partitions[z],
+            sys.parts[z],
+            optimizer_factory,
+            rhoP,
+            rhoQ,
+            cut_edges,
+        )
+    end
+    return nothing
+end
+
+
+# ------------------------------------------------------------
+# HYBRID (V² + P/Q + R/T) — uma partição
+# ------------------------------------------------------------
 function init_socp_hybrid_partition!(
     sub::PartitionSOCP,
     sys_zone,
@@ -102,24 +156,52 @@ function init_socp_hybrid_partition!(
     _build_quad_branch_pq_expr!(sub, rhoP, rhoQ, sub.zone_edges)
     _build_quad_branch_rt_expr!(sub, rhoR, rhoT, sub.zone_edges)
 
-    sub.obj_static =
-        (sub.obj_base) + sub.quad_bus_expr_socp +
-        sub.quad_pq_expr_socp + sub.quad_rt_expr_socp
-
+    sub.obj_static = sub.obj_base + sub.quad_bus_expr_socp + sub.quad_pq_expr_socp + sub.quad_rt_expr_socp
     @objective(m, Min, sub.obj_static)
     optimize!(m)
 
     return nothing
 end
 
+# HYBRID — todas as partições
+function init_socp_hybrid_partition!(
+    partitions::Dict{Int,PartitionSOCP},
+    sys::ADMMSystem,
+    zone_ids::Vector{Int},
+    optimizer_factory,
+    rhoV2::Float64,
+    rhoP::Float64,
+    rhoQ::Float64,
+    rhoR::Float64,
+    rhoT::Float64,
+    cut_edges,
+)
+    for z in zone_ids
+        init_socp_hybrid_partition!(
+            partitions[z],
+            sys.parts[z],
+            optimizer_factory,
+            rhoV2,
+            rhoP,
+            rhoQ,
+            rhoR,
+            rhoT,
+            cut_edges,
+        )
+    end
+    return nothing
+end
+
+
+# ============================================================
+# RUNNERS — removendo os "for z in zone_ids init_..."
+# ============================================================
+
 function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
     t0_ns = time_ns()
 
     @assert config.base_model == SOCP "ADMM-SOCP: base_model deve ser SOCP."
 
-    # ---------------------------
-    # 2) Inputs e parâmetros
-    # ---------------------------
     shared_buses = sys.shared_buses
     cut_edges    = sys.cut_edges
     max_iter     = config.max_iter
@@ -134,34 +216,19 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
 
     optimizer_factory = resolve_socp_optimizer(config)
 
-    # ---------------------------
-    # 3) Build estrutural
-    # ---------------------------
     partitions = build_socp_partitions(sys)
     zone_ids = collect(keys(partitions))
     n_zones = length(zone_ids)
 
-    # hotpaths + edges antes
-    for z in zone_ids
-        sub = partitions[z]
-        prepare_hotpaths!(sub)
-        sub.zone_edges = _zone_cut_edges(sub, cut_edges)
-    end
-
     shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
-    # ---------------------------
-    # 4) Alocações (buffers + históricos)
-    # ---------------------------
-    # BUS (denso)
     v2bar      = ones(Float64, n_shared_buses)
     v2bar_prev = similar(v2bar)
 
     duals_v2 = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
     lambda_zone_buf = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
 
-    # RT (dict)
     zR = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zT = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zR_prev = Dict{Int, Float64}()
@@ -185,25 +252,9 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
     results = Vector{NamedTuple{(:gen_cost_expr, :real_cost),
                                 Tuple{Float64, Float64}}}(undef, n_zones)
 
-    # ---------------------------
-    # 5) Init por zona
-    # ---------------------------
-    for z in zone_ids
-        sub = partitions[z]
-        init_socp_v2rt_partition!(
-            sub,
-            sys.parts[z],
-            optimizer_factory,
-            rhoV2[],
-            rhoR[],
-            rhoT[],
-            cut_edges,
-        )
-    end
+    # ✅ init (some o for do runner)
+    init_socp_v2rt_partition!(partitions, sys, zone_ids, optimizer_factory, rhoV2[], rhoR[], rhoT[], cut_edges)
 
-    # ---------------------------
-    # 6) Loop ADMM
-    # ---------------------------
     iter_done = 0
     for k in 1:max_iter
         iter_done = k
@@ -280,7 +331,6 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
             )
         end
 
-        # RT duals (por extração)
         for z in zone_ids
             sub = partitions[z]
             m = sub.model::JuMP.Model
@@ -336,9 +386,6 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
         end
     end
 
-    # ---------------------------
-    # 7) Pós-processo
-    # ---------------------------
     save_socp_v2rt_plots(
         r_hist, s_hist, eps_r_hist, eps_s_hist,
         rhoV2_hist, rhoR_hist, rhoT_hist;
@@ -360,14 +407,13 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
 
     return total_real_cost, partitions, iter_done, elapsed_s
 end
+
+
 function run_admm_socp_branch(config::DistributedOPFModel, sys::ADMMSystem)
     t0_ns = time_ns()
 
     @assert config.base_model == SOCP "ADMM-SOCP-branch: base_model deve ser SOCP."
 
-    # ---------------------------
-    # 2) Inputs e parâmetros
-    # ---------------------------
     cut_edges = sys.cut_edges
     max_iter  = config.max_iter
 
@@ -380,23 +426,10 @@ function run_admm_socp_branch(config::DistributedOPFModel, sys::ADMMSystem)
 
     optimizer_factory = resolve_socp_optimizer(config)
 
-    # ---------------------------
-    # 3) Build estrutural
-    # ---------------------------
     partitions = build_socp_partitions(sys)
     zone_ids = collect(keys(partitions))
     n_zones = length(zone_ids)
 
-    # hotpaths + zone_edges antes
-    for z in zone_ids
-        sub = partitions[z]
-        prepare_hotpaths!(sub)
-        sub.zone_edges = _zone_cut_edges(sub, cut_edges)
-    end
-
-    # ---------------------------
-    # 4) Alocações (buffers + históricos)
-    # ---------------------------
     zP = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zQ = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zP_prev = Dict{Int, Float64}()
@@ -415,24 +448,9 @@ function run_admm_socp_branch(config::DistributedOPFModel, sys::ADMMSystem)
     prev_rhoP = rhoP[]
     prev_rhoQ = rhoQ[]
 
-    # ---------------------------
-    # 5) Init por zona
-    # ---------------------------
-    for z in zone_ids
-        sub = partitions[z]
-        init_socp_pq_partition!(
-            sub,
-            sys.parts[z],
-            optimizer_factory,
-            rhoP[],
-            rhoQ[],
-            cut_edges,
-        )
-    end
+    # ✅ init (some o for do runner)
+    init_socp_pq_partition!(partitions, sys, zone_ids, optimizer_factory, rhoP[], rhoQ[], cut_edges)
 
-    # ---------------------------
-    # 6) Loop ADMM
-    # ---------------------------
     iter_done = 0
     for k in 1:max_iter
         iter_done = k
@@ -508,9 +526,6 @@ function run_admm_socp_branch(config::DistributedOPFModel, sys::ADMMSystem)
         end
     end
 
-    # ---------------------------
-    # 7) Pós-processo
-    # ---------------------------
     save_socp_branch_pq_plots(
         r_hist, s_hist, eps_r_hist, eps_s_hist, rhoP_hist, rhoQ_hist;
         stem = "admm_socp_branch",
@@ -537,9 +552,6 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
 
     @assert config.base_model == SOCP "ADMM-SOCP-hybrid: base_model deve ser SOCP."
 
-    # ---------------------------
-    # 2) Inputs e parâmetros
-    # ---------------------------
     shared_buses = sys.shared_buses
     cut_edges    = sys.cut_edges
     max_iter     = config.max_iter
@@ -558,25 +570,13 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
 
     optimizer_factory = resolve_socp_optimizer(config)
 
-    # ---------------------------
-    # 3) Build estrutural
-    # ---------------------------
     partitions = build_socp_partitions(sys)
     zone_ids = collect(keys(partitions))
     n_zones = length(zone_ids)
 
-    for z in zone_ids
-        sub = partitions[z]
-        prepare_hotpaths!(sub)
-        sub.zone_edges = _zone_cut_edges(sub, cut_edges)
-    end
-
     shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
-    # ---------------------------
-    # 4) Alocações (buffers + históricos)
-    # ---------------------------
     v2bar      = ones(Float64, n_shared_buses)
     v2bar_prev = similar(v2bar)
 
@@ -615,27 +615,12 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     prev_rhoR  = rhoR[]
     prev_rhoT  = rhoT[]
 
-    # ---------------------------
-    # 5) Init por zona
-    # ---------------------------
-    for z in zone_ids
-        sub = partitions[z]
-        init_socp_hybrid_partition!(
-            sub,
-            sys.parts[z],
-            optimizer_factory,
-            rhoV2[],
-            rhoP[],
-            rhoQ[],
-            rhoR[],
-            rhoT[],
-            cut_edges,
-        )
-    end
+    # ✅ init (some o for do runner)
+    init_socp_hybrid_partition!(
+        partitions, sys, zone_ids, optimizer_factory,
+        rhoV2[], rhoP[], rhoQ[], rhoR[], rhoT[], cut_edges
+    )
 
-    # ---------------------------
-    # 6) Loop ADMM
-    # ---------------------------
     iter_done = 0
     for k in 1:max_iter
         iter_done = k
@@ -771,9 +756,6 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         end
     end
 
-    # ---------------------------
-    # 7) Pós-processo
-    # ---------------------------
     save_socp_hybrid_plots(
         r_hist, s_hist, eps_r_hist, eps_s_hist,
         rhoV2_hist, rhoP_hist, rhoQ_hist, rhoR_hist, rhoT_hist;

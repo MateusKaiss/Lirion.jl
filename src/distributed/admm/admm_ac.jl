@@ -1,8 +1,3 @@
-############################
-# Helpers: init partitions #
-############################
-
-# BUS/AC init (theta + V mag)
 function init_ac_bus_partition!(
     part::PartitionAC,
     sys_zone,
@@ -16,7 +11,7 @@ function init_ac_bus_partition!(
     part.model = m
     part.obj_base = m[:generation_cost]
     part.theta_var = m[:theta]
-    part.vmag_var = m[:v_magnitude]
+    part.vmag_var  = m[:v_magnitude]
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
@@ -34,7 +29,20 @@ function init_ac_bus_partition!(
     return nothing
 end
 
-# BRANCH/AC init (P,Q on cut edges)
+function init_ac_bus_partition!(
+    partitions::Dict{Int,PartitionAC},
+    sys::ADMMSystem,
+    zone_ids::Vector{Int},
+    optimizer_factory,
+    rho_theta::Float64,
+    rhoV::Float64,
+)
+    for z in zone_ids
+        init_ac_bus_partition!(partitions[z], sys.parts[z], optimizer_factory, rho_theta, rhoV)
+    end
+    return nothing
+end
+
 function init_ac_branch_partition!(
     part::PartitionAC,
     sys_zone,
@@ -43,13 +51,14 @@ function init_ac_branch_partition!(
     rhoQ::Float64,
     cut_edges,
 )
+    prepare_hotpaths_ac!(part)
     part.zone_edges = _zone_cut_edges(part, cut_edges)
 
     m = build_model(sys_zone, AC; optimizer = optimizer_factory)
     part.model = m
     part.obj_base = m[:generation_cost]
     part.theta_var = m[:theta]
-    part.vmag_var = m[:v_magnitude]
+    part.vmag_var  = m[:v_magnitude]
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
@@ -67,7 +76,26 @@ function init_ac_branch_partition!(
     return nothing
 end
 
-# HYBRID/AC init (bus theta,V + branch P,Q)
+# BRANCH/AC init — todas as partições
+function init_ac_branch_partition!(
+    partitions::Dict{Int,PartitionAC},
+    sys::ADMMSystem,
+    zone_ids::Vector{Int},
+    optimizer_factory,
+    rhoP::Float64,
+    rhoQ::Float64,
+    cut_edges,
+)
+    for z in zone_ids
+        init_ac_branch_partition!(partitions[z], sys.parts[z], optimizer_factory, rhoP, rhoQ, cut_edges)
+    end
+    return nothing
+end
+
+
+# ------------------------------------------------------------
+# HYBRID/AC init (bus theta,V + branch P,Q) — uma partição
+# ------------------------------------------------------------
 function init_ac_hybrid_partition!(
     part::PartitionAC,
     sys_zone,
@@ -85,7 +113,7 @@ function init_ac_hybrid_partition!(
     part.model = m
     part.obj_base = m[:generation_cost]
     part.theta_var = m[:theta]
-    part.vmag_var = m[:v_magnitude]
+    part.vmag_var  = m[:v_magnitude]
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
@@ -105,14 +133,34 @@ function init_ac_hybrid_partition!(
     return nothing
 end
 
+# HYBRID/AC init — todas as partições
+function init_ac_hybrid_partition!(
+    partitions::Dict{Int,PartitionAC},
+    sys::ADMMSystem,
+    zone_ids::Vector{Int},
+    optimizer_factory,
+    rho_theta::Float64,
+    rhoV::Float64,
+    rhoP::Float64,
+    rhoQ::Float64,
+    cut_edges,
+)
+    for z in zone_ids
+        init_ac_hybrid_partition!(partitions[z], sys.parts[z], optimizer_factory, rho_theta, rhoV, rhoP, rhoQ, cut_edges)
+    end
+    return nothing
+end
+
+
+# ============================================================
+# RUNNERS — removendo os "for z in zone_ids init_..."
+# ============================================================
+
 function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
     t0_ns = time_ns()
 
     @assert config.base_model == AC "ADMM-AC: base_model deve ser AC."
 
-    # ---------------------------
-    # 2) Inputs e parâmetros
-    # ---------------------------
     shared_buses = sys.shared_buses
     max_iter = config.max_iter
 
@@ -125,9 +173,6 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
 
     optimizer_factory = resolve_optimizer_ac(config)
 
-    # ---------------------------
-    # 3) Build estrutural
-    # ---------------------------
     partitions = build_ac_partitions(sys)
     zone_ids = collect(keys(partitions))
     n_zones = length(zone_ids)
@@ -135,9 +180,6 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
     shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
-    # ---------------------------
-    # 4) Alocações (buffers + históricos)
-    # ---------------------------
     duals_theta = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
     duals_v     = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
 
@@ -164,17 +206,9 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
     results = Vector{NamedTuple{(:expr_cost, :real_cost),
                                 Tuple{Float64, Float64}}}(undef, n_zones)
 
-    # ---------------------------
-    # 5) Init por zona
-    # ---------------------------
-    for z in zone_ids
-        part = partitions[z]
-        init_ac_bus_partition!(part, sys.parts[z], optimizer_factory, rho_theta[], rho_v[])
-    end
+    # ✅ init (some o for do runner)
+    init_ac_bus_partition!(partitions, sys, zone_ids, optimizer_factory, rho_theta[], rho_v[])
 
-    # ---------------------------
-    # 6) Loop ADMM
-    # ---------------------------
     iter_done = 0
     for k in 1:max_iter
         iter_done = k
@@ -188,7 +222,7 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
             prev_rho_v     = rho_v[]
         end
 
-        α_used = nothing  # mantém teu hook (over-relax etc.)
+        α_used = nothing
         theta_target = theta_consensus
         vmag_target  = vmag_consensus
 
@@ -292,9 +326,6 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
         end
     end
 
-    # ---------------------------
-    # 7) Pós-processo
-    # ---------------------------
     save_ac_bus_plots(
         res_primal_hist, res_dual_hist, eps_primal_hist, eps_dual_hist,
         rho_theta_hist, rho_v_hist, theta_avg_hist;
@@ -316,18 +347,15 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
     return total_real_cost, partitions, iter_done, elapsed_s
 end
 
+
 function run_admm_ac_branch(
     config::DistributedOPFModel,
     sys::ADMMSystem;
-    warm_start::Bool = false,  # mantido só pra compatibilidade
+    warm_start::Bool = false,
 )
     t0_ns = time_ns()
-
     @assert config.base_model == AC "ADMM-AC-branch: base_model deve ser AC."
 
-    # ---------------------------
-    # 2) Inputs e parâmetros
-    # ---------------------------
     cut_edges = sys.cut_edges
     max_iter  = config.max_iter
 
@@ -340,16 +368,10 @@ function run_admm_ac_branch(
 
     optimizer_factory = resolve_optimizer_ac(config)
 
-    # ---------------------------
-    # 3) Build estrutural
-    # ---------------------------
     partitions = build_ac_partitions(sys)
     zone_ids = collect(keys(partitions))
     n_zones = length(zone_ids)
 
-    # ---------------------------
-    # 4) Alocações (buffers + históricos)
-    # ---------------------------
     duals_p = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
     duals_q = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
 
@@ -371,17 +393,9 @@ function run_admm_ac_branch(
     results = Vector{NamedTuple{(:expr_cost, :real_cost),
                                 Tuple{Float64, Float64}}}(undef, n_zones)
 
-    # ---------------------------
-    # 5) Init por zona
-    # ---------------------------
-    for z in zone_ids
-        part = partitions[z]
-        init_ac_branch_partition!(part, sys.parts[z], optimizer_factory, rho_p[], rho_q[], cut_edges)
-    end
+    # ✅ init (some o for do runner)
+    init_ac_branch_partition!(partitions, sys, zone_ids, optimizer_factory, rho_p[], rho_q[], cut_edges)
 
-    # ---------------------------
-    # 6) Loop ADMM
-    # ---------------------------
     iter_done = 0
     for k in 1:max_iter
         iter_done = k
@@ -475,9 +489,6 @@ function run_admm_ac_branch(
         end
     end
 
-    # ---------------------------
-    # 7) Pós-processo
-    # ---------------------------
     save_ac_branch_plots(
         res_primal_hist, res_dual_hist, eps_primal_hist, eps_dual_hist,
         rho_p_hist, rho_q_hist;
@@ -499,14 +510,11 @@ function run_admm_ac_branch(
     return total_real_cost, partitions, iter_done, elapsed_s
 end
 
+
 function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     t0_ns = time_ns()
-
     @assert config.base_model == AC "Hybrid AC: base_model deve ser AC."
 
-    # ---------------------------
-    # 2) Inputs e parâmetros
-    # ---------------------------
     shared_buses = sys.shared_buses
     cut_edges    = sys.cut_edges
     max_iter     = config.max_iter
@@ -522,9 +530,6 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
 
     optimizer_factory = resolve_optimizer_ac(config)
 
-    # ---------------------------
-    # 3) Build estrutural
-    # ---------------------------
     partitions = build_ac_partitions(sys)
     zone_ids = collect(keys(partitions))
     n_zones = length(zone_ids)
@@ -532,9 +537,6 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
-    # ---------------------------
-    # 4) Alocações (buffers + históricos)
-    # ---------------------------
     duals_theta = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
     duals_v     = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
 
@@ -574,26 +576,12 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     results = Vector{NamedTuple{(:expr_cost, :real_cost),
                                 Tuple{Float64, Float64}}}(undef, n_zones)
 
-    # ---------------------------
-    # 5) Init por zona
-    # ---------------------------
-    for z in zone_ids
-        part = partitions[z]
-        init_ac_hybrid_partition!(
-            part,
-            sys.parts[z],
-            optimizer_factory,
-            rho_theta[],
-            rho_v[],
-            rho_p[],
-            rho_q[],
-            cut_edges,
-        )
-    end
+    # ✅ init (some o for do runner)
+    init_ac_hybrid_partition!(
+        partitions, sys, zone_ids, optimizer_factory,
+        rho_theta[], rho_v[], rho_p[], rho_q[], cut_edges
+    )
 
-    # ---------------------------
-    # 6) Loop ADMM
-    # ---------------------------
     iter_done = 0
     for k in 1:max_iter
         iter_done = k
@@ -649,11 +637,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
                 rho_q[],
             )
 
-            @objective(
-                m,
-                Min,
-                part.obj_base + part.quad_bus_expr_ac + part.quad_branch_expr_ac + (lin_bus + lin_br),
-            )
+            @objective(m, Min, part.obj_base + part.quad_bus_expr_ac + part.quad_branch_expr_ac + (lin_bus + lin_br))
             optimize!(m)
 
             results[i] = (
@@ -757,7 +741,6 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             adaptive_rho_ac!(rho_q, r_br, s_br; mu_incr=config.mu_incr, mu_decr=config.mu_decr, tau_incr=config.tau_incr, tau_decr=config.tau_decr)
         end
     end
-
 
     total_real_cost = sum(p.real_generation_cost for p in values(partitions))
     total_expr_cost = sum(p.generation_cost_model_expr for p in values(partitions))
