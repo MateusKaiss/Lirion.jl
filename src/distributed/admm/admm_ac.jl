@@ -210,9 +210,9 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
     init_ac_bus_partition!(partitions, sys, zone_ids, optimizer_factory, rho_theta[], rho_v[])
 
     iter_done = 0
-    for k in 1:max_iter
-        iter_done = k
-        _FAST_USE_LOGS && println("\n[ADMM-AC] Iteração $k")
+    for iter in 1:max_iter
+        iter_done = iter
+        _FAST_USE_LOGS && println("\n[ADMM-AC] Iteração $iter")
 
         if (rho_theta[] != prev_rho_theta) || (rho_v[] != prev_rho_v)
             for part in values(partitions)
@@ -397,9 +397,9 @@ function run_admm_ac_branch(
     init_ac_branch_partition!(partitions, sys, zone_ids, optimizer_factory, rho_p[], rho_q[], cut_edges)
 
     iter_done = 0
-    for k in 1:max_iter
-        iter_done = k
-        _FAST_USE_LOGS && println("\n[ADMM-AC-branch] Iteração $k")
+    for iter in 1:max_iter
+        iter_done = iter
+        _FAST_USE_LOGS && println("\n[ADMM-AC-branch] Iteração $iter")
 
         if (rho_p[] != prev_rho_p) || (rho_q[] != prev_rho_q)
             for part in values(partitions)
@@ -576,16 +576,15 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     results = Vector{NamedTuple{(:expr_cost, :real_cost),
                                 Tuple{Float64, Float64}}}(undef, n_zones)
 
-    # ✅ init (some o for do runner)
     init_ac_hybrid_partition!(
         partitions, sys, zone_ids, optimizer_factory,
         rho_theta[], rho_v[], rho_p[], rho_q[], cut_edges
     )
 
     iter_done = 0
-    for k in 1:max_iter
-        iter_done = k
-        _FAST_USE_LOGS && println("\n[ADMM-AC-hybrid] Iteração $k")
+    for iter in 1:max_iter
+        iter_done = iter
+        _FAST_USE_LOGS && println("\n[ADMM-AC-hybrid] Iteração $iter")
 
         if (rho_theta[] != prev_rho_theta) || (rho_v[] != prev_rho_v)
             for part in values(partitions)

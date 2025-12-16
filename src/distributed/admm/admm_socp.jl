@@ -256,9 +256,9 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
     init_socp_v2rt_partition!(partitions, sys, zone_ids, optimizer_factory, rhoV2[], rhoR[], rhoT[], cut_edges)
 
     iter_done = 0
-    for k in 1:max_iter
-        iter_done = k
-        _FAST_USE_LOGS && println("\n[ADMM-SOCP (V²+R,T)] Iteração $k")
+    for iter in 1:max_iter
+        iter_done = iter
+        _FAST_USE_LOGS && println("\n[ADMM-SOCP (V²+R,T)] Iteração $iter")
 
         if rhoV2[] != prev_rhoV2
             for sub in values(partitions)
@@ -452,9 +452,9 @@ function run_admm_socp_branch(config::DistributedOPFModel, sys::ADMMSystem)
     init_socp_pq_partition!(partitions, sys, zone_ids, optimizer_factory, rhoP[], rhoQ[], cut_edges)
 
     iter_done = 0
-    for k in 1:max_iter
-        iter_done = k
-        _FAST_USE_LOGS && println("\n[ADMM-SOCP-branch (P,Q)] Iteração $k")
+    for iter in 1:max_iter
+        iter_done = iter
+        _FAST_USE_LOGS && println("\n[ADMM-SOCP-branch (P,Q)] Iteração $iter")
 
         if (rhoP[] != prev_rhoP) || (rhoQ[] != prev_rhoQ)
             for sub in values(partitions)
@@ -615,16 +615,15 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     prev_rhoR  = rhoR[]
     prev_rhoT  = rhoT[]
 
-    # ✅ init (some o for do runner)
     init_socp_hybrid_partition!(
         partitions, sys, zone_ids, optimizer_factory,
         rhoV2[], rhoP[], rhoQ[], rhoR[], rhoT[], cut_edges
     )
 
     iter_done = 0
-    for k in 1:max_iter
-        iter_done = k
-        _FAST_USE_LOGS && println("\n[ADMM-SOCP-hybrid] Iteração $k")
+    for iter in 1:max_iter
+        iter_done = iter
+        _FAST_USE_LOGS && println("\n[ADMM-SOCP-hybrid] Iteração $iter")
 
         if (rhoV2[] != prev_rhoV2) || (rhoP[] != prev_rhoP) || (rhoQ[] != prev_rhoQ) ||
            (rhoR[] != prev_rhoR)  || (rhoT[] != prev_rhoT)

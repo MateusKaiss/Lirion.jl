@@ -173,9 +173,9 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     init_dc_bus_partition!(partitions, sys, zone_ids, optimizer_factory, rho[])
 
     iter_done = 0
-    for k in 1:max_iter
-        iter_done = k
-        _FAST_USE_LOGS && println("\nIteração $k (bus/DC)")
+    for iter in 1:max_iter
+        iter_done = iter
+        _FAST_USE_LOGS && println("\nIteração $iter (bus/DC)")
 
         if rho[] != prev_rho
             for part in values(partitions)
@@ -351,9 +351,9 @@ function run_admm_branch(
     init_dc_branch_partition!(partitions, sys, zone_ids, optimizer_factory, rho[], cut_edges)
 
     iter_done = 0
-    for k in 1:max_iter
-        iter_done = k
-        _FAST_USE_LOGS && println("\n[ADMM-branch/DC] Iteração $k")
+    for iter in 1:max_iter
+        iter_done = iter
+        _FAST_USE_LOGS && println("\n[ADMM-branch/DC] Iteração $iter")
 
         if rho[] != prev_rho
             for part in values(partitions)
@@ -501,9 +501,9 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     init_dc_hybrid_partition!(partitions, sys, zone_ids, optimizer_factory, rho_theta[], rho_flow[], cut_edges)
 
     iter_done = 0
-    for k in 1:max_iter
-        iter_done = k
-        _FAST_USE_LOGS && println("\n[ADMM-hybrid/DC] Iteração $k")
+    for iter in 1:max_iter
+        iter_done = iter
+        _FAST_USE_LOGS && println("\n[ADMM-hybrid/DC] Iteração $iter")
 
         if rho_theta[] != prev_rho_theta
             for part in values(partitions)
