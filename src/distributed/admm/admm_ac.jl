@@ -132,7 +132,7 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
     zone_ids = collect(keys(partitions))
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_idx = prepare_dense_maps(shared_buses)
+    shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
     # ---------------------------
@@ -529,7 +529,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     zone_ids = collect(keys(partitions))
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_idx = prepare_dense_maps(shared_buses)
+    shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
     # ---------------------------

@@ -100,14 +100,14 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     partitions = build_dc_partitions(sys)
     zone_ids = collect(keys(partitions))
 
-    shared_buses_sorted, shared_buses_idx = prepare_dense_maps(shared_buses)
+    shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
     n_shared_buses  = length(shared_buses_sorted)
     n_zones = length(zone_ids)
 
-    duals_dense = Dict{Int, Vector{Float64}}(
+    dual_theta = Dict{Int, Vector{Float64}}(
         z => zeros(Float64, n_shared_buses ) for z in zone_ids
     )
-    lambda_zone_buf = Dict{Int, Vector{Float64}}(
+    dual_theta_buf = Dict{Int, Vector{Float64}}(
         z => zeros(Float64, n_shared_buses ) for z in zone_ids
     )
 
@@ -148,7 +148,7 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
             part = partitions[z]
             m = part.model::JuMP.Model
 
-            lambdaz = gather_zone_lambda!(lambda_zone_buf[z], duals_dense[z])
+            lambdaz = gather_zone_lambda!(dual_theta_buf[z], dual_theta[z])
 
             lin = _build_linear_bus_expr(
                 part,
@@ -197,7 +197,7 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
 
         for z in zone_ids
             update_duals_theta_vec!(
-                duals_dense[z],
+                dual_theta[z],
                 partitions[z],
                 theta_consensus,
                 rho[],
@@ -457,7 +457,7 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     zone_ids = collect(keys(partitions))
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_idx = prepare_dense_maps(shared_buses)
+    shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
     n_shared_buses  = length(shared_buses_sorted)
 
     # ---------------------------
@@ -470,7 +470,7 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     z_flow_prev = Dict{Int, Float64}()
 
     duals_theta = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses ) for z in zone_ids)
-    lambda_zone_buf = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses ) for z in zone_ids)
+    dual_theta_buf = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses ) for z in zone_ids)
     duals_flow = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
 
     res_primal_hist = Float64[]
@@ -522,7 +522,7 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             part = partitions[z]
             m = part.model::JuMP.Model
 
-            lambdatheta = gather_zone_lambda!(lambda_zone_buf[z], duals_theta[z])
+            lambdatheta = gather_zone_lambda!(dual_theta_buf[z], duals_theta[z])
 
             lin_bus = _build_linear_bus_expr(
                 part,

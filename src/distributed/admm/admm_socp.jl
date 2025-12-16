@@ -148,7 +148,7 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
         sub.zone_edges = _zone_cut_edges(sub, cut_edges)
     end
 
-    shared_buses_sorted, shared_buses_idx = prepare_dense_maps(shared_buses)
+    shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
     # ---------------------------
@@ -571,7 +571,7 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         sub.zone_edges = _zone_cut_edges(sub, cut_edges)
     end
 
-    shared_buses_sorted, shared_buses_idx = prepare_dense_maps(shared_buses)
+    shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
     # ---------------------------
