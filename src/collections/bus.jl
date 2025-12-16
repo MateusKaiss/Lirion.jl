@@ -33,7 +33,7 @@ function get_bus_parameters(bus_data)
     if reference_bus_idx !== nothing
         reference_bus = bus_ids[reference_bus_idx]
     else
-        @info "No reference bus (type 3) found in this zone. Skipping θ_ref constraint."
+        @info "No reference bus (type 3) found in this zone. Skipping theta_ref constraint."
     end
 
     n = length(bus_ids)

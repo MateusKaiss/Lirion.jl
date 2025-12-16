@@ -113,10 +113,10 @@ end
 
 @inline _theta_val_ac(
     m::JuMP.Model,
-    θ::JuMP.Containers.DenseAxisArray,
+    theta::JuMP.Containers.DenseAxisArray,
     b::Int,
     t::Int,
-) = _val_or_start_ac(m, θ[b, t])
+) = _val_or_start_ac(m, theta[b, t])
 
 @inline _vmag_val(
     m::JuMP.Model,
@@ -136,46 +136,46 @@ end
 
 @inline function _theta_val(
     m::JuMP.Model,
-    θ::JuMP.Containers.DenseAxisArray,
+    theta::JuMP.Containers.DenseAxisArray,
     b::Int,
     t::Int,
 )
-    return _val_or_start(m, θ[b, t])
+    return _val_or_start(m, theta[b, t])
 end
 
 @inline function snapshot_theta!(part::PartitionDC)
-    # θ "completo" (todas as barras da zona)
+    # theta "completo" (todas as barras da zona)
     m = part.model::JuMP.Model
-    θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     buf = part.theta_buf
     bus_ids = part.bus.id
     @inbounds for i in eachindex(bus_ids)
-        buf[i] = _theta_val(m, θ, bus_ids[i], 1)
+        buf[i] = _theta_val(m, theta, bus_ids[i], 1)
     end
     return buf
 end
 
 @inline function snapshot_theta_shared!(part::PartitionDC)
-    # θ só nas barras compartilhadas da zona
+    # theta só nas barras compartilhadas da zona
     m = part.model::JuMP.Model
-    θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     buf = part.theta_shared_buf
     pos = part.shared_pos_local
     bus_ids = part.bus.id
     @inbounds for i in eachindex(pos)
         bidx = pos[i]
-        buf[i] = _theta_val(m, θ, bus_ids[bidx], 1)
+        buf[i] = _theta_val(m, theta, bus_ids[bidx], 1)
     end
     return buf
 end
 
 @inline function snapshot_theta_ac!(part::PartitionAC)
     m = part.model::JuMP.Model
-    θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     buf = part.theta_buf
     bus_ids = part.bus.id
     @inbounds for i in eachindex(bus_ids)
-        buf[i] = _theta_val_ac(m, θ, bus_ids[i], 1)
+        buf[i] = _theta_val_ac(m, theta, bus_ids[i], 1)
     end
     return buf
 end
@@ -193,13 +193,13 @@ end
 
 @inline function snapshot_theta_ac_shared!(part::PartitionAC)
     m = part.model::JuMP.Model
-    θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     buf = part.theta_shared_buf
     pos = part.shared_pos_local
     bus_ids = part.bus.id
     @inbounds for i in eachindex(pos)
         bidx = pos[i]
-        buf[i] = _theta_val_ac(m, θ, bus_ids[bidx], 1)
+        buf[i] = _theta_val_ac(m, theta, bus_ids[bidx], 1)
     end
     return buf
 end
@@ -260,12 +260,12 @@ end
     l_local::Int;
     t::Int = 1,
 )
-    θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     f = part.branch.from[l_local]
     tb = part.branch.to[l_local]
     x = part.branch.x[l_local]
     @assert abs(x) > 1e-8 "x≈0 no ramo local $l_local (DC)."
-    return (_theta_val(m, θ, f, t) - _theta_val(m, θ, tb, t)) / x
+    return (_theta_val(m, theta, f, t) - _theta_val(m, theta, tb, t)) / x
 end
 
 @inline function _ac_flow_from_exprs_existing(

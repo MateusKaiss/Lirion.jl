@@ -37,7 +37,7 @@ struct Args
             default = 1_000.0
 
             "--admm-rho-theta"
-            help = "rhoθ (consensus penalty for bus angles; ignored for SOCP-hybrid)"
+            help = "rho_theta (consensus penalty for bus angles; ignored for SOCP-hybrid)"
             arg_type = Float64
 
             "--admm-rho-v"
@@ -62,12 +62,12 @@ struct Args
             default = 350
 
             "--admm-eps-primal"
-            help = "Primal tolerance ε_primal"
+            help = "Primal tolerance eps_primal"
             arg_type = Float64
             default = 1e-7
 
             "--admm-eps-dual"
-            help = "Dual tolerance ε_dual"
+            help = "Dual tolerance eps_dual"
             arg_type = Float64
             default = 1e-7
 
@@ -76,7 +76,7 @@ struct Args
             arg_type = Float64
 
             "--admm-warm-start"
-            help = "Warm start dos subproblemas (pré-solve base e usa θ como start)"
+            help = "Warm start dos subproblemas (pré-solve base e usa theta como start)"
             action = :store_true
 
             "--admm-adaptive"
@@ -187,7 +187,7 @@ struct Args
             rho_flow_p_orig::Union{Nothing, Float64},
             rho_flow_q_orig::Union{Nothing, Float64},
         )
-            # θ em :admm(bus) para DC/AC/SOCP; em :admm_hybrid só para DC/AC
+            # theta em :admm(bus) para DC/AC/SOCP; em :admm_hybrid só para DC/AC
             uses_theta =
                 (
                     method_sym == :admm &&
@@ -266,8 +266,8 @@ struct Args
                         rho_v = rho_v_val,
                         rho_flow_p = rho_flow_p_val,
                         rho_flow_q = rho_flow_q_val,
-                        ε_primal = parsed["admm-eps-primal"],
-                        ε_dual = parsed["admm-eps-dual"],
+                        eps_primal = parsed["admm-eps-primal"],
+                        eps_dual = parsed["admm-eps-dual"],
                         alpha_overrelax = alpha_,
                         warm_start = warm_start_flag,
                         adaptive_rho = adaptive_flag,
@@ -290,8 +290,8 @@ struct Args
                         rho_v = rho_v_val,
                         rho_flow_p = rho_flow_p_val,
                         rho_flow_q = rho_flow_q_val,
-                        ε_primal = parsed["admm-eps-primal"],
-                        ε_dual = parsed["admm-eps-dual"],
+                        eps_primal = parsed["admm-eps-primal"],
+                        eps_dual = parsed["admm-eps-dual"],
                         alpha_overrelax = alpha_,
                         optimizer = optimizer,
                         prefer_socp_solver = :auto,

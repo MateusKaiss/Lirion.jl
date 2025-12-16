@@ -72,12 +72,12 @@ function resolve_optimizer_dc(config)
     end
 
     eps_abs = try
-        getfield(config, Symbol("ε_primal"))
+        getfield(config, Symbol("eps_primal"))
     catch
         1e-6
     end
     eps_rel = try
-        getfield(config, Symbol("ε_dual"))
+        getfield(config, Symbol("eps_dual"))
     catch
         1e-6
     end

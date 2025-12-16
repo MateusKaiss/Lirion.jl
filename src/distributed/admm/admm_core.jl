@@ -46,7 +46,7 @@ function plot_admm_convergence(
         y = eps_primal,
         type = :scatter,
         mode = "lines",
-        name = "εᵖʳⁱ",
+        name = "epsᵖʳⁱ",
         line = (; color = "purple", dash = "dash"),
     )
     p(;
@@ -54,7 +54,7 @@ function plot_admm_convergence(
         y = eps_dual,
         type = :scatter,
         mode = "lines",
-        name = "εᵈᵘᵃˡ",
+        name = "epsᵈᵘᵃˡ",
         line = (; color = "orange", dash = "dash"),
     )
 
@@ -88,9 +88,9 @@ function plot_rho(rho_vec::Vector{Float64}, path::String)
     return println("Gráfico de rho salvo em $path")
 end
 
-function plot_theta_avg_heatmap(θ_avg_history::Dict{Int, Vector{Float64}}, path::String)
-    buses = sort(collect(keys(θ_avg_history)))
-    z_matrix = [θ_avg_history[b] for b in buses]
+function plot_theta_avg_heatmap(theta_avg_history::Dict{Int, Vector{Float64}}, path::String)
+    buses = sort(collect(keys(theta_avg_history)))
+    z_matrix = [theta_avg_history[b] for b in buses]
 
     p = Plot()
     p(;
@@ -99,10 +99,10 @@ function plot_theta_avg_heatmap(θ_avg_history::Dict{Int, Vector{Float64}}, path
         y = buses,
         type = :heatmap,
         colorscale = "Viridis",
-        colorbar = (; title = "θ_avg"),
+        colorbar = (; title = "theta_avg"),
     )
 
-    p.layout.title = "Evolução de θ_avg por Barra Compartilhada"
+    p.layout.title = "Evolução de theta_avg por Barra Compartilhada"
     p.layout.xaxis.title = "Iterações"
     p.layout.yaxis.title = "Ângulo de fase (rad) por Barra Compartilhada"
 
@@ -111,10 +111,10 @@ function plot_theta_avg_heatmap(θ_avg_history::Dict{Int, Vector{Float64}}, path
 end
 
 function plot_theta_local_heatmaps(
-    θ_local_history::Dict{Int, Dict{Int, Vector{Float64}}},
+    theta_local_history::Dict{Int, Dict{Int, Vector{Float64}}},
     base_path::String,
 )
-    for (zone_id, zone_data) in θ_local_history
+    for (zone_id, zone_data) in theta_local_history
         buses = sort(collect(keys(zone_data)))
         z_matrix = [zone_data[b] for b in buses]
 
@@ -125,10 +125,10 @@ function plot_theta_local_heatmaps(
             y = buses,
             type = :heatmap,
             colorscale = "Viridis",
-            colorbar = (; title = "θ (local)"),
+            colorbar = (; title = "theta (local)"),
         )
 
-        p.layout.title = "Zona $zone_id – θ local por Barra Local"
+        p.layout.title = "Zona $zone_id – theta local por Barra Local"
         p.layout.xaxis.title = "Iterações"
         p.layout.yaxis.title = "Ângulo de fase (rad) por Barra Local"
 
@@ -149,7 +149,7 @@ function save_dc_bus_plots(
     eps_pri,
     eps_du,
     rho_hist,
-    θ_avg_history;
+    theta_avg_history;
     stem::String = "admm",
 )
     plot_admm_convergence(
@@ -160,7 +160,7 @@ function save_dc_bus_plots(
         "plot_convergencia_$(stem)_dc.html",
     )
     plot_rho(rho_hist, "plot_rho_$(stem)_dc.html")
-    return plot_theta_avg_heatmap(θ_avg_history, "plot_theta_avg_heatmap_$(stem)_dc.html")
+    return plot_theta_avg_heatmap(theta_avg_history, "plot_theta_avg_heatmap_$(stem)_dc.html")
 end
 
 function save_dc_branch_plots(
@@ -190,9 +190,9 @@ function save_ac_bus_plots(
     res_du,
     eps_pri,
     eps_du,
-    rhoθ_hist,
+    rho_theta_hist,
     rhoV_hist,
-    θ_avg_hist;
+    theta_avg_hist;
     stem::String = "admm_ac",
 )
     plot_admm_convergence(
@@ -207,15 +207,15 @@ function save_ac_bus_plots(
             () -> (
                 p = Plot();
                 p(;
-                    x = 1:length(rhoθ_hist),
-                    y = rhoθ_hist,
+                    x = 1:length(rho_theta_hist),
+                    y = rho_theta_hist,
                     type = :scatter,
                     mode = "lines+markers",
-                    name = "rhoθ",
+                    name = "rho_theta",
                 );
-                p.layout.title = "Evolução de rhoθ";
+                p.layout.title = "Evolução de rho_theta";
                 p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "rhoθ";
+                p.layout.yaxis.title = "rho_theta";
                 p.layout.yaxis.type = "log";
                 p
             )
@@ -242,7 +242,7 @@ function save_ac_bus_plots(
         )(),
         "plot_rho_vmag_$(stem).html",
     )
-    return plot_theta_avg_heatmap(θ_avg_hist, "plot_theta_avg_heatmap_$(stem).html")
+    return plot_theta_avg_heatmap(theta_avg_hist, "plot_theta_avg_heatmap_$(stem).html")
 end
 
 function save_ac_branch_plots(

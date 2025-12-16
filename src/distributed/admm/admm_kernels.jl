@@ -2,36 +2,36 @@
 
 
 function compute_ac_bus_consensus_vec!(
-    θ̄_vec::Vector{Float64},
-    V̄_vec::Vector{Float64},
+    theta_consensus_vec::Vector{Float64},
+    vmag_consensus_vec::Vector{Float64},
     partitions::Dict{Int, PartitionAC},
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
 )
-    fill!(θ̄_vec, 0.0)
-    fill!(V̄_vec, 0.0)
+    fill!(theta_consensus_vec, 0.0)
+    fill!(vmag_consensus_vec, 0.0)
     sums_sin = zeros(Float64, length(shared_buses_sorted))
     sums_cos = zeros(Float64, length(shared_buses_sorted))
     counts = zeros(Int, length(shared_buses_sorted))
 
     for (_, part) in partitions
-        θs = snapshot_theta_ac_shared!(part)
+        thetas = snapshot_theta_ac_shared!(part)
         Vs = snapshot_vmag_shared!(part)
         lbs = part.shared_buses_local
         @inbounds for i in eachindex(lbs)
             j = b2pos[lbs[i]]
-            s, c = sincos(θs[i])
+            s, c = sincos(thetas[i])
             sums_sin[j] += s
             sums_cos[j] += c
-            V̄_vec[j] += Vs[i]
+            vmag_consensus_vec[j] += Vs[i]
             counts[j] += 1
         end
     end
 
-    @inbounds for j in eachindex(θ̄_vec)
+    @inbounds for j in eachindex(theta_consensus_vec)
         if counts[j] != 0
-            θ̄_vec[j] = atan(sums_sin[j], sums_cos[j])
-            V̄_vec[j] /= counts[j]
+            theta_consensus_vec[j] = atan(sums_sin[j], sums_cos[j])
+            vmag_consensus_vec[j] /= counts[j]
         end
     end
 end
@@ -78,38 +78,38 @@ function compute_ac_branch_consensus!(
 end
 
 @inline function update_duals_bus_ac_vec!(
-    dualsθ_vec_zone::Vector{Float64},
+    duals_theta_vec_zone::Vector{Float64},
     dualsV_vec_zone::Vector{Float64},
     part::PartitionAC,
-    θ̄_vec::Vector{Float64},
-    V̄_vec::Vector{Float64},
-    rhoθ::Float64,
+    theta_consensus_vec::Vector{Float64},
+    vmag_consensus_vec::Vector{Float64},
+    rho_theta::Float64,
     rhoV::Float64,
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int};
     α::Union{Nothing, Float64} = nothing,
-    θ̄_prev::Union{Nothing, Vector{Float64}} = nothing,
-    V̄_prev::Union{Nothing, Vector{Float64}} = nothing,
+    theta_consensus_prev::Union{Nothing, Vector{Float64}} = nothing,
+    vmag_consensus_prev::Union{Nothing, Vector{Float64}} = nothing,
 )
-    θs = snapshot_theta_ac_shared!(part)
+    thetas = snapshot_theta_ac_shared!(part)
     Vs = snapshot_vmag_shared!(part)
     lbs = part.shared_buses_local
 
     if α === nothing
         @inbounds for i in eachindex(lbs)
             j = b2pos[lbs[i]]
-            dθ = _wrap_angle_diff(θs[i] - θ̄_vec[j])
-            dV = (Vs[i] - V̄_vec[j])
-            dualsθ_vec_zone[j] += rhoθ * dθ
+            dtheta = _wrap_angle_diff(thetas[i] - theta_consensus_vec[j])
+            dV = (Vs[i] - vmag_consensus_vec[j])
+            duals_theta_vec_zone[j] += rho_theta * dtheta
             dualsV_vec_zone[j] += rhoV * dV
         end
     else
         αv = something(α, 1.0)
         @inbounds for i in eachindex(lbs)
             j = b2pos[lbs[i]]
-            θrel = _wrap_angle_diff(αv * θs[i] + (1 - αv) * θ̄_prev[j] - θ̄_vec[j])
-            Vrel = αv * Vs[i] + (1 - αv) * V̄_prev[j] - V̄_vec[j]
-            dualsθ_vec_zone[j] += rhoθ * θrel
+            thetarel = _wrap_angle_diff(αv * thetas[i] + (1 - αv) * theta_consensus_prev[j] - theta_consensus_vec[j])
+            Vrel = αv * Vs[i] + (1 - αv) * vmag_consensus_prev[j] - vmag_consensus_vec[j]
+            duals_theta_vec_zone[j] += rho_theta * thetarel
             dualsV_vec_zone[j] += rhoV * Vrel
         end
     end
@@ -170,21 +170,21 @@ end
 
 function primal_residual_bus_ac_vec(
     partitions::Dict{Int, PartitionAC},
-    θ̄_vec::Vector{Float64},
-    V̄_vec::Vector{Float64},
+    theta_consensus_vec::Vector{Float64},
+    vmag_consensus_vec::Vector{Float64},
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
 )
     acc = 0.0
     for (_, part) in partitions
-        θbuf = snapshot_theta_ac!(part)
+        thetabuf = snapshot_theta_ac!(part)
         Vbuf = snapshot_vmag!(part)
         pos = part.bus_local_index
         @inbounds for b in part.shared_buses_local
             j = b2pos[b]
             acc +=
-                _wrap_angle_diff(θbuf[pos[b]] - θ̄_vec[j])^2 +
-                (Vbuf[pos[b]] - V̄_vec[j])^2
+                _wrap_angle_diff(thetabuf[pos[b]] - theta_consensus_vec[j])^2 +
+                (Vbuf[pos[b]] - vmag_consensus_vec[j])^2
         end
     end
     return sqrt(acc)
@@ -192,34 +192,34 @@ end
 
 function primal_residual_bus_ac_components(
     partitions::Dict{Int, PartitionAC},
-    θ̄_vec::Vector{Float64},
-    V̄_vec::Vector{Float64},
+    theta_consensus_vec::Vector{Float64},
+    vmag_consensus_vec::Vector{Float64},
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
 )
-    rθ = 0.0
+    rtheta = 0.0
     rV = 0.0
     for (_, part) in partitions
-        θbuf = snapshot_theta_ac!(part)
+        thetabuf = snapshot_theta_ac!(part)
         Vbuf = snapshot_vmag!(part)
         pos = part.bus_local_index
         @inbounds for b in part.shared_buses_local
             j = b2pos[b]
-            rθ += _wrap_angle_diff(θbuf[pos[b]] - θ̄_vec[j])^2
-            rV += (Vbuf[pos[b]] - V̄_vec[j])^2
+            rtheta += _wrap_angle_diff(thetabuf[pos[b]] - theta_consensus_vec[j])^2
+            rV += (Vbuf[pos[b]] - vmag_consensus_vec[j])^2
         end
     end
-    return sqrt(rθ), sqrt(rV)
+    return sqrt(rtheta), sqrt(rV)
 end
 
 function eps_primal_bus_ac_vec(
     partitions::Dict{Int, PartitionAC},
-    θ̄_vec::Vector{Float64},
-    V̄_vec::Vector{Float64},
+    theta_consensus_vec::Vector{Float64},
+    vmag_consensus_vec::Vector{Float64},
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
-    ϵ_abs::Float64,
-    ϵ_rel::Float64,
+    eps_abs::Float64,
+    eps_rel::Float64,
 )
     dim = 0
     for (_, part) in partitions
@@ -227,53 +227,53 @@ function eps_primal_bus_ac_vec(
     end
     z_norm_sq = 0.0
     @inbounds for j in eachindex(shared_buses_sorted)
-        z_norm_sq += θ̄_vec[j]^2 + V̄_vec[j]^2
+        z_norm_sq += theta_consensus_vec[j]^2 + vmag_consensus_vec[j]^2
     end
-    return sqrt(max(1, dim)) * ϵ_abs +
-           ϵ_rel * max(sqrt(z_norm_sq), 1e-12)
+    return sqrt(max(1, dim)) * eps_abs +
+           eps_rel * max(sqrt(z_norm_sq), 1e-12)
 end
 
 function dual_residual_bus_ac_vec(
-    θ̄_vec::Vector{Float64},
-    V̄_vec::Vector{Float64},
-    θ̄_prev::Vector{Float64},
-    V̄_prev::Vector{Float64},
+    theta_consensus_vec::Vector{Float64},
+    vmag_consensus_vec::Vector{Float64},
+    theta_consensus_prev::Vector{Float64},
+    vmag_consensus_prev::Vector{Float64},
 )
-    sθ = 0.0
+    stheta = 0.0
     sV = 0.0
-    @inbounds for j in eachindex(θ̄_vec)
-        sθ += _wrap_angle_diff(θ̄_vec[j] - θ̄_prev[j])^2
-        sV += (V̄_vec[j] - V̄_prev[j])^2
+    @inbounds for j in eachindex(theta_consensus_vec)
+        stheta += _wrap_angle_diff(theta_consensus_vec[j] - theta_consensus_prev[j])^2
+        sV += (vmag_consensus_vec[j] - vmag_consensus_prev[j])^2
     end
-    return sqrt(sθ + sV)
+    return sqrt(stheta + sV)
 end
 
 function dual_residual_bus_ac_components(
-    θ̄_vec::Vector{Float64},
-    V̄_vec::Vector{Float64},
-    θ̄_prev::Vector{Float64},
-    V̄_prev::Vector{Float64},
+    theta_consensus_vec::Vector{Float64},
+    vmag_consensus_vec::Vector{Float64},
+    theta_consensus_prev::Vector{Float64},
+    vmag_consensus_prev::Vector{Float64},
 )
-    sθ = 0.0
+    stheta = 0.0
     sV = 0.0
-    @inbounds for j in eachindex(θ̄_vec)
-        sθ += _wrap_angle_diff(θ̄_vec[j] - θ̄_prev[j])^2
-        sV += (V̄_vec[j] - V̄_prev[j])^2
+    @inbounds for j in eachindex(theta_consensus_vec)
+        stheta += _wrap_angle_diff(theta_consensus_vec[j] - theta_consensus_prev[j])^2
+        sV += (vmag_consensus_vec[j] - vmag_consensus_prev[j])^2
     end
-    return sqrt(sθ), sqrt(sV)
+    return sqrt(stheta), sqrt(sV)
 end
 
 function eps_dual_bus_ac_vec(
-    θ̄_vec::Vector{Float64},
-    V̄_vec::Vector{Float64},
-    θ̄_prev::Vector{Float64},
-    V̄_prev::Vector{Float64},
-    ϵ_abs::Float64,
-    ϵ_rel::Float64,
+    theta_consensus_vec::Vector{Float64},
+    vmag_consensus_vec::Vector{Float64},
+    theta_consensus_prev::Vector{Float64},
+    vmag_consensus_prev::Vector{Float64},
+    eps_abs::Float64,
+    eps_rel::Float64,
 )
-    dim = 2 * max(1, length(θ̄_vec))
-    s = dual_residual_bus_ac_vec(θ̄_vec, V̄_vec, θ̄_prev, V̄_prev)
-    return sqrt(dim) * ϵ_abs + ϵ_rel * s
+    dim = 2 * max(1, length(theta_consensus_vec))
+    s = dual_residual_bus_ac_vec(theta_consensus_vec, vmag_consensus_vec, theta_consensus_prev, vmag_consensus_prev)
+    return sqrt(dim) * eps_abs + eps_rel * s
 end
 
 #############################
@@ -326,8 +326,8 @@ function eps_primal_branch_ac(
     zP::Dict{Int, Float64},
     zQ::Dict{Int, Float64},
     cut_edges::Vector{Int},
-    ϵ_abs::Float64,
-    ϵ_rel::Float64,
+    eps_abs::Float64,
+    eps_rel::Float64,
 )
     dim = 0
     for (_, part) in partitions
@@ -337,8 +337,8 @@ function eps_primal_branch_ac(
     for e in cut_edges
         z_norm_sq += get(zP, e, 0.0)^2 + get(zQ, e, 0.0)^2
     end
-    return sqrt(max(1, dim)) * ϵ_abs +
-           ϵ_rel * max(sqrt(z_norm_sq), 1e-12)
+    return sqrt(max(1, dim)) * eps_abs +
+           eps_rel * max(sqrt(z_norm_sq), 1e-12)
 end
 
 function eps_dual_branch_ac(
@@ -347,37 +347,37 @@ function eps_dual_branch_ac(
     zP_prev::Dict{Int, Float64},
     zQ_prev::Dict{Int, Float64},
     cut_edges::Vector{Int},
-    ϵ_abs::Float64,
-    ϵ_rel::Float64,
+    eps_abs::Float64,
+    eps_rel::Float64,
 )
     dim = 2 * max(1, length(cut_edges))
     s = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
-    return sqrt(dim) * ϵ_abs + ϵ_rel * s
+    return sqrt(dim) * eps_abs + eps_rel * s
 end
 
 
 function compute_theta_consensus_vec!(
-    θ̄_vec::Vector{Float64},
+    theta_consensus_vec::Vector{Float64},
     partitions::Dict{Int, PartitionDC},
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
 )
-    fill!(θ̄_vec, 0.0)
+    fill!(theta_consensus_vec, 0.0)
     counts = zeros(Int, length(shared_buses_sorted))
 
-    # média das θ nas barras compartilhadas
+    # média das theta nas barras compartilhadas
     for (_, part) in partitions
-        θs = snapshot_theta_shared!(part)
+        thetas = snapshot_theta_shared!(part)
         lbs = part.shared_buses_local
         @inbounds for i in eachindex(lbs)
             j = b2pos[lbs[i]]
-            θ̄_vec[j] += θs[i]
+            theta_consensus_vec[j] += thetas[i]
             counts[j] += 1
         end
     end
 
-    @inbounds for j in eachindex(θ̄_vec)
-        counts[j] != 0 && (θ̄_vec[j] /= counts[j])
+    @inbounds for j in eachindex(theta_consensus_vec)
+        counts[j] != 0 && (theta_consensus_vec[j] /= counts[j])
     end
 end
 
@@ -409,23 +409,23 @@ function compute_z_flow_consensus!(
 end
 
 #############################
-# DUAIS EM θ                #
+# DUAIS EM theta                #
 #############################
 
 @inline function update_duals_theta_vec!(
     dual_vec_zone::Vector{Float64},
     part::PartitionDC,
-    θ̄_vec::Vector{Float64},
+    theta_consensus_vec::Vector{Float64},
     rho::Float64,
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
 )
-    θs = snapshot_theta_shared!(part)
+    thetas = snapshot_theta_shared!(part)
     lbs = part.shared_buses_local
 
     @inbounds for i in eachindex(lbs)
         j = b2pos[lbs[i]]
-        dual_vec_zone[j] += rho * (θs[i] - θ̄_vec[j])
+        dual_vec_zone[j] += rho * (thetas[i] - theta_consensus_vec[j])
     end
     return nothing
 end
@@ -444,58 +444,58 @@ end
 
 function primal_residual_bus_dc(
     partitions::Dict{Int, PartitionDC},
-    θ̄_vec::Vector{Float64},
+    theta_consensus_vec::Vector{Float64},
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
 )
     acc = 0.0
     for (_, part) in partitions
-        θbuf = snapshot_theta!(part)
+        thetabuf = snapshot_theta!(part)
         pos = part.bus_local_index
         @inbounds for b in part.shared_buses_local
             j = b2pos[b]
-            acc += (θbuf[pos[b]] - θ̄_vec[j])^2
+            acc += (thetabuf[pos[b]] - theta_consensus_vec[j])^2
         end
     end
     return sqrt(acc)
 end
 
 dual_residual_bus_dc(
-    θ̄_vec::Vector{Float64},
-    θ̄_prev_vec::Vector{Float64},
-) = sqrt(sum((θ̄_vec[j] - θ̄_prev_vec[j])^2 for j in eachindex(θ̄_vec)))
+    theta_consensus_vec::Vector{Float64},
+    theta_consensus_prev_vec::Vector{Float64},
+) = sqrt(sum((theta_consensus_vec[j] - theta_consensus_prev_vec[j])^2 for j in eachindex(theta_consensus_vec)))
 
 function eps_primal_bus_dc(
     partitions::Dict{Int, PartitionDC},
-    θ̄_vec::Vector{Float64},
+    theta_consensus_vec::Vector{Float64},
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
-    ϵ_abs::Float64,
-    ϵ_rel::Float64,
+    eps_abs::Float64,
+    eps_rel::Float64,
 )
     N = max(1, length(shared_buses_sorted))
     norm_x_sq = 0.0
     for (_, part) in partitions
-        θbuf = snapshot_theta!(part)
+        thetabuf = snapshot_theta!(part)
         pos = part.bus_local_index
         @inbounds for b in part.shared_buses_local
-            norm_x_sq += (θbuf[pos[b]])^2
+            norm_x_sq += (thetabuf[pos[b]])^2
         end
     end
-    norm_z_sq = sum((θ̄_vec[j])^2 for j in eachindex(θ̄_vec))
+    norm_z_sq = sum((theta_consensus_vec[j])^2 for j in eachindex(theta_consensus_vec))
 
-    return sqrt(N) * ϵ_abs + ϵ_rel * max(sqrt(norm_x_sq), sqrt(norm_z_sq))
+    return sqrt(N) * eps_abs + eps_rel * max(sqrt(norm_x_sq), sqrt(norm_z_sq))
 end
 
 function eps_dual_bus_dc(
-    θ̄_vec::Vector{Float64},
-    θ̄_prev_vec::Vector{Float64},
-    ϵ_abs::Float64,
-    ϵ_rel::Float64,
+    theta_consensus_vec::Vector{Float64},
+    theta_consensus_prev_vec::Vector{Float64},
+    eps_abs::Float64,
+    eps_rel::Float64,
 )
-    N = max(1, length(θ̄_vec))
-    return sqrt(N) * ϵ_abs +
-           ϵ_rel * sqrt(sum((θ̄_vec[j] - θ̄_prev_vec[j])^2 for j in eachindex(θ̄_vec)))
+    N = max(1, length(theta_consensus_vec))
+    return sqrt(N) * eps_abs +
+           eps_rel * sqrt(sum((theta_consensus_vec[j] - theta_consensus_prev_vec[j])^2 for j in eachindex(theta_consensus_vec)))
 end
 
 #############################
@@ -530,23 +530,23 @@ function eps_primal_branch_dc(
     partitions::Dict{Int, PartitionDC},
     z_flow::Dict{Int, Float64},
     cut_edges::Vector{Int},
-    ϵ_abs::Float64,
-    ϵ_rel::Float64,
+    eps_abs::Float64,
+    eps_rel::Float64,
 )
     dim_pri = sum(length(_zone_cut_edges(part, cut_edges)) for (_, part) in partitions)
-    return sqrt(max(1, dim_pri)) * ϵ_abs +
-           ϵ_rel * max(sqrt(sum(z_flow[e]^2 for e in cut_edges)), 1e-12)
+    return sqrt(max(1, dim_pri)) * eps_abs +
+           eps_rel * max(sqrt(sum(z_flow[e]^2 for e in cut_edges)), 1e-12)
 end
 
 function eps_dual_branch_dc(
     z_flow::Dict{Int, Float64},
     z_flow_prev::Dict{Int, Float64},
-    ϵ_abs::Float64,
-    ϵ_rel::Float64,
+    eps_abs::Float64,
+    eps_rel::Float64,
 )
     dim_du = max(1, length(z_flow))
-    return sqrt(dim_du) * ϵ_abs +
-           ϵ_rel * sqrt(sum((z_flow[e] - get(z_flow_prev, e, 0.0))^2 for e in keys(z_flow)))
+    return sqrt(dim_du) * eps_abs +
+           eps_rel * sqrt(sum((z_flow[e] - get(z_flow_prev, e, 0.0))^2 for e in keys(z_flow)))
 end
 
 ##########################
@@ -684,8 +684,8 @@ function eps_primal_bus_socp_vec(
     v2bar_vec,
     shared_buses_sorted,
     b2pos,
-    ϵ_abs,
-    ϵ_rel,
+    eps_abs,
+    eps_rel,
 )
     N = max(1, length(shared_buses_sorted))
     norm_x_sq = 0.0
@@ -697,13 +697,13 @@ function eps_primal_bus_socp_vec(
         end
     end
     norm_z_sq = sum((v2bar_vec[j])^2 for j in eachindex(v2bar_vec))
-    return sqrt(N) * ϵ_abs + ϵ_rel * max(sqrt(norm_x_sq), sqrt(norm_z_sq))
+    return sqrt(N) * eps_abs + eps_rel * max(sqrt(norm_x_sq), sqrt(norm_z_sq))
 end
 
-function eps_dual_bus_socp_vec(v2bar_vec, v2bar_prev_vec, ϵ_abs, ϵ_rel)
+function eps_dual_bus_socp_vec(v2bar_vec, v2bar_prev_vec, eps_abs, eps_rel)
     N = max(1, length(v2bar_vec))
-    return sqrt(N) * ϵ_abs +
-           ϵ_rel * sqrt(sum((v2bar_vec[j] - v2bar_prev_vec[j])^2
+    return sqrt(N) * eps_abs +
+           eps_rel * sqrt(sum((v2bar_vec[j] - v2bar_prev_vec[j])^2
                     for j in eachindex(v2bar_vec)))
 end
 
@@ -731,7 +731,7 @@ dual_residual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges) =
         ),
     )
 
-function eps_primal_branch_rt_socp(partitions, zR, zT, cut_edges, ϵ_abs, ϵ_rel)
+function eps_primal_branch_rt_socp(partitions, zR, zT, cut_edges, eps_abs, eps_rel)
     dim = 0
     for (_, sub) in partitions
         dim += 2 * length(_zone_cut_edges(sub, cut_edges))
@@ -740,13 +740,13 @@ function eps_primal_branch_rt_socp(partitions, zR, zT, cut_edges, ϵ_abs, ϵ_rel
     @inbounds for e in cut_edges
         z_norm_sq += get(zR, e, 0.0)^2 + get(zT, e, 0.0)^2
     end
-    return sqrt(max(1, dim)) * ϵ_abs + ϵ_rel * max(sqrt(z_norm_sq), 1e-12)
+    return sqrt(max(1, dim)) * eps_abs + eps_rel * max(sqrt(z_norm_sq), 1e-12)
 end
 
-function eps_dual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges, ϵ_abs, ϵ_rel)
+function eps_dual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges, eps_abs, eps_rel)
     dim = 2 * max(1, length(cut_edges))
     s = dual_residual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges)
-    return sqrt(dim) * ϵ_abs + ϵ_rel * s
+    return sqrt(dim) * eps_abs + eps_rel * s
 end
 
 function primal_residual_branch_pq_socp(partitions, zP, zQ, cut_edges)
@@ -772,7 +772,7 @@ dual_residual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges) =
         ),
     )
 
-function eps_primal_branch_pq_socp(partitions, zP, zQ, cut_edges, ϵ_abs, ϵ_rel)
+function eps_primal_branch_pq_socp(partitions, zP, zQ, cut_edges, eps_abs, eps_rel)
     dim = 0
     for (_, sub) in partitions
         dim += 2 * length(_zone_cut_edges(sub, cut_edges))
@@ -781,12 +781,12 @@ function eps_primal_branch_pq_socp(partitions, zP, zQ, cut_edges, ϵ_abs, ϵ_rel
     @inbounds for e in cut_edges
         z_norm_sq += get(zP, e, 0.0)^2 + get(zQ, e, 0.0)^2
     end
-    return sqrt(max(1, dim)) * ϵ_abs + ϵ_rel * max(sqrt(z_norm_sq), 1e-12)
+    return sqrt(max(1, dim)) * eps_abs + eps_rel * max(sqrt(z_norm_sq), 1e-12)
 end
 
-function eps_dual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges, ϵ_abs, ϵ_rel)
+function eps_dual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges, eps_abs, eps_rel)
     dim = 2 * max(1, length(cut_edges))
     s = dual_residual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges)
-    return sqrt(dim) * ϵ_abs + ϵ_rel * s
+    return sqrt(dim) * eps_abs + eps_rel * s
 end
 # ================== RUNNERS (espelhando DC/AC) ==================

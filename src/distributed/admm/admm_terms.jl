@@ -1,11 +1,11 @@
 function _build_quad_bus_expr!(part::PartitionDC, rho::Float64)
     m = part.model::JuMP.Model
-    θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     q = zero(JuMP.QuadExpr)
 
-    # termo (rho/2)*‖θ_shared‖² pra cada barra compartilhada
+    # termo (rho/2)*‖theta_shared‖² pra cada barra compartilhada
     for b in part.shared_buses_local
-        q += 0.5 * rho * θ[b, 1]^2
+        q += 0.5 * rho * theta[b, 1]^2
     end
     part.quad_bus_expr = q
     part.rho_bus_cached = rho
@@ -18,7 +18,7 @@ function _build_quad_branch_expr!(
     zone_edges::Vector{Int},
 )
     m = part.model::JuMP.Model
-    θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     q = zero(JuMP.QuadExpr)
 
     # termo (rho/2)*‖p_flow(e)‖² para cada ramo de corte da zona
@@ -29,7 +29,7 @@ function _build_quad_branch_expr!(
         t = part.branch.to[l_local]
         x = part.branch.x[l_local]
         @assert abs(x) > 1e-10 "x≈0 no ramo global $e (DC)."
-        p = (θ[f, 1] - θ[t, 1]) / x
+        p = (theta[f, 1] - theta[t, 1]) / x
         q += 0.5 * rho * p^2
     end
     part.quad_branch_expr = q
@@ -45,16 +45,16 @@ function _build_linear_bus_expr(
     part::PartitionDC,
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
-    θ̄_vec::Vector{Float64},
+    theta_consensus_vec::Vector{Float64},
     lambda_vec_zone::Vector{Float64},
     rho::Float64,
 )
     m = part.model::JuMP.Model 
-    θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     lin = zero(JuMP.AffExpr) #cria expressão linear vazia
     for b in part.shared_buses_local
         j = b2pos[b]
-        lin += (lambda_vec_zone[j] - rho * θ̄_vec[j]) * θ[b, 1]
+        lin += (lambda_vec_zone[j] - rho * theta_consensus_vec[j]) * theta[b, 1]
     end
     return lin
 end
@@ -66,9 +66,9 @@ function _build_linear_branch_expr(
     lambdae_zone::Dict{Int, Float64},
     rho::Float64,
 )
-    # soma_e ( lambda_e - rho z_e ) p_flow_e(θ)
+    # soma_e ( lambda_e - rho z_e ) p_flow_e(theta)
     m = part.model::JuMP.Model
-    θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     lin = zero(JuMP.AffExpr)
     for e in zone_edges
         l_local = get(part.edge_to_local, e, nothing)
@@ -78,21 +78,21 @@ function _build_linear_branch_expr(
         x = part.branch.x[l_local]
         @assert abs(x) > 1e-10 "x≈0 no ramo global $e (DC)."
         coef = get(lambdae_zone, e, 0.0) - rho * z_flow[e]
-        lin += coef * (θ[f, 1] - θ[t, 1]) / x
+        lin += coef * (theta[f, 1] - theta[t, 1]) / x
     end
     return lin
 end
 
-function _build_quad_bus_expr_ac!(part::PartitionAC, rhoθ::Float64, rhoV::Float64)
+function _build_quad_bus_expr_ac!(part::PartitionAC, rho_theta::Float64, rhoV::Float64)
     m = part.model::JuMP.Model
-    θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     V = part.vmag_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     q = zero(JuMP.QuadExpr)
     for b in part.shared_buses_local
-        q += 0.5 * rhoθ * θ[b, 1]^2 + 0.5 * rhoV * V[b, 1]^2
+        q += 0.5 * rho_theta * theta[b, 1]^2 + 0.5 * rhoV * V[b, 1]^2
     end
     part.quad_bus_expr_ac = q
-    part.rho_bus_theta_cached = rhoθ
+    part.rho_bus_theta_cached = rho_theta
     part.rho_bus_v_cached = rhoV
     return q
 end
@@ -101,21 +101,21 @@ function _build_linear_bus_expr_ac!(
     part::PartitionAC,
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
-    θ̄_vec::Vector{Float64},
-    V̄_vec::Vector{Float64},
-    lambdaθ_zone::Vector{Float64},
+    theta_consensus_vec::Vector{Float64},
+    vmag_consensus_vec::Vector{Float64},
+    lambdatheta_zone::Vector{Float64},
     lambdaV_zone::Vector{Float64},
-    rhoθ::Float64,
+    rho_theta::Float64,
     rhoV::Float64,
 )
     m = part.model::JuMP.Model
-    θ = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     V = part.vmag_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     lin = zero(JuMP.AffExpr)
     for b in part.shared_buses_local
         j = b2pos[b]
-        lin += (lambdaθ_zone[j] - rhoθ * θ̄_vec[j]) * θ[b, 1]
-        lin += (lambdaV_zone[j] - rhoV * V̄_vec[j]) * V[b, 1]
+        lin += (lambdatheta_zone[j] - rho_theta * theta_consensus_vec[j]) * theta[b, 1]
+        lin += (lambdaV_zone[j] - rhoV * vmag_consensus_vec[j]) * V[b, 1]
     end
     return lin
 end

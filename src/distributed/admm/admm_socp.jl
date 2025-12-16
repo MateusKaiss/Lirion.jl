@@ -129,7 +129,7 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
     rhoV2 = Ref(config.rho_v)
     rhoR  = Ref(config.rho_flow_p)
     rhoT  = Ref(config.rho_flow_q)
-    ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
+    eps_abs, eps_rel = config.eps_primal, config.eps_dual
     adaptive = _adaptive_on(config)
 
     optimizer_factory = resolve_socp_optimizer(config)
@@ -281,29 +281,29 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
         push!(r_hist, r)
         push!(s_hist, s)
 
-        ε_pri = begin
-            εb  = eps_primal_bus_socp_vec(partitions, v2bar_vec, consensus_buses_sorted, consensus_buses_idx, ϵ_abs, ϵ_rel)
-            εrt = eps_primal_branch_rt_socp(partitions, zR, zT, cut_edges, ϵ_abs, ϵ_rel)
-            hypot(εb, εrt)
+        eps_pri = begin
+            epsb  = eps_primal_bus_socp_vec(partitions, v2bar_vec, consensus_buses_sorted, consensus_buses_idx, eps_abs, eps_rel)
+            epsrt = eps_primal_branch_rt_socp(partitions, zR, zT, cut_edges, eps_abs, eps_rel)
+            hypot(epsb, epsrt)
         end
-        ε_du = begin
-            εb  = eps_dual_bus_socp_vec(v2bar_vec, v2bar_prev_vec, ϵ_abs, ϵ_rel)
-            εrt = eps_dual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges, ϵ_abs, ϵ_rel)
-            hypot(εb, εrt)
+        eps_du = begin
+            epsb  = eps_dual_bus_socp_vec(v2bar_vec, v2bar_prev_vec, eps_abs, eps_rel)
+            epsrt = eps_dual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges, eps_abs, eps_rel)
+            hypot(epsb, epsrt)
         end
 
-        push!(eps_r_hist, ε_pri)
-        push!(eps_s_hist, ε_du)
+        push!(eps_r_hist, eps_pri)
+        push!(eps_s_hist, eps_du)
 
-        _FAST_USE_LOGS && println("‖r‖ = $r | ε_pri = $ε_pri")
-        _FAST_USE_LOGS && println("‖s‖ = $s | ε_du  = $ε_du")
+        _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_pri")
+        _FAST_USE_LOGS && println("‖s‖ = $s | eps_du  = $eps_du")
 
         push!(rhoV2_hist, rhoV2[])
         push!(rhoR_hist, rhoR[])
         push!(rhoT_hist, rhoT[])
 
         iter_done = k
-        if r < ε_pri && s < ε_du
+        if r < eps_pri && s < eps_du
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
         end
@@ -350,7 +350,7 @@ function run_admm_socp_branch(config::DistributedOPFModel, sys::ADMMSystem)
 
     rhoP = Ref(config.rho_flow_p)
     rhoQ = Ref(config.rho_flow_q)
-    ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
+    eps_abs, eps_rel = config.eps_primal, config.eps_dual
     adaptive = _adaptive_on(config)
 
     optimizer_factory = resolve_socp_optimizer(config)
@@ -436,20 +436,20 @@ function run_admm_socp_branch(config::DistributedOPFModel, sys::ADMMSystem)
         push!(r_hist, r)
         push!(s_hist, s)
 
-        ε_pri = eps_primal_branch_pq_socp(partitions, zP, zQ, cut_edges, ϵ_abs, ϵ_rel)
-        ε_du  = eps_dual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges, ϵ_abs, ϵ_rel)
+        eps_pri = eps_primal_branch_pq_socp(partitions, zP, zQ, cut_edges, eps_abs, eps_rel)
+        eps_du  = eps_dual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges, eps_abs, eps_rel)
 
-        push!(eps_r_hist, ε_pri)
-        push!(eps_s_hist, ε_du)
+        push!(eps_r_hist, eps_pri)
+        push!(eps_s_hist, eps_du)
 
-        _FAST_USE_LOGS && println("‖r‖ = $r | ε_pri = $ε_pri")
-        _FAST_USE_LOGS && println("‖s‖ = $s | ε_du  = $ε_du")
+        _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_pri")
+        _FAST_USE_LOGS && println("‖s‖ = $s | eps_du  = $eps_du")
 
         push!(rhoP_hist, rhoP[])
         push!(rhoQ_hist, rhoQ[])
 
         iter_done = k
-        if r < ε_pri && s < ε_du
+        if r < eps_pri && s < eps_du
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
         end
@@ -501,7 +501,7 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     rhoR  = Ref(config.rho_flow_p)
     rhoT  = Ref(config.rho_flow_q)
 
-    ϵ_abs, ϵ_rel = config.ε_primal, config.ε_dual
+    eps_abs, eps_rel = config.eps_primal, config.eps_dual
     adaptive = _adaptive_on(config)
 
     optimizer_factory = resolve_socp_optimizer(config)
@@ -645,24 +645,24 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         push!(r_hist, r)
         push!(s_hist, s)
 
-        ε_pri = begin
-            εb  = eps_primal_bus_socp_vec(partitions, v2bar_vec, consensus_buses_sorted, consensus_buses_idx, ϵ_abs, ϵ_rel)
-            εpq = eps_primal_branch_pq_socp(partitions, zP, zQ, cut_edges, ϵ_abs, ϵ_rel)
-            εrt = eps_primal_branch_rt_socp(partitions, zR, zT, cut_edges, ϵ_abs, ϵ_rel)
-            sqrt(εb^2 + εpq^2 + εrt^2)
+        eps_pri = begin
+            epsb  = eps_primal_bus_socp_vec(partitions, v2bar_vec, consensus_buses_sorted, consensus_buses_idx, eps_abs, eps_rel)
+            epspq = eps_primal_branch_pq_socp(partitions, zP, zQ, cut_edges, eps_abs, eps_rel)
+            epsrt = eps_primal_branch_rt_socp(partitions, zR, zT, cut_edges, eps_abs, eps_rel)
+            sqrt(epsb^2 + epspq^2 + epsrt^2)
         end
-        ε_du = begin
-            εb  = eps_dual_bus_socp_vec(v2bar_vec, v2bar_prev_vec, ϵ_abs, ϵ_rel)
-            εpq = eps_dual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges, ϵ_abs, ϵ_rel)
-            εrt = eps_dual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges, ϵ_abs, ϵ_rel)
-            sqrt(εb^2 + εpq^2 + εrt^2)
+        eps_du = begin
+            epsb  = eps_dual_bus_socp_vec(v2bar_vec, v2bar_prev_vec, eps_abs, eps_rel)
+            epspq = eps_dual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges, eps_abs, eps_rel)
+            epsrt = eps_dual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges, eps_abs, eps_rel)
+            sqrt(epsb^2 + epspq^2 + epsrt^2)
         end
 
-        push!(eps_r_hist, ε_pri)
-        push!(eps_s_hist, ε_du)
+        push!(eps_r_hist, eps_pri)
+        push!(eps_s_hist, eps_du)
 
-        _FAST_USE_LOGS && println("‖r‖ = $r | ε_pri = $ε_pri")
-        _FAST_USE_LOGS && println("‖s‖ = $s | ε_du  = $ε_du")
+        _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_pri")
+        _FAST_USE_LOGS && println("‖s‖ = $s | eps_du  = $eps_du")
 
         push!(rhoV2_hist, rhoV2[])
         push!(rhoP_hist, rhoP[])
@@ -671,7 +671,7 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         push!(rhoT_hist, rhoT[])
 
         iter_done = k
-        if r < ε_pri && s < ε_du
+        if r < eps_pri && s < eps_du
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
         end
