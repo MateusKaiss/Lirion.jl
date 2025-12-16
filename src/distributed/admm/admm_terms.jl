@@ -49,7 +49,7 @@ function _build_linear_bus_expr(
     lambda_vec_zone::Vector{Float64},
     rho::Float64,
 )
-    m = part.model::JuMP.Model 
+    m = part.model::JuMP.Model
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     lin = zero(JuMP.AffExpr) #cria expressão linear vazia
     for b in part.shared_buses_local
@@ -160,12 +160,12 @@ function _build_linear_branch_expr_ac!(
         lambdaQ = get(dualsQ_zone, e, 0.0)
         zPe = get(zP, e, 0.0)
         zQe = get(zQ, e, 0.0)
-        lin += lambdaP * (P_loc - zPe) + lambdaQ * (Q_loc - zQe) -
-               rhoP * zPe * P_loc - rhoQ * zQe * Q_loc
+        lin +=
+            lambdaP * (P_loc - zPe) + lambdaQ * (Q_loc - zQe) -
+            rhoP * zPe * P_loc - rhoQ * zQe * Q_loc
     end
     return lin
 end
-
 
 "Ridge suave para estabilizar QCP no runner branch (P,Q)."
 function _soft_anchor_branch_expr!(sub::PartitionSOCP;
@@ -271,7 +271,8 @@ end
 
 function _build_linear_branch_rt_expr(sub::PartitionSOCP,
     zone_edges::Vector{Int}, zR::Dict{Int, Float64}, zT::Dict{Int, Float64},
-    lambdaR_zone::Dict{Int, Float64}, lambdaT_zone::Dict{Int, Float64}, rhoR::Float64, rhoT::Float64)
+    lambdaR_zone::Dict{Int, Float64}, lambdaT_zone::Dict{Int, Float64}, rhoR::Float64,
+    rhoT::Float64)
     m = sub.model::JuMP.Model
     lin = zero(JuMP.AffExpr)
     @inbounds for e in zone_edges
@@ -286,7 +287,8 @@ end
 
 function _build_linear_branch_pq_expr(sub::PartitionSOCP,
     zone_edges::Vector{Int}, zP::Dict{Int, Float64}, zQ::Dict{Int, Float64},
-    lambdaP_zone::Dict{Int, Float64}, lambdaQ_zone::Dict{Int, Float64}, rhoP::Float64, rhoQ::Float64)
+    lambdaP_zone::Dict{Int, Float64}, lambdaQ_zone::Dict{Int, Float64}, rhoP::Float64,
+    rhoQ::Float64)
     m = sub.model::JuMP.Model
     lin = zero(JuMP.AffExpr)
     @inbounds for e in zone_edges

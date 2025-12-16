@@ -138,7 +138,6 @@ function plot_theta_local_heatmaps(
     end
 end
 
-
 ##########################
 # WRAPPERS DE PLOT       #
 ##########################
@@ -160,7 +159,10 @@ function save_dc_bus_plots(
         "plot_convergencia_$(stem)_dc.html",
     )
     plot_rho(rho_hist, "plot_rho_$(stem)_dc.html")
-    return plot_theta_avg_heatmap(theta_avg_history, "plot_theta_avg_heatmap_$(stem)_dc.html")
+    return plot_theta_avg_heatmap(
+        theta_avg_history,
+        "plot_theta_avg_heatmap_$(stem)_dc.html",
+    )
 end
 
 function save_dc_branch_plots(

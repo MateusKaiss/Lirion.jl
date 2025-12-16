@@ -171,10 +171,8 @@ function resolve_optimizer_ac(config)
     end
 end
 
-
 "Retorna true se o modelo `m` está usando Gurobi."
 is_gurobi(m::JuMP.Model)::Bool = occursin("Gurobi", MOI.get(m, MOI.SolverName()))
-
 
 # ---- Otimizador: tenta Gurobi -> Clarabel -> SCS (com override) ----
 function resolve_socp_optimizer(config)
@@ -297,4 +295,3 @@ function adaptive_rho_dc!(
         rho[] *= tau_decr
     end
 end
-

@@ -27,7 +27,6 @@ function prepare_hotpaths!(part::PartitionDC)
     return nothing
 end
 
-
 # ----------------- Hot-path / buffers (bus) -----------------
 # =========================
 # HOTPATHS: SOCP (V²)
@@ -100,7 +99,6 @@ end
 )
     return [e for e in cut_edges if haskey(sub.edge_to_local, e)]
 end
-
 
 @inline function _val_or_start_ac(m::JuMP.Model, x::JuMP.VariableRef)
     if JuMP.has_values(m)
@@ -217,7 +215,6 @@ end
     return buf
 end
 
-
 @inline function snapshot_v2!(sub::PartitionSOCP)
     m = sub.model::JuMP.Model
     V2 = m[:v_magnitude_sq]
@@ -276,4 +273,3 @@ end
     m = part.model::JuMP.Model
     return m[:p_flow_branches][l_local, t], m[:q_flow_branches][l_local, t]
 end
-

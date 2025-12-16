@@ -106,7 +106,10 @@ end
         αv = something(α, 1.0)
         @inbounds for i in eachindex(lbs)
             j = b2pos[lbs[i]]
-            thetarel = _wrap_angle_diff(αv * thetas[i] + (1 - αv) * theta_consensus_prev[j] - theta_consensus_vec[j])
+            thetarel = _wrap_angle_diff(
+                αv * thetas[i] + (1 - αv) * theta_consensus_prev[j] -
+                theta_consensus_vec[j],
+            )
             Vrel = αv * Vs[i] + (1 - αv) * vmag_consensus_prev[j] - vmag_consensus_vec[j]
             duals_theta_vec_zone[j] += rho_theta * thetarel
             dualsV_vec_zone[j] += rhoV * Vrel
@@ -271,7 +274,12 @@ function eps_dual_bus_ac_vec(
     eps_rel::Float64,
 )
     dim = 2 * max(1, length(theta_consensus_vec))
-    s = dual_residual_bus_ac_vec(theta_consensus_vec, vmag_consensus_vec, theta_consensus_prev, vmag_consensus_prev)
+    s = dual_residual_bus_ac_vec(
+        theta_consensus_vec,
+        vmag_consensus_vec,
+        theta_consensus_prev,
+        vmag_consensus_prev,
+    )
     return sqrt(dim) * eps_abs + eps_rel * s
 end
 
@@ -353,7 +361,6 @@ function eps_dual_branch_ac(
     s = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
     return sqrt(dim) * eps_abs + eps_rel * s
 end
-
 
 function compute_theta_consensus_vec!(
     theta_consensus_vec::Vector{Float64},
@@ -462,7 +469,12 @@ end
 dual_residual_bus_dc(
     theta_consensus_vec::Vector{Float64},
     theta_consensus_prev_vec::Vector{Float64},
-) = sqrt(sum((theta_consensus_vec[j] - theta_consensus_prev_vec[j])^2 for j in eachindex(theta_consensus_vec)))
+) = sqrt(
+    sum(
+        (theta_consensus_vec[j] - theta_consensus_prev_vec[j])^2 for
+        j in eachindex(theta_consensus_vec)
+    ),
+)
 
 function eps_primal_bus_dc(
     partitions::Dict{Int, PartitionDC},
@@ -494,13 +506,17 @@ function eps_dual_bus_dc(
 )
     N = max(1, length(theta_consensus_vec))
     return sqrt(N) * eps_abs +
-           eps_rel * sqrt(sum((theta_consensus_vec[j] - theta_consensus_prev_vec[j])^2 for j in eachindex(theta_consensus_vec)))
+           eps_rel * sqrt(
+        sum(
+            (theta_consensus_vec[j] - theta_consensus_prev_vec[j])^2 for
+            j in eachindex(theta_consensus_vec)
+        ),
+    )
 end
 
 #############################
 # RESÍDUOS (BRANCH)         #
 #############################
-
 
 function primal_residual_branch_dc(
     partitions::Dict{Int, PartitionDC},
@@ -545,7 +561,8 @@ function eps_dual_branch_dc(
 )
     dim_du = max(1, length(z_flow))
     return sqrt(dim_du) * eps_abs +
-           eps_rel * sqrt(sum((z_flow[e] - get(z_flow_prev, e, 0.0))^2 for e in keys(z_flow)))
+           eps_rel *
+           sqrt(sum((z_flow[e] - get(z_flow_prev, e, 0.0))^2 for e in keys(z_flow)))
 end
 
 ##########################
@@ -571,8 +588,6 @@ function update_duals_flow!(
     end
     return nothing
 end
-
-
 
 function compute_v2_consensus_vec!(v2bar_vec::Vector{Float64},
     partitions,

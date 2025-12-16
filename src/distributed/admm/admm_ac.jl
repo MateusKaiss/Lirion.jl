@@ -11,7 +11,7 @@ function init_ac_bus_partition!(
     part.model = m
     part.obj_base = m[:generation_cost]
     part.theta_var = m[:theta]
-    part.vmag_var  = m[:v_magnitude]
+    part.vmag_var = m[:v_magnitude]
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
@@ -30,7 +30,7 @@ function init_ac_bus_partition!(
 end
 
 function init_ac_bus_partition!(
-    partitions::Dict{Int,PartitionAC},
+    partitions::Dict{Int, PartitionAC},
     sys::ADMMSystem,
     zone_ids::Vector{Int},
     optimizer_factory,
@@ -38,7 +38,13 @@ function init_ac_bus_partition!(
     rhoV::Float64,
 )
     for z in zone_ids
-        init_ac_bus_partition!(partitions[z], sys.parts[z], optimizer_factory, rho_theta, rhoV)
+        init_ac_bus_partition!(
+            partitions[z],
+            sys.parts[z],
+            optimizer_factory,
+            rho_theta,
+            rhoV,
+        )
     end
     return nothing
 end
@@ -58,7 +64,7 @@ function init_ac_branch_partition!(
     part.model = m
     part.obj_base = m[:generation_cost]
     part.theta_var = m[:theta]
-    part.vmag_var  = m[:v_magnitude]
+    part.vmag_var = m[:v_magnitude]
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
@@ -78,7 +84,7 @@ end
 
 # BRANCH/AC init — todas as partições
 function init_ac_branch_partition!(
-    partitions::Dict{Int,PartitionAC},
+    partitions::Dict{Int, PartitionAC},
     sys::ADMMSystem,
     zone_ids::Vector{Int},
     optimizer_factory,
@@ -87,11 +93,17 @@ function init_ac_branch_partition!(
     cut_edges,
 )
     for z in zone_ids
-        init_ac_branch_partition!(partitions[z], sys.parts[z], optimizer_factory, rhoP, rhoQ, cut_edges)
+        init_ac_branch_partition!(
+            partitions[z],
+            sys.parts[z],
+            optimizer_factory,
+            rhoP,
+            rhoQ,
+            cut_edges,
+        )
     end
     return nothing
 end
-
 
 # ------------------------------------------------------------
 # HYBRID/AC init (bus theta,V + branch P,Q) — uma partição
@@ -113,7 +125,7 @@ function init_ac_hybrid_partition!(
     part.model = m
     part.obj_base = m[:generation_cost]
     part.theta_var = m[:theta]
-    part.vmag_var  = m[:v_magnitude]
+    part.vmag_var = m[:v_magnitude]
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
@@ -135,7 +147,7 @@ end
 
 # HYBRID/AC init — todas as partições
 function init_ac_hybrid_partition!(
-    partitions::Dict{Int,PartitionAC},
+    partitions::Dict{Int, PartitionAC},
     sys::ADMMSystem,
     zone_ids::Vector{Int},
     optimizer_factory,
@@ -146,11 +158,19 @@ function init_ac_hybrid_partition!(
     cut_edges,
 )
     for z in zone_ids
-        init_ac_hybrid_partition!(partitions[z], sys.parts[z], optimizer_factory, rho_theta, rhoV, rhoP, rhoQ, cut_edges)
+        init_ac_hybrid_partition!(
+            partitions[z],
+            sys.parts[z],
+            optimizer_factory,
+            rho_theta,
+            rhoV,
+            rhoP,
+            rhoQ,
+            cut_edges,
+        )
     end
     return nothing
 end
-
 
 # ============================================================
 # RUNNERS — removendo os "for z in zone_ids init_..."
@@ -165,7 +185,7 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
     max_iter = config.max_iter
 
     rho_theta = Ref(config.rho_theta)
-    rho_v     = Ref(config.rho_v)
+    rho_v = Ref(config.rho_v)
 
     eps_abs = config.eps_primal
     eps_rel = config.eps_dual
@@ -180,34 +200,48 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
     shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
-    duals_theta = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
-    duals_v     = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+    duals_theta =
+        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+    duals_v =
+        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
 
-    lambdatheta_zone_buf = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
-    lambdaV_zone_buf     = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+    lambdatheta_zone_buf =
+        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+    lambdaV_zone_buf =
+        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
 
     theta_consensus = zeros(Float64, n_shared_buses)
-    vmag_consensus  = ones(Float64, n_shared_buses)
+    vmag_consensus = ones(Float64, n_shared_buses)
 
     theta_consensus_prev = similar(theta_consensus)
-    vmag_consensus_prev  = similar(vmag_consensus)
+    vmag_consensus_prev = similar(vmag_consensus)
 
     res_primal_hist = Float64[]
-    res_dual_hist   = Float64[]
+    res_dual_hist = Float64[]
     eps_primal_hist = Float64[]
-    eps_dual_hist   = Float64[]
-    rho_theta_hist  = Float64[]
-    rho_v_hist      = Float64[]
-    theta_avg_hist  = Dict{Int, Vector{Float64}}()
+    eps_dual_hist = Float64[]
+    rho_theta_hist = Float64[]
+    rho_v_hist = Float64[]
+    theta_avg_hist = Dict{Int, Vector{Float64}}()
 
     prev_rho_theta = rho_theta[]
-    prev_rho_v     = rho_v[]
+    prev_rho_v = rho_v[]
 
     results = Vector{NamedTuple{(:expr_cost, :real_cost),
-                                Tuple{Float64, Float64}}}(undef, n_zones)
+        Tuple{Float64, Float64}}}(
+        undef,
+        n_zones,
+    )
 
     # ✅ init (some o for do runner)
-    init_ac_bus_partition!(partitions, sys, zone_ids, optimizer_factory, rho_theta[], rho_v[])
+    init_ac_bus_partition!(
+        partitions,
+        sys,
+        zone_ids,
+        optimizer_factory,
+        rho_theta[],
+        rho_v[],
+    )
 
     iter_done = 0
     for iter in 1:max_iter
@@ -219,12 +253,12 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
                 _build_quad_bus_expr_ac!(part, rho_theta[], rho_v[])
             end
             prev_rho_theta = rho_theta[]
-            prev_rho_v     = rho_v[]
+            prev_rho_v = rho_v[]
         end
 
         α_used = nothing
         theta_target = theta_consensus
-        vmag_target  = vmag_consensus
+        vmag_target = vmag_consensus
 
         Threads.@threads for i in 1:n_zones
             z = zone_ids[i]
@@ -232,7 +266,7 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
             m = part.model::JuMP.Model
 
             lambdatheta = (lambdatheta_zone_buf[z] .= duals_theta[z])
-            lambdaV     = (lambdaV_zone_buf[z]     .= duals_v[z])
+            lambdaV = (lambdaV_zone_buf[z] .= duals_v[z])
 
             lin = _build_linear_bus_expr_ac!(
                 part,
@@ -264,7 +298,7 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
         end
 
         theta_consensus_prev .= theta_consensus
-        vmag_consensus_prev  .= vmag_consensus
+        vmag_consensus_prev .= vmag_consensus
 
         compute_ac_bus_consensus_vec!(
             theta_consensus,
@@ -292,22 +326,48 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
                 shared_buses_idx;
                 α = α_used,
                 theta_consensus_prev = theta_consensus_prev,
-                vmag_consensus_prev  = vmag_consensus_prev,
+                vmag_consensus_prev = vmag_consensus_prev,
             )
         end
 
-        r = primal_residual_bus_ac_vec(partitions, theta_consensus, vmag_consensus, shared_buses_sorted, shared_buses_idx)
-        s = dual_residual_bus_ac_vec(theta_consensus, vmag_consensus, theta_consensus_prev, vmag_consensus_prev)
+        r = primal_residual_bus_ac_vec(
+            partitions,
+            theta_consensus,
+            vmag_consensus,
+            shared_buses_sorted,
+            shared_buses_idx,
+        )
+        s = dual_residual_bus_ac_vec(
+            theta_consensus,
+            vmag_consensus,
+            theta_consensus_prev,
+            vmag_consensus_prev,
+        )
 
-        eps_r = eps_primal_bus_ac_vec(partitions, theta_consensus, vmag_consensus, shared_buses_sorted, shared_buses_idx, eps_abs, eps_rel)
-        eps_s = eps_dual_bus_ac_vec(theta_consensus, vmag_consensus, theta_consensus_prev, vmag_consensus_prev, eps_abs, eps_rel)
+        eps_r = eps_primal_bus_ac_vec(
+            partitions,
+            theta_consensus,
+            vmag_consensus,
+            shared_buses_sorted,
+            shared_buses_idx,
+            eps_abs,
+            eps_rel,
+        )
+        eps_s = eps_dual_bus_ac_vec(
+            theta_consensus,
+            vmag_consensus,
+            theta_consensus_prev,
+            vmag_consensus_prev,
+            eps_abs,
+            eps_rel,
+        )
 
         push!(res_primal_hist, r)
         push!(res_dual_hist, s)
         push!(eps_primal_hist, eps_r)
         push!(eps_dual_hist, eps_s)
         push!(rho_theta_hist, rho_theta[])
-        push!(rho_v_hist,     rho_v[])
+        push!(rho_v_hist, rho_v[])
 
         _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_r")
         _FAST_USE_LOGS && println("‖s‖ = $s | eps_du  = $eps_s")
@@ -318,11 +378,38 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
         end
 
         if adaptive
-            rtheta, rV = primal_residual_bus_ac_components(partitions, theta_consensus, vmag_consensus, shared_buses_sorted, shared_buses_idx)
-            stheta, sV = dual_residual_bus_ac_components(theta_consensus, vmag_consensus, theta_consensus_prev, vmag_consensus_prev)
+            rtheta, rV = primal_residual_bus_ac_components(
+                partitions,
+                theta_consensus,
+                vmag_consensus,
+                shared_buses_sorted,
+                shared_buses_idx,
+            )
+            stheta, sV = dual_residual_bus_ac_components(
+                theta_consensus,
+                vmag_consensus,
+                theta_consensus_prev,
+                vmag_consensus_prev,
+            )
 
-            adaptive_rho_ac!(rho_theta, rtheta, stheta; mu_incr=config.mu_incr, mu_decr=config.mu_decr, tau_incr=config.tau_incr, tau_decr=config.tau_decr)
-            adaptive_rho_ac!(rho_v,     rV,     sV;     mu_incr=config.mu_incr, mu_decr=config.mu_decr, tau_incr=config.tau_incr, tau_decr=config.tau_decr)
+            adaptive_rho_ac!(
+                rho_theta,
+                rtheta,
+                stheta;
+                mu_incr = config.mu_incr,
+                mu_decr = config.mu_decr,
+                tau_incr = config.tau_incr,
+                tau_decr = config.tau_decr,
+            )
+            adaptive_rho_ac!(
+                rho_v,
+                rV,
+                sV;
+                mu_incr = config.mu_incr,
+                mu_decr = config.mu_decr,
+                tau_incr = config.tau_incr,
+                tau_decr = config.tau_decr,
+            )
         end
     end
 
@@ -347,7 +434,6 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)
     return total_real_cost, partitions, iter_done, elapsed_s
 end
 
-
 function run_admm_ac_branch(
     config::DistributedOPFModel,
     sys::ADMMSystem;
@@ -357,7 +443,7 @@ function run_admm_ac_branch(
     @assert config.base_model == AC "ADMM-AC-branch: base_model deve ser AC."
 
     cut_edges = sys.cut_edges
-    max_iter  = config.max_iter
+    max_iter = config.max_iter
 
     rho_p = Ref(config.rho_flow_p)
     rho_q = Ref(config.rho_flow_q)
@@ -381,20 +467,31 @@ function run_admm_ac_branch(
     zQ_prev = Dict{Int, Float64}()
 
     res_primal_hist = Float64[]
-    res_dual_hist   = Float64[]
+    res_dual_hist = Float64[]
     eps_primal_hist = Float64[]
-    eps_dual_hist   = Float64[]
-    rho_p_hist      = Float64[]
-    rho_q_hist      = Float64[]
+    eps_dual_hist = Float64[]
+    rho_p_hist = Float64[]
+    rho_q_hist = Float64[]
 
     prev_rho_p = rho_p[]
     prev_rho_q = rho_q[]
 
     results = Vector{NamedTuple{(:expr_cost, :real_cost),
-                                Tuple{Float64, Float64}}}(undef, n_zones)
+        Tuple{Float64, Float64}}}(
+        undef,
+        n_zones,
+    )
 
     # ✅ init (some o for do runner)
-    init_ac_branch_partition!(partitions, sys, zone_ids, optimizer_factory, rho_p[], rho_q[], cut_edges)
+    init_ac_branch_partition!(
+        partitions,
+        sys,
+        zone_ids,
+        optimizer_factory,
+        rho_p[],
+        rho_q[],
+        cut_edges,
+    )
 
     iter_done = 0
     for iter in 1:max_iter
@@ -484,8 +581,24 @@ function run_admm_ac_branch(
         end
 
         if adaptive
-            adaptive_rho_ac!(rho_p, r, s; mu_incr=config.mu_incr, mu_decr=config.mu_decr, tau_incr=config.tau_incr, tau_decr=config.tau_decr)
-            adaptive_rho_ac!(rho_q, r, s; mu_incr=config.mu_incr, mu_decr=config.mu_decr, tau_incr=config.tau_incr, tau_decr=config.tau_decr)
+            adaptive_rho_ac!(
+                rho_p,
+                r,
+                s;
+                mu_incr = config.mu_incr,
+                mu_decr = config.mu_decr,
+                tau_incr = config.tau_incr,
+                tau_decr = config.tau_decr,
+            )
+            adaptive_rho_ac!(
+                rho_q,
+                r,
+                s;
+                mu_incr = config.mu_incr,
+                mu_decr = config.mu_decr,
+                tau_incr = config.tau_incr,
+                tau_decr = config.tau_decr,
+            )
         end
     end
 
@@ -510,19 +623,18 @@ function run_admm_ac_branch(
     return total_real_cost, partitions, iter_done, elapsed_s
 end
 
-
 function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     t0_ns = time_ns()
     @assert config.base_model == AC "Hybrid AC: base_model deve ser AC."
 
     shared_buses = sys.shared_buses
-    cut_edges    = sys.cut_edges
-    max_iter     = config.max_iter
+    cut_edges = sys.cut_edges
+    max_iter = config.max_iter
 
     rho_theta = Ref(config.rho_theta)
-    rho_v     = Ref(config.rho_v)
-    rho_p     = Ref(config.rho_flow_p)
-    rho_q     = Ref(config.rho_flow_q)
+    rho_v = Ref(config.rho_v)
+    rho_p = Ref(config.rho_flow_p)
+    rho_q = Ref(config.rho_flow_q)
 
     eps_abs = config.eps_primal
     eps_rel = config.eps_dual
@@ -537,19 +649,23 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
-    duals_theta = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
-    duals_v     = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+    duals_theta =
+        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+    duals_v =
+        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
 
-    lambdatheta_zone_buf = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
-    lambdaV_zone_buf     = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+    lambdatheta_zone_buf =
+        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+    lambdaV_zone_buf =
+        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
 
     duals_p = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
     duals_q = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
 
     theta_consensus = zeros(Float64, n_shared_buses)
-    vmag_consensus  = ones(Float64, n_shared_buses)
+    vmag_consensus = ones(Float64, n_shared_buses)
     theta_consensus_prev = similar(theta_consensus)
-    vmag_consensus_prev  = similar(vmag_consensus)
+    vmag_consensus_prev = similar(vmag_consensus)
 
     zP = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zQ = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
@@ -557,28 +673,31 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     zQ_prev = Dict{Int, Float64}()
 
     res_primal_hist = Float64[]
-    res_dual_hist   = Float64[]
+    res_dual_hist = Float64[]
     eps_primal_hist = Float64[]
-    eps_dual_hist   = Float64[]
+    eps_dual_hist = Float64[]
 
-    rho_theta_hist  = Float64[]
-    rho_v_hist      = Float64[]
-    rho_p_hist      = Float64[]
-    rho_q_hist      = Float64[]
+    rho_theta_hist = Float64[]
+    rho_v_hist = Float64[]
+    rho_p_hist = Float64[]
+    rho_q_hist = Float64[]
 
     theta_avg_hist = Dict{Int, Vector{Float64}}()
 
     prev_rho_theta = rho_theta[]
-    prev_rho_v     = rho_v[]
-    prev_rho_p     = rho_p[]
-    prev_rho_q     = rho_q[]
+    prev_rho_v = rho_v[]
+    prev_rho_p = rho_p[]
+    prev_rho_q = rho_q[]
 
     results = Vector{NamedTuple{(:expr_cost, :real_cost),
-                                Tuple{Float64, Float64}}}(undef, n_zones)
+        Tuple{Float64, Float64}}}(
+        undef,
+        n_zones,
+    )
 
     init_ac_hybrid_partition!(
         partitions, sys, zone_ids, optimizer_factory,
-        rho_theta[], rho_v[], rho_p[], rho_q[], cut_edges
+        rho_theta[], rho_v[], rho_p[], rho_q[], cut_edges,
     )
 
     iter_done = 0
@@ -591,7 +710,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
                 _build_quad_bus_expr_ac!(part, rho_theta[], rho_v[])
             end
             prev_rho_theta = rho_theta[]
-            prev_rho_v     = rho_v[]
+            prev_rho_v = rho_v[]
         end
 
         if (rho_p[] != prev_rho_p) || (rho_q[] != prev_rho_q)
@@ -604,7 +723,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
 
         α_used = nothing
         theta_target = theta_consensus
-        vmag_target  = vmag_consensus
+        vmag_target = vmag_consensus
 
         Threads.@threads for i in 1:n_zones
             z = zone_ids[i]
@@ -612,7 +731,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             m = part.model::JuMP.Model
 
             lambdatheta = (lambdatheta_zone_buf[z] .= duals_theta[z])
-            lambdaV     = (lambdaV_zone_buf[z]     .= duals_v[z])
+            lambdaV = (lambdaV_zone_buf[z] .= duals_v[z])
 
             lin_bus = _build_linear_bus_expr_ac!(
                 part,
@@ -636,7 +755,12 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
                 rho_q[],
             )
 
-            @objective(m, Min, part.obj_base + part.quad_bus_expr_ac + part.quad_branch_expr_ac + (lin_bus + lin_br))
+            @objective(
+                m,
+                Min,
+                part.obj_base + part.quad_bus_expr_ac + part.quad_branch_expr_ac +
+                (lin_bus + lin_br)
+            )
             optimize!(m)
 
             results[i] = (
@@ -654,11 +778,17 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         end
 
         theta_consensus_prev .= theta_consensus
-        vmag_consensus_prev  .= vmag_consensus
+        vmag_consensus_prev .= vmag_consensus
         zP_prev = copy(zP)
         zQ_prev = copy(zQ)
 
-        compute_ac_bus_consensus_vec!(theta_consensus, vmag_consensus, partitions, shared_buses_sorted, shared_buses_idx)
+        compute_ac_bus_consensus_vec!(
+            theta_consensus,
+            vmag_consensus,
+            partitions,
+            shared_buses_sorted,
+            shared_buses_idx,
+        )
         @inbounds for b in shared_buses_sorted
             j = shared_buses_idx[b]
             push!(get!(theta_avg_hist, b, Float64[]), theta_consensus[j])
@@ -678,7 +808,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
                 shared_buses_idx;
                 α = α_used,
                 theta_consensus_prev = theta_consensus_prev,
-                vmag_consensus_prev  = vmag_consensus_prev,
+                vmag_consensus_prev = vmag_consensus_prev,
             )
         end
         update_duals_branch_ac!(
@@ -695,20 +825,46 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             zQ_prev = zQ_prev,
         )
 
-        r_bus = primal_residual_bus_ac_vec(partitions, theta_consensus, vmag_consensus, shared_buses_sorted, shared_buses_idx)
-        r_br  = primal_residual_branch_ac(partitions, zP, zQ, cut_edges)
+        r_bus = primal_residual_bus_ac_vec(
+            partitions,
+            theta_consensus,
+            vmag_consensus,
+            shared_buses_sorted,
+            shared_buses_idx,
+        )
+        r_br = primal_residual_branch_ac(partitions, zP, zQ, cut_edges)
         r_tot = hypot(r_bus, r_br)
 
-        s_bus = dual_residual_bus_ac_vec(theta_consensus, vmag_consensus, theta_consensus_prev, vmag_consensus_prev)
-        s_br  = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
+        s_bus = dual_residual_bus_ac_vec(
+            theta_consensus,
+            vmag_consensus,
+            theta_consensus_prev,
+            vmag_consensus_prev,
+        )
+        s_br = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
         s_tot = hypot(s_bus, s_br)
 
-        eps_bus_r = eps_primal_bus_ac_vec(partitions, theta_consensus, vmag_consensus, shared_buses_sorted, shared_buses_idx, eps_abs, eps_rel)
-        eps_br_r  = eps_primal_branch_ac(partitions, zP, zQ, cut_edges, eps_abs, eps_rel)
+        eps_bus_r = eps_primal_bus_ac_vec(
+            partitions,
+            theta_consensus,
+            vmag_consensus,
+            shared_buses_sorted,
+            shared_buses_idx,
+            eps_abs,
+            eps_rel,
+        )
+        eps_br_r = eps_primal_branch_ac(partitions, zP, zQ, cut_edges, eps_abs, eps_rel)
         eps_r_tot = hypot(eps_bus_r, eps_br_r)
 
-        eps_bus_s = eps_dual_bus_ac_vec(theta_consensus, vmag_consensus, theta_consensus_prev, vmag_consensus_prev, eps_abs, eps_rel)
-        eps_br_s  = eps_dual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges, eps_abs, eps_rel)
+        eps_bus_s = eps_dual_bus_ac_vec(
+            theta_consensus,
+            vmag_consensus,
+            theta_consensus_prev,
+            vmag_consensus_prev,
+            eps_abs,
+            eps_rel,
+        )
+        eps_br_s = eps_dual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges, eps_abs, eps_rel)
         eps_s_tot = hypot(eps_bus_s, eps_br_s)
 
         push!(res_primal_hist, r_tot)
@@ -717,9 +873,9 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         push!(eps_dual_hist, eps_s_tot)
 
         push!(rho_theta_hist, rho_theta[])
-        push!(rho_v_hist,     rho_v[])
-        push!(rho_p_hist,     rho_p[])
-        push!(rho_q_hist,     rho_q[])
+        push!(rho_v_hist, rho_v[])
+        push!(rho_p_hist, rho_p[])
+        push!(rho_q_hist, rho_q[])
 
         _FAST_USE_LOGS && println("‖r‖ = $r_tot | eps_pri = $eps_r_tot")
         _FAST_USE_LOGS && println("‖s‖ = $s_tot | eps_du  = $eps_s_tot")
@@ -730,14 +886,57 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         end
 
         if adaptive
-            rtheta, rV = primal_residual_bus_ac_components(partitions, theta_consensus, vmag_consensus, shared_buses_sorted, shared_buses_idx)
-            stheta, sV = dual_residual_bus_ac_components(theta_consensus, vmag_consensus, theta_consensus_prev, vmag_consensus_prev)
+            rtheta, rV = primal_residual_bus_ac_components(
+                partitions,
+                theta_consensus,
+                vmag_consensus,
+                shared_buses_sorted,
+                shared_buses_idx,
+            )
+            stheta, sV = dual_residual_bus_ac_components(
+                theta_consensus,
+                vmag_consensus,
+                theta_consensus_prev,
+                vmag_consensus_prev,
+            )
 
-            adaptive_rho_ac!(rho_theta, rtheta, stheta; mu_incr=config.mu_incr, mu_decr=config.mu_decr, tau_incr=config.tau_incr, tau_decr=config.tau_decr)
-            adaptive_rho_ac!(rho_v,     rV,     sV;     mu_incr=config.mu_incr, mu_decr=config.mu_decr, tau_incr=config.tau_incr, tau_decr=config.tau_decr)
+            adaptive_rho_ac!(
+                rho_theta,
+                rtheta,
+                stheta;
+                mu_incr = config.mu_incr,
+                mu_decr = config.mu_decr,
+                tau_incr = config.tau_incr,
+                tau_decr = config.tau_decr,
+            )
+            adaptive_rho_ac!(
+                rho_v,
+                rV,
+                sV;
+                mu_incr = config.mu_incr,
+                mu_decr = config.mu_decr,
+                tau_incr = config.tau_incr,
+                tau_decr = config.tau_decr,
+            )
 
-            adaptive_rho_ac!(rho_p, r_br, s_br; mu_incr=config.mu_incr, mu_decr=config.mu_decr, tau_incr=config.tau_incr, tau_decr=config.tau_decr)
-            adaptive_rho_ac!(rho_q, r_br, s_br; mu_incr=config.mu_incr, mu_decr=config.mu_decr, tau_incr=config.tau_incr, tau_decr=config.tau_decr)
+            adaptive_rho_ac!(
+                rho_p,
+                r_br,
+                s_br;
+                mu_incr = config.mu_incr,
+                mu_decr = config.mu_decr,
+                tau_incr = config.tau_incr,
+                tau_decr = config.tau_decr,
+            )
+            adaptive_rho_ac!(
+                rho_q,
+                r_br,
+                s_br;
+                mu_incr = config.mu_incr,
+                mu_decr = config.mu_decr,
+                tau_incr = config.tau_incr,
+                tau_decr = config.tau_decr,
+            )
         end
     end
 
