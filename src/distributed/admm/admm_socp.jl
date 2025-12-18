@@ -1,3 +1,229 @@
+
+# -------- refreshers (V² + R/T) --------
+
+@inline function refresh_rho_v2_socp!(
+    partitions,
+    rhoV2::Base.RefValue{Float64},
+    prev_rhoV2::Base.RefValue{Float64},
+)
+    ρv2 = rhoV2[]
+    if ρv2 != prev_rhoV2[]
+        for sub in values(partitions)
+            _build_quad_bus_expr_socp!(sub, ρv2)
+            sub.obj_static = sub.obj_base + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
+        end
+        prev_rhoV2[] = ρv2
+    end
+    return nothing
+end
+
+@inline function refresh_rho_rt_socp!(
+    partitions,
+    rhoR::Base.RefValue{Float64},
+    prev_rhoR::Base.RefValue{Float64},
+    rhoT::Base.RefValue{Float64},
+    prev_rhoT::Base.RefValue{Float64},
+)
+    ρr = rhoR[]
+    ρt = rhoT[]
+    if (ρr != prev_rhoR[]) || (ρt != prev_rhoT[])
+        for sub in values(partitions)
+            _build_quad_branch_rt_expr!(sub, ρr, ρt, sub.zone_edges)
+            sub.obj_static = sub.obj_base + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
+        end
+        prev_rhoR[] = ρr
+        prev_rhoT[] = ρt
+    end
+    return nothing
+end
+
+# -------- refreshers (branch P/Q) --------
+
+@inline function refresh_rho_pq_socp!(
+    partitions,
+    rhoP::Base.RefValue{Float64},
+    prev_rhoP::Base.RefValue{Float64},
+    rhoQ::Base.RefValue{Float64},
+    prev_rhoQ::Base.RefValue{Float64},
+)
+    ρp = rhoP[]
+    ρq = rhoQ[]
+    if (ρp != prev_rhoP[]) || (ρq != prev_rhoQ[])
+        for sub in values(partitions)
+            _build_quad_branch_pq_expr!(sub, ρp, ρq, sub.zone_edges)
+            sub.obj_static = sub.obj_base + sub.quad_pq_expr_socp + sub.soft_anchor_expr
+        end
+        prev_rhoP[] = ρp
+        prev_rhoQ[] = ρq
+    end
+    return nothing
+end
+
+# -------- refreshers (hybrid: V² + P/Q + R/T) --------
+
+@inline function refresh_rho_hybrid_socp!(
+    partitions,
+    rhoV2::Base.RefValue{Float64},
+    prev_rhoV2::Base.RefValue{Float64},
+    rhoP::Base.RefValue{Float64},
+    prev_rhoP::Base.RefValue{Float64},
+    rhoQ::Base.RefValue{Float64},
+    prev_rhoQ::Base.RefValue{Float64},
+    rhoR::Base.RefValue{Float64},
+    prev_rhoR::Base.RefValue{Float64},
+    rhoT::Base.RefValue{Float64},
+    prev_rhoT::Base.RefValue{Float64},
+)
+    ρv2 = rhoV2[]
+    ρp  = rhoP[]
+    ρq  = rhoQ[]
+    ρr  = rhoR[]
+    ρt  = rhoT[]
+
+    if (ρv2 != prev_rhoV2[]) || (ρp != prev_rhoP[]) || (ρq != prev_rhoQ[]) ||
+       (ρr != prev_rhoR[])  || (ρt != prev_rhoT[])
+        for sub in values(partitions)
+            (ρv2 != prev_rhoV2[]) && _build_quad_bus_expr_socp!(sub, ρv2)
+            ((ρp != prev_rhoP[]) || (ρq != prev_rhoQ[])) &&
+                _build_quad_branch_pq_expr!(sub, ρp, ρq, sub.zone_edges)
+            ((ρr != prev_rhoR[]) || (ρt != prev_rhoT[])) &&
+                _build_quad_branch_rt_expr!(sub, ρr, ρt, sub.zone_edges)
+
+            sub.obj_static =
+                sub.obj_base + sub.quad_bus_expr_socp + sub.quad_pq_expr_socp +
+                sub.quad_rt_expr_socp
+        end
+
+        prev_rhoV2[] = ρv2
+        prev_rhoP[]  = ρp
+        prev_rhoQ[]  = ρq
+        prev_rhoR[]  = ρr
+        prev_rhoT[]  = ρt
+    end
+    return nothing
+end
+
+# -------- adaptive rho --------
+
+@inline function maybe_adapt_rho!(
+    adaptive::Bool,
+    rhoV2::Base.RefValue{Float64},
+    r_bus::Float64,
+    s_bus::Float64,
+    rhoR::Base.RefValue{Float64},
+    rhoT::Base.RefValue{Float64},
+    r_rt::Float64,
+    s_rt::Float64,
+    config,
+)
+    adaptive || return nothing
+    adaptive_rho_dc!(
+        rhoV2, r_bus, s_bus;
+        mu_incr = config.mu_incr,
+        mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr,
+        tau_decr = config.tau_decr,
+    )
+    adaptive_rho_dc!(
+        rhoR, r_rt / sqrt(2), s_rt / sqrt(2);
+        mu_incr = config.mu_incr,
+        mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr,
+        tau_decr = config.tau_decr,
+    )
+    adaptive_rho_dc!(
+        rhoT, r_rt / sqrt(2), s_rt / sqrt(2);
+        mu_incr = config.mu_incr,
+        mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr,
+        tau_decr = config.tau_decr,
+    )
+    return nothing
+end
+
+@inline function maybe_adapt_rho!(
+    adaptive::Bool,
+    rhoP::Base.RefValue{Float64},
+    rhoQ::Base.RefValue{Float64},
+    r::Float64,
+    s::Float64,
+    config,
+)
+    adaptive || return nothing
+    adaptive_rho_dc!(
+        rhoP, r / sqrt(2), s / sqrt(2);
+        mu_incr = config.mu_incr,
+        mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr,
+        tau_decr = config.tau_decr,
+    )
+    adaptive_rho_dc!(
+        rhoQ, r / sqrt(2), s / sqrt(2);
+        mu_incr = config.mu_incr,
+        mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr,
+        tau_decr = config.tau_decr,
+    )
+    return nothing
+end
+
+@inline function maybe_adapt_rho!(
+    adaptive::Bool,
+    rhoV2::Base.RefValue{Float64},
+    r_bus::Float64,
+    s_bus::Float64,
+    rhoP::Base.RefValue{Float64},
+    rhoQ::Base.RefValue{Float64},
+    r_pq::Float64,
+    s_pq::Float64,
+    rhoR::Base.RefValue{Float64},
+    rhoT::Base.RefValue{Float64},
+    r_rt::Float64,
+    s_rt::Float64,
+    config,
+)
+    adaptive || return nothing
+
+    adaptive_rho_dc!(
+        rhoV2, r_bus, s_bus;
+        mu_incr = config.mu_incr,
+        mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr,
+        tau_decr = config.tau_decr,
+    )
+
+    adaptive_rho_dc!(
+        rhoP, r_pq / sqrt(2), s_pq / sqrt(2);
+        mu_incr = config.mu_incr,
+        mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr,
+        tau_decr = config.tau_decr,
+    )
+    adaptive_rho_dc!(
+        rhoQ, r_pq / sqrt(2), s_pq / sqrt(2);
+        mu_incr = config.mu_incr,
+        mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr,
+        tau_decr = config.tau_decr,
+    )
+
+    adaptive_rho_dc!(
+        rhoR, r_rt / sqrt(2), s_rt / sqrt(2);
+        mu_incr = config.mu_incr,
+        mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr,
+        tau_decr = config.tau_decr,
+    )
+    adaptive_rho_dc!(
+        rhoT, r_rt / sqrt(2), s_rt / sqrt(2);
+        mu_incr = config.mu_incr,
+        mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr,
+        tau_decr = config.tau_decr,
+    )
+
+    return nothing
+end
 function init_socp_v2rt_partition!(
     sub::PartitionSOCP,
     sys_zone,
@@ -192,13 +418,8 @@ function init_socp_hybrid_partition!(
     return nothing
 end
 
-# ============================================================
-# RUNNERS — removendo os "for z in zone_ids init_..."
-# ============================================================
-
 function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
     t0_ns = time_ns()
-
     @assert config.base_model == SOCP "ADMM-SOCP: base_model deve ser SOCP."
 
     shared_buses = sys.shared_buses
@@ -206,8 +427,12 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
     max_iter = config.max_iter
 
     rhoV2 = Ref(config.rho_v)
-    rhoR = Ref(config.rho_flow_p)
-    rhoT = Ref(config.rho_flow_q)
+    rhoR  = Ref(config.rho_flow_p)
+    rhoT  = Ref(config.rho_flow_q)
+
+    prev_rhoV2 = Ref(rhoV2[])
+    prev_rhoR  = Ref(rhoR[])
+    prev_rhoT  = Ref(rhoT[])
 
     eps_abs = config.eps_primal
     eps_rel = config.eps_dual
@@ -225,10 +450,8 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
     v2bar = ones(Float64, n_shared_buses)
     v2bar_prev = similar(v2bar)
 
-    duals_v2 =
-        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
-    lambda_zone_buf =
-        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+    duals_v2 = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+    lambda_zone_buf = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
 
     zR = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zT = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
@@ -246,26 +469,11 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
     rhoR_hist = Float64[]
     rhoT_hist = Float64[]
 
-    prev_rhoV2 = rhoV2[]
-    prev_rhoR = rhoR[]
-    prev_rhoT = rhoT[]
+    results = Vector{NamedTuple{(:gen_cost_expr, :real_cost), Tuple{Float64, Float64}}}(undef, n_zones)
 
-    results = Vector{NamedTuple{(:gen_cost_expr, :real_cost),
-        Tuple{Float64, Float64}}}(
-        undef,
-        n_zones,
-    )
-
-    # ✅ init (some o for do runner)
     init_socp_v2rt_partition!(
-        partitions,
-        sys,
-        zone_ids,
-        optimizer_factory,
-        rhoV2[],
-        rhoR[],
-        rhoT[],
-        cut_edges,
+        partitions, sys, zone_ids, optimizer_factory,
+        rhoV2[], rhoR[], rhoT[], cut_edges,
     )
 
     iter_done = 0
@@ -273,24 +481,8 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
         iter_done = iter
         _FAST_USE_LOGS && println("\n[ADMM-SOCP (V²+R,T)] Iteração $iter")
 
-        if rhoV2[] != prev_rhoV2
-            for sub in values(partitions)
-                _build_quad_bus_expr_socp!(sub, rhoV2[])
-                sub.obj_static =
-                    sub.obj_base + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
-            end
-            prev_rhoV2 = rhoV2[]
-        end
-
-        if (rhoR[] != prev_rhoR) || (rhoT[] != prev_rhoT)
-            for sub in values(partitions)
-                _build_quad_branch_rt_expr!(sub, rhoR[], rhoT[], sub.zone_edges)
-                sub.obj_static =
-                    sub.obj_base + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
-            end
-            prev_rhoR = rhoR[]
-            prev_rhoT = rhoT[]
-        end
+        refresh_rho_v2_socp!(partitions, rhoV2, prev_rhoV2)
+        refresh_rho_rt_socp!(partitions, rhoR, prev_rhoR, rhoT, prev_rhoT)
 
         α_used = nothing
         v2_target = v2bar
@@ -314,7 +506,7 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
 
             results[i] = (
                 gen_cost_expr = value(m[:generation_cost]),
-                real_cost = compute_real_generation_cost(m, sub.objective_params),
+                real_cost     = compute_real_generation_cost(m, sub.objective_params),
             )
         end
 
@@ -358,98 +550,38 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
             end
         end
 
-        r_bus = primal_residual_bus_socp_vec(
-            partitions,
-            v2bar,
-            shared_buses_sorted,
-            shared_buses_idx,
-        )
-        r_rt = primal_residual_branch_rt_socp(partitions, zR, zT, cut_edges)
+        r_bus = primal_residual_bus_socp_vec(partitions, v2bar, shared_buses_sorted, shared_buses_idx)
+        r_rt  = primal_residual_branch_rt_socp(partitions, zR, zT, cut_edges)
         r = hypot(r_bus, r_rt)
 
         s_bus = dual_residual_bus_socp_vec(v2bar, v2bar_prev)
-        s_rt = dual_residual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges)
+        s_rt  = dual_residual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges)
         s = hypot(s_bus, s_rt)
 
         eps_r = begin
-            epsb = eps_primal_bus_socp_vec(
-                partitions,
-                v2bar,
-                shared_buses_sorted,
-                shared_buses_idx,
-                eps_abs,
-                eps_rel,
-            )
-            epsrt = eps_primal_branch_rt_socp(
-                partitions,
-                zR,
-                zT,
-                cut_edges,
-                eps_abs,
-                eps_rel,
-            )
+            epsb = eps_primal_bus_socp_vec(partitions, v2bar, shared_buses_sorted, shared_buses_idx, eps_abs, eps_rel)
+            epsrt = eps_primal_branch_rt_socp(partitions, zR, zT, cut_edges, eps_abs, eps_rel)
             hypot(epsb, epsrt)
         end
         eps_s = begin
             epsb = eps_dual_bus_socp_vec(v2bar, v2bar_prev, eps_abs, eps_rel)
-            epsrt = eps_dual_branch_rt_socp(
-                zR,
-                zT,
-                zR_prev,
-                zT_prev,
-                cut_edges,
-                eps_abs,
-                eps_rel,
-            )
+            epsrt = eps_dual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges, eps_abs, eps_rel)
             hypot(epsb, epsrt)
         end
 
-        push!(r_hist, r)
-        push!(s_hist, s)
-        push!(eps_r_hist, eps_r)
-        push!(eps_s_hist, eps_s)
+        push!(r_hist, r); push!(s_hist, s)
+        push!(eps_r_hist, eps_r); push!(eps_s_hist, eps_s)
+        push!(rhoV2_hist, rhoV2[]); push!(rhoR_hist, rhoR[]); push!(rhoT_hist, rhoT[])
 
         _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_r")
         _FAST_USE_LOGS && println("‖s‖ = $s | eps_du  = $eps_s")
 
-        push!(rhoV2_hist, rhoV2[])
-        push!(rhoR_hist, rhoR[])
-        push!(rhoT_hist, rhoT[])
-
-        if r < eps_r && s < eps_s
+        if stop_if_converged!(r, s, eps_r, eps_s)
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
         end
 
-        if adaptive
-            adaptive_rho_dc!(
-                rhoV2,
-                r_bus,
-                s_bus;
-                mu_incr = config.mu_incr,
-                mu_decr = config.mu_decr,
-                tau_incr = config.tau_incr,
-                tau_decr = config.tau_decr,
-            )
-            adaptive_rho_dc!(
-                rhoR,
-                r_rt / sqrt(2),
-                s_rt / sqrt(2);
-                mu_incr = config.mu_incr,
-                mu_decr = config.mu_decr,
-                tau_incr = config.tau_incr,
-                tau_decr = config.tau_decr,
-            )
-            adaptive_rho_dc!(
-                rhoT,
-                r_rt / sqrt(2),
-                s_rt / sqrt(2);
-                mu_incr = config.mu_incr,
-                mu_decr = config.mu_decr,
-                tau_incr = config.tau_incr,
-                tau_decr = config.tau_decr,
-            )
-        end
+        maybe_adapt_rho!(adaptive, rhoV2, r_bus, s_bus, rhoR, rhoT, r_rt, s_rt, config)
     end
 
     save_socp_v2rt_plots(
@@ -474,9 +606,9 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)
     return total_real_cost, partitions, iter_done, elapsed_s
 end
 
+
 function run_admm_socp_branch(config::DistributedOPFModel, sys::ADMMSystem)
     t0_ns = time_ns()
-
     @assert config.base_model == SOCP "ADMM-SOCP-branch: base_model deve ser SOCP."
 
     cut_edges = sys.cut_edges
@@ -484,6 +616,8 @@ function run_admm_socp_branch(config::DistributedOPFModel, sys::ADMMSystem)
 
     rhoP = Ref(config.rho_flow_p)
     rhoQ = Ref(config.rho_flow_q)
+    prev_rhoP = Ref(rhoP[])
+    prev_rhoQ = Ref(rhoQ[])
 
     eps_abs = config.eps_primal
     eps_rel = config.eps_dual
@@ -493,7 +627,6 @@ function run_admm_socp_branch(config::DistributedOPFModel, sys::ADMMSystem)
 
     partitions = build_socp_partitions(sys)
     zone_ids = collect(keys(partitions))
-    n_zones = length(zone_ids)
 
     zP = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zQ = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
@@ -510,33 +643,14 @@ function run_admm_socp_branch(config::DistributedOPFModel, sys::ADMMSystem)
     rhoP_hist = Float64[]
     rhoQ_hist = Float64[]
 
-    prev_rhoP = rhoP[]
-    prev_rhoQ = rhoQ[]
-
-    # ✅ init (some o for do runner)
-    init_socp_pq_partition!(
-        partitions,
-        sys,
-        zone_ids,
-        optimizer_factory,
-        rhoP[],
-        rhoQ[],
-        cut_edges,
-    )
+    init_socp_pq_partition!(partitions, sys, zone_ids, optimizer_factory, rhoP[], rhoQ[], cut_edges)
 
     iter_done = 0
     for iter in 1:max_iter
         iter_done = iter
         _FAST_USE_LOGS && println("\n[ADMM-SOCP-branch (P,Q)] Iteração $iter")
 
-        if (rhoP[] != prev_rhoP) || (rhoQ[] != prev_rhoQ)
-            for sub in values(partitions)
-                _build_quad_branch_pq_expr!(sub, rhoP[], rhoQ[], sub.zone_edges)
-                sub.obj_static = sub.obj_base + sub.quad_pq_expr_socp + sub.soft_anchor_expr
-            end
-            prev_rhoP = rhoP[]
-            prev_rhoQ = rhoQ[]
-        end
+        refresh_rho_pq_socp!(partitions, rhoP, prev_rhoP, rhoQ, prev_rhoQ)
 
         for z in zone_ids
             sub = partitions[z]
@@ -575,45 +689,21 @@ function run_admm_socp_branch(config::DistributedOPFModel, sys::ADMMSystem)
         s = dual_residual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges)
 
         eps_r = eps_primal_branch_pq_socp(partitions, zP, zQ, cut_edges, eps_abs, eps_rel)
-        eps_s =
-            eps_dual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges, eps_abs, eps_rel)
+        eps_s = eps_dual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges, eps_abs, eps_rel)
 
-        push!(r_hist, r)
-        push!(s_hist, s)
-        push!(eps_r_hist, eps_r)
-        push!(eps_s_hist, eps_s)
+        push!(r_hist, r); push!(s_hist, s)
+        push!(eps_r_hist, eps_r); push!(eps_s_hist, eps_s)
+        push!(rhoP_hist, rhoP[]); push!(rhoQ_hist, rhoQ[])
 
         _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_r")
         _FAST_USE_LOGS && println("‖s‖ = $s | eps_du  = $eps_s")
 
-        push!(rhoP_hist, rhoP[])
-        push!(rhoQ_hist, rhoQ[])
-
-        if r < eps_r && s < eps_s
+        if stop_if_converged!(r, s, eps_r, eps_s)
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
         end
 
-        if adaptive
-            adaptive_rho_dc!(
-                rhoP,
-                r / sqrt(2),
-                s / sqrt(2);
-                mu_incr = config.mu_incr,
-                mu_decr = config.mu_decr,
-                tau_incr = config.tau_incr,
-                tau_decr = config.tau_decr,
-            )
-            adaptive_rho_dc!(
-                rhoQ,
-                r / sqrt(2),
-                s / sqrt(2);
-                mu_incr = config.mu_incr,
-                mu_decr = config.mu_decr,
-                tau_incr = config.tau_incr,
-                tau_decr = config.tau_decr,
-            )
-        end
+        maybe_adapt_rho!(adaptive, rhoP, rhoQ, r, s, config)
     end
 
     save_socp_branch_pq_plots(
@@ -636,9 +726,9 @@ function run_admm_socp_branch(config::DistributedOPFModel, sys::ADMMSystem)
     return total_real_cost, partitions, iter_done, elapsed_s
 end
 
+
 function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     t0_ns = time_ns()
-
     @assert config.base_model == SOCP "ADMM-SOCP-hybrid: base_model deve ser SOCP."
 
     shared_buses = sys.shared_buses
@@ -646,12 +736,16 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     max_iter = config.max_iter
 
     rhoV2 = Ref(config.rho_v)
-    rhoP = Ref(config.rho_flow_p)
-    rhoQ = Ref(config.rho_flow_q)
+    rhoP  = Ref(config.rho_flow_p)
+    rhoQ  = Ref(config.rho_flow_q)
+    rhoR  = Ref(config.rho_flow_p)  # reuso como você já fazia
+    rhoT  = Ref(config.rho_flow_q)  # reuso como você já fazia
 
-    # reuso (como você já fazia)
-    rhoR = Ref(config.rho_flow_p)
-    rhoT = Ref(config.rho_flow_q)
+    prev_rhoV2 = Ref(rhoV2[])
+    prev_rhoP  = Ref(rhoP[])
+    prev_rhoQ  = Ref(rhoQ[])
+    prev_rhoR  = Ref(rhoR[])
+    prev_rhoT  = Ref(rhoT[])
 
     eps_abs = config.eps_primal
     eps_rel = config.eps_dual
@@ -669,10 +763,8 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     v2bar = ones(Float64, n_shared_buses)
     v2bar_prev = similar(v2bar)
 
-    duals_v2 =
-        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
-    lambda_zone_buf =
-        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+    duals_v2 = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+    lambda_zone_buf = Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
 
     zP = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zQ = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
@@ -695,16 +787,10 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     eps_s_hist = Float64[]
 
     rhoV2_hist = Float64[]
-    rhoP_hist = Float64[]
-    rhoQ_hist = Float64[]
-    rhoR_hist = Float64[]
-    rhoT_hist = Float64[]
-
-    prev_rhoV2 = rhoV2[]
-    prev_rhoP = rhoP[]
-    prev_rhoQ = rhoQ[]
-    prev_rhoR = rhoR[]
-    prev_rhoT = rhoT[]
+    rhoP_hist  = Float64[]
+    rhoQ_hist  = Float64[]
+    rhoR_hist  = Float64[]
+    rhoT_hist  = Float64[]
 
     init_socp_hybrid_partition!(
         partitions, sys, zone_ids, optimizer_factory,
@@ -716,26 +802,14 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         iter_done = iter
         _FAST_USE_LOGS && println("\n[ADMM-SOCP-hybrid] Iteração $iter")
 
-        if (rhoV2[] != prev_rhoV2) || (rhoP[] != prev_rhoP) || (rhoQ[] != prev_rhoQ) ||
-           (rhoR[] != prev_rhoR) || (rhoT[] != prev_rhoT)
-            for sub in values(partitions)
-                (rhoV2[] != prev_rhoV2) && _build_quad_bus_expr_socp!(sub, rhoV2[])
-                ((rhoP[] != prev_rhoP) || (rhoQ[] != prev_rhoQ)) &&
-                    _build_quad_branch_pq_expr!(sub, rhoP[], rhoQ[], sub.zone_edges)
-                ((rhoR[] != prev_rhoR) || (rhoT[] != prev_rhoT)) &&
-                    _build_quad_branch_rt_expr!(sub, rhoR[], rhoT[], sub.zone_edges)
-
-                sub.obj_static =
-                    sub.obj_base + sub.quad_bus_expr_socp + sub.quad_pq_expr_socp +
-                    sub.quad_rt_expr_socp
-            end
-
-            prev_rhoV2 = rhoV2[]
-            prev_rhoP = rhoP[]
-            prev_rhoQ = rhoQ[]
-            prev_rhoR = rhoR[]
-            prev_rhoT = rhoT[]
-        end
+        refresh_rho_hybrid_socp!(
+            partitions,
+            rhoV2, prev_rhoV2,
+            rhoP,  prev_rhoP,
+            rhoQ,  prev_rhoQ,
+            rhoR,  prev_rhoR,
+            rhoT,  prev_rhoT,
+        )
 
         α_used = nothing
         v2_target = v2bar
@@ -748,32 +822,13 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             lambdaz = (lambda_zone_buf[z] .= duals_v2[z])
 
             lin_bus = _build_linear_bus_expr_socp(
-                sub,
-                shared_buses_sorted,
-                shared_buses_idx,
-                v2_target,
-                lambdaz,
-                rhoV2[],
+                sub, shared_buses_sorted, shared_buses_idx, v2_target, lambdaz, rhoV2[],
             )
             lin_pq = _build_linear_branch_pq_expr(
-                sub,
-                sub.zone_edges,
-                zP,
-                zQ,
-                dualsP[z],
-                dualsQ[z],
-                rhoP[],
-                rhoQ[],
+                sub, sub.zone_edges, zP, zQ, dualsP[z], dualsQ[z], rhoP[], rhoQ[],
             )
             lin_rt = _build_linear_branch_rt_expr(
-                sub,
-                sub.zone_edges,
-                zR,
-                zT,
-                dualsR[z],
-                dualsT[z],
-                rhoR[],
-                rhoT[],
+                sub, sub.zone_edges, zR, zT, dualsR[z], dualsT[z], rhoR[], rhoT[],
             )
 
             @objective(m, Min, sub.obj_static + (lin_bus + lin_pq + lin_rt))
@@ -785,10 +840,8 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         end
 
         v2bar_prev .= v2bar
-        zP_prev = copy(zP)
-        zQ_prev = copy(zQ)
-        zR_prev = copy(zR)
-        zT_prev = copy(zT)
+        zP_prev = copy(zP); zQ_prev = copy(zQ)
+        zR_prev = copy(zR); zT_prev = copy(zT)
 
         compute_v2_consensus_vec!(v2bar, partitions, shared_buses_sorted, shared_buses_idx)
         compute_pq_consensus!(zP, zQ, partitions, cut_edges)
@@ -824,78 +877,31 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             end
         end
 
-        r_bus = primal_residual_bus_socp_vec(
-            partitions,
-            v2bar,
-            shared_buses_sorted,
-            shared_buses_idx,
-        )
-        r_pq = primal_residual_branch_pq_socp(partitions, zP, zQ, cut_edges)
-        r_rt = primal_residual_branch_rt_socp(partitions, zR, zT, cut_edges)
+        r_bus = primal_residual_bus_socp_vec(partitions, v2bar, shared_buses_sorted, shared_buses_idx)
+        r_pq  = primal_residual_branch_pq_socp(partitions, zP, zQ, cut_edges)
+        r_rt  = primal_residual_branch_rt_socp(partitions, zR, zT, cut_edges)
         r = sqrt(r_bus^2 + r_pq^2 + r_rt^2)
 
         s_bus = dual_residual_bus_socp_vec(v2bar, v2bar_prev)
-        s_pq = dual_residual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges)
-        s_rt = dual_residual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges)
+        s_pq  = dual_residual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges)
+        s_rt  = dual_residual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges)
         s = sqrt(s_bus^2 + s_pq^2 + s_rt^2)
 
         eps_r = begin
-            epsb = eps_primal_bus_socp_vec(
-                partitions,
-                v2bar,
-                shared_buses_sorted,
-                shared_buses_idx,
-                eps_abs,
-                eps_rel,
-            )
-            epspq = eps_primal_branch_pq_socp(
-                partitions,
-                zP,
-                zQ,
-                cut_edges,
-                eps_abs,
-                eps_rel,
-            )
-            epsrt = eps_primal_branch_rt_socp(
-                partitions,
-                zR,
-                zT,
-                cut_edges,
-                eps_abs,
-                eps_rel,
-            )
+            epsb  = eps_primal_bus_socp_vec(partitions, v2bar, shared_buses_sorted, shared_buses_idx, eps_abs, eps_rel)
+            epspq = eps_primal_branch_pq_socp(partitions, zP, zQ, cut_edges, eps_abs, eps_rel)
+            epsrt = eps_primal_branch_rt_socp(partitions, zR, zT, cut_edges, eps_abs, eps_rel)
             sqrt(epsb^2 + epspq^2 + epsrt^2)
         end
         eps_s = begin
-            epsb = eps_dual_bus_socp_vec(v2bar, v2bar_prev, eps_abs, eps_rel)
-            epspq = eps_dual_branch_pq_socp(
-                zP,
-                zQ,
-                zP_prev,
-                zQ_prev,
-                cut_edges,
-                eps_abs,
-                eps_rel,
-            )
-            epsrt = eps_dual_branch_rt_socp(
-                zR,
-                zT,
-                zR_prev,
-                zT_prev,
-                cut_edges,
-                eps_abs,
-                eps_rel,
-            )
+            epsb  = eps_dual_bus_socp_vec(v2bar, v2bar_prev, eps_abs, eps_rel)
+            epspq = eps_dual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges, eps_abs, eps_rel)
+            epsrt = eps_dual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges, eps_abs, eps_rel)
             sqrt(epsb^2 + epspq^2 + epsrt^2)
         end
 
-        push!(r_hist, r)
-        push!(s_hist, s)
-        push!(eps_r_hist, eps_r)
-        push!(eps_s_hist, eps_s)
-
-        _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_r")
-        _FAST_USE_LOGS && println("‖s‖ = $s | eps_du  = $eps_s")
+        push!(r_hist, r); push!(s_hist, s)
+        push!(eps_r_hist, eps_r); push!(eps_s_hist, eps_s)
 
         push!(rhoV2_hist, rhoV2[])
         push!(rhoP_hist, rhoP[])
@@ -903,60 +909,21 @@ function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         push!(rhoR_hist, rhoR[])
         push!(rhoT_hist, rhoT[])
 
-        if r < eps_r && s < eps_s
+        _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_r")
+        _FAST_USE_LOGS && println("‖s‖ = $s | eps_du  = $eps_s")
+
+        if stop_if_converged!(r, s, eps_r, eps_s)
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
         end
 
-        if adaptive
-            adaptive_rho_dc!(
-                rhoV2,
-                r_bus,
-                s_bus;
-                mu_incr = config.mu_incr,
-                mu_decr = config.mu_decr,
-                tau_incr = config.tau_incr,
-                tau_decr = config.tau_decr,
-            )
-
-            adaptive_rho_dc!(
-                rhoP,
-                r_pq / sqrt(2),
-                s_pq / sqrt(2);
-                mu_incr = config.mu_incr,
-                mu_decr = config.mu_decr,
-                tau_incr = config.tau_incr,
-                tau_decr = config.tau_decr,
-            )
-            adaptive_rho_dc!(
-                rhoQ,
-                r_pq / sqrt(2),
-                s_pq / sqrt(2);
-                mu_incr = config.mu_incr,
-                mu_decr = config.mu_decr,
-                tau_incr = config.tau_incr,
-                tau_decr = config.tau_decr,
-            )
-
-            adaptive_rho_dc!(
-                rhoR,
-                r_rt / sqrt(2),
-                s_rt / sqrt(2);
-                mu_incr = config.mu_incr,
-                mu_decr = config.mu_decr,
-                tau_incr = config.tau_incr,
-                tau_decr = config.tau_decr,
-            )
-            adaptive_rho_dc!(
-                rhoT,
-                r_rt / sqrt(2),
-                s_rt / sqrt(2);
-                mu_incr = config.mu_incr,
-                mu_decr = config.mu_decr,
-                tau_incr = config.tau_incr,
-                tau_decr = config.tau_decr,
-            )
-        end
+        maybe_adapt_rho!(
+            adaptive,
+            rhoV2, r_bus, s_bus,
+            rhoP, rhoQ, r_pq, s_pq,
+            rhoR, rhoT, r_rt, s_rt,
+            config,
+        )
     end
 
     save_socp_hybrid_plots(

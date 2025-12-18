@@ -1,3 +1,83 @@
+@inline function refresh_rho_bus!(
+    partitions,
+    rho::Base.RefValue{Float64},
+    prev_rho::Base.RefValue{Float64},
+)
+    ρ = rho[]
+    if ρ != prev_rho[]
+        for part in values(partitions)
+            _build_quad_bus_expr!(part, ρ)
+        end
+        prev_rho[] = ρ
+    end
+    return nothing
+end
+
+@inline function refresh_rho_branch!(
+    partitions,
+    rho::Base.RefValue{Float64},
+    prev_rho::Base.RefValue{Float64},
+)
+    ρ = rho[]
+    if ρ != prev_rho[]
+        for part in values(partitions)
+            _build_quad_branch_expr!(part, ρ, part.zone_edges)
+        end
+        prev_rho[] = ρ
+    end
+    return nothing
+end
+
+@inline function stop_if_converged!(r::Float64, s::Float64, eps_r::Float64, eps_s::Float64)
+    return (r < eps_r) && (s < eps_s)
+end
+
+@inline function maybe_adapt_rho!(
+    adaptive::Bool,
+    rho::Base.RefValue{Float64},
+    r::Float64,
+    s::Float64,
+    config,
+)
+    adaptive || return nothing
+    adaptive_rho_dc!(
+        rho, r, s;
+        mu_incr = config.mu_incr,
+        mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr,
+        tau_decr = config.tau_decr,
+    )
+    return nothing
+end
+
+@inline function maybe_adapt_rho!(
+    adaptive::Bool,
+    rho_theta::Base.RefValue{Float64},
+    r_bus::Float64,
+    s_bus::Float64,
+    rho_flow::Base.RefValue{Float64},
+    r_br::Float64,
+    s_br::Float64,
+    config,
+)
+    adaptive || return nothing
+    adaptive_rho_dc!(
+        rho_theta, r_bus, s_bus;
+        mu_incr = config.mu_incr,
+        mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr,
+        tau_decr = config.tau_decr,
+    )
+    adaptive_rho_dc!(
+        rho_flow, r_br, s_br;
+        mu_incr = config.mu_incr,
+        mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr,
+        tau_decr = config.tau_decr,
+    )
+    return nothing
+end
+
 function init_dc_bus_partition!(
     part::PartitionDC,
     sys_zone,
@@ -146,6 +226,7 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     max_iter = config.max_iter
 
     rho = Ref(config.rho_theta)
+    prev_rho = Ref(rho[])
     eps_abs = config.eps_primal
     eps_rel = config.eps_dual
     adaptive = _adaptive_on(config)
@@ -159,12 +240,10 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     n_shared_buses = length(shared_buses_sorted)
     n_zones = length(zone_ids)
 
-    dual_theta = Dict{Int, Vector{Float64}}(
-        z => zeros(Float64, n_shared_buses) for z in zone_ids
-    )
-    dual_theta_buf = Dict{Int, Vector{Float64}}(
-        z => zeros(Float64, n_shared_buses) for z in zone_ids
-    )
+    dual_theta =
+        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+    dual_theta_buf =
+        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
 
     theta_consensus = zeros(Float64, n_shared_buses)
     theta_consensus_prev = similar(theta_consensus)
@@ -178,7 +257,6 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     theta_avg_history = Dict{Int, Vector{Float64}}()
     theta_local_history = Dict{Int, Dict{Int, Vector{Float64}}}()
 
-    prev_rho = rho[]
     results = Vector{
         NamedTuple{(:gen_cost_expr, :real_cost, :thetasnap),
             Tuple{Float64, Float64, Dict{Int, Float64}}},
@@ -194,12 +272,7 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
         iter_done = iter
         _FAST_USE_LOGS && println("\nIteração $iter (bus/DC)")
 
-        if rho[] != prev_rho
-            for part in values(partitions)
-                _build_quad_bus_expr!(part, rho[])
-            end
-            prev_rho = rho[]
-        end
+        refresh_rho_bus!(partitions, rho, prev_rho)
 
         Threads.@threads for i in 1:n_zones
             z = zone_ids[i]
@@ -304,26 +377,17 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
         _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_r")
         _FAST_USE_LOGS && println("‖s‖ = $s | eps_du  = $eps_s")
 
-        if r < eps_r && s < eps_s
+        if stop_if_converged!(r, s, eps_r, eps_s)
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
         end
 
-        if adaptive
-            adaptive_rho_dc!(
-                rho, r, s;
-                mu_incr = config.mu_incr,
-                mu_decr = config.mu_decr,
-                tau_incr = config.tau_incr,
-                tau_decr = config.tau_decr,
-            )
-        end
+        maybe_adapt_rho!(adaptive, rho, r, s, config)
     end
 
     save_dc_bus_plots(
         res_primal_hist, res_dual_hist, eps_primal_hist, eps_dual_hist,
-        rho_hist, theta_avg_history;
-        stem = "admm",
+        rho_hist, theta_avg_history; stem = "admm",
     )
 
     total_real_cost = sum(p.real_generation_cost for p in values(partitions))
@@ -357,6 +421,7 @@ function run_admm_branch(
     max_iter = config.max_iter
 
     rho = Ref(config.rho_flow)
+    prev_rho = Ref(rho[])
     eps_abs = config.eps_primal
     eps_rel = config.eps_dual
     adaptive = _adaptive_on(config)
@@ -384,10 +449,7 @@ function run_admm_branch(
     eps_dual_hist = Float64[]
     rho_hist = Float64[]
 
-    prev_rho = rho[]
-
-    results = Vector{NamedTuple{(:gen_cost_expr, :real_cost),
-        Tuple{Float64, Float64}}}(
+    results = Vector{NamedTuple{(:gen_cost_expr, :real_cost), Tuple{Float64, Float64}}}(
         undef,
         n_zones,
     )
@@ -406,12 +468,7 @@ function run_admm_branch(
         iter_done = iter
         _FAST_USE_LOGS && println("\n[ADMM-branch/DC] Iteração $iter")
 
-        if rho[] != prev_rho
-            for part in values(partitions)
-                _build_quad_branch_expr!(part, rho[], part.zone_edges)
-            end
-            prev_rho = rho[]
-        end
+        refresh_rho_branch!(partitions, rho, prev_rho)
 
         Threads.@threads for i in 1:n_zones
             z = zone_ids[i]
@@ -423,10 +480,10 @@ function run_admm_branch(
             @objective(m, Min, part.obj_base + part.quad_branch_expr + lin)
             optimize!(m)
 
-            gen_cost_expr = value(m[:generation_cost])
-            real_cost = compute_real_generation_cost(m, part.objective_params)
-
-            results[i] = (gen_cost_expr = gen_cost_expr, real_cost = real_cost)
+            results[i] = (
+                gen_cost_expr = value(m[:generation_cost]),
+                real_cost = compute_real_generation_cost(m, part.objective_params),
+            )
         end
 
         for (i, z) in enumerate(zone_ids)
@@ -456,7 +513,7 @@ function run_admm_branch(
         _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_r")
         _FAST_USE_LOGS && println("‖s‖ = $s | eps_du  = $eps_s")
 
-        if r < eps_r && s < eps_s
+        if stop_if_converged!(r, s, eps_r, eps_s)
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
         end
@@ -470,7 +527,9 @@ function run_admm_branch(
                 end
             else
                 adaptive_rho_dc!(
-                    rho, r, s;
+                    rho,
+                    r,
+                    s;
                     mu_incr = mu_incr,
                     mu_decr = mu_decr,
                     tau_incr = tau_incr,
@@ -510,6 +569,10 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
 
     rho_theta = Ref(config.rho_theta)
     rho_flow = Ref(config.rho_flow)
+
+    prev_rho_theta = Ref(rho_theta[])
+    prev_rho_flow = Ref(rho_flow[])
+
     eps_abs = config.eps_primal
     eps_rel = config.eps_dual
     adaptive = _adaptive_on(config)
@@ -544,11 +607,7 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
 
     theta_avg_history = Dict{Int, Vector{Float64}}()
 
-    prev_rho_theta = rho_theta[]
-    prev_rho_flow = rho_flow[]
-
-    results = Vector{NamedTuple{(:gen_cost_expr, :real_cost),
-        Tuple{Float64, Float64}}}(
+    results = Vector{NamedTuple{(:gen_cost_expr, :real_cost), Tuple{Float64, Float64}}}(
         undef,
         n_zones,
     )
@@ -568,18 +627,8 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         iter_done = iter
         _FAST_USE_LOGS && println("\n[ADMM-hybrid/DC] Iteração $iter")
 
-        if rho_theta[] != prev_rho_theta
-            for part in values(partitions)
-                _build_quad_bus_expr!(part, rho_theta[])
-            end
-            prev_rho_theta = rho_theta[]
-        end
-        if rho_flow[] != prev_rho_flow
-            for part in values(partitions)
-                _build_quad_branch_expr!(part, rho_flow[], part.zone_edges)
-            end
-            prev_rho_flow = rho_flow[]
-        end
+        refresh_rho_bus!(partitions, rho_theta, prev_rho_theta)
+        refresh_rho_branch!(partitions, rho_flow, prev_rho_flow)
 
         Threads.@threads for i in 1:n_zones
             z = zone_ids[i]
@@ -608,14 +657,14 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
                 m,
                 Min,
                 part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
-                (lin_bus + lin_branch),
+                (lin_bus + lin_branch)
             )
             optimize!(m)
 
-            gen_cost_expr = value(m[:generation_cost])
-            real_cost = compute_real_generation_cost(m, part.objective_params)
-
-            results[i] = (gen_cost_expr = gen_cost_expr, real_cost = real_cost)
+            results[i] = (
+                gen_cost_expr = value(m[:generation_cost]),
+                real_cost = compute_real_generation_cost(m, part.objective_params),
+            )
         end
 
         for (i, z) in enumerate(zone_ids)
@@ -691,27 +740,12 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         _FAST_USE_LOGS && println("‖r‖ = $r_tot | eps_pri = $eps_r_tot")
         _FAST_USE_LOGS && println("‖s‖ = $s_tot | eps_du  = $eps_s_tot")
 
-        if r_tot < eps_r_tot && s_tot < eps_s_tot
+        if stop_if_converged!(r_tot, s_tot, eps_r_tot, eps_s_tot)
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
         end
 
-        if adaptive
-            adaptive_rho_dc!(
-                rho_theta, r_bus, s_bus;
-                mu_incr = config.mu_incr,
-                mu_decr = config.mu_decr,
-                tau_incr = config.tau_incr,
-                tau_decr = config.tau_decr,
-            )
-            adaptive_rho_dc!(
-                rho_flow, r_br, s_br;
-                mu_incr = config.mu_incr,
-                mu_decr = config.mu_decr,
-                tau_incr = config.tau_incr,
-                tau_decr = config.tau_decr,
-            )
-        end
+        maybe_adapt_rho!(adaptive, rho_theta, r_bus, s_bus, rho_flow, r_br, s_br, config)
     end
 
     plot_admm_convergence(
