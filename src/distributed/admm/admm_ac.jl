@@ -373,9 +373,9 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunRes
     max_iter = config.max_iter
 
     rho_theta = Ref(config.rho_theta)
-    rho_v     = Ref(config.rho_v)
+    rho_v = Ref(config.rho_v)
     prev_rho_theta = Ref(rho_theta[])
-    prev_rho_v     = Ref(rho_v[])
+    prev_rho_v = Ref(rho_v[])
 
     eps_abs = config.eps_primal
     eps_rel = config.eps_dual
@@ -401,17 +401,17 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunRes
         Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
 
     theta_consensus = zeros(Float64, n_shared_buses)
-    vmag_consensus  = ones(Float64, n_shared_buses)
+    vmag_consensus = ones(Float64, n_shared_buses)
     theta_consensus_prev = similar(theta_consensus)
-    vmag_consensus_prev  = similar(vmag_consensus)
+    vmag_consensus_prev = similar(vmag_consensus)
 
     # ---------- diagnostics ----------
     hist = ADMMHistory()
     hist.meta[:kind] = :ac_bus
-    hist.meta[:tag]  = "admm_ac_bus"
+    hist.meta[:tag] = "admm_ac_bus"
 
     theta_avg_hist = Dict{Int, Vector{Float64}}()
-    vmag_avg_hist  = Dict{Int, Vector{Float64}}()
+    vmag_avg_hist = Dict{Int, Vector{Float64}}()
 
     results = Vector{NamedTuple{(:expr_cost, :real_cost), Tuple{Float64, Float64}}}(
         undef,
@@ -436,7 +436,7 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunRes
 
         α_used = nothing
         theta_target = theta_consensus
-        vmag_target  = vmag_consensus
+        vmag_target = vmag_consensus
 
         Threads.@threads for i in 1:n_zones
             z = zone_ids[i]
@@ -444,7 +444,7 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunRes
             m = part.model::JuMP.Model
 
             lambdatheta = (lambdatheta_zone_buf[z] .= duals_theta[z])
-            lambdaV     = (lambdaV_zone_buf[z]     .= duals_v[z])
+            lambdaV = (lambdaV_zone_buf[z] .= duals_v[z])
 
             lin = _build_linear_bus_expr_ac!(
                 part,
@@ -476,7 +476,7 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunRes
         end
 
         theta_consensus_prev .= theta_consensus
-        vmag_consensus_prev  .= vmag_consensus
+        vmag_consensus_prev .= vmag_consensus
 
         compute_ac_bus_consensus_vec!(
             theta_consensus,
@@ -489,7 +489,7 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunRes
         @inbounds for b in shared_buses_sorted
             j = shared_buses_idx[b]
             push!(get!(theta_avg_hist, b, Float64[]), theta_consensus[j])
-            push!(get!(vmag_avg_hist,  b, Float64[]), vmag_consensus[j])
+            push!(get!(vmag_avg_hist, b, Float64[]), vmag_consensus[j])
         end
 
         update_duals_bus_ac_all!(
@@ -505,7 +505,7 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunRes
             shared_buses_idx;
             α = α_used,
             theta_consensus_prev = theta_consensus_prev,
-            vmag_consensus_prev  = vmag_consensus_prev,
+            vmag_consensus_prev = vmag_consensus_prev,
         )
 
         r = primal_residual_bus_ac_vec(
@@ -570,7 +570,7 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunRes
 
     # heatmaps/séries opcionais p/ build_plots()
     hist.heatmaps[:theta_avg] = theta_avg_hist
-    hist.heatmaps[:vmag_avg]  = vmag_avg_hist
+    hist.heatmaps[:vmag_avg] = vmag_avg_hist
 
     total_real_cost = sum(p.real_generation_cost for p in values(partitions))
     total_expr_cost = sum(p.generation_cost_model_expr for p in values(partitions))
@@ -591,7 +591,12 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunRes
         iter_done = iter_done,
         elapsed_s = elapsed_s,
     )
-    return LirionRunResult(result = result, model = nothing, system = sys, diagnostics = hist)
+    return LirionRunResult(;
+        result = result,
+        model = nothing,
+        system = sys,
+        diagnostics = hist,
+    )
 end
 
 function run_admm_ac_branch(
@@ -631,7 +636,7 @@ function run_admm_ac_branch(
     # ---------- diagnostics ----------
     hist = ADMMHistory()
     hist.meta[:kind] = :ac_branch
-    hist.meta[:tag]  = "admm_ac_branch"
+    hist.meta[:tag] = "admm_ac_branch"
 
     results = Vector{NamedTuple{(:expr_cost, :real_cost), Tuple{Float64, Float64}}}(
         undef,
@@ -750,7 +755,12 @@ function run_admm_ac_branch(
         iter_done = iter_done,
         elapsed_s = elapsed_s,
     )
-    return LirionRunResult(result = result, model = nothing, system = sys, diagnostics = hist)
+    return LirionRunResult(;
+        result = result,
+        model = nothing,
+        system = sys,
+        diagnostics = hist,
+    )
 end
 
 function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunResult
@@ -762,14 +772,14 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::Lirio
     max_iter = config.max_iter
 
     rho_theta = Ref(config.rho_theta)
-    rho_v     = Ref(config.rho_v)
-    rho_p     = Ref(config.rho_flow_p)
-    rho_q     = Ref(config.rho_flow_q)
+    rho_v = Ref(config.rho_v)
+    rho_p = Ref(config.rho_flow_p)
+    rho_q = Ref(config.rho_flow_q)
 
     prev_rho_theta = Ref(rho_theta[])
-    prev_rho_v     = Ref(rho_v[])
-    prev_rho_p     = Ref(rho_p[])
-    prev_rho_q     = Ref(rho_q[])
+    prev_rho_v = Ref(rho_v[])
+    prev_rho_p = Ref(rho_p[])
+    prev_rho_q = Ref(rho_q[])
 
     eps_abs = config.eps_primal
     eps_rel = config.eps_dual
@@ -798,9 +808,9 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::Lirio
     duals_q = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
 
     theta_consensus = zeros(Float64, n_shared_buses)
-    vmag_consensus  = ones(Float64, n_shared_buses)
+    vmag_consensus = ones(Float64, n_shared_buses)
     theta_consensus_prev = similar(theta_consensus)
-    vmag_consensus_prev  = similar(vmag_consensus)
+    vmag_consensus_prev = similar(vmag_consensus)
 
     zP = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zQ = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
@@ -810,10 +820,10 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::Lirio
     # ---------- diagnostics ----------
     hist = ADMMHistory()
     hist.meta[:kind] = :ac_hybrid
-    hist.meta[:tag]  = "admm_ac_hybrid"
+    hist.meta[:tag] = "admm_ac_hybrid"
 
     theta_avg_hist = Dict{Int, Vector{Float64}}()
-    vmag_avg_hist  = Dict{Int, Vector{Float64}}()
+    vmag_avg_hist = Dict{Int, Vector{Float64}}()
 
     results = Vector{NamedTuple{(:expr_cost, :real_cost), Tuple{Float64, Float64}}}(
         undef,
@@ -835,7 +845,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::Lirio
 
         α_used = nothing
         theta_target = theta_consensus
-        vmag_target  = vmag_consensus
+        vmag_target = vmag_consensus
 
         Threads.@threads for i in 1:n_zones
             z = zone_ids[i]
@@ -843,7 +853,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::Lirio
             m = part.model::JuMP.Model
 
             lambdatheta = (lambdatheta_zone_buf[z] .= duals_theta[z])
-            lambdaV     = (lambdaV_zone_buf[z]     .= duals_v[z])
+            lambdaV = (lambdaV_zone_buf[z] .= duals_v[z])
 
             lin_bus = _build_linear_bus_expr_ac!(
                 part,
@@ -870,7 +880,8 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::Lirio
             @objective(
                 m,
                 Min,
-                part.obj_base + part.quad_bus_expr_ac + part.quad_branch_expr_ac + (lin_bus + lin_br)
+                part.obj_base + part.quad_bus_expr_ac + part.quad_branch_expr_ac +
+                (lin_bus + lin_br)
             )
             optimize!(m)
 
@@ -889,7 +900,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::Lirio
         end
 
         theta_consensus_prev .= theta_consensus
-        vmag_consensus_prev  .= vmag_consensus
+        vmag_consensus_prev .= vmag_consensus
         zP_prev = copy(zP)
         zQ_prev = copy(zQ)
 
@@ -904,7 +915,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::Lirio
         @inbounds for b in shared_buses_sorted
             j = shared_buses_idx[b]
             push!(get!(theta_avg_hist, b, Float64[]), theta_consensus[j])
-            push!(get!(vmag_avg_hist,  b, Float64[]), vmag_consensus[j])
+            push!(get!(vmag_avg_hist, b, Float64[]), vmag_consensus[j])
         end
 
         compute_ac_branch_consensus!(zP, zQ, partitions, cut_edges)
@@ -922,7 +933,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::Lirio
             shared_buses_idx;
             α = α_used,
             theta_consensus_prev = theta_consensus_prev,
-            vmag_consensus_prev  = vmag_consensus_prev,
+            vmag_consensus_prev = vmag_consensus_prev,
         )
 
         update_duals_branch_ac!(
@@ -946,7 +957,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::Lirio
             shared_buses_sorted,
             shared_buses_idx,
         )
-        r_br  = primal_residual_branch_ac(partitions, zP, zQ, cut_edges)
+        r_br = primal_residual_branch_ac(partitions, zP, zQ, cut_edges)
         r_tot = hypot(r_bus, r_br)
 
         s_bus = dual_residual_bus_ac_vec(
@@ -955,7 +966,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::Lirio
             theta_consensus_prev,
             vmag_consensus_prev,
         )
-        s_br  = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
+        s_br = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
         s_tot = hypot(s_bus, s_br)
 
         eps_bus_r = eps_primal_bus_ac_vec(
@@ -967,7 +978,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::Lirio
             eps_abs,
             eps_rel,
         )
-        eps_br_r  = eps_primal_branch_ac(partitions, zP, zQ, cut_edges, eps_abs, eps_rel)
+        eps_br_r = eps_primal_branch_ac(partitions, zP, zQ, cut_edges, eps_abs, eps_rel)
         eps_r_tot = hypot(eps_bus_r, eps_br_r)
 
         eps_bus_s = eps_dual_bus_ac_vec(
@@ -978,16 +989,16 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::Lirio
             eps_abs,
             eps_rel,
         )
-        eps_br_s  = eps_dual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges, eps_abs, eps_rel)
+        eps_br_s = eps_dual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges, eps_abs, eps_rel)
         eps_s_tot = hypot(eps_bus_s, eps_br_s)
 
         _record_iter!(
             hist, r_tot, s_tot, eps_r_tot, eps_s_tot;
             rhos = Dict(
                 :rho_theta => rho_theta[],
-                :rho_v     => rho_v[],
-                :rho_p     => rho_p[],
-                :rho_q     => rho_q[],
+                :rho_v => rho_v[],
+                :rho_p => rho_p[],
+                :rho_q => rho_q[],
             ),
         )
 
@@ -1019,7 +1030,7 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::Lirio
     end
 
     hist.heatmaps[:theta_avg] = theta_avg_hist
-    hist.heatmaps[:vmag_avg]  = vmag_avg_hist
+    hist.heatmaps[:vmag_avg] = vmag_avg_hist
 
     total_real_cost = sum(p.real_generation_cost for p in values(partitions))
     total_expr_cost = sum(p.generation_cost_model_expr for p in values(partitions))
@@ -1042,5 +1053,10 @@ function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::Lirio
         iter_done = iter_done,
         elapsed_s = elapsed_s,
     )
-    return LirionRunResult(result = result, model = nothing, system = sys, diagnostics = hist)
+    return LirionRunResult(;
+        result = result,
+        model = nothing,
+        system = sys,
+        diagnostics = hist,
+    )
 end

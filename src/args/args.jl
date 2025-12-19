@@ -7,6 +7,7 @@ struct Args
     model_type::Union{Type{<:OPFModel}, DistributedOPFModel}
     optimizer::Any
     write_outputs::Bool
+    write_plots::Bool
 
     function Args(raw_args::Vector{String})
         s = ArgParseSettings()
@@ -28,6 +29,10 @@ struct Args
 
             "--outputs"
             help = "Generate CSV output files"
+            action = :store_true
+
+            "--plots"
+            help = "Generate ADMM plots (HTML) into <input_dir>/plots_outputs"
             action = :store_true
 
             # ======= ADMM =======
@@ -309,6 +314,7 @@ struct Args
             model_type,
             optimizer,
             get(parsed, "outputs", false),
+            get(parsed, "plots", false),
         )
     end
 end

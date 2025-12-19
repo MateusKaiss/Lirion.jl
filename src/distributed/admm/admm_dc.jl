@@ -117,7 +117,7 @@ end
     s::Float64,
     eps_r::Float64,
     eps_s::Float64;
-    rhos::Dict{Symbol,<:Real}=Dict{Symbol,Real}(),
+    rhos::Dict{Symbol, <:Real} = Dict{Symbol, Real}(),
 )
     push!(hist.r_primal, r)
     push!(hist.r_dual, s)
@@ -324,7 +324,10 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunResult
     results = Vector{
         NamedTuple{(:gen_cost_expr, :real_cost, :thetasnap),
             Tuple{Float64, Float64, Dict{Int, Float64}}},
-    }(undef, n_zones)
+    }(
+        undef,
+        n_zones,
+    )
 
     init_dc_bus_partition!(partitions, sys, zone_ids, optimizer_factory, rho[])
 
@@ -463,7 +466,12 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunResult
         iter_done = iter_done,
         elapsed_s = elapsed_s,
     )
-    return LirionRunResult(result = result, model = nothing, system = sys, diagnostics = hist)
+    return LirionRunResult(;
+        result = result,
+        model = nothing,
+        system = sys,
+        diagnostics = hist,
+    )
 end
 
 """
@@ -605,7 +613,12 @@ function run_admm_branch(
         iter_done = iter_done,
         elapsed_s = elapsed_s,
     )
-    return LirionRunResult(result = result, model = nothing, system = sys, diagnostics = hist)
+    return LirionRunResult(;
+        result = result,
+        model = nothing,
+        system = sys,
+        diagnostics = hist,
+    )
 end
 
 function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunResult
@@ -617,10 +630,10 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::LirionRu
     max_iter = config.max_iter
 
     rho_theta = Ref(config.rho_theta)
-    rho_flow  = Ref(config.rho_flow_p)
+    rho_flow = Ref(config.rho_flow_p)
 
     prev_rho_theta = Ref(rho_theta[])
-    prev_rho_flow  = Ref(rho_flow[])
+    prev_rho_flow = Ref(rho_flow[])
 
     eps_abs = config.eps_primal
     eps_rel = config.eps_dual
@@ -650,7 +663,7 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::LirionRu
     # ---------- diagnostics ----------
     hist = ADMMHistory()
     hist.meta[:kind] = :dc_hybrid
-    hist.meta[:tag]  = "admm_dc_hybrid"
+    hist.meta[:tag] = "admm_dc_hybrid"
 
     theta_avg_history = Dict{Int, Vector{Float64}}()
 
@@ -695,7 +708,8 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::LirionRu
             @objective(
                 m,
                 Min,
-                part.obj_base + part.quad_bus_expr + part.quad_branch_expr + lin_bus + lin_branch
+                part.obj_base + part.quad_bus_expr + part.quad_branch_expr + lin_bus +
+                lin_branch
             )
             optimize!(m)
 
@@ -805,5 +819,10 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::LirionRu
         iter_done = iter_done,
         elapsed_s = elapsed_s,
     )
-    return LirionRunResult(result = result, model = nothing, system = sys, diagnostics = hist)
+    return LirionRunResult(;
+        result = result,
+        model = nothing,
+        system = sys,
+        diagnostics = hist,
+    )
 end

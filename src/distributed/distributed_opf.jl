@@ -63,10 +63,10 @@ function run_distributed(inputs::LirionInputs)::LirionRunResult
         enriched = merge(
             r isa NamedTuple ? r : (result = r,),
             (config = config,
-             system = inputs.system,
-             database = inputs.database_path)
+                system = inputs.system,
+                database = inputs.database_path),
         )
-        return LirionRunResult(
+        return LirionRunResult(;
             result = enriched,
             model = out.model,
             system = out.system === nothing ? inputs.system : out.system,
@@ -88,8 +88,15 @@ function run_distributed(inputs::LirionInputs)::LirionRunResult
             system = inputs.system,
             database = inputs.database_path,
         )
-        return LirionRunResult(result = result, model = nothing, system = inputs.system, diagnostics = NoDiagnostics())
+        return LirionRunResult(;
+            result = result,
+            model = nothing,
+            system = inputs.system,
+            diagnostics = NoDiagnostics(),
+        )
     end
 
-    error("Runner returned unsupported type: $(typeof(out)). Expected LirionRunResult or a 4-tuple.")
+    return error(
+        "Runner returned unsupported type: $(typeof(out)). Expected LirionRunResult or a 4-tuple.",
+    )
 end

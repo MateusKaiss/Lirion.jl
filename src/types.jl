@@ -186,9 +186,9 @@ struct NoDiagnostics <: AbstractRunDiagnostics end
 
 Base.@kwdef struct ADMMHistory <: AbstractRunDiagnostics
     r_primal::Vector{Float64} = Float64[]
-    r_dual::Vector{Float64}   = Float64[]
+    r_dual::Vector{Float64} = Float64[]
     eps_primal::Vector{Float64} = Float64[]
-    eps_dual::Vector{Float64}   = Float64[]
+    eps_dual::Vector{Float64} = Float64[]
 
     # rhos por “canal”: :rho, :rho_theta, :rhoV, :rhoP, :rhoQ, :rhoV2, :rhoR, :rhoT...
     rhos::Dict{Symbol, Vector{Float64}} = Dict{Symbol, Vector{Float64}}()

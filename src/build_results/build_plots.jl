@@ -144,16 +144,43 @@ end
 # OBS: eles salvam no diretório atual; prefira build_plots(...)
 # ----------------------------
 
-function save_dc_bus_plots(res_pri, res_du, eps_pri, eps_du, rho_hist, theta_avg_history; stem::String="admm")
-    plot_admm_convergence(res_pri, res_du, eps_pri, eps_du, "plot_convergencia_$(stem)_dc.html")
-    plot_rho(rho_hist, "plot_rho_$(stem)_dc.html"; label="rho")
+function save_dc_bus_plots(
+    res_pri,
+    res_du,
+    eps_pri,
+    eps_du,
+    rho_hist,
+    theta_avg_history;
+    stem::String = "admm",
+)
+    plot_admm_convergence(
+        res_pri,
+        res_du,
+        eps_pri,
+        eps_du,
+        "plot_convergencia_$(stem)_dc.html",
+    )
+    plot_rho(rho_hist, "plot_rho_$(stem)_dc.html"; label = "rho")
     plot_theta_avg_heatmap(theta_avg_history, "plot_theta_avg_heatmap_$(stem)_dc.html")
     return nothing
 end
 
-function save_dc_branch_plots(res_pri, res_du, eps_pri, eps_du, rho_hist; stem::String="admm_branch")
-    plot_admm_convergence(res_pri, res_du, eps_pri, eps_du, "plot_convergencia_$(stem).html")
-    plot_rho(rho_hist, "plot_rho_$(stem).html"; label="rho")
+function save_dc_branch_plots(
+    res_pri,
+    res_du,
+    eps_pri,
+    eps_du,
+    rho_hist;
+    stem::String = "admm_branch",
+)
+    plot_admm_convergence(
+        res_pri,
+        res_du,
+        eps_pri,
+        eps_du,
+        "plot_convergencia_$(stem).html",
+    )
+    plot_rho(rho_hist, "plot_rho_$(stem).html"; label = "rho")
     return nothing
 end
 
@@ -173,7 +200,8 @@ function build_plots(hist::ADMMHistory; outdir::String = ".", stem::String = "ad
     mkpath(outdir)
 
     # 0) stem automático via meta (se existir)
-    if haskey(hist.meta, :tag) && hist.meta[:tag] isa AbstractString && !isempty(hist.meta[:tag])
+    if haskey(hist.meta, :tag) && hist.meta[:tag] isa AbstractString &&
+       !isempty(hist.meta[:tag])
         stem = String(hist.meta[:tag])
     elseif haskey(hist.meta, :kind)
         stem = stem * "_" * string(hist.meta[:kind])
