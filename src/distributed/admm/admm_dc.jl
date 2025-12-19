@@ -37,7 +37,7 @@ end
     rho::Base.RefValue{Float64},
     r::Float64,
     s::Float64,
-    config,
+    config::DistributedOPFModel,
 )
     adaptive || return nothing
     adaptive_rho_dc!(
@@ -58,7 +58,7 @@ end
     rho_flow::Base.RefValue{Float64},
     r_br::Float64,
     s_br::Float64,
-    config,
+    config::DistributedOPFModel,
 )
     adaptive || return nothing
     adaptive_rho_dc!(
@@ -97,6 +97,34 @@ end
             shared_buses_sorted,
             shared_buses_idx,
         )
+    end
+    return nothing
+end
+
+# ----------------------------
+# helpers ADMMHistory
+# ----------------------------
+
+@inline function _push_rho!(hist::ADMMHistory, key::Symbol, val::Real)
+    v = get!(hist.rhos, key, Float64[])
+    push!(v, Float64(val))
+    return nothing
+end
+
+@inline function _record_iter!(
+    hist::ADMMHistory,
+    r::Float64,
+    s::Float64,
+    eps_r::Float64,
+    eps_s::Float64;
+    rhos::Dict{Symbol,<:Real}=Dict{Symbol,Real}(),
+)
+    push!(hist.r_primal, r)
+    push!(hist.r_dual, s)
+    push!(hist.eps_primal, eps_r)
+    push!(hist.eps_dual, eps_s)
+    for (k, v) in rhos
+        _push_rho!(hist, k, v)
     end
     return nothing
 end
@@ -244,7 +272,18 @@ function init_dc_hybrid_partition!(
     return nothing
 end
 
-function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
+# ============================================================
+# RUNNERS (corrigidos p/ novo pipeline: LirionRunResult + ADMMHistory)
+# ============================================================
+
+"""
+ADMM bus/DC (consenso em theta nas barras compartilhadas)
+
+Retorna LirionRunResult:
+- result: NamedTuple com custos e partitions
+- diagnostics: ADMMHistory (r,s,eps, rhos e heatmaps opcionais)
+"""
+function run_admm(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == DC "ADMM bus/DC requer base_model == DC."
 
@@ -274,11 +313,10 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     theta_consensus = zeros(Float64, n_shared_buses)
     theta_consensus_prev = similar(theta_consensus)
 
-    res_primal_hist = Float64[]
-    res_dual_hist = Float64[]
-    eps_primal_hist = Float64[]
-    eps_dual_hist = Float64[]
-    rho_hist = Float64[]
+    # ---------- diagnostics ----------
+    hist = ADMMHistory()
+    hist.meta[:kind] = :dc_bus
+    hist.meta[:tag] = "admm_dc_bus"
 
     theta_avg_history = Dict{Int, Vector{Float64}}()
     theta_local_history = Dict{Int, Dict{Int, Vector{Float64}}}()
@@ -286,10 +324,7 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     results = Vector{
         NamedTuple{(:gen_cost_expr, :real_cost, :thetasnap),
             Tuple{Float64, Float64, Dict{Int, Float64}}},
-    }(
-        undef,
-        n_zones,
-    )
+    }(undef, n_zones)
 
     init_dc_bus_partition!(partitions, sys, zone_ids, optimizer_factory, rho[])
 
@@ -393,11 +428,7 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
         )
         eps_s = eps_dual_bus_dc(theta_consensus, theta_consensus_prev, eps_abs, eps_rel)
 
-        push!(res_primal_hist, r)
-        push!(res_dual_hist, s)
-        push!(eps_primal_hist, eps_r)
-        push!(eps_dual_hist, eps_s)
-        push!(rho_hist, rho[])
+        _record_iter!(hist, r, s, eps_r, eps_s; rhos = Dict(:rho_theta => rho[]))
 
         _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_r")
         _FAST_USE_LOGS && println("‖s‖ = $s | eps_du  = $eps_s")
@@ -410,15 +441,9 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
         maybe_adapt_rho!(adaptive, rho, r, s, config)
     end
 
-    save_dc_bus_plots(
-        res_primal_hist,
-        res_dual_hist,
-        eps_primal_hist,
-        eps_dual_hist,
-        rho_hist,
-        theta_avg_history;
-        stem = "admm",
-    )
+    # heatmaps opcionais
+    hist.heatmaps[:theta_avg] = theta_avg_history
+    hist.heatmaps[:theta_local] = theta_local_history
 
     total_real_cost = sum(p.real_generation_cost for p in values(partitions))
     total_expr_cost = sum(p.generation_cost_model_expr for p in values(partitions))
@@ -431,18 +456,26 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     println("Iterações realizadas: $iter_done")
     println("Tempo ADMM (bus/DC): $(_pretty_time(elapsed_s))")
 
-    return total_real_cost, partitions, iter_done, elapsed_s
+    result = (
+        total_real_cost = total_real_cost,
+        total_expr_cost = total_expr_cost,
+        partitions = partitions,
+        iter_done = iter_done,
+        elapsed_s = elapsed_s,
+    )
+    return LirionRunResult(result = result, model = nothing, system = sys, diagnostics = hist)
 end
 
+"""
+ADMM branch/DC (consenso em fluxo nas arestas de corte)
+
+- Usa rho_flow_p (campo real) para evitar depender do shim :rho_flow.
+"""
 function run_admm_branch(
     config::DistributedOPFModel,
     sys::ADMMSystem;
     use_legacy_rho::Bool = false,
-    mu_incr::Float64 = 2.0,
-    mu_decr::Float64 = 2.0,
-    tau_incr::Float64 = 1.05,
-    tau_decr::Float64 = 0.98,
-)
+)::LirionRunResult
     t0_ns = time_ns()
 
     @assert config.base_model == DC "ADMM-branch/DC requer base_model == DC."
@@ -450,17 +483,11 @@ function run_admm_branch(
     cut_edges = sys.cut_edges
     max_iter = config.max_iter
 
-    rho = Ref(config.rho_flow)
+    rho = Ref(config.rho_flow_p)     # <<< campo real
     prev_rho = Ref(rho[])
     eps_abs = config.eps_primal
     eps_rel = config.eps_dual
     adaptive = _adaptive_on(config)
-
-    # se você quer SEMPRE usar o config, sobrescreve os kwargs:
-    mu_incr = config.mu_incr
-    mu_decr = config.mu_decr
-    tau_incr = config.tau_incr
-    tau_decr = config.tau_decr
 
     optimizer_factory = resolve_optimizer_dc(config)
 
@@ -472,12 +499,9 @@ function run_admm_branch(
     z_flow_prev = Dict{Int, Float64}()
 
     duals = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
-
-    res_primal_hist = Float64[]
-    res_dual_hist = Float64[]
-    eps_primal_hist = Float64[]
-    eps_dual_hist = Float64[]
-    rho_hist = Float64[]
+    hist = ADMMHistory()
+    hist.meta[:kind] = :dc_branch
+    hist.meta[:tag] = "admm_dc_branch"
 
     results = Vector{NamedTuple{(:gen_cost_expr, :real_cost), Tuple{Float64, Float64}}}(
         undef,
@@ -534,11 +558,7 @@ function run_admm_branch(
         eps_r = eps_primal_branch_dc(partitions, z_flow, cut_edges, eps_abs, eps_rel)
         eps_s = eps_dual_branch_dc(z_flow, z_flow_prev, eps_abs, eps_rel)
 
-        push!(res_primal_hist, r)
-        push!(res_dual_hist, s)
-        push!(eps_primal_hist, eps_r)
-        push!(eps_dual_hist, eps_s)
-        push!(rho_hist, rho[])
+        _record_iter!(hist, r, s, eps_r, eps_s; rhos = Dict(:rho_flow => rho[]))
 
         _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_r")
         _FAST_USE_LOGS && println("‖s‖ = $s | eps_du  = $eps_s")
@@ -550,29 +570,22 @@ function run_admm_branch(
 
         if adaptive
             if use_legacy_rho
-                if r > mu_incr * s
-                    rho[] *= tau_incr
-                elseif s > mu_decr * r
-                    rho[] *= tau_decr
+                if r > config.mu_incr * s
+                    rho[] *= config.tau_incr
+                elseif s > config.mu_decr * r
+                    rho[] *= config.tau_decr
                 end
             else
                 adaptive_rho_dc!(
-                    rho,
-                    r,
-                    s;
-                    mu_incr = mu_incr,
-                    mu_decr = mu_decr,
-                    tau_incr = tau_incr,
-                    tau_decr = tau_decr,
+                    rho, r, s;
+                    mu_incr = config.mu_incr,
+                    mu_decr = config.mu_decr,
+                    tau_incr = config.tau_incr,
+                    tau_decr = config.tau_decr,
                 )
             end
         end
     end
-
-    save_dc_branch_plots(
-        res_primal_hist, res_dual_hist, eps_primal_hist, eps_dual_hist,
-        rho_hist; stem = "admm_branch",
-    )
 
     total_real_cost = sum(p.real_generation_cost for p in values(partitions))
     total_expr_cost = sum(p.generation_cost_model_expr for p in values(partitions))
@@ -581,16 +594,22 @@ function run_admm_branch(
     println("\n[ADMM-branch/DC] Resumo:")
     println("→ Total (value(:generation_cost))     = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
-    println("rho_flow inicial: $(config.rho_flow) | rho_flow final: $(rho[])")
+    println("rho_flow inicial: $(config.rho_flow_p) | rho_flow final: $(rho[])")
     println("Iterações realizadas: $iter_done")
     println("Tempo ADMM (branch/DC): $(_pretty_time(elapsed_s))")
 
-    return total_real_cost, partitions, iter_done, elapsed_s
+    result = (
+        total_real_cost = total_real_cost,
+        total_expr_cost = total_expr_cost,
+        partitions = partitions,
+        iter_done = iter_done,
+        elapsed_s = elapsed_s,
+    )
+    return LirionRunResult(result = result, model = nothing, system = sys, diagnostics = hist)
 end
 
-function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
+function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunResult
     t0_ns = time_ns()
-
     @assert config.base_model == DC "Hybrid ADMM/DC requer DC."
 
     shared_buses = sys.shared_buses
@@ -598,10 +617,10 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     max_iter = config.max_iter
 
     rho_theta = Ref(config.rho_theta)
-    rho_flow = Ref(config.rho_flow)
+    rho_flow  = Ref(config.rho_flow_p)
 
     prev_rho_theta = Ref(rho_theta[])
-    prev_rho_flow = Ref(rho_flow[])
+    prev_rho_flow  = Ref(rho_flow[])
 
     eps_abs = config.eps_primal
     eps_rel = config.eps_dual
@@ -628,12 +647,10 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
     duals_flow = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
 
-    res_primal_hist = Float64[]
-    res_dual_hist = Float64[]
-    eps_primal_hist = Float64[]
-    eps_dual_hist = Float64[]
-    rho_theta_hist = Float64[]
-    rho_flow_hist = Float64[]
+    # ---------- diagnostics ----------
+    hist = ADMMHistory()
+    hist.meta[:kind] = :dc_hybrid
+    hist.meta[:tag]  = "admm_dc_hybrid"
 
     theta_avg_history = Dict{Int, Vector{Float64}}()
 
@@ -678,8 +695,7 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             @objective(
                 m,
                 Min,
-                part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
-                (lin_bus + lin_branch)
+                part.obj_base + part.quad_bus_expr + part.quad_branch_expr + lin_bus + lin_branch
             )
             optimize!(m)
 
@@ -710,6 +726,7 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             j = shared_buses_idx[b]
             push!(get!(theta_avg_history, b, Float64[]), theta_consensus[j])
         end
+
         compute_z_flow_consensus!(z_flow, partitions, cut_edges)
 
         update_duals_theta_all!(
@@ -751,12 +768,10 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         eps_br_s = eps_dual_branch_dc(z_flow, z_flow_prev, eps_abs, eps_rel)
         eps_s_tot = hypot(eps_bus_s, eps_br_s)
 
-        push!(res_primal_hist, r_tot)
-        push!(res_dual_hist, s_tot)
-        push!(eps_primal_hist, eps_r_tot)
-        push!(eps_dual_hist, eps_s_tot)
-        push!(rho_theta_hist, rho_theta[])
-        push!(rho_flow_hist, rho_flow[])
+        _record_iter!(
+            hist, r_tot, s_tot, eps_r_tot, eps_s_tot;
+            rhos = Dict(:rho_theta => rho_theta[], :rho_flow => rho_flow[]),
+        )
 
         _FAST_USE_LOGS && println("‖r‖ = $r_tot | eps_pri = $eps_r_tot")
         _FAST_USE_LOGS && println("‖s‖ = $s_tot | eps_du  = $eps_s_tot")
@@ -769,28 +784,7 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         maybe_adapt_rho!(adaptive, rho_theta, r_bus, s_bus, rho_flow, r_br, s_br, config)
     end
 
-    plot_admm_convergence(
-        res_primal_hist, res_dual_hist, eps_primal_hist, eps_dual_hist,
-        "plot_convergencia_admm_hybrid.html",
-    )
-
-    PlotlyLight.save(
-        (
-            () -> (
-                p = Plot();
-                p(; x = 1:length(rho_flow_hist), y = rho_flow_hist,
-                    type = :scatter, mode = "lines+markers", name = "rho_flow");
-                p.layout.title = "Evolução de rho_flow";
-                p.layout.xaxis.title = "Iterações";
-                p.layout.yaxis.title = "rho_flow";
-                p.layout.yaxis.type = "log";
-                p
-            )
-        )(),
-        "plot_rho_flow_hybrid.html",
-    )
-
-    plot_theta_avg_heatmap(theta_avg_history, "plot_theta_avg_heatmap_hybrid.html")
+    hist.heatmaps[:theta_avg] = theta_avg_history
 
     total_real_cost = sum(p.real_generation_cost for p in values(partitions))
     total_expr_cost = sum(p.generation_cost_model_expr for p in values(partitions))
@@ -800,9 +794,16 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
     println("→ Total (value(:generation_cost))     = $total_expr_cost")
     println("→ Total (reavaliado via p_generation) = $total_real_cost")
     println("rho_theta inicial: $(config.rho_theta) | rho_theta final: $(rho_theta[])")
-    println("rho_flow  inicial: $(config.rho_flow)  | rho_flow  final: $(rho_flow[])")
+    println("rho_flow  inicial: $(config.rho_flow_p) | rho_flow  final: $(rho_flow[])")
     println("Iterações realizadas: $iter_done")
     println("Tempo ADMM (hybrid/DC): $(_pretty_time(elapsed_s))")
 
-    return total_real_cost, partitions, iter_done, elapsed_s
+    result = (
+        total_real_cost = total_real_cost,
+        total_expr_cost = total_expr_cost,
+        partitions = partitions,
+        iter_done = iter_done,
+        elapsed_s = elapsed_s,
+    )
+    return LirionRunResult(result = result, model = nothing, system = sys, diagnostics = hist)
 end

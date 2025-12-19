@@ -1,6 +1,24 @@
 @inline _adaptive_on(config) =
     hasfield(typeof(config), :adaptive_rho) ? getfield(config, :adaptive_rho) : true
 
+function compute_real_generation_cost(model, params)
+    T = get(model.ext, :time_periods, 1)
+    active_generators = findall(params.generator_status .== 1)
+
+    total_cost = 0.0
+    for t in 1:T, g in active_generators
+        if haskey(params.generator_costs, t) && haskey(params.generator_costs[t], g)
+            pgen = value(model[:p_generation][g, t]) * params.sbase
+            coefs = params.generator_costs[t][g]
+            degree = length(coefs)
+            for i in 1:degree
+                total_cost += coefs[i] * pgen^(degree - i)
+            end
+        end
+    end
+    return total_cost
+end
+
 function _set_model_silent!(m::JuMP.Model)
     _safe(k, v) = (
         try

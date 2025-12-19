@@ -107,6 +107,7 @@ include("build_model/build_model.jl")
 # Pós-processamento / resultados
 # ------------------------------------------------------------------
 include("build_results/build_results.jl")
+include("build_results/build_plots.jl")
 
 # ------------------------------------------------------------------
 # Métodos distribuídos (ADMM, etc.)
@@ -117,7 +118,6 @@ include("distributed/admm/admm_support.jl")
 include("distributed/admm/admm_hotpaths.jl")
 include("distributed/admm/admm_terms.jl")
 include("distributed/admm/admm_kernels.jl")
-include("distributed/admm/admm_core.jl")
 
 include("distributed/admm/admm_dc.jl")
 include("distributed/admm/admm_ac.jl")
