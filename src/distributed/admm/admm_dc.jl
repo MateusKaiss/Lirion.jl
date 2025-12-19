@@ -78,6 +78,33 @@ end
     return nothing
 end
 
+@inline function update_duals_theta_all!(
+    dual_theta,
+    partitions,
+    zone_ids,
+    theta_consensus::Vector{Float64},
+    rho::Base.RefValue{Float64},
+    shared_buses_sorted,
+    shared_buses_idx,
+)
+    ρ = rho[]
+    @inbounds for z in zone_ids
+        update_duals_theta_vec!(
+            dual_theta[z],
+            partitions[z],
+            theta_consensus,
+            ρ,
+            shared_buses_sorted,
+            shared_buses_idx,
+        )
+    end
+    return nothing
+end
+
+# ============================================================
+# INITs (inalterados)
+# ============================================================
+
 function init_dc_bus_partition!(
     part::PartitionDC,
     sys_zone,
@@ -219,7 +246,6 @@ end
 
 function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     t0_ns = time_ns()
-
     @assert config.base_model == DC "ADMM bus/DC requer base_model == DC."
 
     shared_buses = sys.shared_buses
@@ -339,16 +365,15 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
             push!(get!(theta_avg_history, b, Float64[]), theta_consensus[j])
         end
 
-        for z in zone_ids
-            update_duals_theta_vec!(
-                dual_theta[z],
-                partitions[z],
-                theta_consensus,
-                rho[],
-                shared_buses_sorted,
-                shared_buses_idx,
-            )
-        end
+        update_duals_theta_all!(
+            dual_theta,
+            partitions,
+            zone_ids,
+            theta_consensus,
+            rho,
+            shared_buses_sorted,
+            shared_buses_idx,
+        )
 
         r = primal_residual_bus_dc(
             partitions,
@@ -386,8 +411,13 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)
     end
 
     save_dc_bus_plots(
-        res_primal_hist, res_dual_hist, eps_primal_hist, eps_dual_hist,
-        rho_hist, theta_avg_history; stem = "admm",
+        res_primal_hist,
+        res_dual_hist,
+        eps_primal_hist,
+        eps_dual_hist,
+        rho_hist,
+        theta_avg_history;
+        stem = "admm",
     )
 
     total_real_cost = sum(p.real_generation_cost for p in values(partitions))
@@ -638,19 +668,11 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
             lambdatheta = gather_zone_lambda!(dual_theta_buf[z], duals_theta[z])
 
             lin_bus = _build_linear_bus_expr(
-                part,
-                shared_buses_sorted,
-                shared_buses_idx,
-                theta_consensus,
-                lambdatheta,
-                rho_theta[],
+                part, shared_buses_sorted, shared_buses_idx, theta_consensus,
+                lambdatheta, rho_theta[],
             )
             lin_branch = _build_linear_branch_expr(
-                part,
-                part.zone_edges,
-                z_flow,
-                duals_flow[z],
-                rho_flow[],
+                part, part.zone_edges, z_flow, duals_flow[z], rho_flow[],
             )
 
             @objective(
@@ -690,16 +712,15 @@ function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)
         end
         compute_z_flow_consensus!(z_flow, partitions, cut_edges)
 
-        for z in zone_ids
-            update_duals_theta_vec!(
-                duals_theta[z],
-                partitions[z],
-                theta_consensus,
-                rho_theta[],
-                shared_buses_sorted,
-                shared_buses_idx,
-            )
-        end
+        update_duals_theta_all!(
+            duals_theta,
+            partitions,
+            zone_ids,
+            theta_consensus,
+            rho_theta,
+            shared_buses_sorted,
+            shared_buses_idx,
+        )
         update_duals_flow!(duals_flow, partitions, z_flow, cut_edges, rho_flow[])
 
         r_bus = primal_residual_bus_dc(
