@@ -1,7 +1,7 @@
 module Lirion
 
 # ------------------------------------------------------------------
-# Configuração de threads (Julia + BLAS)
+# Thread configuration (Julia + BLAS)
 # ------------------------------------------------------------------
 for k in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
     if !haskey(ENV, k)
@@ -16,7 +16,7 @@ catch
 end
 
 # ------------------------------------------------------------------
-# Pacotes
+# Packages
 # ------------------------------------------------------------------
 using PlotlyLight
 using JuMP
@@ -49,12 +49,12 @@ function __init__()
 end
 
 # ------------------------------------------------------------------
-# Tipos básicos
+# Basic types
 # ------------------------------------------------------------------
 include("types.jl")
 
 # ------------------------------------------------------------------
-# Collections: dados estáticos + timeseries + SystemData
+# Collections: static data + time series + SystemData
 # ------------------------------------------------------------------
 include("collections/timeseries/timeseries_utils.jl")
 include("collections/timeseries/bus_timeseries.jl")
@@ -73,20 +73,20 @@ include("collections/system_data.jl")
 include("collections/preprocess.jl")
 
 # ------------------------------------------------------------------
-# Parsing de casos (.m / .csv)
+# Case parsing (.m / .csv)
 # ------------------------------------------------------------------
 include("args/args.jl")
 include("collections/inputs.jl")
 include("collections/admm_structs.jl")
 
 # ------------------------------------------------------------------
-# Parsing de casos (.m / .csv)
+# Case parsing (.m / .csv)
 # ------------------------------------------------------------------
 include("parsing/parser.jl")
 include("parsing/csv_parser.jl")
 
 # ------------------------------------------------------------------
-# Construção do modelo e solução do modelo centralizado
+# Model construction and centralized solution
 # ------------------------------------------------------------------
 include("build_model/bus.jl")
 include("build_model/branch.jl")
@@ -99,13 +99,13 @@ include("build_model/objective_function.jl")
 include("build_model/build_model.jl")
 
 # ------------------------------------------------------------------
-# Pós-processamento / resultados
+# Post-processing / results
 # ------------------------------------------------------------------
 include("build_results/build_results.jl")
 include("build_results/build_plots.jl")
 
 # ------------------------------------------------------------------
-# Métodos distribuídos
+# Distributed methods
 # ------------------------------------------------------------------
 include("distributed/distributed_opf.jl")
 
@@ -120,8 +120,9 @@ include("distributed/admm/rho.jl")
 include("distributed/admm/admm_dc.jl")
 include("distributed/admm/admm_ac.jl")
 include("distributed/admm/admm_socp.jl")
+
 # ------------------------------------------------------------------
-# run_lirion / main / julia_main)
+# run_lirion / main / julia_main
 # ------------------------------------------------------------------
 include("main.jl")
 
