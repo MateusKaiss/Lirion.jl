@@ -1,87 +1,51 @@
-function get_method_runner(config::DistributedOPFModel)::Function
-    method = config.method
-    base = config.base_model
+@inline get_method_runner(config::DistributedOPFModel) =
+    get_method_runner(config.base_model, Val(config.method))
 
-    if method === :admm
-        if base === DC
-            return run_admm
-        elseif base === AC
-            return run_admm_ac
-        elseif base === SOCP
-            return run_admm_socp
-        end
+# DC
+@inline get_method_runner(::Type{DC},   ::Val{:admm})        = run_admm
+@inline get_method_runner(::Type{DC},   ::Val{:admm_branch}) = run_admm_branch
+@inline get_method_runner(::Type{DC},   ::Val{:admm_hybrid}) = run_admm_hybrid
 
-    elseif method === :admm_branch
-        if base === DC
-            return run_admm_branch
-        elseif base === AC
-            return run_admm_ac_branch
-        elseif base === SOCP
-            return run_admm_socp_branch
-        end
+# AC
+@inline get_method_runner(::Type{AC},   ::Val{:admm})        = run_admm_ac
+@inline get_method_runner(::Type{AC},   ::Val{:admm_branch}) = run_admm_ac_branch
+@inline get_method_runner(::Type{AC},   ::Val{:admm_hybrid}) = run_admm_ac_hybrid
 
-    elseif method === :admm_hybrid
-        if base === DC
-            return run_admm_hybrid
-        elseif base === AC
-            return run_admm_ac_hybrid
-        elseif base === SOCP
-            return run_admm_socp_hybrid
-        end
-    end
+# SOCP
+@inline get_method_runner(::Type{SOCP}, ::Val{:admm})        = run_admm_socp
+@inline get_method_runner(::Type{SOCP}, ::Val{:admm_branch}) = run_admm_socp_branch
+@inline get_method_runner(::Type{SOCP}, ::Val{:admm_hybrid}) = run_admm_socp_hybrid
 
-    return error("Distributed method $(method) with base model $(base) not implemented.")
+function get_method_runner(base::Type{<:OPFModel}, ::Val{m}) where {m}
+    error("Distributed method $(m) with base model $(base) not implemented.")
 end
 
 function run_distributed(inputs::LirionInputs)::LirionRunResult
     @assert inputs.model_type isa DistributedOPFModel
 
-    config = inputs.model_type::DistributedOPFModel
-    admm_sys = inputs.admm_system
+    config   = inputs.model_type::DistributedOPFModel
+    admm_sys = inputs.admm_system::ADMMSystem
 
     @info "Running distributed OPF"
     @info "  method     = $(config.method)"
     @info "  base_model = $(config.base_model)"
 
     runner = get_method_runner(config)
-    out = runner(admm_sys, config)
+    output = runner(admm_sys, config)
 
-    if out isa LirionRunResult
-        r = out.result
-        enriched = merge(
-            r isa NamedTuple ? r : (result = r,),
-            (config = config,
-                system = inputs.system,
-                database = inputs.database_path),
-        )
+    if output isa LirionRunResult
+        r = output.result
+        base_nt = r isa NamedTuple ? r : (result = r,)
+        meta_nt = (config = config, system = inputs.system, database = inputs.database_path)
+        enriched = merge(base_nt, meta_nt)
+
         return LirionRunResult(;
             result = enriched,
-            model = out.model,
-            system = out.system === nothing ? inputs.system : out.system,
-            diagnostics = out.diagnostics,
+            model = output.model,
+            system = output.system === nothing ? inputs.system : output.system,
+            diagnostics = output.diagnostics,
         )
     end
 
-    if out isa Tuple && length(out) == 4
-        total_real_cost, partitions, iter_done, elapsed_s = out
-        result = (
-            total_cost = total_real_cost,
-            partitions = partitions,
-            iterations = iter_done,
-            elapsed_s = elapsed_s,
-            config = config,
-            system = inputs.system,
-            database = inputs.database_path,
-        )
-        return LirionRunResult(;
-            result = result,
-            model = nothing,
-            system = inputs.system,
-            diagnostics = NoDiagnostics(),
-        )
-    end
-
-    return error(
-        "Runner returned unsupported type: $(typeof(out)). Expected LirionRunResult or a 4-tuple.",
-    )
+    error("Runner returned unsupported type: $(typeof(output)). Expected LirionRunResult.")
 end
