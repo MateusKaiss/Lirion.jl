@@ -183,7 +183,7 @@ function init_socp_hybrid_partition!(
     return nothing
 end
 
-function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunResult
+function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == SOCP "ADMM-SOCP: base_model deve ser SOCP."
 
@@ -391,7 +391,7 @@ function run_admm_socp(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunR
     )
 end
 
-function run_admm_socp_branch(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunResult
+function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == SOCP "ADMM-SOCP-branch: base_model deve ser SOCP."
 
@@ -524,7 +524,7 @@ end
     return ρr, ρt
 end
 
-function run_admm_socp_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunResult
+function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == SOCP "ADMM-SOCP-hybrid: base_model deve ser SOCP."
 

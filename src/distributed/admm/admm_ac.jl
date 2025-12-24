@@ -170,7 +170,7 @@ end
 ###########################
 # RUNNERS (limpos)        #
 ###########################
-function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunResult
+function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == AC "ADMM-AC: base_model deve ser AC."
 
@@ -405,8 +405,8 @@ function run_admm_ac(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunRes
 end
 
 function run_admm_ac_branch(
+    sys::ADMMSystem,
     config::DistributedOPFModel,
-    sys::ADMMSystem;
     warm_start::Bool = false,
 )::LirionRunResult
     t0_ns = time_ns()
@@ -568,7 +568,7 @@ function run_admm_ac_branch(
     )
 end
 
-function run_admm_ac_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunResult
+function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == AC "Hybrid AC: base_model deve ser AC."
 

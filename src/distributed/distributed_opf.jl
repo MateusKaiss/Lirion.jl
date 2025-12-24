@@ -33,13 +33,6 @@ function get_method_runner(config::DistributedOPFModel)::Function
     return error("Distributed method $(method) with base model $(base) not implemented.")
 end
 
-"""
-Executa o método distribuído e retorna SEMPRE `LirionRunResult`.
-
-Compatibilidade:
-- Se o runner retornar `LirionRunResult` (novo padrão), usamos `out.result`.
-- Se retornar a tupla legada `(total_cost, partitions, iter_done, elapsed_s)`, convertemos.
-"""
 function run_distributed(inputs::LirionInputs)::LirionRunResult
     @assert inputs.model_type isa DistributedOPFModel
 
@@ -51,14 +44,9 @@ function run_distributed(inputs::LirionInputs)::LirionRunResult
     @info "  base_model = $(config.base_model)"
 
     runner = get_method_runner(config)
-    out = runner(config, admm_sys)
+    out = runner(admm_sys, config)
 
-    # -----------------------------
-    # NOVO PADRÃO: retorna LirionRunResult
-    # -----------------------------
     if out isa LirionRunResult
-        # Garanta que o `system`/`database` apareçam no result final (opcional, mas útil)
-        # (não mexe no diagnostics)
         r = out.result
         enriched = merge(
             r isa NamedTuple ? r : (result = r,),
@@ -74,9 +62,6 @@ function run_distributed(inputs::LirionInputs)::LirionRunResult
         )
     end
 
-    # -----------------------------
-    # LEGADO: retorna tupla (total_cost, partitions, iter_done, elapsed_s)
-    # -----------------------------
     if out isa Tuple && length(out) == 4
         total_real_cost, partitions, iter_done, elapsed_s = out
         result = (

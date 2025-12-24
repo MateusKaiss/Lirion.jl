@@ -45,7 +45,7 @@ function run_lirion(inputs::LirionInputs)::LirionRunResult
     @info "Optimizer (raw): $(inputs.optimizer)"
 
     if is_distributed_model(inputs.model_type)
-        return run_distributed(inputs) # deve retornar LirionRunResult(diagnostics = ADMMHistory)
+        return run_distributed(inputs)
     else
         result_model = solve_model(inputs)
         sys = inputs.system

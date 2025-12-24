@@ -156,17 +156,9 @@ function init_dc_hybrid_partition!(
 end
 
 # ============================================================
-# RUNNERS (corrigidos p/ novo pipeline: LirionRunResult + ADMMHistory)
+# RUNNERS
 # ============================================================
-
-"""
-ADMM bus/DC (consenso em theta nas barras compartilhadas)
-
-Retorna LirionRunResult:
-- result: NamedTuple com custos e partitions
-- diagnostics: ADMMHistory (r,s,eps, rhos e heatmaps opcionais)
-"""
-function run_admm(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunResult
+function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == DC "ADMM bus/DC requer base_model == DC."
 
@@ -357,14 +349,9 @@ function run_admm(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunResult
     )
 end
 
-"""
-ADMM branch/DC (consenso em fluxo nas arestas de corte)
-
-- Usa rho_flow_p (campo real) para evitar depender do shim :rho_flow.
-"""
 function run_admm_branch(
-    config::DistributedOPFModel,
-    sys::ADMMSystem;
+    sys::ADMMSystem,
+    config::DistributedOPFModel;
     use_legacy_rho::Bool = false,
 )::LirionRunResult
     t0_ns = time_ns()
@@ -504,7 +491,7 @@ function run_admm_branch(
     )
 end
 
-function run_admm_hybrid(config::DistributedOPFModel, sys::ADMMSystem)::LirionRunResult
+function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == DC "Hybrid ADMM/DC requer DC."
 
