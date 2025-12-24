@@ -1,20 +1,31 @@
+# ============================================================
+# Adaptive rho + refreshers (ADMM)
+# ============================================================
+
+# ------------------------------------------------------------
+# Core: adaptive rho update rule
+# ------------------------------------------------------------
 
 # ---------- rho adaptativo (paridade com DC) ----------
-function adaptive_rho!(rho::Base.RefValue{Float64}, r::Float64, s::Float64;
-    mu_incr = 2.0, mu_decr = 2.0, tau_incr = 1.05, tau_decr = 0.98)
+function adaptive_rho!(
+    rho::Base.RefValue{Float64},
+    r::Float64,
+    s::Float64;
+    mu_incr = 2.0,
+    mu_decr = 2.0,
+    tau_incr = 1.05,
+    tau_decr = 0.98,
+)
     if r > mu_incr * s
         rho[] *= tau_incr
     elseif s > mu_decr * r
         rho[] *= tau_decr
     end
 end
-##########################
-# rho ADAPTATIVO           #
-##########################
 
-#############################
-# rho ADAPTATIVO AC           #
-#############################
+# ------------------------------------------------------------
+# Adaptive rho kernels: AC / DC
+# ------------------------------------------------------------
 
 function adaptive_rho_ac!(
     rho::Base.RefValue{Float64},
@@ -48,6 +59,9 @@ function adaptive_rho_dc!(
     end
 end
 
+# ------------------------------------------------------------
+# AC refreshers: rebuild cached quadratic terms when rho changes
+# ------------------------------------------------------------
 
 @inline function refresh_rho_bus_ac!(
     partitions,
@@ -86,6 +100,10 @@ end
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# AC adaptive rho: bus (θ,V via components) + branch (P,Q)
+# ------------------------------------------------------------
 
 # --- ADAPTIVE RHO (bus AC: θ e V separados via componentes) ---
 @inline function maybe_adapt_rho!(
@@ -134,7 +152,7 @@ end
     return nothing
 end
 
-# --- ADAPTIVE RHO (branch AC: usa r,s do branch pros dois) ---
+# --- ADAPTIVE RHO (branch AC/SOCP-style: usa r,s do branch pros dois) ---
 @inline function maybe_adapt_rho_socp!(
     adaptive::Bool,
     rho_p::Base.RefValue{Float64},
@@ -199,6 +217,10 @@ end
     return nothing
 end
 
+# ------------------------------------------------------------
+# DC refreshers: rebuild cached quadratic terms when rho changes
+# ------------------------------------------------------------
+
 @inline function refresh_rho_bus!(
     partitions,
     rho::Base.RefValue{Float64},
@@ -228,6 +250,10 @@ end
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# DC helpers: stop + maybe_adapt_rho overloads
+# ------------------------------------------------------------
 
 @inline function stop_if_converged!(r::Float64, s::Float64, eps_r::Float64, eps_s::Float64)
     return (r < eps_r) && (s < eps_s)
@@ -279,15 +305,19 @@ end
     return nothing
 end
 
-# ----------------------------
-# helpers ADMMHistory
-# ----------------------------
+# ------------------------------------------------------------
+# Helpers: ADMMHistory rho tracking
+# ------------------------------------------------------------
 
 @inline function _push_rho!(hist::ADMMHistory, key::Symbol, val::Real)
     v = get!(hist.rhos, key, Float64[])
     push!(v, Float64(val))
     return nothing
 end
+
+# ------------------------------------------------------------
+# SOCP refreshers: rebuild cached objective pieces when rho changes
+# ------------------------------------------------------------
 
 @inline function refresh_rho_v2_socp!(
     partitions,
@@ -325,8 +355,6 @@ end
     return nothing
 end
 
-# -------- refreshers (branch P/Q) --------
-
 @inline function refresh_rho_pq_socp!(
     partitions,
     rhoP::Base.RefValue{Float64},
@@ -346,8 +374,6 @@ end
     end
     return nothing
 end
-
-# -------- refreshers (hybrid: V² + P/Q + R/T) --------
 
 @inline function refresh_rho_hybrid_socp!(
     partitions,
@@ -391,7 +417,9 @@ end
     return nothing
 end
 
-# -------- adaptive rho --------
+# ------------------------------------------------------------
+# SOCP adaptive rho: overloads
+# ------------------------------------------------------------
 
 @inline function maybe_adapt_rho!(
     adaptive::Bool,

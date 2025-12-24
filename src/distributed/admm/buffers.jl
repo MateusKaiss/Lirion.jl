@@ -1,3 +1,6 @@
+# ------------------------------------------------------------
+# Utilities
+# ------------------------------------------------------------
 function sorted_ids_and_pos(shared_buses::Vector{Int})
     shared_buses_sorted = sort(shared_buses)
     shared_buses_idx = Dict{Int, Int}(b => i for (i, b) in enumerate(shared_buses_sorted))
@@ -19,6 +22,9 @@ end
     return [e for e in cut_edges if haskey(sub.edge_to_local, e)]
 end
 
+# ------------------------------------------------------------
+# Value helpers (JuMP)
+# ------------------------------------------------------------
 @inline function _val_or_start(m::JuMP.Model, x::JuMP.VariableRef)
     if JuMP.has_values(m)
         return JuMP.value(x)
@@ -60,6 +66,10 @@ end
     t::Int,
 ) = _val_or_start_ac(m, theta[b, t])
 
+# ------------------------------------------------------------
+# Hotpaths preparation (allocate buffers + mapping)
+# ------------------------------------------------------------
+
 function prepare_hotpaths!(part::PartitionDC)
     # mapa id de barra -> posição local no vetor (1..n_local)
 
@@ -89,12 +99,6 @@ function prepare_hotpaths!(part::PartitionDC)
     return nothing
 end
 
-# ----------------- Hot-path / buffers (bus) -----------------
-# =========================
-# HOTPATHS: SOCP (V²)
-# =========================
-# HOTPATHS: SOCP (V²)
-# =========================
 function prepare_hotpaths!(part::PartitionSOCP)
     # map bus global id -> posição local
     ids = part.bus.id
@@ -141,6 +145,11 @@ function prepare_hotpaths_ac!(part::PartitionAC)
     return nothing
 end
 
+# ------------------------------------------------------------
+# Snapshots (copy current model solution into buffers)
+# ------------------------------------------------------------
+
+# ---------------- DC ----------------
 
 @inline function snapshot_theta!(part::PartitionDC)
     # theta "completo" (todas as barras da zona)
@@ -168,6 +177,8 @@ end
     return buf
 end
 
+# ---------------- AC ----------------
+
 @inline function snapshot_theta_ac!(part::PartitionAC)
     m = part.model::JuMP.Model
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
@@ -178,7 +189,6 @@ end
     end
     return buf
 end
-
 
 @inline function snapshot_vmag!(part::PartitionAC)
     m = part.model::JuMP.Model
@@ -217,6 +227,8 @@ end
     return buf
 end
 
+# ---------------- SOCP (V^2) ----------------
+
 @inline function snapshot_v2!(sub::PartitionSOCP)
     m = sub.model::JuMP.Model
     V2 = m[:v_magnitude_sq]
@@ -252,6 +264,10 @@ end
     end
     return buf
 end
+
+# ------------------------------------------------------------
+# Flow helpers
+# ------------------------------------------------------------
 
 @inline function _dc_flow_val_model(
     m::JuMP.Model,

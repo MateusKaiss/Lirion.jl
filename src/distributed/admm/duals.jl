@@ -1,3 +1,10 @@
+# ============================================================
+# Dual updates (ADMM)
+# ============================================================
+
+# ------------------------------------------------------------
+# AC duals: bus variables (theta, |V|) - vector form
+# ------------------------------------------------------------
 @inline function update_duals_bus_ac_all!(
     duals_theta::Dict{Int, Vector{Float64}},
     duals_v::Dict{Int, Vector{Float64}},
@@ -34,30 +41,6 @@
     end
     return nothing
 end
-
-@inline function update_duals_theta_all!(
-    dual_theta,
-    partitions,
-    zone_ids,
-    theta_consensus::Vector{Float64},
-    rho::Base.RefValue{Float64},
-    shared_buses_sorted,
-    shared_buses_idx,
-)
-    ρ = rho[]
-    @inbounds for z in zone_ids
-        update_duals_theta_vec!(
-            dual_theta[z],
-            partitions[z],
-            theta_consensus,
-            ρ,
-            shared_buses_sorted,
-            shared_buses_idx,
-        )
-    end
-    return nothing
-end
-
 
 @inline function update_duals_bus_ac_vec!(
     duals_theta_vec_zone::Vector{Float64},
@@ -98,8 +81,13 @@ end
             dualsV_vec_zone[j] += rhoV * Vrel
         end
     end
+
     return nothing
 end
+
+# ------------------------------------------------------------
+# AC duals: branch variables (P, Q) - Dict form
+# ------------------------------------------------------------
 
 function update_duals_branch_ac!(
     dualsP::Dict{Int, Dict{Int, Float64}},
@@ -122,6 +110,7 @@ function update_duals_branch_ac!(
         for e in part.zone_edges
             l_local = get(part.edge_to_local, e, nothing)
             l_local === nothing && continue
+
             P_loc, Q_loc = _ac_flow_from_exprs_existing(part, l_local)
             pval = JuMP.value(P_loc)
             qval = JuMP.value(Q_loc)
@@ -146,9 +135,36 @@ function update_duals_branch_ac!(
             end
         end
     end
+
     return nothing
 end
 
+# ------------------------------------------------------------
+# DC duals: bus variables (theta) - vector form
+# ------------------------------------------------------------
+
+@inline function update_duals_theta_all!(
+    dual_theta,
+    partitions,
+    zone_ids,
+    theta_consensus::Vector{Float64},
+    rho::Base.RefValue{Float64},
+    shared_buses_sorted,
+    shared_buses_idx,
+)
+    ρ = rho[]
+    @inbounds for z in zone_ids
+        update_duals_theta_vec!(
+            dual_theta[z],
+            partitions[z],
+            theta_consensus,
+            ρ,
+            shared_buses_sorted,
+            shared_buses_idx,
+        )
+    end
+    return nothing
+end
 
 @inline function update_duals_theta_vec!(
     dual_vec_zone::Vector{Float64},
@@ -168,6 +184,9 @@ end
     return nothing
 end
 
+# ------------------------------------------------------------
+# DC duals: branch variables (flow on cut edges) - Dict form
+# ------------------------------------------------------------
 
 function update_duals_flow!(
     duals::Dict{Int, Dict{Int, Float64}},
@@ -189,14 +208,23 @@ function update_duals_flow!(
     return nothing
 end
 
-# ----------------- Duais (forma vetorial p/ BUS) -----------------
-@inline function update_duals_v2_vec!(dual_vec_zone::Vector{Float64},
+# ------------------------------------------------------------
+# SOCP duals: bus variables (V^2) - vector form
+# ------------------------------------------------------------
+
+@inline function update_duals_v2_vec!(
+    dual_vec_zone::Vector{Float64},
     sub::PartitionSOCP,
-    v2bar_vec::Vector{Float64}, v2bar_prev_vec::Vector{Float64},
-    rho::Float64, α::Union{Nothing, Float64},
-    shared_buses_sorted::Vector{Int}, b2pos::Dict{Int, Int})
+    v2bar_vec::Vector{Float64},
+    v2bar_prev_vec::Vector{Float64},
+    rho::Float64,
+    α::Union{Nothing, Float64},
+    shared_buses_sorted::Vector{Int},
+    b2pos::Dict{Int, Int},
+)
     v2s = snapshot_v2_shared!(sub)
     lbs = sub.shared_buses_local
+
     if isnothing(α)
         @inbounds for i in eachindex(lbs)
             j = b2pos[lbs[i]]
@@ -210,8 +238,9 @@ end
             dual_vec_zone[j] += rho * (v_rel - v2bar_vec[j])
         end
     end
-end
 
+    return nothing
+end
 
 @inline function update_duals_v2_all!(
     duals_v2::Dict{Int, Vector{Float64}},
@@ -239,6 +268,10 @@ end
     return nothing
 end
 
+# ------------------------------------------------------------
+# SOCP duals: branch variables (R,T) - Dict form
+# ------------------------------------------------------------
+
 @inline function update_duals_rt_all!(
     dualsR::Dict{Int, Dict{Int, Float64}},
     dualsT::Dict{Int, Dict{Int, Float64}},
@@ -262,6 +295,10 @@ end
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# SOCP duals: branch variables (P,Q) - Dict form
+# ------------------------------------------------------------
 
 @inline function update_duals_pq_all!(
     dualsP::Dict{Int, Dict{Int, Float64}},
