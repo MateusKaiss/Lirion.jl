@@ -1,3 +1,11 @@
+# ============================================================
+# ADMM-DC
+# ============================================================
+
+# ------------------------------------------------------------
+# Diagnostics / history helpers
+# ------------------------------------------------------------
+
 @inline function _record_iter!(
     hist::ADMMHistory,
     r::Float64,
@@ -15,6 +23,14 @@
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Partition initialization
+# ------------------------------------------------------------
+
+# ----------------------------
+# DC / bus partition
+# ----------------------------
 
 function init_dc_bus_partition!(
     part::PartitionDC,
@@ -53,6 +69,10 @@ function init_dc_bus_partition!(
     end
     return nothing
 end
+
+# ----------------------------
+# DC / branch partition
+# ----------------------------
 
 function init_dc_branch_partition!(
     part::PartitionDC,
@@ -101,6 +121,10 @@ function init_dc_branch_partition!(
     end
     return nothing
 end
+
+# ----------------------------
+# DC / hybrid partition
+# ----------------------------
 
 function init_dc_hybrid_partition!(
     part::PartitionDC,
@@ -158,6 +182,11 @@ end
 # ============================================================
 # RUNNERS
 # ============================================================
+
+# ------------------------------------------------------------
+# Runner: ADMM bus/DC
+# ------------------------------------------------------------
+
 function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == DC "ADMM bus/DC requer base_model == DC."
@@ -349,6 +378,10 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     )
 end
 
+# ------------------------------------------------------------
+# Runner: ADMM branch/DC
+# ------------------------------------------------------------
+
 function run_admm_branch(
     sys::ADMMSystem,
     config::DistributedOPFModel;
@@ -361,7 +394,7 @@ function run_admm_branch(
     cut_edges = sys.cut_edges
     max_iter = config.max_iter
 
-    rho = Ref(config.rho_flow_p)     # <<< campo real
+    rho = Ref(config.rho_flow_p)
     prev_rho = Ref(rho[])
     eps_abs = config.eps_primal
     eps_rel = config.eps_dual
@@ -490,6 +523,10 @@ function run_admm_branch(
         diagnostics = hist,
     )
 end
+
+# ------------------------------------------------------------
+# Runner: ADMM hybrid/DC
+# ------------------------------------------------------------
 
 function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     t0_ns = time_ns()

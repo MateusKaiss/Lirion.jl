@@ -2,28 +2,28 @@
     get_method_runner(config.base_model, Val(config.method))
 
 # DC
-@inline get_method_runner(::Type{DC},   ::Val{:admm})        = run_admm
-@inline get_method_runner(::Type{DC},   ::Val{:admm_branch}) = run_admm_branch
-@inline get_method_runner(::Type{DC},   ::Val{:admm_hybrid}) = run_admm_hybrid
+@inline get_method_runner(::Type{DC}, ::Val{:admm}) = run_admm
+@inline get_method_runner(::Type{DC}, ::Val{:admm_branch}) = run_admm_branch
+@inline get_method_runner(::Type{DC}, ::Val{:admm_hybrid}) = run_admm_hybrid
 
 # AC
-@inline get_method_runner(::Type{AC},   ::Val{:admm})        = run_admm_ac
-@inline get_method_runner(::Type{AC},   ::Val{:admm_branch}) = run_admm_ac_branch
-@inline get_method_runner(::Type{AC},   ::Val{:admm_hybrid}) = run_admm_ac_hybrid
+@inline get_method_runner(::Type{AC}, ::Val{:admm}) = run_admm_ac
+@inline get_method_runner(::Type{AC}, ::Val{:admm_branch}) = run_admm_ac_branch
+@inline get_method_runner(::Type{AC}, ::Val{:admm_hybrid}) = run_admm_ac_hybrid
 
 # SOCP
-@inline get_method_runner(::Type{SOCP}, ::Val{:admm})        = run_admm_socp
+@inline get_method_runner(::Type{SOCP}, ::Val{:admm}) = run_admm_socp
 @inline get_method_runner(::Type{SOCP}, ::Val{:admm_branch}) = run_admm_socp_branch
 @inline get_method_runner(::Type{SOCP}, ::Val{:admm_hybrid}) = run_admm_socp_hybrid
 
 function get_method_runner(base::Type{<:OPFModel}, ::Val{m}) where {m}
-    error("Distributed method $(m) with base model $(base) not implemented.")
+    return error("Distributed method $(m) with base model $(base) not implemented.")
 end
 
 function run_distributed(inputs::LirionInputs)::LirionRunResult
     @assert inputs.model_type isa DistributedOPFModel
 
-    config   = inputs.model_type::DistributedOPFModel
+    config = inputs.model_type::DistributedOPFModel
     admm_sys = inputs.admm_system::ADMMSystem
 
     @info "Running distributed OPF"
@@ -47,5 +47,7 @@ function run_distributed(inputs::LirionInputs)::LirionRunResult
         )
     end
 
-    error("Runner returned unsupported type: $(typeof(output)). Expected LirionRunResult.")
+    return error(
+        "Runner returned unsupported type: $(typeof(output)). Expected LirionRunResult.",
+    )
 end

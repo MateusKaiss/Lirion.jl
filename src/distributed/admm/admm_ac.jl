@@ -1,3 +1,15 @@
+# ============================================================
+# ADMM-AC
+# ============================================================
+
+# ------------------------------------------------------------
+# Partition initialization
+# ------------------------------------------------------------
+
+# ----------------------------
+# AC / bus partition
+# ----------------------------
+
 function init_ac_bus_partition!(
     part::PartitionAC,
     sys_zone,
@@ -48,6 +60,10 @@ function init_ac_bus_partition!(
     end
     return nothing
 end
+
+# ----------------------------
+# AC / branch partition
+# ----------------------------
 
 function init_ac_branch_partition!(
     part::PartitionAC,
@@ -103,6 +119,10 @@ function init_ac_branch_partition!(
     end
     return nothing
 end
+
+# ----------------------------
+# AC / hybrid partition
+# ----------------------------
 
 function init_ac_hybrid_partition!(
     part::PartitionAC,
@@ -167,9 +187,14 @@ function init_ac_hybrid_partition!(
     return nothing
 end
 
-###########################
-# RUNNERS (limpos)        #
-###########################
+# ============================================================
+# RUNNERS (ADMM-AC)
+# ============================================================
+
+# ------------------------------------------------------------
+# Runner: ADMM bus/AC
+# ------------------------------------------------------------
+
 function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == AC "ADMM-AC: base_model deve ser AC."
@@ -404,6 +429,10 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
     )
 end
 
+# ------------------------------------------------------------
+# Runner: ADMM branch/AC
+# ------------------------------------------------------------
+
 function run_admm_ac_branch(
     sys::ADMMSystem,
     config::DistributedOPFModel,
@@ -567,6 +596,10 @@ function run_admm_ac_branch(
         diagnostics = hist,
     )
 end
+
+# ------------------------------------------------------------
+# Runner: ADMM hybrid/AC
+# ------------------------------------------------------------
 
 function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     t0_ns = time_ns()

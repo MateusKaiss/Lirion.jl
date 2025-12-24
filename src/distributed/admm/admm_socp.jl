@@ -1,3 +1,15 @@
+# ============================================================
+# ADMM-SOCP
+# ============================================================
+
+# ------------------------------------------------------------
+# Partition initialization
+# ------------------------------------------------------------
+
+# ----------------------------
+# SOCP / V² + (R,T) partition
+# ----------------------------
+
 function init_socp_v2rt_partition!(
     sub::PartitionSOCP,
     sys_zone,
@@ -55,6 +67,10 @@ function init_socp_v2rt_partition!(
     end
     return nothing
 end
+
+# ----------------------------
+# SOCP / (P,Q) partition
+# ----------------------------
 
 function init_socp_pq_partition!(
     sub::PartitionSOCP,
@@ -115,6 +131,10 @@ function init_socp_pq_partition!(
     end
     return nothing
 end
+
+# ----------------------------
+# SOCP / hybrid partition (V² + P/Q + R/T)
+# ----------------------------
 
 function init_socp_hybrid_partition!(
     sub::PartitionSOCP,
@@ -182,6 +202,14 @@ function init_socp_hybrid_partition!(
     end
     return nothing
 end
+
+# ============================================================
+# RUNNERS (ADMM-SOCP)
+# ============================================================
+
+# ------------------------------------------------------------
+# Runner: ADMM SOCP (V² + R/T)
+# ------------------------------------------------------------
 
 function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     t0_ns = time_ns()
@@ -391,6 +419,10 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
     )
 end
 
+# ------------------------------------------------------------
+# Runner: ADMM SOCP (branch P/Q)
+# ------------------------------------------------------------
+
 function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == SOCP "ADMM-SOCP-branch: base_model deve ser SOCP."
@@ -509,6 +541,10 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
     )
 end
 
+# ------------------------------------------------------------
+# Helpers
+# ------------------------------------------------------------
+
 @inline function _get_rho_rt_initial(config::DistributedOPFModel)
     # fallback: se não existir rho_flow_r/t, usa p/q
     ρr = try
@@ -523,6 +559,10 @@ end
     end
     return ρr, ρt
 end
+
+# ------------------------------------------------------------
+# Runner: ADMM SOCP hybrid (V² + P/Q + R/T)
+# ------------------------------------------------------------
 
 function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     t0_ns = time_ns()
