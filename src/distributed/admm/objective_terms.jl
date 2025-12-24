@@ -1,3 +1,17 @@
+function _build_quad_bus_expr_ac!(part::PartitionAC, rho_theta::Float64, rhoV::Float64)
+    m = part.model::JuMP.Model
+    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    V = part.vmag_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    q = zero(JuMP.QuadExpr)
+    for b in part.shared_buses_local
+        q += 0.5 * rho_theta * theta[b, 1]^2 + 0.5 * rhoV * V[b, 1]^2
+    end
+    part.quad_bus_expr_ac = q
+    part.rho_bus_theta_cached = rho_theta
+    part.rho_bus_v_cached = rhoV
+    return q
+end
+
 function _build_quad_bus_expr!(part::PartitionDC, rho::Float64)
     m = part.model::JuMP.Model
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
@@ -37,9 +51,74 @@ function _build_quad_branch_expr!(
     return q
 end
 
-#############################
-# EXPRESSÕES LINEARES       #
-#############################
+
+function _build_quad_branch_expr_ac!(
+    part::PartitionAC,
+    rhoP::Float64,
+    rhoQ::Float64,
+    zone_edges::Vector{Int},
+)
+    m = part.model::JuMP.Model
+    q = zero(JuMP.QuadExpr)
+    for e in zone_edges
+        l_local = get(part.edge_to_local, e, nothing)
+        l_local === nothing && continue
+        P_loc, Q_loc = _ac_flow_from_exprs_existing(part, l_local)
+        q += 0.5 * rhoP * P_loc^2 + 0.5 * rhoQ * Q_loc^2
+    end
+    part.quad_branch_expr_ac = q
+    part.rho_branch_p_cached = rhoP
+    part.rho_branch_q_cached = rhoQ
+    return q
+end
+
+
+# ----------------- Construção de termos (cache de quadrático) -----------------
+function _build_quad_bus_expr_socp!(sub::PartitionSOCP, rho::Float64)
+    m = sub.model::JuMP.Model
+    V2 = m[:v_magnitude_sq]
+    q = zero(JuMP.QuadExpr)
+    # penaliza APENAS barras compartilhadas (padrão ADMM/DC/AC)
+    for b in sub.shared_buses_local
+        q += 0.5 * rho * V2[b, 1]^2
+    end
+    sub.quad_bus_expr_socp = q
+    sub.rho_bus_v2_cached = rho
+    return sub.quad_bus_expr_socp
+end
+
+function _build_quad_branch_rt_expr!(sub::PartitionSOCP, rhoR::Float64, rhoT::Float64,
+    zone_edges::Vector{Int})
+    m = sub.model::JuMP.Model
+    q = zero(JuMP.QuadExpr)
+    @inbounds for e in zone_edges
+        l_local = get(sub.edge_to_local, e, nothing)
+        l_local === nothing && continue
+        Rloc, Tloc = _rt_from_exprs_socp(m, l_local)
+        q += 0.5 * rhoR * Rloc^2 + 0.5 * rhoT * Tloc^2
+    end
+    sub.quad_rt_expr_socp = q
+    sub.rho_branch_r_cached = rhoR
+    sub.rho_branch_t_cached = rhoT
+    return q
+end
+
+function _build_quad_branch_pq_expr!(sub::PartitionSOCP, rhoP::Float64, rhoQ::Float64,
+    zone_edges::Vector{Int})
+    m = sub.model::JuMP.Model
+    q = zero(JuMP.QuadExpr)
+    @inbounds for e in zone_edges
+        l_local = get(sub.edge_to_local, e, nothing)
+        l_local === nothing && continue
+        P_loc, Q_loc = _socp_flow_from_exprs_existing(m, l_local)
+        q += 0.5 * rhoP * P_loc^2 + 0.5 * rhoQ * Q_loc^2
+    end
+    sub.quad_pq_expr_socp = q
+    sub.rho_branch_p_cached = rhoP
+    sub.rho_branch_q_cached = rhoQ
+    return q
+end
+
 
 function _build_linear_bus_expr(
     part::PartitionDC,
@@ -83,20 +162,6 @@ function _build_linear_branch_expr(
     return lin
 end
 
-function _build_quad_bus_expr_ac!(part::PartitionAC, rho_theta::Float64, rhoV::Float64)
-    m = part.model::JuMP.Model
-    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
-    V = part.vmag_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
-    q = zero(JuMP.QuadExpr)
-    for b in part.shared_buses_local
-        q += 0.5 * rho_theta * theta[b, 1]^2 + 0.5 * rhoV * V[b, 1]^2
-    end
-    part.quad_bus_expr_ac = q
-    part.rho_bus_theta_cached = rho_theta
-    part.rho_bus_v_cached = rhoV
-    return q
-end
-
 function _build_linear_bus_expr_ac!(
     part::PartitionAC,
     shared_buses_sorted::Vector{Int},
@@ -120,25 +185,6 @@ function _build_linear_bus_expr_ac!(
     return lin
 end
 
-function _build_quad_branch_expr_ac!(
-    part::PartitionAC,
-    rhoP::Float64,
-    rhoQ::Float64,
-    zone_edges::Vector{Int},
-)
-    m = part.model::JuMP.Model
-    q = zero(JuMP.QuadExpr)
-    for e in zone_edges
-        l_local = get(part.edge_to_local, e, nothing)
-        l_local === nothing && continue
-        P_loc, Q_loc = _ac_flow_from_exprs_existing(part, l_local)
-        q += 0.5 * rhoP * P_loc^2 + 0.5 * rhoQ * Q_loc^2
-    end
-    part.quad_branch_expr_ac = q
-    part.rho_branch_p_cached = rhoP
-    part.rho_branch_q_cached = rhoQ
-    return q
-end
 
 function _build_linear_branch_expr_ac!(
     part::PartitionAC,
@@ -197,62 +243,6 @@ function _soft_anchor_branch_expr!(sub::PartitionSOCP;
     end
 
     sub.soft_anchor_expr = q
-    return q
-end
-
-@inline function _socp_flow_from_exprs_existing(
-    model::Model, l_local::Int; t::Int = 1,
-)
-    return model[:p_flow_branches][l_local, t], model[:q_flow_branches][l_local, t]
-end
-
-@inline function _rt_from_exprs_socp(model::Model, l_local::Int; t::Int = 1)
-    return model[:R][l_local, t], model[:T_var][l_local, t]
-end
-
-# ----------------- Construção de termos (cache de quadrático) -----------------
-function _build_quad_bus_expr_socp!(sub::PartitionSOCP, rho::Float64)
-    m = sub.model::JuMP.Model
-    V2 = m[:v_magnitude_sq]
-    q = zero(JuMP.QuadExpr)
-    # penaliza APENAS barras compartilhadas (padrão ADMM/DC/AC)
-    for b in sub.shared_buses_local
-        q += 0.5 * rho * V2[b, 1]^2
-    end
-    sub.quad_bus_expr_socp = q
-    sub.rho_bus_v2_cached = rho
-    return sub.quad_bus_expr_socp
-end
-
-function _build_quad_branch_rt_expr!(sub::PartitionSOCP, rhoR::Float64, rhoT::Float64,
-    zone_edges::Vector{Int})
-    m = sub.model::JuMP.Model
-    q = zero(JuMP.QuadExpr)
-    @inbounds for e in zone_edges
-        l_local = get(sub.edge_to_local, e, nothing)
-        l_local === nothing && continue
-        Rloc, Tloc = _rt_from_exprs_socp(m, l_local)
-        q += 0.5 * rhoR * Rloc^2 + 0.5 * rhoT * Tloc^2
-    end
-    sub.quad_rt_expr_socp = q
-    sub.rho_branch_r_cached = rhoR
-    sub.rho_branch_t_cached = rhoT
-    return q
-end
-
-function _build_quad_branch_pq_expr!(sub::PartitionSOCP, rhoP::Float64, rhoQ::Float64,
-    zone_edges::Vector{Int})
-    m = sub.model::JuMP.Model
-    q = zero(JuMP.QuadExpr)
-    @inbounds for e in zone_edges
-        l_local = get(sub.edge_to_local, e, nothing)
-        l_local === nothing && continue
-        P_loc, Q_loc = _socp_flow_from_exprs_existing(m, l_local)
-        q += 0.5 * rhoP * P_loc^2 + 0.5 * rhoQ * Q_loc^2
-    end
-    sub.quad_pq_expr_socp = q
-    sub.rho_branch_p_cached = rhoP
-    sub.rho_branch_q_cached = rhoQ
     return q
 end
 

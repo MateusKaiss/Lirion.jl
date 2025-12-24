@@ -1,3 +1,65 @@
+function sorted_ids_and_pos(shared_buses::Vector{Int})
+    shared_buses_sorted = sort(shared_buses)
+    shared_buses_idx = Dict{Int, Int}(b => i for (i, b) in enumerate(shared_buses_sorted))
+    return shared_buses_sorted, shared_buses_idx
+end
+
+@inline function _zone_cut_edges(part::PartitionAC, cut_edges::Vector{Int})
+    return [e for e in cut_edges if haskey(part.edge_to_local, e)]
+end
+
+@inline function _zone_cut_edges(part::PartitionDC, cut_edges::Vector{Int})
+    return [e for e in cut_edges if haskey(part.edge_to_local, e)]
+end
+
+@inline function _zone_cut_edges(
+    sub::Union{PartitionDC, PartitionAC, PartitionSOCP},
+    cut_edges::Vector{Int},
+)
+    return [e for e in cut_edges if haskey(sub.edge_to_local, e)]
+end
+
+@inline function _val_or_start(m::JuMP.Model, x::JuMP.VariableRef)
+    if JuMP.has_values(m)
+        return JuMP.value(x)
+    else
+        sv = JuMP.start_value(x)
+        return sv === nothing ? 0.0 : sv
+    end
+end
+
+@inline function _val_or_start_ac(m::JuMP.Model, x::JuMP.VariableRef)
+    if JuMP.has_values(m)
+        return JuMP.value(x)
+    else
+        sv = JuMP.start_value(x)
+        return sv === nothing ? 0.0 : sv
+    end
+end
+
+@inline _vmag_val(
+    m::JuMP.Model,
+    V::JuMP.Containers.DenseAxisArray,
+    b::Int,
+    t::Int,
+) = _val_or_start_ac(m, V[b, t])
+
+@inline function _theta_val(
+    m::JuMP.Model,
+    theta::JuMP.Containers.DenseAxisArray,
+    b::Int,
+    t::Int,
+)
+    return _val_or_start(m, theta[b, t])
+end
+
+@inline _theta_val_ac(
+    m::JuMP.Model,
+    theta::JuMP.Containers.DenseAxisArray,
+    b::Int,
+    t::Int,
+) = _val_or_start_ac(m, theta[b, t])
+
 function prepare_hotpaths!(part::PartitionDC)
     # mapa id de barra -> posição local no vetor (1..n_local)
 
@@ -79,67 +141,6 @@ function prepare_hotpaths_ac!(part::PartitionAC)
     return nothing
 end
 
-function sorted_ids_and_pos(shared_buses::Vector{Int})
-    shared_buses_sorted = sort(shared_buses)
-    shared_buses_idx = Dict{Int, Int}(b => i for (i, b) in enumerate(shared_buses_sorted))
-    return shared_buses_sorted, shared_buses_idx
-end
-
-@inline function _zone_cut_edges(part::PartitionAC, cut_edges::Vector{Int})
-    return [e for e in cut_edges if haskey(part.edge_to_local, e)]
-end
-
-@inline function _zone_cut_edges(part::PartitionDC, cut_edges::Vector{Int})
-    return [e for e in cut_edges if haskey(part.edge_to_local, e)]
-end
-
-@inline function _zone_cut_edges(
-    sub::Union{PartitionDC, PartitionAC, PartitionSOCP},
-    cut_edges::Vector{Int},
-)
-    return [e for e in cut_edges if haskey(sub.edge_to_local, e)]
-end
-
-@inline function _val_or_start_ac(m::JuMP.Model, x::JuMP.VariableRef)
-    if JuMP.has_values(m)
-        return JuMP.value(x)
-    else
-        sv = JuMP.start_value(x)
-        return sv === nothing ? 0.0 : sv
-    end
-end
-
-@inline _theta_val_ac(
-    m::JuMP.Model,
-    theta::JuMP.Containers.DenseAxisArray,
-    b::Int,
-    t::Int,
-) = _val_or_start_ac(m, theta[b, t])
-
-@inline _vmag_val(
-    m::JuMP.Model,
-    V::JuMP.Containers.DenseAxisArray,
-    b::Int,
-    t::Int,
-) = _val_or_start_ac(m, V[b, t])
-
-@inline function _val_or_start(m::JuMP.Model, x::JuMP.VariableRef)
-    if JuMP.has_values(m)
-        return JuMP.value(x)
-    else
-        sv = JuMP.start_value(x)
-        return sv === nothing ? 0.0 : sv
-    end
-end
-
-@inline function _theta_val(
-    m::JuMP.Model,
-    theta::JuMP.Containers.DenseAxisArray,
-    b::Int,
-    t::Int,
-)
-    return _val_or_start(m, theta[b, t])
-end
 
 @inline function snapshot_theta!(part::PartitionDC)
     # theta "completo" (todas as barras da zona)
@@ -177,6 +178,7 @@ end
     end
     return buf
 end
+
 
 @inline function snapshot_vmag!(part::PartitionAC)
     m = part.model::JuMP.Model
@@ -272,4 +274,14 @@ end
 )
     m = part.model::JuMP.Model
     return m[:p_flow_branches][l_local, t], m[:q_flow_branches][l_local, t]
+end
+
+@inline function _socp_flow_from_exprs_existing(
+    model::Model, l_local::Int; t::Int = 1,
+)
+    return model[:p_flow_branches][l_local, t], model[:q_flow_branches][l_local, t]
+end
+
+@inline function _rt_from_exprs_socp(model::Model, l_local::Int; t::Int = 1)
+    return model[:R][l_local, t], model[:T_var][l_local, t]
 end
