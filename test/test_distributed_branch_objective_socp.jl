@@ -146,8 +146,8 @@ function compare_distributed_branch_socp_vs_centralized(
     rho_flow_p::Float64 = 1.0e3,
     rho_flow_q::Float64 = 1.0e3,
     admm_max_iter::Int = 350,
-    admm_eps_primal::Float64 = 1e-4,
-    admm_eps_dual::Float64 = 1e-4,
+    admm_eps_abs::Float64 = 1e-4,
+    admm_eps_rel::Float64 = 1e-4,
 )
     case_name = basename(file)
 
@@ -184,8 +184,8 @@ function compare_distributed_branch_socp_vs_centralized(
                 "--admm-rho-v", "1e8",
                 "--admm-rho-flow-p", "1e8",
                 "--admm-rho-flow-q", "1e8",
-                "--admm-eps-primal", "1e-4",
-                "--admm-eps-dual", "1e-4",
+                "--admm-eps-abs", "1e-4",
+                "--admm-eps-rel", "1e-4",
                 "--admm-adaptive", "on",
                 "--admm-mu-incr", "5.0",
                 "--admm-mu-decr", "5.0",
@@ -231,8 +231,8 @@ function compare_distributed_branch_socp_vs_centralized(
             "--admm-rho-flow-p", string(rho_flow_p),
             "--admm-rho-flow-q", string(rho_flow_q),
             "--admm-max-iter", string(admm_max_iter),
-            "--admm-eps-primal", string(admm_eps_primal),
-            "--admm-eps-dual", string(admm_eps_dual),
+            "--admm-eps-abs", string(admm_eps_abs),
+            "--admm-eps-rel", string(admm_eps_rel),
         ]
         obj, _ = Lirion.main(args_dist)
         obj
@@ -252,7 +252,7 @@ function run_distributed_branch_socp_objective_tests(;
     central_optimizer = _CENTRAL_DEFAULT,
     distributed_optimizer = _DISTRIB_DEFAULT,
     rtol = 0.05, atol = 1e-6,
-    admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,
+    admm_eps_abs = 1e-4, admm_eps_rel = 1e-4,
 )
     if isempty(case_list)
         @info "Empty distributed (branch-SOCP) case list. No tests will be run."
@@ -275,8 +275,8 @@ function run_distributed_branch_socp_objective_tests(;
         rho_flow_p_case = 1e3
         rho_flow_q_case = 1e3
         admm_max_iter_case = 350
-        admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case = admm_eps_dual
+        admm_eps_abs_case = admm_eps_abs
+        admm_eps_rel_case = admm_eps_rel
 
         # regras simples por tamanho/zonas (mantém rhos)
         if occursin("_3zones_", case_name) || occursin("_4zones_", case_name)
@@ -288,7 +288,7 @@ function run_distributed_branch_socp_objective_tests(;
 
         @info "[$label] Rodando caso $i/$n: $case_name " *
               "(max_iter=$(admm_max_iter_case), rhoV²=$(rho_v_case), rhoP=$(rho_flow_p_case), rhoQ=$(rho_flow_q_case), " *
-              "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"
+              "eps_pr=$(admm_eps_abs_case), eps_dual=$(admm_eps_rel_case))"
 
         @testset "$(label) - $(case_name)" begin
             compare_distributed_branch_socp_vs_centralized(
@@ -302,8 +302,8 @@ function run_distributed_branch_socp_objective_tests(;
                 rho_flow_p = rho_flow_p_case,
                 rho_flow_q = rho_flow_q_case,
                 admm_max_iter = admm_max_iter_case,
-                admm_eps_primal = admm_eps_primal_case,
-                admm_eps_dual = admm_eps_dual_case,
+                admm_eps_abs = admm_eps_abs_case,
+                admm_eps_rel = admm_eps_rel_case,
             )
         end
     end

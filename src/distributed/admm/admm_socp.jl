@@ -227,8 +227,8 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
     prev_rhoR = Ref(rhoR[])
     prev_rhoT = Ref(rhoT[])
 
-    eps_abs = config.eps_primal
-    eps_rel = config.eps_dual
+    eps_abs = config.eps_abs
+    eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
 
     optimizer_factory = resolve_socp_optimizer(config)
@@ -435,8 +435,8 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
     prev_rhoP = Ref(rhoP[])
     prev_rhoQ = Ref(rhoQ[])
 
-    eps_abs = config.eps_primal
-    eps_rel = config.eps_dual
+    eps_abs = config.eps_abs
+    eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
 
     optimizer_factory = resolve_socp_optimizer(config)
@@ -587,8 +587,8 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
     prev_rhoR = Ref(rhoR[])
     prev_rhoT = Ref(rhoT[])
 
-    eps_abs = config.eps_primal
-    eps_rel = config.eps_dual
+    eps_abs = config.eps_abs
+    eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
 
     optimizer_factory = resolve_socp_optimizer(config)

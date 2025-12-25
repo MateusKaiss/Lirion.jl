@@ -298,7 +298,7 @@ args = [
     "--optimizer", "Ipopt.Optimizer",
     "--admm-rho", "2000.0",
     "--admm-max-iter", "500",
-    "--admm-eps-primal", "1e-6",
+    "--admm-eps-abs", "1e-6",
     "--admm-eps-dual", "1e-6",
     "--admm-alpha", "1.5"
 ]

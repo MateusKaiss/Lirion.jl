@@ -107,8 +107,8 @@ function compare_distributed_socp_vs_centralized(
     rho_v::Float64 = 1.0e3,
     rho_flow_p::Float64 = 3.0e2,
     rho_flow_q::Float64 = 3.0e2,
-    admm_eps_primal::Float64 = 1e-4,
-    admm_eps_dual::Float64 = 1e-4,
+    admm_eps_abs::Float64 = 1e-4,
+    admm_eps_rel::Float64 = 1e-4,
 )
     case_name = basename(file)
 
@@ -170,8 +170,8 @@ function compare_distributed_socp_vs_centralized(
                 "--admm-rho-v", "1e6",
                 "--admm-rho-flow-p", "1e6",
                 "--admm-rho-flow-q", "1e6",
-                "--admm-eps-primal", "1e-4",
-                "--admm-eps-dual", "1e-4",
+                "--admm-eps-abs", "1e-4",
+                "--admm-eps-rel", "1e-4",
                 "--admm-adaptive", "on",
                 "--admm-mu-incr", "5.0",
                 "--admm-mu-decr", "5.0",
@@ -214,8 +214,8 @@ function compare_distributed_socp_vs_centralized(
             "--admm-rho-flow-p", string(rho_flow_p),
             "--admm-rho-flow-q", string(rho_flow_q),
             "--admm-max-iter", string(ADMM_MAX_IT),
-            "--admm-eps-primal", string(admm_eps_primal),
-            "--admm-eps-dual", string(admm_eps_dual),
+            "--admm-eps-abs", string(admm_eps_abs),
+            "--admm-eps-rel", string(admm_eps_rel),
         ]
         obj, _ = Lirion.main(args_dist)
         obj
@@ -235,7 +235,7 @@ function run_distributed_socp_objective_tests(;
     central_optimizer = _CENTRAL_DEFAULT,
     distributed_optimizer = _DISTRIB_DEFAULT,
     rtol = 0.05, atol = 1e-6,
-    admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,
+    admm_eps_abs = 1e-4, admm_eps_rel = 1e-4,
 )
     if isempty(case_list)
         @info "Empty SOCP distributed case list. No tests will be run."
@@ -259,12 +259,12 @@ function run_distributed_socp_objective_tests(;
         rho_flow_q_case = 3.0e5
 
         admm_max_iter_case = ADMM_MAX_IT
-        admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case = admm_eps_dual
+        admm_eps_abs_case = admm_eps_abs
+        admm_eps_rel_case = admm_eps_rel
 
         @info "[$label] Rodando caso $i de $n: $case_name " *
               "(max_iter=$(admm_max_iter_case), rhoV²=$(rho_v_case), rhoP=$(rho_flow_p_case), rhoQ=$(rho_flow_q_case), " *
-              "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case))"
+              "eps_pr=$(admm_eps_abs_case), eps_dual=$(admm_eps_rel_case))"
 
         @testset "$(label) - $(case_name)" begin
             compare_distributed_socp_vs_centralized(
@@ -277,8 +277,8 @@ function run_distributed_socp_objective_tests(;
                 rho_v = rho_v_case,
                 rho_flow_p = rho_flow_p_case,
                 rho_flow_q = rho_flow_q_case,
-                admm_eps_primal = admm_eps_primal_case,
-                admm_eps_dual = admm_eps_dual_case,
+                admm_eps_abs = admm_eps_abs_case,
+                admm_eps_rel = admm_eps_rel_case,
             )
         end
     end

@@ -56,8 +56,8 @@ function compare_distributed_branch_ac_vs_centralized(
     admm_rho_flow_p = nothing,
     admm_rho_flow_q = nothing,
     admm_max_iter = 400,
-    admm_eps_primal = 1e-4,
-    admm_eps_dual = 1e-4,
+    admm_eps_abs = 1e-4,
+    admm_eps_rel = 1e-4,
     admm_mu_incr = 2.0,
     admm_mu_decr = 2.0,
     admm_tau_incr = 1.05,
@@ -89,8 +89,8 @@ function compare_distributed_branch_ac_vs_centralized(
             "--model", "distributed-admm-branch-ac",
             "--optimizer", string(distributed_optimizer),
             "--admm-max-iter", string(admm_max_iter),
-            "--admm-eps-primal", string(admm_eps_primal),
-            "--admm-eps-dual", string(admm_eps_dual),
+            "--admm-eps-abs", string(admm_eps_abs),
+            "--admm-eps-rel", string(admm_eps_rel),
             "--admm-mu-incr", string(admm_mu_incr),
             "--admm-mu-decr", string(admm_mu_decr),
             "--admm-tau-incr", string(admm_tau_incr),
@@ -129,7 +129,7 @@ function run_distributed_branch_ac_objective_tests(;
     central_optimizer = Ipopt.Optimizer,
     distributed_optimizer = Ipopt.Optimizer,
     rtol = 0.05, atol = 1e-6,
-    admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,
+    admm_eps_abs = 1e-4, admm_eps_rel = 1e-4,
     admm_mu_incr = 2.0,
     admm_mu_decr = 2.0,
     admm_tau_incr = 1.05,
@@ -156,8 +156,8 @@ function run_distributed_branch_ac_objective_tests(;
             else
                 (300, 1.0e5)
             end
-        admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case = admm_eps_dual
+        admm_eps_abs_case = admm_eps_abs
+        admm_eps_rel_case = admm_eps_rel
         mu_incr_case = admm_mu_incr
         mu_decr_case = admm_mu_decr
         tau_incr_case = admm_tau_incr
@@ -166,13 +166,13 @@ function run_distributed_branch_ac_objective_tests(;
         extra_flags = String[]
 
         if occursin("_3zones_", case_name)
-            admm_eps_primal_case = 1e-4
-            admm_eps_dual_case = 1e-4
+            admm_eps_abs_case = 1e-4
+            admm_eps_rel_case = 1e-4
         end
         if case_name == "pglib_opf_case118_2zones_ieee.m"
             admm_max_iter_case = 500
-            admm_eps_primal_case = 1e-4
-            admm_eps_dual_case = 1e-4
+            admm_eps_abs_case = 1e-4
+            admm_eps_rel_case = 1e-4
             admm_rho_case = 1.0e5
             adaptive_case = "on"
             mu_incr_case, mu_decr_case = 2.0, 2.0
@@ -181,8 +181,8 @@ function run_distributed_branch_ac_objective_tests(;
         if case_name in
            ("pglib_opf_case118_5zones_ieee.m", "pglib_opf_case118_3zones_ieee.m")
             admm_max_iter_case = 500
-            admm_eps_primal_case = 1e-4
-            admm_eps_dual_case = 1e-4
+            admm_eps_abs_case = 1e-4
+            admm_eps_rel_case = 1e-4
             admm_rho_case = 1.0e5
             adaptive_case = "on"
             mu_incr_case, mu_decr_case = 3.0, 3.0
@@ -192,8 +192,8 @@ function run_distributed_branch_ac_objective_tests(;
         if case_name == "pglib_opf_case500_3zones_goc.m" ||
            case_name == "pglib_opf_case500_4zones_goc.m"
             admm_max_iter_case = 700
-            admm_eps_primal_case = 1e-4
-            admm_eps_dual_case = 1e-4
+            admm_eps_abs_case = 1e-4
+            admm_eps_rel_case = 1e-4
             adaptive_case = "on"
             mu_incr_case, mu_decr_case = 3.0, 3.0
             tau_incr_case, tau_decr_case = 1.3, 0.7
@@ -205,8 +205,8 @@ function run_distributed_branch_ac_objective_tests(;
 
         if case_name == "pglib_opf_case2000_5zones_goc.m"
             admm_max_iter_case = 700
-            admm_eps_primal_case = 1e-4
-            admm_eps_dual_case = 1e-4
+            admm_eps_abs_case = 1e-4
+            admm_eps_rel_case = 1e-4
             admm_rho_case = 1.0e4   # rho único (P e Q)
             adaptive_case = "on"
             mu_incr_case, mu_decr_case = 3.0, 3.0
@@ -215,8 +215,8 @@ function run_distributed_branch_ac_objective_tests(;
 
         if case_name == "pglib_opf_case3970_25zones_goc.m"
             admm_max_iter_case = 700
-            admm_eps_primal_case = 3e-4
-            admm_eps_dual_case = 3e-4
+            admm_eps_abs_case = 3e-4
+            admm_eps_rel_case = 3e-4
             admm_rho_case = 1.0e4   # rho único (P e Q)
             adaptive_case = "on"
             mu_incr_case, mu_decr_case = 3.0, 3.0
@@ -225,8 +225,8 @@ function run_distributed_branch_ac_objective_tests(;
 
         if case_name == "pglib_opf_case10000_goc.m"
             admm_max_iter_case = 800
-            admm_eps_primal_case = 3e-4
-            admm_eps_dual_case = 3e-4
+            admm_eps_abs_case = 3e-4
+            admm_eps_rel_case = 3e-4
             admm_rho_case = 1.0e3   # rho único (P e Q). 
             adaptive_case = "on"
             mu_incr_case, mu_decr_case = 3.0, 3.0
@@ -235,7 +235,7 @@ function run_distributed_branch_ac_objective_tests(;
 
         @info "[$label] Rodando caso $i de $n: $case_name " *
               "(max_iter=$(admm_max_iter_case), rho_flow=$(admm_rho_case), " *
-              "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), " *
+              "eps_pr=$(admm_eps_abs_case), eps_dual=$(admm_eps_rel_case), " *
               "mu=(incr=$(mu_incr_case),decr=$(mu_decr_case)), " *
               "tau=(incr=$(tau_incr_case),decr=$(tau_decr_case)), " *
               "adaptive=$(adaptive_case))"
@@ -250,8 +250,8 @@ function run_distributed_branch_ac_objective_tests(;
                 atol = atol,
                 admm_rho_flow = admm_rho_case,
                 admm_max_iter = admm_max_iter_case,
-                admm_eps_primal = admm_eps_primal_case,
-                admm_eps_dual = admm_eps_dual_case,
+                admm_eps_abs = admm_eps_abs_case,
+                admm_eps_rel = admm_eps_rel_case,
                 admm_mu_incr = mu_incr_case,
                 admm_mu_decr = mu_decr_case,
                 admm_tau_incr = tau_incr_case,

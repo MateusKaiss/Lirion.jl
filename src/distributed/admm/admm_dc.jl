@@ -196,8 +196,8 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
 
     rho = Ref(config.rho_theta)
     prev_rho = Ref(rho[])
-    eps_abs = config.eps_primal
-    eps_rel = config.eps_dual
+    eps_abs = config.eps_abs
+    eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
 
     optimizer_factory = resolve_optimizer_dc(config)
@@ -396,8 +396,8 @@ function run_admm_branch(
 
     rho = Ref(config.rho_flow_p)
     prev_rho = Ref(rho[])
-    eps_abs = config.eps_primal
-    eps_rel = config.eps_dual
+    eps_abs = config.eps_abs
+    eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
 
     optimizer_factory = resolve_optimizer_dc(config)
@@ -542,8 +542,8 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
     prev_rho_theta = Ref(rho_theta[])
     prev_rho_flow = Ref(rho_flow[])
 
-    eps_abs = config.eps_primal
-    eps_rel = config.eps_dual
+    eps_abs = config.eps_abs
+    eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
 
     optimizer_factory = resolve_optimizer_dc(config)

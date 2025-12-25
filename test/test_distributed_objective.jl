@@ -54,8 +54,8 @@ function compare_distributed_vs_centralized(
     atol = 1e-6,
     admm_rho = 1_000.0,
     admm_max_iter = 350,
-    admm_eps_primal = 1e-6,
-    admm_eps_dual = 1e-6,
+    admm_eps_abs = 1e-6,
+    admm_eps_rel = 1e-6,
     admm_alpha::Float64 = 1.0,
     admm_mu_incr::Float64 = 3.0,
     admm_mu_decr::Float64 = 3.0,
@@ -88,8 +88,8 @@ function compare_distributed_vs_centralized(
             "--model", "distributed-admm-dc",
             "--admm-rho", string(admm_rho),
             "--admm-max-iter", string(admm_max_iter),
-            "--admm-eps-primal", string(admm_eps_primal),
-            "--admm-eps-dual", string(admm_eps_dual),
+            "--admm-eps-abs", string(admm_eps_abs),
+            "--admm-eps-rel", string(admm_eps_rel),
             "--admm-alpha", string(admm_alpha),
             "--admm-mu-incr", string(admm_mu_incr),
             "--admm-mu-decr", string(admm_mu_decr),
@@ -130,7 +130,7 @@ function run_distributed_objective_tests(;
     central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
     distributed_optimizer::Union{Nothing, Function} = nothing,
     rtol = 0.05, atol = 1e-6,
-    admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,
+    admm_eps_abs = 1e-4, admm_eps_rel = 1e-4,
     admm_alpha::Float64 = 1.0,  # over-relaxation inativo
     admm_accel::Bool = false,
     admm_adaptive::Union{Nothing, String} = nothing,
@@ -161,8 +161,8 @@ function run_distributed_objective_tests(;
                 (350, 1_000.0)
             end
 
-        admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case = admm_eps_dual
+        admm_eps_abs_case = admm_eps_abs
+        admm_eps_rel_case = admm_eps_rel
         admm_alpha_case = admm_alpha
 
         # parâmetros adaptativos: defaults gerais
@@ -177,14 +177,14 @@ function run_distributed_objective_tests(;
         if occursin("case118_", case_name)
             admm_max_iter_case = 700
             admm_rho_case = 1_000_000.0
-            admm_eps_primal_case = 1e-4
-            admm_eps_dual_case = 1e-4
+            admm_eps_abs_case = 1e-4
+            admm_eps_rel_case = 1e-4
         end
         if occursin("case2000_11zonesbus", case_name)
             admm_max_iter_case = 900
             admm_rho_case = 10_000.0
-            admm_eps_primal_case = 1e-4
-            admm_eps_dual_case = 1e-4
+            admm_eps_abs_case = 1e-4
+            admm_eps_rel_case = 1e-4
             admm_mu_incr_case = 3.0
             admm_mu_decr_case = 3.0
             admm_tau_incr_case = 1.2
@@ -193,8 +193,8 @@ function run_distributed_objective_tests(;
         if occursin("case3970_20zonesbus", case_name)
             admm_max_iter_case = 1500
             admm_rho_case = 1_000_000.0
-            admm_eps_primal_case = 1e-4
-            admm_eps_dual_case = 1e-4
+            admm_eps_abs_case = 1e-4
+            admm_eps_rel_case = 1e-4
             admm_mu_incr_case = 3.0
             admm_mu_decr_case = 3.0
             admm_tau_incr_case = 1.1
@@ -203,8 +203,8 @@ function run_distributed_objective_tests(;
         if occursin("case10000_50zonesbus", case_name)
             admm_max_iter_case = 1500
             admm_rho_case = 1_000_000.0
-            admm_eps_primal_case = 1e-4
-            admm_eps_dual_case = 1e-4
+            admm_eps_abs_case = 1e-4
+            admm_eps_rel_case = 1e-4
             admm_mu_incr_case = 3.0
             admm_mu_decr_case = 3.0
             admm_tau_incr_case = 1.2
@@ -213,8 +213,8 @@ function run_distributed_objective_tests(;
         if occursin("case20758_42zonesbus", case_name)
             admm_max_iter_case = 1500
             admm_rho_case = 5_000_000.0
-            admm_eps_primal_case = 7e-5
-            admm_eps_dual_case = 7e-5
+            admm_eps_abs_case = 7e-5
+            admm_eps_rel_case = 7e-5
             admm_mu_incr_case = 3.0
             admm_mu_decr_case = 3.0
             admm_tau_incr_case = 1.2
@@ -226,8 +226,8 @@ function run_distributed_objective_tests(;
            occursin("case30000_20zones", case_name)
             admm_max_iter_case = 1500
             admm_rho_case = 300_000.0
-            admm_eps_primal_case = 5e-4
-            admm_eps_dual_case = 5e-4
+            admm_eps_abs_case = 5e-4
+            admm_eps_rel_case = 5e-4
             admm_alpha_case = 1.0
             admm_mu_incr_case = 3.0
             admm_mu_decr_case = 3.0
@@ -245,8 +245,8 @@ function run_distributed_objective_tests(;
         if occursin("case78484_157zones", case_name) || occursin("case78484_", case_name)
             admm_max_iter_case = 1000
             admm_rho_case = 7_000_000.0      # 7e6
-            admm_eps_primal_case = 3e-4
-            admm_eps_dual_case = 3e-4
+            admm_eps_abs_case = 3e-4
+            admm_eps_rel_case = 3e-4
             admm_alpha_case = 1.0            # α desligado
             admm_mu_incr_case = 3.0
             admm_mu_decr_case = 3.0
@@ -258,7 +258,7 @@ function run_distributed_objective_tests(;
 
         @info "[$label] Rodando caso $i de $n: $case_name " *
               "(max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), " *
-              "eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), " *
+              "eps_pr=$(admm_eps_abs_case), eps_dual=$(admm_eps_rel_case), " *
               "alpha=$(admm_alpha_case), mu_incr=$(admm_mu_incr_case), mu_decr=$(admm_mu_decr_case), " *
               "tau_incr=$(admm_tau_incr_case), tau_decr=$(admm_tau_decr_case), " *
               "accel=$(admm_accel_case), adaptive=$(admm_adaptive_case), " *
@@ -274,8 +274,8 @@ function run_distributed_objective_tests(;
                 atol = atol,
                 admm_rho = admm_rho_case,
                 admm_max_iter = admm_max_iter_case,
-                admm_eps_primal = admm_eps_primal_case,
-                admm_eps_dual = admm_eps_dual_case,
+                admm_eps_abs = admm_eps_abs_case,
+                admm_eps_rel = admm_eps_rel_case,
                 admm_alpha = admm_alpha_case,
                 admm_mu_incr = admm_mu_incr_case,
                 admm_mu_decr = admm_mu_decr_case,

@@ -47,8 +47,8 @@ function compare_distributed_hybrid_vs_centralized(
     atol = 1e-6,
     admm_rho = 1_000.0,
     admm_max_iter = 350,
-    admm_eps_primal = 1e-4,
-    admm_eps_dual = 1e-4,
+    admm_eps_abs = 1e-4,
+    admm_eps_rel = 1e-4,
     admm_alpha::Float64 = 1.0,
     admm_warm_start::Bool = false,
     extra_flags::Vector{String} = String[],
@@ -77,8 +77,8 @@ function compare_distributed_hybrid_vs_centralized(
             "--model", "distributed-admm-hybrid-dc",
             "--admm-rho", string(admm_rho),
             "--admm-max-iter", string(admm_max_iter),
-            "--admm-eps-primal", string(admm_eps_primal),
-            "--admm-eps-dual", string(admm_eps_dual),
+            "--admm-eps-abs", string(admm_eps_abs),
+            "--admm-eps-rel", string(admm_eps_rel),
             "--admm-alpha", string(admm_alpha),
         ]
         if !isempty(extra_flags)
@@ -109,7 +109,7 @@ function run_distributed_hybrid_objective_tests(;
     central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
     distributed_optimizer::Union{Nothing, Function} = nothing,
     rtol = 0.05, atol = 1e-6,
-    admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,
+    admm_eps_abs = 1e-4, admm_eps_rel = 1e-4,
     admm_alpha::Float64 = 1.0,
 )
     if isempty(case_list)
@@ -139,8 +139,8 @@ function run_distributed_hybrid_objective_tests(;
                 (700, 1_000.0)
             end
 
-        admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case = admm_eps_dual
+        admm_eps_abs_case = admm_eps_abs
+        admm_eps_rel_case = admm_eps_rel
         admm_alpha_case = admm_alpha
 
         extra_flags_case = String[]
@@ -191,8 +191,8 @@ function run_distributed_hybrid_objective_tests(;
             admm_max_iter_case = 1500
             admm_alpha_case = 1.0
             admm_rho_case = 1.0
-            admm_eps_primal_case = 3e-4
-            admm_eps_dual_case = 3e-4
+            admm_eps_abs_case = 3e-4
+            admm_eps_rel_case = 3e-4
             admm_warm_start_case = false
             extra_flags_case = String[
                 "--admm-adaptive", "on",
@@ -210,8 +210,8 @@ function run_distributed_hybrid_objective_tests(;
             admm_max_iter_case = 2000
             admm_alpha_case = 1.0
             admm_rho_case = 1.0
-            admm_eps_primal_case = 5e-4
-            admm_eps_dual_case = 5e-4
+            admm_eps_abs_case = 5e-4
+            admm_eps_rel_case = 5e-4
             admm_warm_start_case = false
             extra_flags_case = String[
                 "--admm-mu-incr", "3.0",
@@ -223,7 +223,7 @@ function run_distributed_hybrid_objective_tests(;
             ]
         end
 
-        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), alpha=$(admm_alpha_case), warm_start=$(admm_warm_start_case), extra_flags=$(join(extra_flags_case, ' ')))"
+        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), eps_pr=$(admm_eps_abs_case), eps_dual=$(admm_eps_rel_case), alpha=$(admm_alpha_case), warm_start=$(admm_warm_start_case), extra_flags=$(join(extra_flags_case, ' ')))"
 
         @testset "$(label) - $(case_name)" begin
             compare_distributed_hybrid_vs_centralized(
@@ -235,8 +235,8 @@ function run_distributed_hybrid_objective_tests(;
                 atol = atol,
                 admm_rho = admm_rho_case,
                 admm_max_iter = admm_max_iter_case,
-                admm_eps_primal = admm_eps_primal_case,
-                admm_eps_dual = admm_eps_dual_case,
+                admm_eps_abs = admm_eps_abs_case,
+                admm_eps_rel = admm_eps_rel_case,
                 admm_alpha = admm_alpha_case,
                 admm_warm_start = admm_warm_start_case,
                 extra_flags = extra_flags_case,

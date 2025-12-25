@@ -56,8 +56,8 @@ function compare_distributed_ac_vs_centralized(
     # parâmetros padrões
     admm_rho = 1_000.0,
     admm_max_iter = 350,
-    admm_eps_primal = 1e-4,
-    admm_eps_dual = 1e-4,
+    admm_eps_abs = 1e-4,
+    admm_eps_rel = 1e-4,
     admm_mu_incr = 2.0,
     admm_mu_decr = 2.0,
     admm_tau_incr = 1.05,
@@ -90,8 +90,8 @@ function compare_distributed_ac_vs_centralized(
             "--model", "distributed-admm-ac",
             "--optimizer", string(distributed_optimizer),
             "--admm-max-iter", string(admm_max_iter),
-            "--admm-eps-primal", string(admm_eps_primal),
-            "--admm-eps-dual", string(admm_eps_dual),
+            "--admm-eps-abs", string(admm_eps_abs),
+            "--admm-eps-rel", string(admm_eps_rel),
             "--admm-mu-incr", string(admm_mu_incr),
             "--admm-mu-decr", string(admm_mu_decr),
             "--admm-tau-incr", string(admm_tau_incr),
@@ -132,7 +132,7 @@ function run_distributed_ac_objective_tests(;
     central_optimizer = Ipopt.Optimizer,
     distributed_optimizer = Ipopt.Optimizer,
     rtol = 0.05, atol = 1e-6,
-    admm_eps_primal = 1e-4, admm_eps_dual = 1e-4,
+    admm_eps_abs = 1e-4, admm_eps_rel = 1e-4,
     admm_mu_incr = 2.0,
     admm_mu_decr = 2.0,
     admm_tau_incr = 1.05,
@@ -163,8 +163,8 @@ function run_distributed_ac_objective_tests(;
                 (600, 1_000.0)
             end
 
-        admm_eps_primal_case = admm_eps_primal
-        admm_eps_dual_case = admm_eps_dual
+        admm_eps_abs_case = admm_eps_abs
+        admm_eps_rel_case = admm_eps_rel
 
         admm_rho_theta_case = nothing
         admm_rho_v_case = nothing
@@ -176,14 +176,14 @@ function run_distributed_ac_objective_tests(;
         if occursin("case500_", case_name)
             admm_max_iter_case = max(admm_max_iter_case, 800)
             admm_rho_case = 1_000_000.0
-            admm_eps_primal_case = min(admm_eps_primal_case, 1e-4)
-            admm_eps_dual_case = min(admm_eps_dual_case, 1e-4)
+            admm_eps_abs_case = min(admm_eps_abs_case, 1e-4)
+            admm_eps_rel_case = min(admm_eps_rel_case, 1e-4)
         end
 
         if case_name == "pglib_opf_case118_2zones_ieee.m"
             admm_max_iter_case = 500
-            admm_eps_primal_case = 1e-4
-            admm_eps_dual_case = 1e-4
+            admm_eps_abs_case = 1e-4
+            admm_eps_rel_case = 1e-4
             admm_rho_theta_case = 1e5
             admm_rho_v_case = 1e5
             admm_adaptive_case = "on"
@@ -194,8 +194,8 @@ function run_distributed_ac_objective_tests(;
         end
         if case_name == "pglib_opf_case118_3zones_ieee.m"
             admm_max_iter_case = 500
-            admm_eps_primal_case = 1e-4
-            admm_eps_dual_case = 1e-4
+            admm_eps_abs_case = 1e-4
+            admm_eps_rel_case = 1e-4
             admm_rho_theta_case = 1e5
             admm_rho_v_case = 1e5
             admm_adaptive_case = "on"
@@ -206,8 +206,8 @@ function run_distributed_ac_objective_tests(;
         end
         if case_name == "pglib_opf_case118_5zones_ieee.m"
             admm_max_iter_case = 700
-            admm_eps_primal_case = 1e-4
-            admm_eps_dual_case = 1e-4
+            admm_eps_abs_case = 1e-4
+            admm_eps_rel_case = 1e-4
             admm_rho_theta_case = 1e5
             admm_rho_v_case = 1e5
             admm_adaptive_case = "on"
@@ -219,8 +219,8 @@ function run_distributed_ac_objective_tests(;
         if case_name == "pglib_opf_case500_3zones_goc.m" ||
            case_name == "pglib_opf_case500_4zones_goc.m"
             admm_max_iter_case = 700
-            admm_eps_primal_case = 1e-4
-            admm_eps_dual_case = 1e-4
+            admm_eps_abs_case = 1e-4
+            admm_eps_rel_case = 1e-4
             admm_rho_theta_case = 1e4
             admm_rho_v_case = 1e4
             admm_adaptive_case = "on"
@@ -232,8 +232,8 @@ function run_distributed_ac_objective_tests(;
 
         if case_name == "pglib_opf_case2000_5zones_goc.m"
             admm_max_iter_case = 700
-            admm_eps_primal_case = 1e-4
-            admm_eps_dual_case = 1e-4
+            admm_eps_abs_case = 1e-4
+            admm_eps_rel_case = 1e-4
             admm_rho_theta_case = 1e5
             admm_rho_v_case = 1e5
             admm_adaptive_case = "on"
@@ -245,8 +245,8 @@ function run_distributed_ac_objective_tests(;
 
         if case_name == "pglib_opf_case3970_25zones_goc.m"
             admm_max_iter_case = 700
-            admm_eps_primal_case = 3e-4
-            admm_eps_dual_case = 3e-4
+            admm_eps_abs_case = 3e-4
+            admm_eps_rel_case = 3e-4
             admm_rho_theta_case = 1e5
             admm_rho_v_case = 1e5
             admm_adaptive_case = "on"
@@ -258,8 +258,8 @@ function run_distributed_ac_objective_tests(;
 
         if case_name == "pglib_opf_case10000_50zones_goc.m"
             admm_max_iter_case = 700
-            admm_eps_primal_case = 3e-4
-            admm_eps_dual_case = 3e-4
+            admm_eps_abs_case = 3e-4
+            admm_eps_rel_case = 3e-4
             admm_rho_theta_case = 1e5
             admm_rho_v_case = 1e5
             admm_adaptive_case = "on"
@@ -269,7 +269,7 @@ function run_distributed_ac_objective_tests(;
             admm_tau_decr = 0.9
         end
 
-        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), rho_theta=$(admm_rho_theta_case), rhoV=$(admm_rho_v_case), eps_pr=$(admm_eps_primal_case), eps_dual=$(admm_eps_dual_case), mu=(incr=$(admm_mu_incr),decr=$(admm_mu_decr)), tau=(incr=$(admm_tau_incr),decr=$(admm_tau_decr)), adaptive=$(admm_adaptive_case))"
+        @info "[$label] Rodando caso $i de $n: $case_name (max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), rho_theta=$(admm_rho_theta_case), rhoV=$(admm_rho_v_case), eps_pr=$(admm_eps_abs_case), eps_dual=$(admm_eps_rel_case), mu=(incr=$(admm_mu_incr),decr=$(admm_mu_decr)), tau=(incr=$(admm_tau_incr),decr=$(admm_tau_decr)), adaptive=$(admm_adaptive_case))"
         @testset "$(label) - $(case_name)" begin
             compare_distributed_ac_vs_centralized(
                 file;
@@ -280,8 +280,8 @@ function run_distributed_ac_objective_tests(;
                 atol = atol,
                 admm_rho = admm_rho_case,
                 admm_max_iter = admm_max_iter_case,
-                admm_eps_primal = admm_eps_primal_case,
-                admm_eps_dual = admm_eps_dual_case,
+                admm_eps_abs = admm_eps_abs_case,
+                admm_eps_rel = admm_eps_rel_case,
                 admm_mu_incr = admm_mu_incr,
                 admm_mu_decr = admm_mu_decr,
                 admm_tau_incr = admm_tau_incr,

@@ -66,13 +66,13 @@ struct Args
             arg_type = Int
             default = 350
 
-            "--admm-eps-primal"
-            help = "Primal tolerance eps_primal"
+            "--admm-eps-abs"
+            help = "Absolute tolerance ε_abs used to compute ADMM stopping criteria."
             arg_type = Float64
             default = 1e-7
 
-            "--admm-eps-dual"
-            help = "Dual tolerance eps_dual"
+            "--admm-eps-rel"
+            help = "Relative tolerance ε_rel used in ADMM stopping criteria (Boyd et al.)."
             arg_type = Float64
             default = 1e-7
 
@@ -271,8 +271,8 @@ struct Args
                         rho_v = rho_v_val,
                         rho_flow_p = rho_flow_p_val,
                         rho_flow_q = rho_flow_q_val,
-                        eps_primal = parsed["admm-eps-primal"],
-                        eps_dual = parsed["admm-eps-dual"],
+                        eps_abs = parsed["admm-eps-abs"],
+                        eps_rel = parsed["admm-eps-rel"],
                         alpha_overrelax = alpha_,
                         warm_start = warm_start_flag,
                         adaptive_rho = adaptive_flag,
@@ -295,8 +295,8 @@ struct Args
                         rho_v = rho_v_val,
                         rho_flow_p = rho_flow_p_val,
                         rho_flow_q = rho_flow_q_val,
-                        eps_primal = parsed["admm-eps-primal"],
-                        eps_dual = parsed["admm-eps-dual"],
+                        eps_abs = parsed["admm-eps-abs"],
+                        eps_rel = parsed["admm-eps-rel"],
                         alpha_overrelax = alpha_,
                         optimizer = optimizer,
                         prefer_socp_solver = :auto,

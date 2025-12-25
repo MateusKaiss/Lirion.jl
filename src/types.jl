@@ -11,8 +11,8 @@ mutable struct DistributedOPFModel
     rho_v::Float64         # rhoV  (consenso de |V| ou V²) [AC/SOCP-bus]
     rho_flow_p::Float64    # rhoP  (consenso de P_flow / Re(W))
     rho_flow_q::Float64    # rhoQ  (consenso de Q_flow / Im(W))
-    eps_primal::Float64
-    eps_dual::Float64
+    eps_abs::Float64
+    eps_rel::Float64
     alpha_overrelax::Union{Nothing, Float64}
     warm_start::Bool
     adaptive_rho::Bool
@@ -32,8 +32,8 @@ mutable struct DistributedOPFModel
         rho_v::Real,
         rho_flow_p::Real,
         rho_flow_q::Real,
-        eps_primal::Real,
-        eps_dual::Real;
+        eps_abs::Real,
+        eps_rel::Real;
         alpha_overrelax::Union{Nothing, Real} = nothing,
         warm_start::Bool = false,
         adaptive_rho::Bool = true,
@@ -50,8 +50,8 @@ mutable struct DistributedOPFModel
         rho_v > 0 || throw(ArgumentError("rho_v must be > 0"))
         rho_flow_p > 0 || throw(ArgumentError("rho_flow_p must be > 0"))
         rho_flow_q > 0 || throw(ArgumentError("rho_flow_q must be > 0"))
-        eps_primal ≥ 0 || throw(ArgumentError("eps_primal must be ≥ 0"))
-        eps_dual ≥ 0 || throw(ArgumentError("eps_dual must be ≥ 0"))
+        eps_abs ≥ 0 || throw(ArgumentError("eps_abs must be ≥ 0"))
+        eps_rel ≥ 0 || throw(ArgumentError("eps_rel must be ≥ 0"))
         mu_incr > 0 || throw(ArgumentError("mu_incr must be > 0"))
         mu_decr > 0 || throw(ArgumentError("mu_decr must be > 0"))
         tau_incr > 0 || throw(ArgumentError("tau_incr must be > 0"))
@@ -63,7 +63,7 @@ mutable struct DistributedOPFModel
             base_model, method, Int(max_iter),
             Float64(rho_theta), Float64(rho_v),
             Float64(rho_flow_p), Float64(rho_flow_q),
-            Float64(eps_primal), Float64(eps_dual), α,
+            Float64(eps_abs), Float64(eps_rel), α,
             warm_start,
             adaptive_rho,
             Float64(mu_incr), Float64(mu_decr), Float64(tau_incr), Float64(tau_decr),
@@ -80,8 +80,8 @@ DistributedOPFModel(
     method::Symbol,
     max_iter::Int,
     rho::Float64,
-    eps_primal::Float64,
-    eps_dual::Float64;
+    eps_abs::Float64,
+    eps_rel::Float64;
     alpha_overrelax::Union{Nothing, Float64} = nothing,
     warm_start::Bool = false,
     adaptive_rho::Bool = true,
@@ -93,7 +93,7 @@ DistributedOPFModel(
     optimizer::Any = nothing,
     prefer_socp_solver::Symbol = :auto,
 ) = DistributedOPFModel(
-    base_model, method, max_iter, rho, rho, rho, rho, eps_primal, eps_dual;
+    base_model, method, max_iter, rho, rho, rho, rho, eps_abs, eps_rel;
     alpha_overrelax = alpha_overrelax,
     warm_start = warm_start,
     adaptive_rho = adaptive_rho,
@@ -117,8 +117,8 @@ DistributedOPFModel(
     rho_flow::Union{Nothing, Float64} = nothing,
     rho_flow_p::Union{Nothing, Float64} = nothing,
     rho_flow_q::Union{Nothing, Float64} = nothing,
-    eps_primal::Float64 = 1e-7,
-    eps_dual::Float64 = 1e-7,
+    eps_abs::Float64 = 1e-7,
+    eps_rel::Float64 = 1e-7,
     alpha_overrelax::Union{Nothing, Float64} = nothing,
     warm_start::Bool = false,
     adaptive_rho::Bool = true,
@@ -135,7 +135,7 @@ DistributedOPFModel(
     coalesce(rho_v, rho),
     coalesce(rho_flow_p, rho_flow, rho),
     coalesce(rho_flow_q, rho_flow, rho),
-    eps_primal, eps_dual;
+    eps_abs, eps_rel;
     alpha_overrelax = alpha_overrelax,
     warm_start = warm_start,
     adaptive_rho = adaptive_rho,
