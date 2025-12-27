@@ -297,10 +297,10 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
             sub = partitions[zone_id]
             m = sub.model::JuMP.Model
 
-            lambdaz = (lambda_zone_buf[zone_id] .= duals_v2[zone_id])
+            lambda_z = (lambda_zone_buf[zone_id] .= duals_v2[zone_id])
 
             lin_bus = _build_linear_bus_expr_socp(
-                sub, shared_buses_sorted, shared_buses_idx, v2_target, lambdaz, rhoV2[],
+                sub, shared_buses_sorted, shared_buses_idx, v2_target, lambda_z, rhoV2[],
             )
             lin_rt = _build_linear_branch_rt_expr(
                 sub, sub.zone_edges, zR, zT, dualsR[zone_id], dualsT[zone_id], rhoR[],
@@ -682,10 +682,10 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
             sub = partitions[zone_id]
             m = sub.model::JuMP.Model
 
-            lambdaz = (lambda_zone_buf[zone_id] .= duals_v2[zone_id])
+            lambda_z = (lambda_zone_buf[zone_id] .= duals_v2[zone_id])
 
             lin_bus = _build_linear_bus_expr_socp(
-                sub, shared_buses_sorted, shared_buses_idx, v2_target, lambdaz, rhoV2[],
+                sub, shared_buses_sorted, shared_buses_idx, v2_target, lambda_z, rhoV2[],
             )
             lin_pq = _build_linear_branch_pq_expr(
                 sub, sub.zone_edges, zP, zQ, dualsP[zone_id], dualsQ[zone_id], rhoP[],
