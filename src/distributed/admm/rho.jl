@@ -13,14 +13,14 @@
     prev_rho_v::Base.RefValue{Float64},
 )
     rho_theta_val = rho_theta[]
-    rho_v_val     = rho_v[]
+    rho_v_val = rho_v[]
 
     if (rho_theta_val != prev_rho_theta[]) || (rho_v_val != prev_rho_v[])
         for part in values(partitions)
             _build_quad_bus_expr_ac!(part, rho_theta_val, rho_v_val)
         end
         prev_rho_theta[] = rho_theta_val
-        prev_rho_v[]     = rho_v_val
+        prev_rho_v[] = rho_v_val
     end
     return nothing
 end
@@ -155,14 +155,14 @@ end
     prev_rhoT::Base.RefValue{Float64},
 )
     rho_v2_val = rhoV2[]
-    rho_p_val  = rhoP[]
-    rho_q_val  = rhoQ[]
-    rho_r_val  = rhoR[]
-    rho_t_val  = rhoT[]
+    rho_p_val = rhoP[]
+    rho_q_val = rhoQ[]
+    rho_r_val = rhoR[]
+    rho_t_val = rhoT[]
 
-    if (rho_v2_val != prev_rhoV2[]) || (rho_p_val != prev_rhoP[]) || (rho_q_val != prev_rhoQ[]) ||
+    if (rho_v2_val != prev_rhoV2[]) || (rho_p_val != prev_rhoP[]) ||
+       (rho_q_val != prev_rhoQ[]) ||
        (rho_r_val != prev_rhoR[]) || (rho_t_val != prev_rhoT[])
-
         for sub in values(partitions)
             (rho_v2_val != prev_rhoV2[]) && _build_quad_bus_expr_socp!(sub, rho_v2_val)
 
@@ -173,14 +173,15 @@ end
                 _build_quad_branch_rt_expr!(sub, rho_r_val, rho_t_val, sub.zone_edges)
 
             sub.obj_static =
-                sub.obj_base + sub.quad_bus_expr_socp + sub.quad_pq_expr_socp + sub.quad_rt_expr_socp
+                sub.obj_base + sub.quad_bus_expr_socp + sub.quad_pq_expr_socp +
+                sub.quad_rt_expr_socp
         end
 
         prev_rhoV2[] = rho_v2_val
-        prev_rhoP[]  = rho_p_val
-        prev_rhoQ[]  = rho_q_val
-        prev_rhoR[]  = rho_r_val
-        prev_rhoT[]  = rho_t_val
+        prev_rhoP[] = rho_p_val
+        prev_rhoQ[] = rho_q_val
+        prev_rhoR[] = rho_r_val
+        prev_rhoT[] = rho_t_val
     end
     return nothing
 end
@@ -241,7 +242,6 @@ function adaptive_rho_dc!(
         rho[] *= tau_decr
     end
 end
-
 
 # ------------------------------------------------------------
 # AC adaptive rho: bus (θ,V via components) + branch (P,Q)

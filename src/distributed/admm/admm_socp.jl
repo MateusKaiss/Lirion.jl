@@ -244,17 +244,25 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
     v2bar_prev = similar(v2bar)
 
     duals_v2 =
-        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
+        Dict{Int, Vector{Float64}}(
+            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+        )
     lambda_zone_buf =
-        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
+        Dict{Int, Vector{Float64}}(
+            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+        )
 
     zR = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zT = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zR_prev = Dict{Int, Float64}()
     zT_prev = Dict{Int, Float64}()
 
-    dualsR = Dict{Int, Dict{Int, Float64}}(zone_id => Dict{Int, Float64}() for zone_id in zone_ids)
-    dualsT = Dict{Int, Dict{Int, Float64}}(zone_id => Dict{Int, Float64}() for zone_id in zone_ids)
+    dualsR = Dict{Int, Dict{Int, Float64}}(
+        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
+    )
+    dualsT = Dict{Int, Dict{Int, Float64}}(
+        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
+    )
 
     # ---------- diagnostics ----------
     hist = ADMMHistory()
@@ -295,7 +303,8 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
                 sub, shared_buses_sorted, shared_buses_idx, v2_target, lambdaz, rhoV2[],
             )
             lin_rt = _build_linear_branch_rt_expr(
-                sub, sub.zone_edges, zR, zT, dualsR[zone_id], dualsT[zone_id], rhoR[], rhoT[],
+                sub, sub.zone_edges, zR, zT, dualsR[zone_id], dualsT[zone_id], rhoR[],
+                rhoT[],
             )
 
             @objective(m, Min, sub.obj_static + (lin_bus + lin_rt))
@@ -449,8 +458,12 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
     zP_prev = Dict{Int, Float64}()
     zQ_prev = Dict{Int, Float64}()
 
-    dualsP = Dict{Int, Dict{Int, Float64}}(zone_id => Dict{Int, Float64}() for zone_id in zone_ids)
-    dualsQ = Dict{Int, Dict{Int, Float64}}(zone_id => Dict{Int, Float64}() for zone_id in zone_ids)
+    dualsP = Dict{Int, Dict{Int, Float64}}(
+        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
+    )
+    dualsQ = Dict{Int, Dict{Int, Float64}}(
+        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
+    )
 
     # ---------- diagnostics ----------
     hist = ADMMHistory()
@@ -473,7 +486,8 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
             m = sub.model::JuMP.Model
 
             lin = _build_linear_branch_pq_expr(
-                sub, sub.zone_edges, zP, zQ, dualsP[zone_id], dualsQ[zone_id], rhoP[], rhoQ[],
+                sub, sub.zone_edges, zP, zQ, dualsP[zone_id], dualsQ[zone_id], rhoP[],
+                rhoQ[],
             )
 
             @objective(m, Min, sub.obj_static + lin)
@@ -604,9 +618,13 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
     v2bar_prev = similar(v2bar)
 
     duals_v2 =
-        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
+        Dict{Int, Vector{Float64}}(
+            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+        )
     lambda_zone_buf =
-        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
+        Dict{Int, Vector{Float64}}(
+            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+        )
 
     zP = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zQ = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
@@ -618,10 +636,18 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
     zR_prev = Dict{Int, Float64}()
     zT_prev = Dict{Int, Float64}()
 
-    dualsP = Dict{Int, Dict{Int, Float64}}(zone_id => Dict{Int, Float64}() for zone_id in zone_ids)
-    dualsQ = Dict{Int, Dict{Int, Float64}}(zone_id => Dict{Int, Float64}() for zone_id in zone_ids)
-    dualsR = Dict{Int, Dict{Int, Float64}}(zone_id => Dict{Int, Float64}() for zone_id in zone_ids)
-    dualsT = Dict{Int, Dict{Int, Float64}}(zone_id => Dict{Int, Float64}() for zone_id in zone_ids)
+    dualsP = Dict{Int, Dict{Int, Float64}}(
+        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
+    )
+    dualsQ = Dict{Int, Dict{Int, Float64}}(
+        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
+    )
+    dualsR = Dict{Int, Dict{Int, Float64}}(
+        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
+    )
+    dualsT = Dict{Int, Dict{Int, Float64}}(
+        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
+    )
 
     # ---------- diagnostics ----------
     hist = ADMMHistory()
@@ -662,10 +688,12 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
                 sub, shared_buses_sorted, shared_buses_idx, v2_target, lambdaz, rhoV2[],
             )
             lin_pq = _build_linear_branch_pq_expr(
-                sub, sub.zone_edges, zP, zQ, dualsP[zone_id], dualsQ[zone_id], rhoP[], rhoQ[],
+                sub, sub.zone_edges, zP, zQ, dualsP[zone_id], dualsQ[zone_id], rhoP[],
+                rhoQ[],
             )
             lin_rt = _build_linear_branch_rt_expr(
-                sub, sub.zone_edges, zR, zT, dualsR[zone_id], dualsT[zone_id], rhoR[], rhoT[],
+                sub, sub.zone_edges, zR, zT, dualsR[zone_id], dualsT[zone_id], rhoR[],
+                rhoT[],
             )
 
             @objective(m, Min, sub.obj_static + (lin_bus + lin_pq + lin_rt))

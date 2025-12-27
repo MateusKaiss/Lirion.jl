@@ -11,7 +11,6 @@ function _build_quad_bus_expr!(part::PartitionDC, rho::Float64)
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     q = zero(JuMP.QuadExpr)
 
-    # termo (rho/2)*‖theta_shared‖² pra cada barra compartilhada
     for b in part.shared_buses_local
         q += 0.5 * rho * theta[b, 1]^2
     end
@@ -61,7 +60,7 @@ function _build_linear_bus_expr(
 )
     m = part.model::JuMP.Model
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
-    lin = zero(JuMP.AffExpr) # cria expressão linear vazia
+    lin = zero(JuMP.AffExpr)
 
     for b in part.shared_buses_local
         j = b2pos[b]

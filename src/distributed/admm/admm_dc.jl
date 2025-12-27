@@ -65,7 +65,12 @@ function init_dc_bus_partition!(
     rho_theta::Float64,
 )
     for zone_id in zone_ids
-        init_dc_bus_partition!(partitions[zone_id], sys.parts[zone_id], optimizer_factory, rho_theta)
+        init_dc_bus_partition!(
+            partitions[zone_id],
+            sys.parts[zone_id],
+            optimizer_factory,
+            rho_theta,
+        )
     end
     return nothing
 end
@@ -210,14 +215,17 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     n_zones = length(zone_ids)
 
     dual_theta =
-        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
+        Dict{Int, Vector{Float64}}(
+            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+        )
     dual_theta_buf =
-        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
+        Dict{Int, Vector{Float64}}(
+            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+        )
 
     theta_consensus = zeros(Float64, n_shared_buses)
     theta_consensus_prev = similar(theta_consensus)
 
-    # ---------- diagnostics ----------
     hist = ADMMHistory()
     hist.meta[:kind] = :dc_bus
     hist.meta[:tag] = "admm_dc_bus"
@@ -347,8 +355,6 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
 
         maybe_adapt_rho!(adaptive, rho, r, s, config)
     end
-
-    # heatmaps opcionais
     hist.heatmaps[:theta_avg] = theta_avg_history
     hist.heatmaps[:theta_local] = theta_local_history
 
@@ -409,7 +415,9 @@ function run_admm_branch(
     z_flow = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     z_flow_prev = Dict{Int, Float64}()
 
-    duals = Dict{Int, Dict{Int, Float64}}(zone_id => Dict{Int, Float64}() for zone_id in zone_ids)
+    duals = Dict{Int, Dict{Int, Float64}}(
+        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
+    )
     hist = ADMMHistory()
     hist.meta[:kind] = :dc_branch
     hist.meta[:tag] = "admm_dc_branch"
@@ -440,7 +448,13 @@ function run_admm_branch(
             part = partitions[zone_id]
             m = part.model::JuMP.Model
 
-            lin = _build_linear_branch_expr(part, part.zone_edges, z_flow, duals[zone_id], rho[])
+            lin = _build_linear_branch_expr(
+                part,
+                part.zone_edges,
+                z_flow,
+                duals[zone_id],
+                rho[],
+            )
 
             @objective(m, Min, part.obj_base + part.quad_branch_expr + lin)
             optimize!(m)
@@ -562,12 +576,17 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
     z_flow_prev = Dict{Int, Float64}()
 
     duals_theta =
-        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
+        Dict{Int, Vector{Float64}}(
+            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+        )
     dual_theta_buf =
-        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
-    duals_flow = Dict{Int, Dict{Int, Float64}}(zone_id => Dict{Int, Float64}() for zone_id in zone_ids)
+        Dict{Int, Vector{Float64}}(
+            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+        )
+    duals_flow = Dict{Int, Dict{Int, Float64}}(
+        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
+    )
 
-    # ---------- diagnostics ----------
     hist = ADMMHistory()
     hist.meta[:kind] = :dc_hybrid
     hist.meta[:tag] = "admm_dc_hybrid"

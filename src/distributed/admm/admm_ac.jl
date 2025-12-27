@@ -221,14 +221,22 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
     n_shared_buses = length(shared_buses_sorted)
 
     duals_theta =
-        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
+        Dict{Int, Vector{Float64}}(
+            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+        )
     duals_v =
-        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
+        Dict{Int, Vector{Float64}}(
+            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+        )
 
     lambdatheta_zone_buf =
-        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
+        Dict{Int, Vector{Float64}}(
+            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+        )
     lambdaV_zone_buf =
-        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
+        Dict{Int, Vector{Float64}}(
+            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+        )
 
     theta_consensus = zeros(Float64, n_shared_buses)
     vmag_consensus = ones(Float64, n_shared_buses)
@@ -459,8 +467,12 @@ function run_admm_ac_branch(
     zone_ids = collect(keys(partitions))
     n_zones = length(zone_ids)
 
-    duals_p = Dict{Int, Dict{Int, Float64}}(zone_id => Dict{Int, Float64}() for zone_id in zone_ids)
-    duals_q = Dict{Int, Dict{Int, Float64}}(zone_id => Dict{Int, Float64}() for zone_id in zone_ids)
+    duals_p = Dict{Int, Dict{Int, Float64}}(
+        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
+    )
+    duals_q = Dict{Int, Dict{Int, Float64}}(
+        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
+    )
 
     zP = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zQ = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
@@ -633,17 +645,29 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
     n_shared_buses = length(shared_buses_sorted)
 
     duals_theta =
-        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
+        Dict{Int, Vector{Float64}}(
+            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+        )
     duals_v =
-        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
+        Dict{Int, Vector{Float64}}(
+            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+        )
 
     lambdatheta_zone_buf =
-        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
+        Dict{Int, Vector{Float64}}(
+            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+        )
     lambdaV_zone_buf =
-        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
+        Dict{Int, Vector{Float64}}(
+            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+        )
 
-    duals_p = Dict{Int, Dict{Int, Float64}}(zone_id => Dict{Int, Float64}() for zone_id in zone_ids)
-    duals_q = Dict{Int, Dict{Int, Float64}}(zone_id => Dict{Int, Float64}() for zone_id in zone_ids)
+    duals_p = Dict{Int, Dict{Int, Float64}}(
+        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
+    )
+    duals_q = Dict{Int, Dict{Int, Float64}}(
+        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
+    )
 
     theta_consensus = zeros(Float64, n_shared_buses)
     vmag_consensus = ones(Float64, n_shared_buses)
