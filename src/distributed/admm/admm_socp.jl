@@ -45,7 +45,7 @@ function init_socp_v2rt_partition!(
 end
 
 function init_socp_v2rt_partition!(
-    partitions::Dict{Int, PartitionSOCP},
+    partitions::Partitions{PartitionSOCP},
     sys::ADMMSystem,
     zone_ids::Vector{Int},
     optimizer_factory,
@@ -56,7 +56,7 @@ function init_socp_v2rt_partition!(
 )
     for zone_id in zone_ids
         init_socp_v2rt_partition!(
-            partitions[zone_id],
+            getzone(partitions, zone_id),
             sys.parts[zone_id],
             optimizer_factory,
             rhoV2,
@@ -111,7 +111,7 @@ function init_socp_pq_partition!(
 end
 
 function init_socp_pq_partition!(
-    partitions::Dict{Int, PartitionSOCP},
+    partitions::Partitions{PartitionSOCP},
     sys::ADMMSystem,
     zone_ids::Vector{Int},
     optimizer_factory,
@@ -121,7 +121,7 @@ function init_socp_pq_partition!(
 )
     for zone_id in zone_ids
         init_socp_pq_partition!(
-            partitions[zone_id],
+            getzone(partitions, zone_id),
             sys.parts[zone_id],
             optimizer_factory,
             rhoP,
@@ -176,7 +176,7 @@ function init_socp_hybrid_partition!(
 end
 
 function init_socp_hybrid_partition!(
-    partitions::Dict{Int, PartitionSOCP},
+    partitions::Partitions{PartitionSOCP},
     sys::ADMMSystem,
     zone_ids::Vector{Int},
     optimizer_factory,
@@ -189,7 +189,7 @@ function init_socp_hybrid_partition!(
 )
     for zone_id in zone_ids
         init_socp_hybrid_partition!(
-            partitions[zone_id],
+            getzone(partitions, zone_id),
             sys.parts[zone_id],
             optimizer_factory,
             rhoV2,
@@ -233,8 +233,8 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
 
     optimizer_factory = resolve_socp_optimizer(config)
 
-    partitions = build_socp_partitions(sys)
-    zone_ids = collect(keys(partitions))
+    partitions = build_socp_partitions(sys)     # ::Partitions{PartitionSOCP}
+    zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
     shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
@@ -243,14 +243,12 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
     v2bar = ones(Float64, n_shared_buses)
     v2bar_prev = similar(v2bar)
 
-    duals_v2 =
-        Dict{Int, Vector{Float64}}(
-            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-        )
-    lambda_zone_buf =
-        Dict{Int, Vector{Float64}}(
-            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-        )
+    duals_v2 = Dict{Int, Vector{Float64}}(
+        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+    )
+    lambda_zone_buf = Dict{Int, Vector{Float64}}(
+        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+    )
 
     zR = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zT = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
@@ -294,7 +292,7 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            sub = partitions[zone_id]
+            sub = getzone(partitions, zone_id)
             m = sub.model::JuMP.Model
 
             lambda_z = (lambda_zone_buf[zone_id] .= duals_v2[zone_id])
@@ -317,7 +315,7 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
         end
 
         for (i, zone_id) in enumerate(zone_ids)
-            sub = partitions[zone_id]
+            sub = getzone(partitions, zone_id)
             out = results[i]
             sub.has_solution = true
             sub.generation_cost_model_expr = out.gen_cost_expr
@@ -400,8 +398,8 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
 
     hist.heatmaps[:v2_avg] = v2_avg_history
 
-    total_real_cost = sum(p.real_generation_cost for p in values(partitions))
-    total_expr_cost = sum(p.generation_cost_model_expr for p in values(partitions))
+    total_real_cost = sum(p.real_generation_cost for p in partitions.parts)
+    total_expr_cost = sum(p.generation_cost_model_expr for p in partitions.parts)
 
     elapsed_s = (time_ns() - t0_ns) / 1e9
     println("\n[ADMM-SOCP (V²+R,T)] Resumo:")
@@ -450,8 +448,9 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
 
     optimizer_factory = resolve_socp_optimizer(config)
 
-    partitions = build_socp_partitions(sys)
-    zone_ids = collect(keys(partitions))
+    partitions = build_socp_partitions(sys)   # ::Partitions{PartitionSOCP}
+    zone_ids = partitions.zones
+    n_zones = length(zone_ids)
 
     zP = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zQ = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
@@ -481,8 +480,9 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
 
         refresh_rho_pq_socp!(partitions, rhoP, prev_rhoP, rhoQ, prev_rhoQ)
 
-        for zone_id in zone_ids
-            sub = partitions[zone_id]
+        Threads.@threads for i in 1:n_zones
+            zone_id = zone_ids[i]
+            sub = getzone(partitions, zone_id)
             m = sub.model::JuMP.Model
 
             lin = _build_linear_branch_pq_expr(
@@ -528,8 +528,8 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
         maybe_adapt_rho!(adaptive, rhoP, rhoQ, r, s, config)
     end
 
-    total_real_cost = sum(p.real_generation_cost for p in values(partitions))
-    total_expr_cost = sum(p.generation_cost_model_expr for p in values(partitions))
+    total_real_cost = sum(p.real_generation_cost for p in partitions.parts)
+    total_expr_cost = sum(p.generation_cost_model_expr for p in partitions.parts)
 
     elapsed_s = (time_ns() - t0_ns) / 1e9
     println("\n[ADMM-SOCP-branch (P,Q)] Resumo:")
@@ -607,8 +607,8 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
 
     optimizer_factory = resolve_socp_optimizer(config)
 
-    partitions = build_socp_partitions(sys)
-    zone_ids = collect(keys(partitions))
+    partitions = build_socp_partitions(sys)   # ::Partitions{PartitionSOCP}
+    zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
     shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
@@ -617,14 +617,12 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
     v2bar = ones(Float64, n_shared_buses)
     v2bar_prev = similar(v2bar)
 
-    duals_v2 =
-        Dict{Int, Vector{Float64}}(
-            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-        )
-    lambda_zone_buf =
-        Dict{Int, Vector{Float64}}(
-            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-        )
+    duals_v2 = Dict{Int, Vector{Float64}}(
+        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+    )
+    lambda_zone_buf = Dict{Int, Vector{Float64}}(
+        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+    )
 
     zP = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zQ = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
@@ -679,7 +677,7 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            sub = partitions[zone_id]
+            sub = getzone(partitions, zone_id)
             m = sub.model::JuMP.Model
 
             lambda_z = (lambda_zone_buf[zone_id] .= duals_v2[zone_id])
@@ -814,8 +812,8 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
 
     hist.heatmaps[:v2_avg] = v2_avg_history
 
-    total_real_cost = sum(p.real_generation_cost for p in values(partitions))
-    total_expr_cost = sum(p.generation_cost_model_expr for p in values(partitions))
+    total_real_cost = sum(p.real_generation_cost for p in partitions.parts)
+    total_expr_cost = sum(p.generation_cost_model_expr for p in partitions.parts)
 
     elapsed_s = (time_ns() - t0_ns) / 1e9
     println("\n[ADMM-SOCP-hybrid] Resumo:")

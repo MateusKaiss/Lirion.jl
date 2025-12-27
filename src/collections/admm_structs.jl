@@ -1,3 +1,25 @@
+struct Partitions{P}
+    parts::Vector{P}
+    zones::Vector{Int}
+    zone_to_idx::Dict{Int, Int}
+end
+
+Base.length(ps::Partitions) = length(ps.parts)
+Base.iterate(ps::Partitions, st::Int = 1) =
+    st > length(ps.parts) ? nothing : (ps.parts[st], st + 1)
+Base.getindex(ps::Partitions, i::Int) = ps.parts[i]
+
+@inline function getzone(ps::Partitions, zone::Int)
+    return ps.parts[ps.zone_to_idx[zone]]
+end
+
+@inline function zoneindex(ps::Partitions, zone::Int)
+    return ps.zone_to_idx[zone]
+end
+
+# =======================================================================
+# ADMM Partitions structs
+# =======================================================================
 mutable struct PartitionDC
     id::Int
     bus::BusData
@@ -90,13 +112,15 @@ end
 # =======================================================================
 # ADMM Partitions Builders
 # =======================================================================
-function build_ac_partitions(sys::ADMMSystem)::Dict{Int, PartitionAC}
-    parts = Dict{Int, PartitionAC}()
 
-    for (zone, s) in sys.parts
-        bus = s.bus
-        branch = s.branch
-        gen = s.gen
+function build_ac_partitions(sys::ADMMSystem)::Partitions{PartitionAC}
+    zones = sort!(collect(keys(sys.parts)))
+    parts = Vector{PartitionAC}(undef, length(zones))
+    zone_to_idx = Dict{Int, Int}(zone => i for (i, zone) in pairs(zones))
+
+    for (i, zone) in pairs(zones)
+        s = sys.parts[zone]
+        bus, branch, gen = s.bus, s.branch, s.gen
 
         raw = s.raw
         branch_local_indices = raw["branch_local_indices"]::Vector{Int}
@@ -105,7 +129,7 @@ function build_ac_partitions(sys::ADMMSystem)::Dict{Int, PartitionAC}
 
         zone_edges = Int[]
 
-        parts[zone] = PartitionAC(
+        parts[i] = PartitionAC(
             zone,
             bus,
             branch,
@@ -123,6 +147,8 @@ function build_ac_partitions(sys::ADMMSystem)::Dict{Int, PartitionAC}
             nothing,
             nothing,
             nothing,
+            # obs: seus tipos aqui são NonlinearExpr/QuadExpr;
+            # deixei igual ao que você tinha (zero(QuadExpr)).
             zero(JuMP.QuadExpr),
             0.0,
             0.0,
@@ -137,16 +163,17 @@ function build_ac_partitions(sys::ADMMSystem)::Dict{Int, PartitionAC}
         )
     end
 
-    return parts
+    return Partitions{PartitionAC}(parts, zones, zone_to_idx)
 end
 
-function build_dc_partitions(sys::ADMMSystem)::Dict{Int, PartitionDC}
-    parts = Dict{Int, PartitionDC}()
+function build_dc_partitions(sys::ADMMSystem)::Partitions{PartitionDC}
+    zones = sort!(collect(keys(sys.parts)))
+    parts = Vector{PartitionDC}(undef, length(zones))
+    zone_to_idx = Dict{Int, Int}(zone => i for (i, zone) in pairs(zones))
 
-    for (zone, s) in sys.parts
-        bus = s.bus
-        branch = s.branch
-        gen = s.gen
+    for (i, zone) in pairs(zones)
+        s = sys.parts[zone]
+        bus, branch, gen = s.bus, s.branch, s.gen
 
         raw = s.raw
         branch_local_indices = raw["branch_local_indices"]::Vector{Int}
@@ -155,7 +182,7 @@ function build_dc_partitions(sys::ADMMSystem)::Dict{Int, PartitionDC}
 
         zone_edges = Int[]
 
-        parts[zone] = PartitionDC(
+        parts[i] = PartitionDC(
             zone,
             bus,
             branch,
@@ -182,16 +209,17 @@ function build_dc_partitions(sys::ADMMSystem)::Dict{Int, PartitionDC}
         )
     end
 
-    return parts
+    return Partitions{PartitionDC}(parts, zones, zone_to_idx)
 end
 
-function build_socp_partitions(sys::ADMMSystem)::Dict{Int, PartitionSOCP}
-    parts = Dict{Int, PartitionSOCP}()
+function build_socp_partitions(sys::ADMMSystem)::Partitions{PartitionSOCP}
+    zones = sort!(collect(keys(sys.parts)))
+    parts = Vector{PartitionSOCP}(undef, length(zones))
+    zone_to_idx = Dict{Int, Int}(zone => i for (i, zone) in pairs(zones))
 
-    for (zone, s) in sys.parts
-        bus = s.bus
-        branch = s.branch
-        gen = s.gen
+    for (i, zone) in pairs(zones)
+        s = sys.parts[zone]
+        bus, branch, gen = s.bus, s.branch, s.gen
 
         raw = s.raw
         branch_local_indices = raw["branch_local_indices"]::Vector{Int}
@@ -200,7 +228,7 @@ function build_socp_partitions(sys::ADMMSystem)::Dict{Int, PartitionSOCP}
 
         zone_edges = Int[]
 
-        parts[zone] = PartitionSOCP(
+        parts[i] = PartitionSOCP(
             zone,
             bus,
             branch,
@@ -233,5 +261,5 @@ function build_socp_partitions(sys::ADMMSystem)::Dict{Int, PartitionSOCP}
         )
     end
 
-    return parts
+    return Partitions{PartitionSOCP}(parts, zones, zone_to_idx)
 end

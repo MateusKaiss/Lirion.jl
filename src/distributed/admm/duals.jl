@@ -8,14 +8,14 @@
 @inline function update_duals_bus_ac_all!(
     duals_theta::Dict{Int, Vector{Float64}},
     duals_v::Dict{Int, Vector{Float64}},
-    partitions,
-    zone_ids,
+    partitions::Partitions{PartitionAC},
+    zone_ids::AbstractVector{Int},
     theta_consensus::Vector{Float64},
     vmag_consensus::Vector{Float64},
     rho_theta::Base.RefValue{Float64},
     rho_v::Base.RefValue{Float64},
-    shared_buses_sorted,
-    shared_buses_idx;
+    shared_buses_sorted::AbstractVector{Int},
+    shared_buses_idx::Dict{Int, Int};
     α = nothing,
     theta_consensus_prev = nothing,
     vmag_consensus_prev = nothing,
@@ -24,10 +24,11 @@
     ρv = rho_v[]
 
     @inbounds for z in zone_ids
+        part = getzone(partitions, z)
         update_duals_bus_ac_vec!(
             duals_theta[z],
             duals_v[z],
-            partitions[z],
+            part,
             theta_consensus,
             vmag_consensus,
             ρθ,
@@ -92,7 +93,7 @@ end
 function update_duals_branch_ac!(
     dualsP::Dict{Int, Dict{Int, Float64}},
     dualsQ::Dict{Int, Dict{Int, Float64}},
-    partitions::Dict{Int, PartitionAC},
+    partitions::Partitions{PartitionAC},
     zP::Dict{Int, Float64},
     zQ::Dict{Int, Float64},
     cut_edges::Vector{Int},
@@ -102,14 +103,15 @@ function update_duals_branch_ac!(
     zP_prev::Union{Nothing, Dict{Int, Float64}} = nothing,
     zQ_prev::Union{Nothing, Dict{Int, Float64}} = nothing,
 )
-    for (z, part) in partitions
+    for part in partitions
+        z = part.id
         m = part.model::JuMP.Model
         lambdaPz = get!(dualsP, z, Dict{Int, Float64}())
         lambdaQz = get!(dualsQ, z, Dict{Int, Float64}())
 
-        for e in part.zone_edges
-            l_local = get(part.edge_to_local, e, nothing)
-            l_local === nothing && continue
+        @inbounds for e in part.zone_edges
+            l_local = get(part.edge_to_local, e, 0)
+            l_local == 0 && continue
 
             P_loc, Q_loc = _ac_flow_from_exprs_existing(part, l_local)
             pval = JuMP.value(P_loc)
@@ -144,19 +146,20 @@ end
 # ------------------------------------------------------------
 
 @inline function update_duals_theta_all!(
-    dual_theta,
-    partitions,
-    zone_ids,
+    dual_theta::Dict{Int, Vector{Float64}},
+    partitions::Partitions{PartitionDC},
+    zone_ids::AbstractVector{Int},
     theta_consensus::Vector{Float64},
     rho::Base.RefValue{Float64},
-    shared_buses_sorted,
-    shared_buses_idx,
+    shared_buses_sorted::AbstractVector{Int},
+    shared_buses_idx::Dict{Int, Int},
 )
     ρ = rho[]
     @inbounds for z in zone_ids
+        part = getzone(partitions, z)
         update_duals_theta_vec!(
             dual_theta[z],
-            partitions[z],
+            part,
             theta_consensus,
             ρ,
             shared_buses_sorted,
@@ -190,19 +193,21 @@ end
 
 function update_duals_flow!(
     duals::Dict{Int, Dict{Int, Float64}},
-    partitions::Dict{Int, PartitionDC},
+    partitions::Partitions{PartitionDC},
     z_flow::Dict{Int, Float64},
     cut_edges::Vector{Int},
     rho::Float64,
 )
-    for (z, part) in partitions
+    for part in partitions
+        z = part.id
         m = part.model::JuMP.Model
-        @inbounds for e in cut_edges
-            l_local = get(part.edge_to_local, e, nothing)
-            if l_local !== nothing
-                p_val = _dc_flow_val_model(m, part, l_local)
-                duals[z][e] = get(duals[z], e, 0.0) + rho * (p_val - z_flow[e])
-            end
+        dz = get!(duals, z, Dict{Int, Float64}())
+
+        @inbounds for e in part.zone_edges
+            l_local = get(part.edge_to_local, e, 0)
+            l_local == 0 && continue
+            p_val = _dc_flow_val_model(m, part, l_local)
+            dz[e] = get(dz, e, 0.0) + rho * (p_val - get(z_flow, e, 0.0))
         end
     end
     return nothing
@@ -244,19 +249,20 @@ end
 
 @inline function update_duals_v2_all!(
     duals_v2::Dict{Int, Vector{Float64}},
-    partitions::Dict{Int, PartitionSOCP},
+    partitions::Partitions{PartitionSOCP},
     zone_ids::AbstractVector{Int},
     v2bar::Vector{Float64},
     v2bar_prev::Vector{Float64},
     rhoV2::Float64,
     α_used,
     shared_buses_sorted::AbstractVector{Int},
-    shared_buses_idx,
+    shared_buses_idx::Dict{Int, Int},
 )
     @inbounds for z in zone_ids
+        sub = getzone(partitions, z)
         update_duals_v2_vec!(
             duals_v2[z],
-            partitions[z],
+            sub,
             v2bar,
             v2bar_prev,
             rhoV2,
@@ -275,7 +281,7 @@ end
 @inline function update_duals_rt_all!(
     dualsR::Dict{Int, Dict{Int, Float64}},
     dualsT::Dict{Int, Dict{Int, Float64}},
-    partitions::Dict{Int, PartitionSOCP},
+    partitions::Partitions{PartitionSOCP},
     zone_ids::AbstractVector{Int},
     zR::Dict{Int, Float64},
     zT::Dict{Int, Float64},
@@ -283,14 +289,17 @@ end
     rhoT::Float64,
 )
     @inbounds for z in zone_ids
-        sub = partitions[z]
+        sub = getzone(partitions, z)
         m = sub.model::JuMP.Model
+        dR = get!(dualsR, z, Dict{Int, Float64}())
+        dT = get!(dualsT, z, Dict{Int, Float64}())
+
         @inbounds for e in sub.zone_edges
-            l = get(sub.edge_to_local, e, nothing)
-            l === nothing && continue
+            l = get(sub.edge_to_local, e, 0)
+            l == 0 && continue
             R, T = _rt_from_exprs_socp(m, l)
-            dualsR[z][e] = get(dualsR[z], e, 0.0) + rhoR * (value(R) - zR[e])
-            dualsT[z][e] = get(dualsT[z], e, 0.0) + rhoT * (value(T) - zT[e])
+            dR[e] = get(dR, e, 0.0) + rhoR * (JuMP.value(R) - get(zR, e, 0.0))
+            dT[e] = get(dT, e, 0.0) + rhoT * (JuMP.value(T) - get(zT, e, 0.0))
         end
     end
     return nothing
@@ -303,7 +312,7 @@ end
 @inline function update_duals_pq_all!(
     dualsP::Dict{Int, Dict{Int, Float64}},
     dualsQ::Dict{Int, Dict{Int, Float64}},
-    partitions::Dict{Int, PartitionSOCP},
+    partitions::Partitions{PartitionSOCP},
     zone_ids::AbstractVector{Int},
     zP::Dict{Int, Float64},
     zQ::Dict{Int, Float64},
@@ -311,14 +320,17 @@ end
     rhoQ::Float64,
 )
     @inbounds for z in zone_ids
-        sub = partitions[z]
+        sub = getzone(partitions, z)
         m = sub.model::JuMP.Model
+        dP = get!(dualsP, z, Dict{Int, Float64}())
+        dQ = get!(dualsQ, z, Dict{Int, Float64}())
+
         @inbounds for e in sub.zone_edges
-            l = get(sub.edge_to_local, e, nothing)
-            l === nothing && continue
+            l = get(sub.edge_to_local, e, 0)
+            l == 0 && continue
             P, Q = _socp_flow_from_exprs_existing(m, l)
-            dualsP[z][e] = get(dualsP[z], e, 0.0) + rhoP * (value(P) - zP[e])
-            dualsQ[z][e] = get(dualsQ[z], e, 0.0) + rhoQ * (value(Q) - zQ[e])
+            dP[e] = get(dP, e, 0.0) + rhoP * (JuMP.value(P) - get(zP, e, 0.0))
+            dQ[e] = get(dQ, e, 0.0) + rhoQ * (JuMP.value(Q) - get(zQ, e, 0.0))
         end
     end
     return nothing

@@ -58,7 +58,7 @@ function init_dc_bus_partition!(
 end
 
 function init_dc_bus_partition!(
-    partitions::Dict{Int, PartitionDC},
+    partitions::Partitions{PartitionDC},
     sys::ADMMSystem,
     zone_ids::Vector{Int},
     optimizer_factory,
@@ -66,7 +66,7 @@ function init_dc_bus_partition!(
 )
     for zone_id in zone_ids
         init_dc_bus_partition!(
-            partitions[zone_id],
+            getzone(partitions, zone_id),
             sys.parts[zone_id],
             optimizer_factory,
             rho_theta,
@@ -108,7 +108,7 @@ function init_dc_branch_partition!(
 end
 
 function init_dc_branch_partition!(
-    partitions::Dict{Int, PartitionDC},
+    partitions::Partitions{PartitionDC},
     sys::ADMMSystem,
     zone_ids::Vector{Int},
     optimizer_factory,
@@ -117,7 +117,7 @@ function init_dc_branch_partition!(
 )
     for zone_id in zone_ids
         init_dc_branch_partition!(
-            partitions[zone_id],
+            getzone(partitions, zone_id),
             sys.parts[zone_id],
             optimizer_factory,
             rhoe,
@@ -163,7 +163,7 @@ function init_dc_hybrid_partition!(
 end
 
 function init_dc_hybrid_partition!(
-    partitions::Dict{Int, PartitionDC},
+    partitions::Partitions{PartitionDC},
     sys::ADMMSystem,
     zone_ids::Vector{Int},
     optimizer_factory,
@@ -173,7 +173,7 @@ function init_dc_hybrid_partition!(
 )
     for zone_id in zone_ids
         init_dc_hybrid_partition!(
-            partitions[zone_id],
+            getzone(partitions, zone_id),
             sys.parts[zone_id],
             optimizer_factory,
             rho_theta,
@@ -207,21 +207,19 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
 
     optimizer_factory = resolve_optimizer_dc(config)
 
-    partitions = build_dc_partitions(sys)
-    zone_ids = collect(keys(partitions))
+    partitions = build_dc_partitions(sys)          # ::Partitions{PartitionDC}
+    zone_ids = partitions.zones                    # ordem estável
+    n_zones = length(zone_ids)
 
     shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
-    n_zones = length(zone_ids)
 
-    dual_theta =
-        Dict{Int, Vector{Float64}}(
-            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-        )
-    dual_theta_buf =
-        Dict{Int, Vector{Float64}}(
-            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-        )
+    dual_theta = Dict{Int, Vector{Float64}}(
+        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+    )
+    dual_theta_buf = Dict{Int, Vector{Float64}}(
+        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+    )
 
     theta_consensus = zeros(Float64, n_shared_buses)
     theta_consensus_prev = similar(theta_consensus)
@@ -252,7 +250,7 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            part = partitions[zone_id]
+            part = getzone(partitions, zone_id)
             m = part.model::JuMP.Model
 
             lambda_z = gather_zone_lambda!(dual_theta_buf[zone_id], dual_theta[zone_id])
@@ -284,7 +282,7 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
         end
 
         for (i, zone_id) in enumerate(zone_ids)
-            part = partitions[zone_id]
+            part = getzone(partitions, zone_id)
             out = results[i]
             part.has_solution = true
             part.generation_cost_model_expr = out.gen_cost_expr
@@ -355,11 +353,12 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
 
         maybe_adapt_rho!(adaptive, rho, r, s, config)
     end
+
     hist.heatmaps[:theta_avg] = theta_avg_history
     hist.heatmaps[:theta_local] = theta_local_history
 
-    total_real_cost = sum(p.real_generation_cost for p in values(partitions))
-    total_expr_cost = sum(p.generation_cost_model_expr for p in values(partitions))
+    total_real_cost = sum(p.real_generation_cost for p in partitions.parts)
+    total_expr_cost = sum(p.generation_cost_model_expr for p in partitions.parts)
 
     elapsed_s = (time_ns() - t0_ns) / 1e9
     println("\nResumo (bus/DC):")
@@ -408,8 +407,8 @@ function run_admm_branch(
 
     optimizer_factory = resolve_optimizer_dc(config)
 
-    partitions = build_dc_partitions(sys)
-    zone_ids = collect(keys(partitions))
+    partitions = build_dc_partitions(sys)   # ::Partitions{PartitionDC}
+    zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
     z_flow = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
@@ -418,6 +417,7 @@ function run_admm_branch(
     duals = Dict{Int, Dict{Int, Float64}}(
         zone_id => Dict{Int, Float64}() for zone_id in zone_ids
     )
+
     hist = ADMMHistory()
     hist.meta[:kind] = :dc_branch
     hist.meta[:tag] = "admm_dc_branch"
@@ -445,7 +445,7 @@ function run_admm_branch(
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            part = partitions[zone_id]
+            part = getzone(partitions, zone_id)
             m = part.model::JuMP.Model
 
             lin = _build_linear_branch_expr(
@@ -466,7 +466,7 @@ function run_admm_branch(
         end
 
         for (i, zone_id) in enumerate(zone_ids)
-            part = partitions[zone_id]
+            part = getzone(partitions, zone_id)
             out = results[i]
             part.has_solution = true
             part.generation_cost_model_expr = out.gen_cost_expr
@@ -512,8 +512,8 @@ function run_admm_branch(
         end
     end
 
-    total_real_cost = sum(p.real_generation_cost for p in values(partitions))
-    total_expr_cost = sum(p.generation_cost_model_expr for p in values(partitions))
+    total_real_cost = sum(p.real_generation_cost for p in partitions.parts)
+    total_expr_cost = sum(p.generation_cost_model_expr for p in partitions.parts)
 
     elapsed_s = (time_ns() - t0_ns) / 1e9
     println("\n[ADMM-branch/DC] Resumo:")
@@ -563,7 +563,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
     optimizer_factory = resolve_optimizer_dc(config)
 
     partitions = build_dc_partitions(sys)
-    zone_ids = collect(keys(partitions))
+    zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
     shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
@@ -575,14 +575,12 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
     z_flow = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     z_flow_prev = Dict{Int, Float64}()
 
-    duals_theta =
-        Dict{Int, Vector{Float64}}(
-            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-        )
-    dual_theta_buf =
-        Dict{Int, Vector{Float64}}(
-            zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-        )
+    duals_theta = Dict{Int, Vector{Float64}}(
+        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+    )
+    dual_theta_buf = Dict{Int, Vector{Float64}}(
+        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+    )
     duals_flow = Dict{Int, Dict{Int, Float64}}(
         zone_id => Dict{Int, Float64}() for zone_id in zone_ids
     )
@@ -618,17 +616,25 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            part = partitions[zone_id]
+            part = getzone(partitions, zone_id)
             m = part.model::JuMP.Model
 
             lambdatheta = gather_zone_lambda!(dual_theta_buf[zone_id], duals_theta[zone_id])
 
             lin_bus = _build_linear_bus_expr(
-                part, shared_buses_sorted, shared_buses_idx, theta_consensus,
-                lambdatheta, rho_theta[],
+                part,
+                shared_buses_sorted,
+                shared_buses_idx,
+                theta_consensus,
+                lambdatheta,
+                rho_theta[],
             )
             lin_branch = _build_linear_branch_expr(
-                part, part.zone_edges, z_flow, duals_flow[zone_id], rho_flow[],
+                part,
+                part.zone_edges,
+                z_flow,
+                duals_flow[zone_id],
+                rho_flow[],
             )
 
             @objective(
@@ -646,7 +652,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
         end
 
         for (i, zone_id) in enumerate(zone_ids)
-            part = partitions[zone_id]
+            part = getzone(partitions, zone_id)
             out = results[i]
             part.has_solution = true
             part.generation_cost_model_expr = out.gen_cost_expr
@@ -726,8 +732,8 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
 
     hist.heatmaps[:theta_avg] = theta_avg_history
 
-    total_real_cost = sum(p.real_generation_cost for p in values(partitions))
-    total_expr_cost = sum(p.generation_cost_model_expr for p in values(partitions))
+    total_real_cost = sum(p.real_generation_cost for p in partitions.parts)
+    total_expr_cost = sum(p.generation_cost_model_expr for p in partitions.parts)
 
     elapsed_s = (time_ns() - t0_ns) / 1e9
     println("\n[ADMM-hybrid/DC] Resumo:")

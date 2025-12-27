@@ -7,39 +7,22 @@ function sorted_ids_and_pos(shared_buses::Vector{Int})
     return shared_buses_sorted, shared_buses_idx
 end
 
-@inline function _zone_cut_edges(part::PartitionAC, cut_edges::Vector{Int})
-    return [e for e in cut_edges if haskey(part.edge_to_local, e)]
-end
-
-@inline function _zone_cut_edges(part::PartitionDC, cut_edges::Vector{Int})
-    return [e for e in cut_edges if haskey(part.edge_to_local, e)]
-end
-
 @inline function _zone_cut_edges(
-    sub::Union{PartitionDC, PartitionAC, PartitionSOCP},
+    part::Union{PartitionDC, PartitionAC, PartitionSOCP},
     cut_edges::Vector{Int},
 )
-    return [e for e in cut_edges if haskey(sub.edge_to_local, e)]
+    return [e for e in cut_edges if haskey(part.edge_to_local, e)]
 end
 
 # ------------------------------------------------------------
 # Value helpers (JuMP)
 # ------------------------------------------------------------
-@inline function _val_or_start(m::JuMP.Model, x::JuMP.VariableRef)
+@inline function _val_or_start(m::JuMP.Model, x::JuMP.VariableRef; default::Float64 = 0.0)
     if JuMP.has_values(m)
         return JuMP.value(x)
     else
         sv = JuMP.start_value(x)
-        return sv === nothing ? 0.0 : sv
-    end
-end
-
-@inline function _val_or_start_ac(m::JuMP.Model, x::JuMP.VariableRef)
-    if JuMP.has_values(m)
-        return JuMP.value(x)
-    else
-        sv = JuMP.start_value(x)
-        return sv === nothing ? 0.0 : sv
+        return sv === nothing ? default : sv
     end
 end
 
@@ -48,7 +31,14 @@ end
     V::JuMP.Containers.DenseAxisArray,
     b::Int,
     t::Int,
-) = _val_or_start_ac(m, V[b, t])
+) = _val_or_start(m, V[b, t]; default = 1.0)
+
+@inline _v2_val(
+    m::JuMP.Model,
+    V2::JuMP.Containers.DenseAxisArray,
+    b::Int,
+    t::Int,
+) = _val_or_start(m, V2[b, t]; default = 1.0)
 
 @inline function _theta_val(
     m::JuMP.Model,
@@ -56,66 +46,52 @@ end
     b::Int,
     t::Int,
 )
-    return _val_or_start(m, theta[b, t])
+    return _val_or_start(m, theta[b, t]; default = 0.0)
 end
-
-@inline _theta_val_ac(
-    m::JuMP.Model,
-    theta::JuMP.Containers.DenseAxisArray,
-    b::Int,
-    t::Int,
-) = _val_or_start_ac(m, theta[b, t])
 
 # ------------------------------------------------------------
 # Hotpaths preparation (allocate buffers + mapping)
 # ------------------------------------------------------------
 
 function prepare_hotpaths!(part::PartitionDC)
-    # mapa id de barra -> posição local no vetor (1..n_local)
-
-    # pega o bus_id e salva em bus_local index sua posição
-    bus_ids = part.bus.id
-    bus_local_index = Dict{Int, Int}()
-    @inbounds for (i, b) in enumerate(bus_ids)
-        bus_local_index[b] = i
-    end
-    part.bus_local_index = bus_local_index
-
-    # vetor das posições locais das barras compartilhadas
-
-    # pega o bus_compartilhado e salva em bus_local index sua posição
-
-    local_shared = part.shared_buses_local
-    shared_pos_local = Vector{Int}(undef, length(local_shared))
-    @inbounds for (k, b) in enumerate(local_shared)
-        shared_pos_local[k] = bus_local_index[b]
-    end
-    part.shared_pos_local = shared_pos_local
-
-    # buffers para snapshots
-    #guarda os buffers
-    part.theta_buf = zeros(Float64, length(bus_ids))
-    part.theta_shared_buf = zeros(Float64, length(shared_pos_local))
-    return nothing
-end
-
-function prepare_hotpaths!(part::PartitionSOCP)
-    # map bus global id -> posição local
     ids = part.bus.id
     nbus = length(ids)
 
-    if isempty(part.bus_local_index)
-        part.bus_local_index = Dict{Int, Int}(ids[i] => i for i in 1:nbus)
-    end
+    # sempre (re)gera para ficar consistente com part.bus atual
+    bus_local_index = Dict{Int, Int}(ids[i] => i for i in 1:nbus)
+    part.bus_local_index = bus_local_index
 
     lbs = part.shared_buses_local
     nshared = length(lbs)
 
-    part.shared_pos_local = Vector{Int}(undef, nshared)
+    shared_pos_local = Vector{Int}(undef, nshared)
     @inbounds for i in 1:nshared
-        b = lbs[i]
-        part.shared_pos_local[i] = part.bus_local_index[b]
+        shared_pos_local[i] = bus_local_index[lbs[i]]
     end
+    part.shared_pos_local = shared_pos_local
+
+    part.theta_buf = zeros(Float64, nbus)
+    part.theta_shared_buf = zeros(Float64, nshared)
+
+    return nothing
+end
+
+function prepare_hotpaths!(part::PartitionSOCP)
+    ids = part.bus.id
+    nbus = length(ids)
+
+    # sempre (re)gera
+    bus_local_index = Dict{Int, Int}(ids[i] => i for i in 1:nbus)
+    part.bus_local_index = bus_local_index
+
+    lbs = part.shared_buses_local
+    nshared = length(lbs)
+
+    shared_pos_local = Vector{Int}(undef, nshared)
+    @inbounds for i in 1:nshared
+        shared_pos_local[i] = bus_local_index[lbs[i]]
+    end
+    part.shared_pos_local = shared_pos_local
 
     part.v2_buf = zeros(Float64, nbus)
     part.v2_shared_buf = zeros(Float64, nshared)
@@ -124,24 +100,26 @@ function prepare_hotpaths!(part::PartitionSOCP)
 end
 
 function prepare_hotpaths_ac!(part::PartitionAC)
-    bus_ids = part.bus.id
-    bus_local_index = Dict{Int, Int}()
-    @inbounds for (i, b) in enumerate(bus_ids)
-        bus_local_index[b] = i
-    end
+    ids = part.bus.id
+    nbus = length(ids)
+
+    bus_local_index = Dict{Int, Int}(ids[i] => i for i in 1:nbus)
     part.bus_local_index = bus_local_index
 
-    local_shared = part.shared_buses_local
-    shared_pos_local = Vector{Int}(undef, length(local_shared))
-    @inbounds for (k, b) in enumerate(local_shared)
-        shared_pos_local[k] = bus_local_index[b]
+    lbs = part.shared_buses_local
+    nshared = length(lbs)
+
+    shared_pos_local = Vector{Int}(undef, nshared)
+    @inbounds for i in 1:nshared
+        shared_pos_local[i] = bus_local_index[lbs[i]]
     end
     part.shared_pos_local = shared_pos_local
 
-    part.theta_buf = zeros(Float64, length(bus_ids))
-    part.vmag_buf = ones(Float64, length(bus_ids))
-    part.theta_shared_buf = zeros(Float64, length(shared_pos_local))
-    part.vmag_shared_buf = ones(Float64, length(shared_pos_local))
+    part.theta_buf = zeros(Float64, nbus)
+    part.vmag_buf = ones(Float64, nbus)
+    part.theta_shared_buf = zeros(Float64, nshared)
+    part.vmag_shared_buf = ones(Float64, nshared)
+
     return nothing
 end
 
@@ -152,27 +130,25 @@ end
 # ---------------- DC ----------------
 
 @inline function snapshot_theta!(part::PartitionDC)
-    # theta "completo" (todas as barras da zona)
     m = part.model::JuMP.Model
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     buf = part.theta_buf
-    bus_ids = part.bus.id
-    @inbounds for i in eachindex(bus_ids)
-        buf[i] = _theta_val(m, theta, bus_ids[i], 1)
+    ids = part.bus.id
+    @inbounds for i in eachindex(ids)
+        buf[i] = _theta_val(m, theta, ids[i], 1)
     end
     return buf
 end
 
 @inline function snapshot_theta_shared!(part::PartitionDC)
-    # theta só nas barras compartilhadas da zona
     m = part.model::JuMP.Model
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     buf = part.theta_shared_buf
     pos = part.shared_pos_local
-    bus_ids = part.bus.id
+    ids = part.bus.id
     @inbounds for i in eachindex(pos)
         bidx = pos[i]
-        buf[i] = _theta_val(m, theta, bus_ids[bidx], 1)
+        buf[i] = _theta_val(m, theta, ids[bidx], 1)
     end
     return buf
 end
@@ -183,9 +159,9 @@ end
     m = part.model::JuMP.Model
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     buf = part.theta_buf
-    bus_ids = part.bus.id
-    @inbounds for i in eachindex(bus_ids)
-        buf[i] = _theta_val_ac(m, theta, bus_ids[i], 1)
+    ids = part.bus.id
+    @inbounds for i in eachindex(ids)
+        buf[i] = _theta_val(m, theta, ids[i], 1)
     end
     return buf
 end
@@ -194,9 +170,9 @@ end
     m = part.model::JuMP.Model
     V = part.vmag_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     buf = part.vmag_buf
-    bus_ids = part.bus.id
-    @inbounds for i in eachindex(bus_ids)
-        buf[i] = _vmag_val(m, V, bus_ids[i], 1)
+    ids = part.bus.id
+    @inbounds for i in eachindex(ids)
+        buf[i] = _vmag_val(m, V, ids[i], 1)
     end
     return buf
 end
@@ -206,10 +182,10 @@ end
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     buf = part.theta_shared_buf
     pos = part.shared_pos_local
-    bus_ids = part.bus.id
+    ids = part.bus.id
     @inbounds for i in eachindex(pos)
         bidx = pos[i]
-        buf[i] = _theta_val_ac(m, theta, bus_ids[bidx], 1)
+        buf[i] = _theta_val(m, theta, ids[bidx], 1)
     end
     return buf
 end
@@ -219,10 +195,10 @@ end
     V = part.vmag_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     buf = part.vmag_shared_buf
     pos = part.shared_pos_local
-    bus_ids = part.bus.id
+    ids = part.bus.id
     @inbounds for i in eachindex(pos)
         bidx = pos[i]
-        buf[i] = _vmag_val(m, V, bus_ids[bidx], 1)
+        buf[i] = _vmag_val(m, V, ids[bidx], 1)
     end
     return buf
 end
@@ -231,36 +207,24 @@ end
 
 @inline function snapshot_v2!(sub::PartitionSOCP)
     m = sub.model::JuMP.Model
-    V2 = m[:v_magnitude_sq]
+    V2 = sub.v2_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     buf = sub.v2_buf
     ids = sub.bus.id
     @inbounds for i in eachindex(ids)
-        x = V2[ids[i], 1]
-        buf[i] =
-            JuMP.has_values(m) ? value(x) :
-            (
-                JuMP.start_value(x) === nothing ? 1.0 :
-                JuMP.start_value(x)
-            )
+        buf[i] = _v2_val(m, V2, ids[i], 1)
     end
     return buf
 end
 
 @inline function snapshot_v2_shared!(sub::PartitionSOCP)
     m = sub.model::JuMP.Model
-    V2 = m[:v_magnitude_sq]
+    V2 = sub.v2_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     buf = sub.v2_shared_buf
     pos = sub.shared_pos_local
     ids = sub.bus.id
     @inbounds for i in eachindex(pos)
         bidx = pos[i]
-        x = V2[ids[bidx], 1]
-        buf[i] =
-            JuMP.has_values(m) ? value(x) :
-            (
-                JuMP.start_value(x) === nothing ? 1.0 :
-                JuMP.start_value(x)
-            )
+        buf[i] = _v2_val(m, V2, ids[bidx], 1)
     end
     return buf
 end
@@ -293,11 +257,17 @@ end
 end
 
 @inline function _socp_flow_from_exprs_existing(
-    model::Model, l_local::Int; t::Int = 1,
+    model::JuMP.Model,
+    l_local::Int;
+    t::Int = 1,
 )
     return model[:p_flow_branches][l_local, t], model[:q_flow_branches][l_local, t]
 end
 
-@inline function _rt_from_exprs_socp(model::Model, l_local::Int; t::Int = 1)
+@inline function _rt_from_exprs_socp(
+    model::JuMP.Model,
+    l_local::Int;
+    t::Int = 1,
+)
     return model[:R][l_local, t], model[:T_var][l_local, t]
 end
