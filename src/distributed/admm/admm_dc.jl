@@ -64,8 +64,8 @@ function init_dc_bus_partition!(
     optimizer_factory,
     rho_theta::Float64,
 )
-    for z in zone_ids
-        init_dc_bus_partition!(partitions[z], sys.parts[z], optimizer_factory, rho_theta)
+    for zone_id in zone_ids
+        init_dc_bus_partition!(partitions[zone_id], sys.parts[zone_id], optimizer_factory, rho_theta)
     end
     return nothing
 end
@@ -110,10 +110,10 @@ function init_dc_branch_partition!(
     rhoe::Float64,
     cut_edges,
 )
-    for z in zone_ids
+    for zone_id in zone_ids
         init_dc_branch_partition!(
-            partitions[z],
-            sys.parts[z],
+            partitions[zone_id],
+            sys.parts[zone_id],
             optimizer_factory,
             rhoe,
             cut_edges,
@@ -166,10 +166,10 @@ function init_dc_hybrid_partition!(
     rhoe::Float64,
     cut_edges,
 )
-    for z in zone_ids
+    for zone_id in zone_ids
         init_dc_hybrid_partition!(
-            partitions[z],
-            sys.parts[z],
+            partitions[zone_id],
+            sys.parts[zone_id],
             optimizer_factory,
             rho_theta,
             rhoe,
@@ -210,9 +210,9 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     n_zones = length(zone_ids)
 
     dual_theta =
-        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
     dual_theta_buf =
-        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
 
     theta_consensus = zeros(Float64, n_shared_buses)
     theta_consensus_prev = similar(theta_consensus)
@@ -243,11 +243,11 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
         refresh_rho_bus!(partitions, rho, prev_rho)
 
         Threads.@threads for i in 1:n_zones
-            z = zone_ids[i]
-            part = partitions[z]
+            zone_id = zone_ids[i]
+            part = partitions[zone_id]
             m = part.model::JuMP.Model
 
-            lambdaz = gather_zone_lambda!(dual_theta_buf[z], dual_theta[z])
+            lambdaz = gather_zone_lambda!(dual_theta_buf[zone_id], dual_theta[zone_id])
 
             lin = _build_linear_bus_expr(
                 part,
@@ -275,8 +275,8 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
             )
         end
 
-        for (i, z) in enumerate(zone_ids)
-            part = partitions[z]
+        for (i, zone_id) in enumerate(zone_ids)
+            part = partitions[zone_id]
             out = results[i]
             part.has_solution = true
             part.generation_cost_model_expr = out.gen_cost_expr
@@ -285,7 +285,7 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
             @inbounds for (b, thetab) in out.thetasnap
                 push!(
                     get!(
-                        get!(theta_local_history, z, Dict{Int, Vector{Float64}}()),
+                        get!(theta_local_history, zone_id, Dict{Int, Vector{Float64}}()),
                         b,
                         Float64[],
                     ),
@@ -409,7 +409,7 @@ function run_admm_branch(
     z_flow = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     z_flow_prev = Dict{Int, Float64}()
 
-    duals = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
+    duals = Dict{Int, Dict{Int, Float64}}(zone_id => Dict{Int, Float64}() for zone_id in zone_ids)
     hist = ADMMHistory()
     hist.meta[:kind] = :dc_branch
     hist.meta[:tag] = "admm_dc_branch"
@@ -436,11 +436,11 @@ function run_admm_branch(
         refresh_rho_branch!(partitions, rho, prev_rho)
 
         Threads.@threads for i in 1:n_zones
-            z = zone_ids[i]
-            part = partitions[z]
+            zone_id = zone_ids[i]
+            part = partitions[zone_id]
             m = part.model::JuMP.Model
 
-            lin = _build_linear_branch_expr(part, part.zone_edges, z_flow, duals[z], rho[])
+            lin = _build_linear_branch_expr(part, part.zone_edges, z_flow, duals[zone_id], rho[])
 
             @objective(m, Min, part.obj_base + part.quad_branch_expr + lin)
             optimize!(m)
@@ -451,8 +451,8 @@ function run_admm_branch(
             )
         end
 
-        for (i, z) in enumerate(zone_ids)
-            part = partitions[z]
+        for (i, zone_id) in enumerate(zone_ids)
+            part = partitions[zone_id]
             out = results[i]
             part.has_solution = true
             part.generation_cost_model_expr = out.gen_cost_expr
@@ -562,10 +562,10 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
     z_flow_prev = Dict{Int, Float64}()
 
     duals_theta =
-        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
     dual_theta_buf =
-        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
-    duals_flow = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
+        Dict{Int, Vector{Float64}}(zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids)
+    duals_flow = Dict{Int, Dict{Int, Float64}}(zone_id => Dict{Int, Float64}() for zone_id in zone_ids)
 
     # ---------- diagnostics ----------
     hist = ADMMHistory()
@@ -598,18 +598,18 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
         refresh_rho_branch!(partitions, rho_flow, prev_rho_flow)
 
         Threads.@threads for i in 1:n_zones
-            z = zone_ids[i]
-            part = partitions[z]
+            zone_id = zone_ids[i]
+            part = partitions[zone_id]
             m = part.model::JuMP.Model
 
-            lambdatheta = gather_zone_lambda!(dual_theta_buf[z], duals_theta[z])
+            lambdatheta = gather_zone_lambda!(dual_theta_buf[zone_id], duals_theta[zone_id])
 
             lin_bus = _build_linear_bus_expr(
                 part, shared_buses_sorted, shared_buses_idx, theta_consensus,
                 lambdatheta, rho_theta[],
             )
             lin_branch = _build_linear_branch_expr(
-                part, part.zone_edges, z_flow, duals_flow[z], rho_flow[],
+                part, part.zone_edges, z_flow, duals_flow[zone_id], rho_flow[],
             )
 
             @objective(
@@ -626,8 +626,8 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             )
         end
 
-        for (i, z) in enumerate(zone_ids)
-            part = partitions[z]
+        for (i, zone_id) in enumerate(zone_ids)
+            part = partitions[zone_id]
             out = results[i]
             part.has_solution = true
             part.generation_cost_model_expr = out.gen_cost_expr

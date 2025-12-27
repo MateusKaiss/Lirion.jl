@@ -1,6 +1,189 @@
 # ============================================================
 # Adaptive rho + refreshers (ADMM)
 # ============================================================
+# ------------------------------------------------------------
+# AC refreshers: rebuild cached quadratic terms when rho changes
+# ------------------------------------------------------------
+
+@inline function refresh_rho_bus_ac!(
+    partitions,
+    rho_theta::Base.RefValue{Float64},
+    prev_rho_theta::Base.RefValue{Float64},
+    rho_v::Base.RefValue{Float64},
+    prev_rho_v::Base.RefValue{Float64},
+)
+    rho_theta_val = rho_theta[]
+    rho_v_val     = rho_v[]
+
+    if (rho_theta_val != prev_rho_theta[]) || (rho_v_val != prev_rho_v[])
+        for part in values(partitions)
+            _build_quad_bus_expr_ac!(part, rho_theta_val, rho_v_val)
+        end
+        prev_rho_theta[] = rho_theta_val
+        prev_rho_v[]     = rho_v_val
+    end
+    return nothing
+end
+
+@inline function refresh_rho_branch_ac!(
+    partitions,
+    rho_p::Base.RefValue{Float64},
+    prev_rho_p::Base.RefValue{Float64},
+    rho_q::Base.RefValue{Float64},
+    prev_rho_q::Base.RefValue{Float64},
+)
+    rho_p_val = rho_p[]
+    rho_q_val = rho_q[]
+
+    if (rho_p_val != prev_rho_p[]) || (rho_q_val != prev_rho_q[])
+        for part in values(partitions)
+            _build_quad_branch_expr_ac!(part, rho_p_val, rho_q_val, part.zone_edges)
+        end
+        prev_rho_p[] = rho_p_val
+        prev_rho_q[] = rho_q_val
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# DC refreshers: rebuild cached quadratic terms when rho changes
+# ------------------------------------------------------------
+
+@inline function refresh_rho_bus!(
+    partitions,
+    rho::Base.RefValue{Float64},
+    prev_rho::Base.RefValue{Float64},
+)
+    rho_val = rho[]
+    if rho_val != prev_rho[]
+        for part in values(partitions)
+            _build_quad_bus_expr!(part, rho_val)
+        end
+        prev_rho[] = rho_val
+    end
+    return nothing
+end
+
+@inline function refresh_rho_branch!(
+    partitions,
+    rho::Base.RefValue{Float64},
+    prev_rho::Base.RefValue{Float64},
+)
+    rho_val = rho[]
+    if rho_val != prev_rho[]
+        for part in values(partitions)
+            _build_quad_branch_expr!(part, rho_val, part.zone_edges)
+        end
+        prev_rho[] = rho_val
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# SOCP refreshers: rebuild cached objective pieces when rho changes
+# ------------------------------------------------------------
+
+@inline function refresh_rho_v2_socp!(
+    partitions,
+    rhoV2::Base.RefValue{Float64},
+    prev_rhoV2::Base.RefValue{Float64},
+)
+    rho_v2_val = rhoV2[]
+    if rho_v2_val != prev_rhoV2[]
+        for sub in values(partitions)
+            _build_quad_bus_expr_socp!(sub, rho_v2_val)
+            sub.obj_static = sub.obj_base + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
+        end
+        prev_rhoV2[] = rho_v2_val
+    end
+    return nothing
+end
+
+@inline function refresh_rho_rt_socp!(
+    partitions,
+    rhoR::Base.RefValue{Float64},
+    prev_rhoR::Base.RefValue{Float64},
+    rhoT::Base.RefValue{Float64},
+    prev_rhoT::Base.RefValue{Float64},
+)
+    rho_r_val = rhoR[]
+    rho_t_val = rhoT[]
+
+    if (rho_r_val != prev_rhoR[]) || (rho_t_val != prev_rhoT[])
+        for sub in values(partitions)
+            _build_quad_branch_rt_expr!(sub, rho_r_val, rho_t_val, sub.zone_edges)
+            sub.obj_static = sub.obj_base + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
+        end
+        prev_rhoR[] = rho_r_val
+        prev_rhoT[] = rho_t_val
+    end
+    return nothing
+end
+
+@inline function refresh_rho_pq_socp!(
+    partitions,
+    rhoP::Base.RefValue{Float64},
+    prev_rhoP::Base.RefValue{Float64},
+    rhoQ::Base.RefValue{Float64},
+    prev_rhoQ::Base.RefValue{Float64},
+)
+    rho_p_val = rhoP[]
+    rho_q_val = rhoQ[]
+
+    if (rho_p_val != prev_rhoP[]) || (rho_q_val != prev_rhoQ[])
+        for sub in values(partitions)
+            _build_quad_branch_pq_expr!(sub, rho_p_val, rho_q_val, sub.zone_edges)
+            sub.obj_static = sub.obj_base + sub.quad_pq_expr_socp + sub.soft_anchor_expr
+        end
+        prev_rhoP[] = rho_p_val
+        prev_rhoQ[] = rho_q_val
+    end
+    return nothing
+end
+
+@inline function refresh_rho_hybrid_socp!(
+    partitions,
+    rhoV2::Base.RefValue{Float64},
+    prev_rhoV2::Base.RefValue{Float64},
+    rhoP::Base.RefValue{Float64},
+    prev_rhoP::Base.RefValue{Float64},
+    rhoQ::Base.RefValue{Float64},
+    prev_rhoQ::Base.RefValue{Float64},
+    rhoR::Base.RefValue{Float64},
+    prev_rhoR::Base.RefValue{Float64},
+    rhoT::Base.RefValue{Float64},
+    prev_rhoT::Base.RefValue{Float64},
+)
+    rho_v2_val = rhoV2[]
+    rho_p_val  = rhoP[]
+    rho_q_val  = rhoQ[]
+    rho_r_val  = rhoR[]
+    rho_t_val  = rhoT[]
+
+    if (rho_v2_val != prev_rhoV2[]) || (rho_p_val != prev_rhoP[]) || (rho_q_val != prev_rhoQ[]) ||
+       (rho_r_val != prev_rhoR[]) || (rho_t_val != prev_rhoT[])
+
+        for sub in values(partitions)
+            (rho_v2_val != prev_rhoV2[]) && _build_quad_bus_expr_socp!(sub, rho_v2_val)
+
+            ((rho_p_val != prev_rhoP[]) || (rho_q_val != prev_rhoQ[])) &&
+                _build_quad_branch_pq_expr!(sub, rho_p_val, rho_q_val, sub.zone_edges)
+
+            ((rho_r_val != prev_rhoR[]) || (rho_t_val != prev_rhoT[])) &&
+                _build_quad_branch_rt_expr!(sub, rho_r_val, rho_t_val, sub.zone_edges)
+
+            sub.obj_static =
+                sub.obj_base + sub.quad_bus_expr_socp + sub.quad_pq_expr_socp + sub.quad_rt_expr_socp
+        end
+
+        prev_rhoV2[] = rho_v2_val
+        prev_rhoP[]  = rho_p_val
+        prev_rhoQ[]  = rho_q_val
+        prev_rhoR[]  = rho_r_val
+        prev_rhoT[]  = rho_t_val
+    end
+    return nothing
+end
 
 # ------------------------------------------------------------
 # Core: adaptive rho update rule
@@ -59,47 +242,6 @@ function adaptive_rho_dc!(
     end
 end
 
-# ------------------------------------------------------------
-# AC refreshers: rebuild cached quadratic terms when rho changes
-# ------------------------------------------------------------
-
-@inline function refresh_rho_bus_ac!(
-    partitions,
-    rho_theta::Base.RefValue{Float64},
-    prev_rho_theta::Base.RefValue{Float64},
-    rho_v::Base.RefValue{Float64},
-    prev_rho_v::Base.RefValue{Float64},
-)
-    ρθ = rho_theta[]
-    ρv = rho_v[]
-    if (ρθ != prev_rho_theta[]) || (ρv != prev_rho_v[])
-        for part in values(partitions)
-            _build_quad_bus_expr_ac!(part, ρθ, ρv)
-        end
-        prev_rho_theta[] = ρθ
-        prev_rho_v[] = ρv
-    end
-    return nothing
-end
-
-@inline function refresh_rho_branch_ac!(
-    partitions,
-    rho_p::Base.RefValue{Float64},
-    prev_rho_p::Base.RefValue{Float64},
-    rho_q::Base.RefValue{Float64},
-    prev_rho_q::Base.RefValue{Float64},
-)
-    ρp = rho_p[]
-    ρq = rho_q[]
-    if (ρp != prev_rho_p[]) || (ρq != prev_rho_q[])
-        for part in values(partitions)
-            _build_quad_branch_expr_ac!(part, ρp, ρq, part.zone_edges)
-        end
-        prev_rho_p[] = ρp
-        prev_rho_q[] = ρq
-    end
-    return nothing
-end
 
 # ------------------------------------------------------------
 # AC adaptive rho: bus (θ,V via components) + branch (P,Q)
@@ -218,40 +360,6 @@ end
 end
 
 # ------------------------------------------------------------
-# DC refreshers: rebuild cached quadratic terms when rho changes
-# ------------------------------------------------------------
-
-@inline function refresh_rho_bus!(
-    partitions,
-    rho::Base.RefValue{Float64},
-    prev_rho::Base.RefValue{Float64},
-)
-    ρ = rho[]
-    if ρ != prev_rho[]
-        for part in values(partitions)
-            _build_quad_bus_expr!(part, ρ)
-        end
-        prev_rho[] = ρ
-    end
-    return nothing
-end
-
-@inline function refresh_rho_branch!(
-    partitions,
-    rho::Base.RefValue{Float64},
-    prev_rho::Base.RefValue{Float64},
-)
-    ρ = rho[]
-    if ρ != prev_rho[]
-        for part in values(partitions)
-            _build_quad_branch_expr!(part, ρ, part.zone_edges)
-        end
-        prev_rho[] = ρ
-    end
-    return nothing
-end
-
-# ------------------------------------------------------------
 # DC helpers: stop + maybe_adapt_rho overloads
 # ------------------------------------------------------------
 
@@ -312,108 +420,6 @@ end
 @inline function _push_rho!(hist::ADMMHistory, key::Symbol, val::Real)
     v = get!(hist.rhos, key, Float64[])
     push!(v, Float64(val))
-    return nothing
-end
-
-# ------------------------------------------------------------
-# SOCP refreshers: rebuild cached objective pieces when rho changes
-# ------------------------------------------------------------
-
-@inline function refresh_rho_v2_socp!(
-    partitions,
-    rhoV2::Base.RefValue{Float64},
-    prev_rhoV2::Base.RefValue{Float64},
-)
-    ρv2 = rhoV2[]
-    if ρv2 != prev_rhoV2[]
-        for sub in values(partitions)
-            _build_quad_bus_expr_socp!(sub, ρv2)
-            sub.obj_static = sub.obj_base + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
-        end
-        prev_rhoV2[] = ρv2
-    end
-    return nothing
-end
-
-@inline function refresh_rho_rt_socp!(
-    partitions,
-    rhoR::Base.RefValue{Float64},
-    prev_rhoR::Base.RefValue{Float64},
-    rhoT::Base.RefValue{Float64},
-    prev_rhoT::Base.RefValue{Float64},
-)
-    ρr = rhoR[]
-    ρt = rhoT[]
-    if (ρr != prev_rhoR[]) || (ρt != prev_rhoT[])
-        for sub in values(partitions)
-            _build_quad_branch_rt_expr!(sub, ρr, ρt, sub.zone_edges)
-            sub.obj_static = sub.obj_base + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
-        end
-        prev_rhoR[] = ρr
-        prev_rhoT[] = ρt
-    end
-    return nothing
-end
-
-@inline function refresh_rho_pq_socp!(
-    partitions,
-    rhoP::Base.RefValue{Float64},
-    prev_rhoP::Base.RefValue{Float64},
-    rhoQ::Base.RefValue{Float64},
-    prev_rhoQ::Base.RefValue{Float64},
-)
-    ρp = rhoP[]
-    ρq = rhoQ[]
-    if (ρp != prev_rhoP[]) || (ρq != prev_rhoQ[])
-        for sub in values(partitions)
-            _build_quad_branch_pq_expr!(sub, ρp, ρq, sub.zone_edges)
-            sub.obj_static = sub.obj_base + sub.quad_pq_expr_socp + sub.soft_anchor_expr
-        end
-        prev_rhoP[] = ρp
-        prev_rhoQ[] = ρq
-    end
-    return nothing
-end
-
-@inline function refresh_rho_hybrid_socp!(
-    partitions,
-    rhoV2::Base.RefValue{Float64},
-    prev_rhoV2::Base.RefValue{Float64},
-    rhoP::Base.RefValue{Float64},
-    prev_rhoP::Base.RefValue{Float64},
-    rhoQ::Base.RefValue{Float64},
-    prev_rhoQ::Base.RefValue{Float64},
-    rhoR::Base.RefValue{Float64},
-    prev_rhoR::Base.RefValue{Float64},
-    rhoT::Base.RefValue{Float64},
-    prev_rhoT::Base.RefValue{Float64},
-)
-    ρv2 = rhoV2[]
-    ρp = rhoP[]
-    ρq = rhoQ[]
-    ρr = rhoR[]
-    ρt = rhoT[]
-
-    if (ρv2 != prev_rhoV2[]) || (ρp != prev_rhoP[]) || (ρq != prev_rhoQ[]) ||
-       (ρr != prev_rhoR[]) || (ρt != prev_rhoT[])
-        for sub in values(partitions)
-            (ρv2 != prev_rhoV2[]) && _build_quad_bus_expr_socp!(sub, ρv2)
-            ((ρp != prev_rhoP[]) || (ρq != prev_rhoQ[])) &&
-                _build_quad_branch_pq_expr!(sub, ρp, ρq, sub.zone_edges)
-            ((ρr != prev_rhoR[]) || (ρt != prev_rhoT[])) &&
-                _build_quad_branch_rt_expr!(sub, ρr, ρt, sub.zone_edges)
-
-            sub.obj_static =
-                sub.obj_base + sub.quad_bus_expr_socp + sub.quad_pq_expr_socp +
-                sub.quad_rt_expr_socp
-        end
-
-        prev_rhoV2[] = ρv2
-        prev_rhoP[] = ρp
-        prev_rhoQ[] = ρq
-        prev_rhoR[] = ρr
-        prev_rhoT[] = ρt
-    end
     return nothing
 end
 
