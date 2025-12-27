@@ -234,7 +234,7 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     theta_local_history = Dict{Int, Dict{Int, Vector{Float64}}}()
 
     results = Vector{
-        NamedTuple{(:gen_cost_expr, :real_cost, :thetasnap),
+        NamedTuple{(:gen_cost_expr, :real_cost, :theta_snap),
             Tuple{Float64, Float64, Dict{Int, Float64}}},
     }(
         undef,
@@ -274,12 +274,12 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
 
             thetas = snapshot_theta_shared!(part)
             lbs = part.shared_buses_local
-            thetasnap = Dict{Int, Float64}(b => thetas[j] for (j, b) in pairs(lbs))
+            theta_snap = Dict{Int, Float64}(b => thetas[j] for (j, b) in pairs(lbs))
 
             results[i] = (
                 gen_cost_expr = gen_cost_expr,
                 real_cost = real_cost,
-                thetasnap = thetasnap,
+                theta_snap = theta_snap,
             )
         end
 
@@ -290,7 +290,7 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
             part.generation_cost_model_expr = out.gen_cost_expr
             part.real_generation_cost = out.real_cost
 
-            @inbounds for (b, thetab) in out.thetasnap
+            @inbounds for (b, thetab) in out.theta_snap
                 push!(
                     get!(
                         get!(theta_local_history, zone_id, Dict{Int, Vector{Float64}}()),
