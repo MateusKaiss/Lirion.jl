@@ -83,7 +83,7 @@ function init_dc_branch_partition!(
     part::PartitionDC,
     sys_zone,
     optimizer_factory,
-    rhoe::Float64,
+    rho::Float64,
     cut_edges,
 )
     prepare_hotpaths!(part)
@@ -101,7 +101,7 @@ function init_dc_branch_partition!(
         set_start_value(part.theta_var[I], 0.0)
     end
 
-    _build_quad_branch_expr!(part, rhoe, part.zone_edges)
+    _build_quad_branch_expr!(part, rho, part.zone_edges)
     @objective(m, Min, part.obj_base + part.quad_branch_expr)
 
     return nothing
@@ -112,7 +112,7 @@ function init_dc_branch_partition!(
     sys::ADMMSystem,
     zone_ids::Vector{Int},
     optimizer_factory,
-    rhoe::Float64,
+    rho::Float64,
     cut_edges,
 )
     for zone_id in zone_ids
@@ -120,7 +120,7 @@ function init_dc_branch_partition!(
             getzone(partitions, zone_id),
             sys.parts[zone_id],
             optimizer_factory,
-            rhoe,
+            rho,
             cut_edges,
         )
     end
@@ -136,7 +136,7 @@ function init_dc_hybrid_partition!(
     sys_zone,
     optimizer_factory,
     rho_theta::Float64,
-    rhoe::Float64,
+    rho::Float64,
     cut_edges,
 )
     prepare_hotpaths!(part)
@@ -155,7 +155,7 @@ function init_dc_hybrid_partition!(
     end
 
     _build_quad_bus_expr!(part, rho_theta)
-    _build_quad_branch_expr!(part, rhoe, part.zone_edges)
+    _build_quad_branch_expr!(part, rho, part.zone_edges)
 
     @objective(m, Min, part.obj_base + part.quad_bus_expr + part.quad_branch_expr)
 
@@ -168,7 +168,7 @@ function init_dc_hybrid_partition!(
     zone_ids::Vector{Int},
     optimizer_factory,
     rho_theta::Float64,
-    rhoe::Float64,
+    rho::Float64,
     cut_edges,
 )
     for zone_id in zone_ids
@@ -177,7 +177,7 @@ function init_dc_hybrid_partition!(
             sys.parts[zone_id],
             optimizer_factory,
             rho_theta,
-            rhoe,
+            rho,
             cut_edges,
         )
     end

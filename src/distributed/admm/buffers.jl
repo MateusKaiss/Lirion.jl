@@ -12,31 +12,6 @@ end
     return [e for e in cut_edges if haskey(part.edge_to_local, e)]
 end
 
-# ------------------------------------------------------------
-# Value helpers (JuMP)
-# ------------------------------------------------------------
-
-@inline function _val_or_start(
-    m::JuMP.Model,
-    x::JuMP.VariableRef,
-    default::Float64,
-    has_vals::Bool,
-)
-    if has_vals
-        return JuMP.value(x)
-    end
-    sv = JuMP.start_value(x)
-    return sv === nothing ? default : sv
-end
-
-@inline _val_at(
-    m::JuMP.Model,
-    A::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2},
-    b::Int,
-    t::Int,
-    default::Float64,
-    has_vals::Bool,
-) = _val_or_start(m, A[b, t], default, has_vals)
 
 # ------------------------------------------------------------
 # Hotpaths preparation (shared mapping)
@@ -81,6 +56,32 @@ function prepare_hotpaths!(part::PartitionAC)
     part.vmag_shared_buf = ones(nshared)
     return nothing
 end
+
+# ------------------------------------------------------------
+# Value helpers (JuMP)
+# ------------------------------------------------------------
+
+@inline function _val_or_start(
+    m::JuMP.Model,
+    x::JuMP.VariableRef,
+    default::Float64,
+    has_vals::Bool,
+)
+    if has_vals
+        return JuMP.value(x)
+    end
+    sv = JuMP.start_value(x)
+    return sv === nothing ? default : sv
+end
+
+@inline _val_at(
+    m::JuMP.Model,
+    A::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2},
+    b::Int,
+    t::Int,
+    default::Float64,
+    has_vals::Bool,
+) = _val_or_start(m, A[b, t], default, has_vals)
 
 # ------------------------------------------------------------
 # Snapshot primitives

@@ -50,7 +50,7 @@ struct Args
             arg_type = Float64
 
             "--admm-rho-flow"
-            help = "rhoe (consensus penalty for branch flows; applies to P and Q if specifics are absent)"
+            help = "rho (consensus penalty for branch flows; applies to P and Q if specifics are absent)"
             arg_type = Float64
 
             "--admm-rho-flow-p"
