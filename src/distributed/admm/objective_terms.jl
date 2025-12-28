@@ -73,7 +73,7 @@ end
 function _build_linear_branch_expr(
     part::PartitionDC,
     zone_edges::Vector{Int},
-    z_flow::Dict{Int, Float64},
+    flow_consensus::Dict{Int, Float64},
     lambdae_zone::Dict{Int, Float64},
     rho::Float64,
 )
@@ -89,7 +89,7 @@ function _build_linear_branch_expr(
         t = part.branch.to[l_local]
         x = part.branch.x[l_local]
         @assert abs(x) > 1e-10 "x≈0 no ramo global $e (DC)."
-        coef = get(lambdae_zone, e, 0.0) - rho * z_flow[e]
+        coef = get(lambdae_zone, e, 0.0) - rho * flow_consensus[e]
         lin += coef * (theta[f, 1] - theta[t, 1]) / x
     end
 

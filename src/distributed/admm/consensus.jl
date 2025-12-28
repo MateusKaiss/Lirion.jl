@@ -36,8 +36,8 @@ end
 # DC consensus: branch variables (flow on cut edges)
 # ------------------------------------------------------------
 
-function compute_z_flow_consensus!(
-    z_flow::Dict{Int, Float64},
+function compute_flow_consensus_consensus!(
+    flow_consensus::Dict{Int, Float64},
     partitions::Partitions{PartitionDC},
     cut_edges::Vector{Int},
 )
@@ -59,7 +59,7 @@ function compute_z_flow_consensus!(
     # escreve apenas para os cut_edges globais (mantém contrato)
     @inbounds for e in cut_edges
         n = get(cnts, e, 0)
-        n > 0 && (z_flow[e] = sums[e] / n)
+        n > 0 && (flow_consensus[e] = sums[e] / n)
     end
     return nothing
 end

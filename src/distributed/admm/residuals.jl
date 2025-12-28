@@ -227,7 +227,7 @@ end
 
 function primal_residual_branch_dc(
     partitions::Partitions{PartitionDC},
-    z_flow::Dict{Int, Float64},
+    flow_consensus::Dict{Int, Float64},
     cut_edges::Vector{Int},
 )
     acc = 0.0
@@ -236,7 +236,7 @@ function primal_residual_branch_dc(
         @inbounds for e in cut_edges
             l_local = get(part.edge_to_local, e, 0)
             l_local == 0 && continue
-            acc += (_dc_flow_val_model(m, part, l_local) - get(z_flow, e, 0.0))^2
+            acc += (_dc_flow_val_model(m, part, l_local) - get(flow_consensus, e, 0.0))^2
         end
     end
     return sqrt(acc)
@@ -257,9 +257,9 @@ dual_residual_bus_dc(
 )
 
 dual_residual_branch_dc(
-    z_flow::Dict{Int, Float64},
-    z_flow_prev::Dict{Int, Float64},
-) = sqrt(sum((get(z_flow, e, 0.0) - get(z_flow_prev, e, 0.0))^2 for e in keys(z_flow)))
+    flow_consensus::Dict{Int, Float64},
+    flow_consensus_prev::Dict{Int, Float64},
+) = sqrt(sum((get(flow_consensus, e, 0.0) - get(flow_consensus_prev, e, 0.0))^2 for e in keys(flow_consensus)))
 
 # ------------------------------------------------------------
 # DC tolerances: eps_primal / eps_dual (bus / branch)
@@ -290,7 +290,7 @@ end
 
 function eps_primal_branch_dc(
     partitions::Partitions{PartitionDC},
-    z_flow::Dict{Int, Float64},
+    flow_consensus::Dict{Int, Float64},
     cut_edges::Vector{Int},
     eps_abs::Float64,
     eps_rel::Float64,
@@ -302,7 +302,7 @@ function eps_primal_branch_dc(
 
     z_norm_sq = 0.0
     @inbounds for e in cut_edges
-        z_norm_sq += get(z_flow, e, 0.0)^2
+        z_norm_sq += get(flow_consensus, e, 0.0)^2
     end
 
     return sqrt(max(1, dim_pri)) * eps_abs + eps_rel * max(sqrt(z_norm_sq), 1e-12)
@@ -320,13 +320,13 @@ function eps_dual_bus_dc(
 end
 
 function eps_dual_branch_dc(
-    z_flow::Dict{Int, Float64},
-    z_flow_prev::Dict{Int, Float64},
+    flow_consensus::Dict{Int, Float64},
+    flow_consensus_prev::Dict{Int, Float64},
     eps_abs::Float64,
     eps_rel::Float64,
 )
-    dim_du = max(1, length(z_flow))
-    s = dual_residual_branch_dc(z_flow, z_flow_prev)
+    dim_du = max(1, length(flow_consensus))
+    s = dual_residual_branch_dc(flow_consensus, flow_consensus_prev)
     return sqrt(dim_du) * eps_abs + eps_rel * s
 end
 

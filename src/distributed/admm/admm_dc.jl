@@ -411,8 +411,8 @@ function run_admm_branch(
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    z_flow = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
-    z_flow_prev = Dict{Int, Float64}()
+    flow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    flow_consensus_prev = Dict{Int, Float64}()
 
     duals = Dict{Int, Dict{Int, Float64}}(
         zone_id => Dict{Int, Float64}() for zone_id in zone_ids
@@ -451,7 +451,7 @@ function run_admm_branch(
             lin = _build_linear_branch_expr(
                 part,
                 part.zone_edges,
-                z_flow,
+                flow_consensus,
                 duals[zone_id],
                 rho[],
             )
@@ -473,15 +473,15 @@ function run_admm_branch(
             part.real_generation_cost = out.real_cost
         end
 
-        z_flow_prev = copy(z_flow)
-        compute_z_flow_consensus!(z_flow, partitions, cut_edges)
-        update_duals_flow!(duals, partitions, z_flow, cut_edges, rho[])
+        flow_consensus_prev = copy(flow_consensus)
+        compute_flow_consensus_consensus!(flow_consensus, partitions, cut_edges)
+        update_duals_flow!(duals, partitions, flow_consensus, cut_edges, rho[])
 
-        r = primal_residual_branch_dc(partitions, z_flow, cut_edges)
-        s = dual_residual_branch_dc(z_flow, z_flow_prev)
+        r = primal_residual_branch_dc(partitions, flow_consensus, cut_edges)
+        s = dual_residual_branch_dc(flow_consensus, flow_consensus_prev)
 
-        eps_r = eps_primal_branch_dc(partitions, z_flow, cut_edges, eps_abs, eps_rel)
-        eps_s = eps_dual_branch_dc(z_flow, z_flow_prev, eps_abs, eps_rel)
+        eps_r = eps_primal_branch_dc(partitions, flow_consensus, cut_edges, eps_abs, eps_rel)
+        eps_s = eps_dual_branch_dc(flow_consensus, flow_consensus_prev, eps_abs, eps_rel)
 
         _record_iter!(hist, r, s, eps_r, eps_s; rhos = Dict(:rho_flow => rho[]))
 
@@ -571,9 +571,8 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
 
     theta_consensus = zeros(Float64, n_shared_buses)
     theta_consensus_prev = similar(theta_consensus)
-
-    z_flow = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
-    z_flow_prev = Dict{Int, Float64}()
+    flow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    flow_consensus_prev = Dict{Int, Float64}()
 
     duals_theta = Dict{Int, Vector{Float64}}(
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
@@ -632,7 +631,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             lin_branch = _build_linear_branch_expr(
                 part,
                 part.zone_edges,
-                z_flow,
+                flow_consensus,
                 duals_flow[zone_id],
                 rho_flow[],
             )
@@ -660,7 +659,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
         end
 
         theta_consensus_prev .= theta_consensus
-        z_flow_prev = copy(z_flow)
+        flow_consensus_prev = copy(flow_consensus)
 
         compute_theta_consensus_vec!(
             theta_consensus,
@@ -673,7 +672,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             push!(get!(theta_avg_history, b, Float64[]), theta_consensus[j])
         end
 
-        compute_z_flow_consensus!(z_flow, partitions, cut_edges)
+        compute_flow_consensus_consensus!(flow_consensus, partitions, cut_edges)
 
         update_duals_theta_all!(
             duals_theta,
@@ -684,7 +683,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             shared_buses_sorted,
             shared_buses_to_pos,
         )
-        update_duals_flow!(duals_flow, partitions, z_flow, cut_edges, rho_flow[])
+        update_duals_flow!(duals_flow, partitions, flow_consensus, cut_edges, rho_flow[])
 
         r_bus = primal_residual_bus_dc(
             partitions,
@@ -692,11 +691,11 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             shared_buses_sorted,
             shared_buses_to_pos,
         )
-        r_br = primal_residual_branch_dc(partitions, z_flow, cut_edges)
+        r_br = primal_residual_branch_dc(partitions, flow_consensus, cut_edges)
         r_tot = hypot(r_bus, r_br)
 
         s_bus = dual_residual_bus_dc(theta_consensus, theta_consensus_prev)
-        s_br = dual_residual_branch_dc(z_flow, z_flow_prev)
+        s_br = dual_residual_branch_dc(flow_consensus, flow_consensus_prev)
         s_tot = hypot(s_bus, s_br)
 
         eps_bus_r = eps_primal_bus_dc(
@@ -707,11 +706,11 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             eps_abs,
             eps_rel,
         )
-        eps_br_r = eps_primal_branch_dc(partitions, z_flow, cut_edges, eps_abs, eps_rel)
+        eps_br_r = eps_primal_branch_dc(partitions, flow_consensus, cut_edges, eps_abs, eps_rel)
         eps_r_tot = hypot(eps_bus_r, eps_br_r)
 
         eps_bus_s = eps_dual_bus_dc(theta_consensus, theta_consensus_prev, eps_abs, eps_rel)
-        eps_br_s = eps_dual_branch_dc(z_flow, z_flow_prev, eps_abs, eps_rel)
+        eps_br_s = eps_dual_branch_dc(flow_consensus, flow_consensus_prev, eps_abs, eps_rel)
         eps_s_tot = hypot(eps_bus_s, eps_br_s)
 
         _record_iter!(

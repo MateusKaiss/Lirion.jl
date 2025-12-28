@@ -194,7 +194,7 @@ end
 function update_duals_flow!(
     duals::Dict{Int, Dict{Int, Float64}},
     partitions::Partitions{PartitionDC},
-    z_flow::Dict{Int, Float64},
+    flow_consensus::Dict{Int, Float64},
     cut_edges::Vector{Int},
     rho::Float64,
 )
@@ -207,7 +207,7 @@ function update_duals_flow!(
             l_local = get(part.edge_to_local, e, 0)
             l_local == 0 && continue
             p_val = _dc_flow_val_model(m, part, l_local)
-            dz[e] = get(dz, e, 0.0) + rho * (p_val - get(z_flow, e, 0.0))
+            dz[e] = get(dz, e, 0.0) + rho * (p_val - get(flow_consensus, e, 0.0))
         end
     end
     return nothing
