@@ -36,7 +36,7 @@ end
 # DC consensus: branch variables (flow on cut edges)
 # ------------------------------------------------------------
 
-function compute_flow_consensus_consensus!(
+function compute_flow_consensus!(
     flow_consensus::Dict{Int, Float64},
     partitions::Partitions{PartitionDC},
     cut_edges::Vector{Int},

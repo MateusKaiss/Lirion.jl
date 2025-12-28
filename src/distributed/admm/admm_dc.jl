@@ -474,7 +474,7 @@ function run_admm_branch(
         end
 
         flow_consensus_prev = copy(flow_consensus)
-        compute_flow_consensus_consensus!(flow_consensus, partitions, cut_edges)
+        compute_flow_consensus!(flow_consensus, partitions, cut_edges)
         update_duals_flow!(duals, partitions, flow_consensus, cut_edges, rho[])
 
         r = primal_residual_branch_dc(partitions, flow_consensus, cut_edges)
@@ -674,7 +674,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             push!(get!(theta_avg_history, b, Float64[]), theta_consensus[j])
         end
 
-        compute_flow_consensus_consensus!(flow_consensus, partitions, cut_edges)
+        compute_flow_consensus!(flow_consensus, partitions, cut_edges)
 
         update_duals_theta_all!(
             duals_theta,
