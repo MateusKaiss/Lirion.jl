@@ -237,7 +237,7 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
+    shared_buses_sorted, shared_buses_idx = sorted_ids_and_id2idx(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
     v2bar = ones(Float64, n_shared_buses)
@@ -611,7 +611,7 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
+    shared_buses_sorted, shared_buses_idx = sorted_ids_and_id2idx(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
     v2bar = ones(Float64, n_shared_buses)

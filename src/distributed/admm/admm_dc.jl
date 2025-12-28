@@ -207,11 +207,11 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
 
     optimizer_factory = resolve_optimizer_dc(config)
 
-    partitions = build_dc_partitions(sys)          # ::Partitions{PartitionDC}
-    zone_ids = partitions.zones                    # ordem estável
+    partitions = build_dc_partitions(sys)
+    zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
+    shared_buses_sorted, shared_buses_idx = sorted_ids_and_id2idx(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
     dual_theta = Dict{Int, Vector{Float64}}(
@@ -407,7 +407,7 @@ function run_admm_branch(
 
     optimizer_factory = resolve_optimizer_dc(config)
 
-    partitions = build_dc_partitions(sys)   # ::Partitions{PartitionDC}
+    partitions = build_dc_partitions(sys)
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
@@ -566,7 +566,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_idx = sorted_ids_and_pos(shared_buses)
+    shared_buses_sorted, shared_buses_idx = sorted_ids_and_id2idx(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
     theta_consensus = zeros(Float64, n_shared_buses)

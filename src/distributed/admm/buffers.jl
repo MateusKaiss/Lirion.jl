@@ -1,10 +1,10 @@
 # ------------------------------------------------------------
 # Utilities
 # ------------------------------------------------------------
-function sorted_ids_and_pos(shared_buses::Vector{Int})
-    shared_buses_sorted = sort(shared_buses)
-    shared_buses_idx = Dict{Int, Int}(b => i for (i, b) in enumerate(shared_buses_sorted))
-    return shared_buses_sorted, shared_buses_idx
+function sorted_ids_and_id2idx(ids::Vector{Int})
+    sorted = sort(ids)
+    id2idx = Dict{Int, Int}(id => i for (i, id) in pairs(sorted))
+    return sorted, id2idx
 end
 
 @inline function _zone_cut_edges(

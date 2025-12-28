@@ -147,8 +147,6 @@ function build_ac_partitions(sys::ADMMSystem)::Partitions{PartitionAC}
             nothing,
             nothing,
             nothing,
-            # obs: seus tipos aqui são NonlinearExpr/QuadExpr;
-            # deixei igual ao que você tinha (zero(QuadExpr)).
             zero(JuMP.QuadExpr),
             0.0,
             0.0,
