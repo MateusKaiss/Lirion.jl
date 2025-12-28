@@ -58,7 +58,6 @@ function primal_residual_branch_ac(
 )
     acc = 0.0
     for part in partitions
-        # mais robusto: mede residual só nos cut_edges globais
         @inbounds for e in cut_edges
             l_local = get(part.edge_to_local, e, 0)
             l_local == 0 && continue

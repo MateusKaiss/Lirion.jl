@@ -211,7 +211,7 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
     eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
 
-    optimizer_factory = resolve_optimizer_ac(config)
+    optimizer_factory = resolve_optimizer(config)
 
     partitions = build_ac_partitions(sys)
     zone_ids = partitions.zones
@@ -455,7 +455,7 @@ function run_admm_ac_branch(
     eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
 
-    optimizer_factory = resolve_optimizer_ac(config)
+    optimizer_factory = resolve_optimizer(config)
 
     partitions = build_ac_partitions(sys)
     zone_ids = partitions.zones
@@ -659,7 +659,7 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
     eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
 
-    optimizer_factory = resolve_optimizer_ac(config)
+    optimizer_factory = resolve_optimizer(config)
 
     partitions = build_ac_partitions(sys)
     zone_ids = partitions.zones

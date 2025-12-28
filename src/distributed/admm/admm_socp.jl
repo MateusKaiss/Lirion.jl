@@ -231,7 +231,7 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
     eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
 
-    optimizer_factory = resolve_socp_optimizer(config)
+    optimizer_factory = resolve_optimizer(config)
 
     partitions = build_socp_partitions(sys)
     zone_ids = partitions.zones
@@ -471,7 +471,7 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
     eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
 
-    optimizer_factory = resolve_socp_optimizer(config)
+    optimizer_factory = resolve_optimizer(config)
 
     partitions = build_socp_partitions(sys)   # ::Partitions{PartitionSOCP}
     zone_ids = partitions.zones
@@ -666,7 +666,7 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
     eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
 
-    optimizer_factory = resolve_socp_optimizer(config)
+    optimizer_factory = resolve_optimizer(config)
 
     partitions = build_socp_partitions(sys)   # ::Partitions{PartitionSOCP}
     zone_ids = partitions.zones
