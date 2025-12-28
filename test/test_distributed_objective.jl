@@ -247,7 +247,7 @@ function run_distributed_objective_tests(;
             admm_rho_case = 7_000_000.0      # 7e6
             admm_eps_abs_case = 3e-4
             admm_eps_rel_case = 3e-4
-            admm_alpha_case = 1.0            # α desligado
+            admm_alpha_case = 1.0            # alpha desligado
             admm_mu_incr_case = 3.0
             admm_mu_decr_case = 3.0
             admm_tau_incr_case = 1.0         # neutro (sem adaptação efetiva)

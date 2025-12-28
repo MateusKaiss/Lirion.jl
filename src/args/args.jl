@@ -77,7 +77,7 @@ struct Args
             default = 1e-7
 
             "--admm-alpha"
-            help = "Over-relaxation α (use only if 1<α<2). If omitted, over-relaxation is disabled."
+            help = "Over-relaxation alpha (use only if 1<alpha<2). If omitted, over-relaxation is disabled."
             arg_type = Float64
 
             "--admm-warm-start"
@@ -151,7 +151,7 @@ struct Args
         # ===== alpha (over-relaxation) =====
         alpha_ = get(parsed, "admm-alpha", nothing)
         if alpha_ !== nothing && !(1.0 < alpha_ < 2.0)
-            @warn "Ignoring --admm-alpha=$(alpha_) because it must satisfy 1<α<2."
+            @warn "Ignoring --admm-alpha=$(alpha_) because it must satisfy 1<alpha<2."
             alpha_ = nothing
         end
 

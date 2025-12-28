@@ -57,13 +57,13 @@ mutable struct DistributedOPFModel
         tau_incr > 0 || throw(ArgumentError("tau_incr must be > 0"))
         tau_decr > 0 || throw(ArgumentError("tau_decr must be > 0"))
 
-        α = isnothing(alpha_overrelax) ? nothing : Float64(alpha_overrelax)
+        alpha = isnothing(alpha_overrelax) ? nothing : Float64(alpha_overrelax)
 
         return new(
             base_model, method, Int(max_iter),
             Float64(rho_theta), Float64(rho_v),
             Float64(rho_flow_p), Float64(rho_flow_q),
-            Float64(eps_abs), Float64(eps_rel), α,
+            Float64(eps_abs), Float64(eps_rel), alpha,
             warm_start,
             adaptive_rho,
             Float64(mu_incr), Float64(mu_decr), Float64(tau_incr), Float64(tau_decr),

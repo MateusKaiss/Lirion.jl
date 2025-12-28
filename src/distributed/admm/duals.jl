@@ -16,7 +16,7 @@
     rho_v::Base.RefValue{Float64},
     shared_buses_sorted::AbstractVector{Int},
     shared_buses_to_pos::Dict{Int, Int};
-    α = nothing,
+    alpha = nothing,
     theta_consensus_prev = nothing,
     vmag_consensus_prev = nothing,
 )
@@ -35,7 +35,7 @@
             ρv,
             shared_buses_sorted,
             shared_buses_to_pos;
-            α = α,
+            alpha = alpha,
             theta_consensus_prev = theta_consensus_prev,
             vmag_consensus_prev = vmag_consensus_prev,
         )
@@ -53,7 +53,7 @@ end
     rhoV::Float64,
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int};
-    α::Union{Nothing, Float64} = nothing,
+    alpha::Union{Nothing, Float64} = nothing,
     theta_consensus_prev::Union{Nothing, Vector{Float64}} = nothing,
     vmag_consensus_prev::Union{Nothing, Vector{Float64}} = nothing,
 )
@@ -61,7 +61,7 @@ end
     Vs = snapshot_vmag_shared!(part)
     lbs = part.shared_buses_local
 
-    if α === nothing
+    if alpha === nothing
         @inbounds for i in eachindex(lbs)
             j = b2pos[lbs[i]]
             dtheta = _wrap_angle_diff(thetas[i] - theta_consensus_vec[j])
@@ -70,14 +70,16 @@ end
             dualsV_vec_zone[j] += rhoV * dV
         end
     else
-        αv = something(α, 1.0)
+        alphav = something(alpha, 1.0)
         @inbounds for i in eachindex(lbs)
             j = b2pos[lbs[i]]
             thetarel = _wrap_angle_diff(
-                αv * thetas[i] + (1 - αv) * theta_consensus_prev[j] -
+                alphav * thetas[i] + (1 - alphav) * theta_consensus_prev[j] -
                 theta_consensus_vec[j],
             )
-            Vrel = αv * Vs[i] + (1 - αv) * vmag_consensus_prev[j] - vmag_consensus_vec[j]
+            Vrel =
+                alphav * Vs[i] + (1 - alphav) * vmag_consensus_prev[j] -
+                vmag_consensus_vec[j]
             duals_theta_vec_zone[j] += rho_theta * thetarel
             dualsV_vec_zone[j] += rhoV * Vrel
         end
@@ -99,7 +101,7 @@ function update_duals_branch_ac!(
     cut_edges::Vector{Int},
     rhoP::Float64,
     rhoQ::Float64;
-    α::Union{Nothing, Float64} = nothing,
+    alpha::Union{Nothing, Float64} = nothing,
     pflow_consensus_prev::Union{Nothing, Dict{Int, Float64}} = nothing,
     qflow_consensus_prev::Union{Nothing, Dict{Int, Float64}} = nothing,
 )
@@ -117,7 +119,7 @@ function update_duals_branch_ac!(
             pval = JuMP.value(P_loc)
             qval = JuMP.value(Q_loc)
 
-            if α === nothing
+            if alpha === nothing
                 if isfinite(pval)
                     lambdaPz[e] =
                         get(lambdaPz, e, 0.0) + rhoP * (pval - get(pflow_consensus, e, 0.0))
@@ -127,11 +129,11 @@ function update_duals_branch_ac!(
                         get(lambdaQz, e, 0.0) + rhoQ * (qval - get(qflow_consensus, e, 0.0))
                 end
             else
-                αv = something(α, 1.0)
+                alphav = something(alpha, 1.0)
                 if isfinite(pval)
                     p_rel =
-                        αv * pval +
-                        (1 - αv) *
+                        alphav * pval +
+                        (1 - alphav) *
                         get(pflow_consensus_prev, e, get(pflow_consensus, e, 0.0))
                     lambdaPz[e] =
                         get(lambdaPz, e, 0.0) +
@@ -139,8 +141,8 @@ function update_duals_branch_ac!(
                 end
                 if isfinite(qval)
                     q_rel =
-                        αv * qval +
-                        (1 - αv) *
+                        alphav * qval +
+                        (1 - alphav) *
                         get(qflow_consensus_prev, e, get(qflow_consensus, e, 0.0))
                     lambdaQz[e] =
                         get(lambdaQz, e, 0.0) +
@@ -235,23 +237,23 @@ end
     v2_consensus_vec::Vector{Float64},
     v2_consensus_prev_vec::Vector{Float64},
     rho::Float64,
-    α::Union{Nothing, Float64},
+    alpha::Union{Nothing, Float64},
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
 )
     v2s = snapshot_v2_shared!(sub)
     lbs = sub.shared_buses_local
 
-    if isnothing(α)
+    if isnothing(alpha)
         @inbounds for i in eachindex(lbs)
             j = b2pos[lbs[i]]
             dual_vec_zone[j] += rho * (v2s[i] - v2_consensus_vec[j])
         end
     else
-        αv = something(α, 1.0)
+        alphav = something(alpha, 1.0)
         @inbounds for i in eachindex(lbs)
             j = b2pos[lbs[i]]
-            v_rel = αv * v2s[i] + (1 - αv) * v2_consensus_prev_vec[j]
+            v_rel = alphav * v2s[i] + (1 - alphav) * v2_consensus_prev_vec[j]
             dual_vec_zone[j] += rho * (v_rel - v2_consensus_vec[j])
         end
     end
@@ -266,7 +268,7 @@ end
     v2_consensus::Vector{Float64},
     v2_consensus_prev::Vector{Float64},
     rhoV2::Float64,
-    α_used,
+    alpha_used,
     shared_buses_sorted::AbstractVector{Int},
     shared_buses_to_pos::Dict{Int, Int},
 )
@@ -278,7 +280,7 @@ end
             v2_consensus,
             v2_consensus_prev,
             rhoV2,
-            α_used,
+            alpha_used,
             shared_buses_sorted,
             shared_buses_to_pos,
         )

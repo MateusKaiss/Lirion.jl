@@ -198,7 +198,7 @@ julia main.jl case.m --model distributed-admm-hybrid-dc --optimizer Ipopt.Optimi
 - `--admm-max-iter`: Maximum ADMM iterations (default: 350)
 - `--admm-eps-primal`: Primal tolerance (default: 1e-7)
 - `--admm-eps-dual`: Dual tolerance (default: 1e-7)
-- `--admm-alpha`: Over-relaxation parameter (1 < α < 2)
+- `--admm-alpha`: Over-relaxation parameter (1 < alpha < 2)
 
 ## Network Partitioning
 

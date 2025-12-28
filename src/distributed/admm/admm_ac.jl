@@ -267,7 +267,7 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
 
         refresh_rho_bus_ac!(partitions, rho_theta, prev_rho_theta, rho_v, prev_rho_v)
 
-        α_used = nothing
+        alpha_used = nothing
         theta_target = theta_consensus
         vmag_target = vmag_consensus
 
@@ -336,7 +336,7 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
             rho_v,
             shared_buses_sorted,
             shared_buses_to_pos;
-            α = α_used,
+            alpha = alpha_used,
             theta_consensus_prev = theta_consensus_prev,
             vmag_consensus_prev = vmag_consensus_prev,
         )
@@ -499,7 +499,7 @@ function run_admm_ac_branch(
 
         refresh_rho_branch_ac!(partitions, rho_p, prev_rho_p, rho_q, prev_rho_q)
 
-        α_used = nothing
+        alpha_used = nothing
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
@@ -553,7 +553,7 @@ function run_admm_ac_branch(
             cut_edges,
             rho_p[],
             rho_q[];
-            α = α_used,
+            alpha = alpha_used,
             pflow_consensus_prev = pflow_consensus_prev,
             qflow_consensus_prev = qflow_consensus_prev,
         )
@@ -724,7 +724,7 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
         refresh_rho_bus_ac!(partitions, rho_theta, prev_rho_theta, rho_v, prev_rho_v)
         refresh_rho_branch_ac!(partitions, rho_p, prev_rho_p, rho_q, prev_rho_q)
 
-        α_used = nothing
+        alpha_used = nothing
         theta_target = theta_consensus
         vmag_target = vmag_consensus
 
@@ -817,7 +817,7 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             rho_v,
             shared_buses_sorted,
             shared_buses_to_pos;
-            α = α_used,
+            alpha = alpha_used,
             theta_consensus_prev = theta_consensus_prev,
             vmag_consensus_prev = vmag_consensus_prev,
         )
@@ -831,7 +831,7 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             cut_edges,
             rho_p[],
             rho_q[];
-            α = α_used,
+            alpha = alpha_used,
             pflow_consensus_prev = pflow_consensus_prev,
             qflow_consensus_prev = qflow_consensus_prev,
         )

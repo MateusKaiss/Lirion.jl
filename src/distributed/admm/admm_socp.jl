@@ -262,12 +262,9 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
         zone_id => Dict{Int, Float64}() for zone_id in zone_ids
     )
 
-    # ---------- diagnostics ----------
     hist = ADMMHistory()
     hist.meta[:kind] = :socp_v2rt
     hist.meta[:tag] = "admm_socp_v2rt"
-
-    # opcional: histórico por barra (consenso de V²)
     v2_avg_history = Dict{Int, Vector{Float64}}()
 
     results = Vector{NamedTuple{(:gen_cost_expr, :real_cost), Tuple{Float64, Float64}}}(
@@ -287,7 +284,7 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
         refresh_rho_v2_socp!(partitions, rhoV2, prev_rhoV2)
         refresh_rho_rt_socp!(partitions, rhoR, prev_rhoR, rhoT, prev_rhoT)
 
-        α_used = nothing
+        alpha_used = nothing
         v2_target = v2_consensus
 
         Threads.@threads for i in 1:n_zones
@@ -335,8 +332,6 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
             shared_buses_to_pos,
         )
         compute_rt_consensus!(rflow_consensus, tflow_consensus, partitions, cut_edges)
-
-        # histórico por barra (opcional)
         @inbounds for b in shared_buses_sorted
             j = shared_buses_to_pos[b]
             push!(get!(v2_avg_history, b, Float64[]), v2_consensus[j])
@@ -349,7 +344,7 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
             v2_consensus,
             v2_consensus_prev,
             rhoV2[],
-            α_used,
+            alpha_used,
             shared_buses_sorted,
             shared_buses_to_pos,
         )
@@ -738,7 +733,7 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
             rhoT, prev_rhoT,
         )
 
-        α_used = nothing
+        alpha_used = nothing
         v2_target = v2_consensus
 
         Threads.@threads for i in 1:n_zones
@@ -793,7 +788,7 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
 
         update_duals_v2_all!(
             duals_v2, partitions, zone_ids, v2_consensus, v2_consensus_prev, rhoV2[],
-            α_used, shared_buses_sorted, shared_buses_to_pos,
+            alpha_used, shared_buses_sorted, shared_buses_to_pos,
         )
         update_duals_pq_all!(
             dualsP,
