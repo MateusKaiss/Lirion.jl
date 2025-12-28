@@ -480,7 +480,8 @@ function run_admm_branch(
         r = primal_residual_branch_dc(partitions, flow_consensus, cut_edges)
         s = dual_residual_branch_dc(flow_consensus, flow_consensus_prev)
 
-        eps_r = eps_primal_branch_dc(partitions, flow_consensus, cut_edges, eps_abs, eps_rel)
+        eps_r =
+            eps_primal_branch_dc(partitions, flow_consensus, cut_edges, eps_abs, eps_rel)
         eps_s = eps_dual_branch_dc(flow_consensus, flow_consensus_prev, eps_abs, eps_rel)
 
         _record_iter!(hist, r, s, eps_r, eps_s; rhos = Dict(:rho_flow => rho[]))
@@ -706,7 +707,8 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             eps_abs,
             eps_rel,
         )
-        eps_br_r = eps_primal_branch_dc(partitions, flow_consensus, cut_edges, eps_abs, eps_rel)
+        eps_br_r =
+            eps_primal_branch_dc(partitions, flow_consensus, cut_edges, eps_abs, eps_rel)
         eps_r_tot = hypot(eps_bus_r, eps_br_r)
 
         eps_bus_s = eps_dual_bus_dc(theta_consensus, theta_consensus_prev, eps_abs, eps_rel)

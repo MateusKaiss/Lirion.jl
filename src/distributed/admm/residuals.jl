@@ -259,7 +259,12 @@ dual_residual_bus_dc(
 dual_residual_branch_dc(
     flow_consensus::Dict{Int, Float64},
     flow_consensus_prev::Dict{Int, Float64},
-) = sqrt(sum((get(flow_consensus, e, 0.0) - get(flow_consensus_prev, e, 0.0))^2 for e in keys(flow_consensus)))
+) = sqrt(
+    sum(
+        (get(flow_consensus, e, 0.0) - get(flow_consensus_prev, e, 0.0))^2 for
+        e in keys(flow_consensus)
+    ),
+)
 
 # ------------------------------------------------------------
 # DC tolerances: eps_primal / eps_dual (bus / branch)
