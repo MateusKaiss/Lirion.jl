@@ -232,8 +232,8 @@ end
 @inline function update_duals_v2_vec!(
     dual_vec_zone::Vector{Float64},
     sub::PartitionSOCP,
-    v2bar_vec::Vector{Float64},
-    v2bar_prev_vec::Vector{Float64},
+    v2_consensus_vec::Vector{Float64},
+    v2_consensus_prev_vec::Vector{Float64},
     rho::Float64,
     α::Union{Nothing, Float64},
     shared_buses_sorted::Vector{Int},
@@ -245,14 +245,14 @@ end
     if isnothing(α)
         @inbounds for i in eachindex(lbs)
             j = b2pos[lbs[i]]
-            dual_vec_zone[j] += rho * (v2s[i] - v2bar_vec[j])
+            dual_vec_zone[j] += rho * (v2s[i] - v2_consensus_vec[j])
         end
     else
         αv = something(α, 1.0)
         @inbounds for i in eachindex(lbs)
             j = b2pos[lbs[i]]
-            v_rel = αv * v2s[i] + (1 - αv) * v2bar_prev_vec[j]
-            dual_vec_zone[j] += rho * (v_rel - v2bar_vec[j])
+            v_rel = αv * v2s[i] + (1 - αv) * v2_consensus_prev_vec[j]
+            dual_vec_zone[j] += rho * (v_rel - v2_consensus_vec[j])
         end
     end
 
@@ -263,8 +263,8 @@ end
     duals_v2::Dict{Int, Vector{Float64}},
     partitions::Partitions{PartitionSOCP},
     zone_ids::AbstractVector{Int},
-    v2bar::Vector{Float64},
-    v2bar_prev::Vector{Float64},
+    v2_consensus::Vector{Float64},
+    v2_consensus_prev::Vector{Float64},
     rhoV2::Float64,
     α_used,
     shared_buses_sorted::AbstractVector{Int},
@@ -275,8 +275,8 @@ end
         update_duals_v2_vec!(
             duals_v2[z],
             sub,
-            v2bar,
-            v2bar_prev,
+            v2_consensus,
+            v2_consensus_prev,
             rhoV2,
             α_used,
             shared_buses_sorted,
@@ -295,8 +295,8 @@ end
     dualsT::Dict{Int, Dict{Int, Float64}},
     partitions::Partitions{PartitionSOCP},
     zone_ids::AbstractVector{Int},
-    zR::Dict{Int, Float64},
-    zT::Dict{Int, Float64},
+    rflow_consensus::Dict{Int, Float64},
+    tflow_consensus::Dict{Int, Float64},
     rhoR::Float64,
     rhoT::Float64,
 )
@@ -310,8 +310,8 @@ end
             l = get(sub.edge_to_local, e, 0)
             l == 0 && continue
             R, T = _rt_from_exprs_socp(m, l)
-            dR[e] = get(dR, e, 0.0) + rhoR * (JuMP.value(R) - get(zR, e, 0.0))
-            dT[e] = get(dT, e, 0.0) + rhoT * (JuMP.value(T) - get(zT, e, 0.0))
+            dR[e] = get(dR, e, 0.0) + rhoR * (JuMP.value(R) - get(rflow_consensus, e, 0.0))
+            dT[e] = get(dT, e, 0.0) + rhoT * (JuMP.value(T) - get(tflow_consensus, e, 0.0))
         end
     end
     return nothing

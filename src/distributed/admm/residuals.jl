@@ -347,7 +347,7 @@ end
 
 function primal_residual_bus_socp_vec(
     partitions::Partitions{PartitionSOCP},
-    v2bar_vec::Vector{Float64},
+    v2_consensus_vec::Vector{Float64},
     shared_buses_sorted::Vector{Int},  # compat
     b2pos::Dict{Int, Int},
 )
@@ -357,7 +357,7 @@ function primal_residual_bus_socp_vec(
         pos = sub.bus_local_index
         @inbounds for b in sub.shared_buses_local
             j = b2pos[b]
-            acc += (v2buf[pos[b]] - v2bar_vec[j])^2
+            acc += (v2buf[pos[b]] - v2_consensus_vec[j])^2
         end
     end
     return sqrt(acc)
@@ -365,8 +365,8 @@ end
 
 function primal_residual_branch_rt_socp(
     partitions::Partitions{PartitionSOCP},
-    zR::Dict{Int, Float64},
-    zT::Dict{Int, Float64},
+    rflow_consensus::Dict{Int, Float64},
+    tflow_consensus::Dict{Int, Float64},
     cut_edges::Vector{Int},
 )
     acc = 0.0
@@ -376,7 +376,9 @@ function primal_residual_branch_rt_socp(
             l = get(sub.edge_to_local, e, 0)
             l == 0 && continue
             R, T = _rt_from_exprs_socp(m, l)
-            acc += (value(R) - get(zR, e, 0.0))^2 + (value(T) - get(zT, e, 0.0))^2
+            acc +=
+                (value(R) - get(rflow_consensus, e, 0.0))^2 +
+                (value(T) - get(tflow_consensus, e, 0.0))^2
         end
     end
     return sqrt(acc)
@@ -407,14 +409,25 @@ end
 # SOCP residuals: dual (bus / branch RT / branch PQ)
 # ------------------------------------------------------------
 
-dual_residual_bus_socp_vec(v2bar_vec, v2bar_prev_vec) =
-    sqrt(sum((v2bar_vec[j] - v2bar_prev_vec[j])^2 for j in eachindex(v2bar_vec)))
-
-dual_residual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges) =
+dual_residual_bus_socp_vec(v2_consensus_vec, v2_consensus_prev_vec) =
     sqrt(
         sum(
-            (get(zR, e, 0.0) - get(zR_prev, e, 0.0))^2 +
-            (get(zT, e, 0.0) - get(zT_prev, e, 0.0))^2
+            (v2_consensus_vec[j] - v2_consensus_prev_vec[j])^2 for
+            j in eachindex(v2_consensus_vec)
+        ),
+    )
+
+dual_residual_branch_rt_socp(
+    rflow_consensus,
+    tflow_consensus,
+    rflow_consensus_prev,
+    tflow_consensus_prev,
+    cut_edges,
+) =
+    sqrt(
+        sum(
+            (get(rflow_consensus, e, 0.0) - get(rflow_consensus_prev, e, 0.0))^2 +
+            (get(tflow_consensus, e, 0.0) - get(tflow_consensus_prev, e, 0.0))^2
             for e in cut_edges
         ),
     )
@@ -440,7 +453,7 @@ dual_residual_branch_pq_socp(
 
 function eps_primal_bus_socp_vec(
     partitions::Partitions{PartitionSOCP},
-    v2bar_vec::Vector{Float64},
+    v2_consensus_vec::Vector{Float64},
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
     eps_abs::Float64,
@@ -455,14 +468,14 @@ function eps_primal_bus_socp_vec(
             norm_x_sq += v2buf[pos[b]]^2
         end
     end
-    norm_z_sq = sum(v2bar_vec[j]^2 for j in eachindex(v2bar_vec))
+    norm_z_sq = sum(v2_consensus_vec[j]^2 for j in eachindex(v2_consensus_vec))
     return sqrt(N) * eps_abs + eps_rel * max(sqrt(norm_x_sq), sqrt(norm_z_sq))
 end
 
 function eps_primal_branch_rt_socp(
     partitions::Partitions{PartitionSOCP},
-    zR::Dict{Int, Float64},
-    zT::Dict{Int, Float64},
+    rflow_consensus::Dict{Int, Float64},
+    tflow_consensus::Dict{Int, Float64},
     cut_edges::Vector{Int},
     eps_abs::Float64,
     eps_rel::Float64,
@@ -473,7 +486,7 @@ function eps_primal_branch_rt_socp(
     end
     z_norm_sq = 0.0
     @inbounds for e in cut_edges
-        z_norm_sq += get(zR, e, 0.0)^2 + get(zT, e, 0.0)^2
+        z_norm_sq += get(rflow_consensus, e, 0.0)^2 + get(tflow_consensus, e, 0.0)^2
     end
     return sqrt(max(1, dim)) * eps_abs + eps_rel * max(sqrt(z_norm_sq), 1e-12)
 end
@@ -497,15 +510,29 @@ function eps_primal_branch_pq_socp(
     return sqrt(max(1, dim)) * eps_abs + eps_rel * max(sqrt(z_norm_sq), 1e-12)
 end
 
-function eps_dual_bus_socp_vec(v2bar_vec, v2bar_prev_vec, eps_abs, eps_rel)
-    N = max(1, length(v2bar_vec))
-    s = dual_residual_bus_socp_vec(v2bar_vec, v2bar_prev_vec)
+function eps_dual_bus_socp_vec(v2_consensus_vec, v2_consensus_prev_vec, eps_abs, eps_rel)
+    N = max(1, length(v2_consensus_vec))
+    s = dual_residual_bus_socp_vec(v2_consensus_vec, v2_consensus_prev_vec)
     return sqrt(N) * eps_abs + eps_rel * s
 end
 
-function eps_dual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges, eps_abs, eps_rel)
+function eps_dual_branch_rt_socp(
+    rflow_consensus,
+    tflow_consensus,
+    rflow_consensus_prev,
+    tflow_consensus_prev,
+    cut_edges,
+    eps_abs,
+    eps_rel,
+)
     dim = 2 * max(1, length(cut_edges))
-    s = dual_residual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges)
+    s = dual_residual_branch_rt_socp(
+        rflow_consensus,
+        tflow_consensus,
+        rflow_consensus_prev,
+        tflow_consensus_prev,
+        cut_edges,
+    )
     return sqrt(dim) * eps_abs + eps_rel * s
 end
 

@@ -157,12 +157,12 @@ end
 # ------------------------------------------------------------
 
 function compute_v2_consensus_vec!(
-    v2bar_vec::Vector{Float64},
+    v2_consensus_vec::Vector{Float64},
     partitions::Partitions{PartitionSOCP},
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
 )
-    fill!(v2bar_vec, 0.0)
+    fill!(v2_consensus_vec, 0.0)
     counts = zeros(Int, length(shared_buses_sorted))
 
     for sub in partitions
@@ -170,13 +170,13 @@ function compute_v2_consensus_vec!(
         lbs = sub.shared_buses_local
         @inbounds for i in eachindex(lbs)
             j = b2pos[lbs[i]]
-            v2bar_vec[j] += v2s[i]
+            v2_consensus_vec[j] += v2s[i]
             counts[j] += 1
         end
     end
 
-    @inbounds for j in eachindex(v2bar_vec)
-        counts[j] != 0 && (v2bar_vec[j] /= counts[j])
+    @inbounds for j in eachindex(v2_consensus_vec)
+        counts[j] != 0 && (v2_consensus_vec[j] /= counts[j])
     end
     return nothing
 end
@@ -186,8 +186,8 @@ end
 # ------------------------------------------------------------
 
 function compute_rt_consensus!(
-    zR::Dict{Int, Float64},
-    zT::Dict{Int, Float64},
+    rflow_consensus::Dict{Int, Float64},
+    tflow_consensus::Dict{Int, Float64},
     partitions::Partitions{PartitionSOCP},
     cut_edges::Vector{Int},
 )
@@ -210,8 +210,8 @@ function compute_rt_consensus!(
     @inbounds for e in cut_edges
         n = get(cnts, e, 0)
         if n > 0
-            zR[e] = sumsR[e] / n
-            zT[e] = sumsT[e] / n
+            rflow_consensus[e] = sumsR[e] / n
+            tflow_consensus[e] = sumsT[e] / n
         end
     end
     return nothing

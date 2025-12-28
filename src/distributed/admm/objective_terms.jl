@@ -267,7 +267,7 @@ function _build_linear_bus_expr_socp(
     sub::PartitionSOCP,
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
-    v2bar_vec::Vector{Float64},
+    v2_consensus_vec::Vector{Float64},
     lambda_vec_zone::Vector{Float64},
     rhoV2::Float64,
 )
@@ -277,7 +277,7 @@ function _build_linear_bus_expr_socp(
 
     for b in sub.shared_buses_local
         j = b2pos[b]
-        lin += (lambda_vec_zone[j] - rhoV2 * v2bar_vec[j]) * V2[b, 1]
+        lin += (lambda_vec_zone[j] - rhoV2 * v2_consensus_vec[j]) * V2[b, 1]
     end
 
     return lin
@@ -286,8 +286,8 @@ end
 function _build_linear_branch_rt_expr(
     sub::PartitionSOCP,
     zone_edges::Vector{Int},
-    zR::Dict{Int, Float64},
-    zT::Dict{Int, Float64},
+    rflow_consensus::Dict{Int, Float64},
+    tflow_consensus::Dict{Int, Float64},
     lambdaR_zone::Dict{Int, Float64},
     lambdaT_zone::Dict{Int, Float64},
     rhoR::Float64,
@@ -300,8 +300,8 @@ function _build_linear_branch_rt_expr(
         l_local = get(sub.edge_to_local, e, nothing)
         l_local === nothing && continue
         Rloc, Tloc = _rt_from_exprs_socp(m, l_local)
-        lin += (get(lambdaR_zone, e, 0.0) - rhoR * get(zR, e, 0.0)) * Rloc
-        lin += (get(lambdaT_zone, e, 0.0) - rhoT * get(zT, e, 0.0)) * Tloc
+        lin += (get(lambdaR_zone, e, 0.0) - rhoR * get(rflow_consensus, e, 0.0)) * Rloc
+        lin += (get(lambdaT_zone, e, 0.0) - rhoT * get(tflow_consensus, e, 0.0)) * Tloc
     end
 
     return lin

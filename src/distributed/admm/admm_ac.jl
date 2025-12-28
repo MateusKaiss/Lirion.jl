@@ -227,10 +227,10 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
 
-    lambda_theta_zone_buf = Dict{Int, Vector{Float64}}(
+    dual_theta_buf = Dict{Int, Vector{Float64}}(
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
-    lambda_v_zone_buf = Dict{Int, Vector{Float64}}(
+    dual_v_buf = Dict{Int, Vector{Float64}}(
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
 
@@ -276,8 +276,8 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
             part = getzone(partitions, zone_id)
             m = part.model::JuMP.Model
 
-            lambda_theta = (lambda_theta_zone_buf[zone_id] .= duals_theta[zone_id])
-            lambda_v = (lambda_v_zone_buf[zone_id] .= duals_v[zone_id])
+            lambda_theta = (dual_theta_buf[zone_id] .= duals_theta[zone_id])
+            lambda_v = (dual_v_buf[zone_id] .= duals_v[zone_id])
 
             lin = _build_linear_bus_expr_ac!(
                 part,
@@ -675,10 +675,10 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
 
-    lambda_theta_zone_buf = Dict{Int, Vector{Float64}}(
+    dual_theta_buf = Dict{Int, Vector{Float64}}(
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
-    lambda_v_zone_buf = Dict{Int, Vector{Float64}}(
+    dual_v_buf = Dict{Int, Vector{Float64}}(
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
 
@@ -733,8 +733,8 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             part = getzone(partitions, zone_id)
             m = part.model::JuMP.Model
 
-            lambda_theta = (lambda_theta_zone_buf[zone_id] .= duals_theta[zone_id])
-            lambda_v = (lambda_v_zone_buf[zone_id] .= duals_v[zone_id])
+            lambda_theta = (dual_theta_buf[zone_id] .= duals_theta[zone_id])
+            lambda_v = (dual_v_buf[zone_id] .= duals_v[zone_id])
 
             lin_bus = _build_linear_bus_expr_ac!(
                 part,
