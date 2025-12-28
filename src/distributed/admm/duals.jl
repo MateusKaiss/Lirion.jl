@@ -15,7 +15,7 @@
     rho_theta::Base.RefValue{Float64},
     rho_v::Base.RefValue{Float64},
     shared_buses_sorted::AbstractVector{Int},
-    shared_buses_idx::Dict{Int, Int};
+    shared_buses_to_pos::Dict{Int, Int};
     α = nothing,
     theta_consensus_prev = nothing,
     vmag_consensus_prev = nothing,
@@ -34,7 +34,7 @@
             ρθ,
             ρv,
             shared_buses_sorted,
-            shared_buses_idx;
+            shared_buses_to_pos;
             α = α,
             theta_consensus_prev = theta_consensus_prev,
             vmag_consensus_prev = vmag_consensus_prev,
@@ -152,7 +152,7 @@ end
     theta_consensus::Vector{Float64},
     rho::Base.RefValue{Float64},
     shared_buses_sorted::AbstractVector{Int},
-    shared_buses_idx::Dict{Int, Int},
+    shared_buses_to_pos::Dict{Int, Int},
 )
     ρ = rho[]
     @inbounds for z in zone_ids
@@ -163,7 +163,7 @@ end
             theta_consensus,
             ρ,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
         )
     end
     return nothing
@@ -256,7 +256,7 @@ end
     rhoV2::Float64,
     α_used,
     shared_buses_sorted::AbstractVector{Int},
-    shared_buses_idx::Dict{Int, Int},
+    shared_buses_to_pos::Dict{Int, Int},
 )
     @inbounds for z in zone_ids
         sub = getzone(partitions, z)
@@ -268,7 +268,7 @@ end
             rhoV2,
             α_used,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
         )
     end
     return nothing

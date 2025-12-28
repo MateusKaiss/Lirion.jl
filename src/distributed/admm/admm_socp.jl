@@ -237,7 +237,7 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_idx = sorted_ids_and_id2idx(shared_buses)
+    shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
     v2bar = ones(Float64, n_shared_buses)
@@ -298,7 +298,7 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
             lambda_z = (lambda_zone_buf[zone_id] .= duals_v2[zone_id])
 
             lin_bus = _build_linear_bus_expr_socp(
-                sub, shared_buses_sorted, shared_buses_idx, v2_target, lambda_z, rhoV2[],
+                sub, shared_buses_sorted, shared_buses_to_pos, v2_target, lambda_z, rhoV2[],
             )
             lin_rt = _build_linear_branch_rt_expr(
                 sub, sub.zone_edges, zR, zT, dualsR[zone_id], dualsT[zone_id], rhoR[],
@@ -326,12 +326,12 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
         zR_prev = copy(zR)
         zT_prev = copy(zT)
 
-        compute_v2_consensus_vec!(v2bar, partitions, shared_buses_sorted, shared_buses_idx)
+        compute_v2_consensus_vec!(v2bar, partitions, shared_buses_sorted, shared_buses_to_pos)
         compute_rt_consensus!(zR, zT, partitions, cut_edges)
 
         # histórico por barra (opcional)
         @inbounds for b in shared_buses_sorted
-            j = shared_buses_idx[b]
+            j = shared_buses_to_pos[b]
             push!(get!(v2_avg_history, b, Float64[]), v2bar[j])
         end
 
@@ -344,12 +344,12 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
             rhoV2[],
             α_used,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
         )
         update_duals_rt_all!(dualsR, dualsT, partitions, zone_ids, zR, zT, rhoR[], rhoT[])
 
         r_bus = primal_residual_bus_socp_vec(
-            partitions, v2bar, shared_buses_sorted, shared_buses_idx,
+            partitions, v2bar, shared_buses_sorted, shared_buses_to_pos,
         )
         r_rt = primal_residual_branch_rt_socp(partitions, zR, zT, cut_edges)
         r = hypot(r_bus, r_rt)
@@ -360,7 +360,7 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
 
         eps_r = begin
             epsb = eps_primal_bus_socp_vec(
-                partitions, v2bar, shared_buses_sorted, shared_buses_idx, eps_abs,
+                partitions, v2bar, shared_buses_sorted, shared_buses_to_pos, eps_abs,
                 eps_rel,
             )
             epsrt = eps_primal_branch_rt_socp(
@@ -611,7 +611,7 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_idx = sorted_ids_and_id2idx(shared_buses)
+    shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
     v2bar = ones(Float64, n_shared_buses)
@@ -683,7 +683,7 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
             lambda_z = (lambda_zone_buf[zone_id] .= duals_v2[zone_id])
 
             lin_bus = _build_linear_bus_expr_socp(
-                sub, shared_buses_sorted, shared_buses_idx, v2_target, lambda_z, rhoV2[],
+                sub, shared_buses_sorted, shared_buses_to_pos, v2_target, lambda_z, rhoV2[],
             )
             lin_pq = _build_linear_branch_pq_expr(
                 sub, sub.zone_edges, zP, zQ, dualsP[zone_id], dualsQ[zone_id], rhoP[],
@@ -708,24 +708,24 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
         zR_prev = copy(zR)
         zT_prev = copy(zT)
 
-        compute_v2_consensus_vec!(v2bar, partitions, shared_buses_sorted, shared_buses_idx)
+        compute_v2_consensus_vec!(v2bar, partitions, shared_buses_sorted, shared_buses_to_pos)
         compute_pq_consensus!(zP, zQ, partitions, cut_edges)
         compute_rt_consensus!(zR, zT, partitions, cut_edges)
 
         @inbounds for b in shared_buses_sorted
-            j = shared_buses_idx[b]
+            j = shared_buses_to_pos[b]
             push!(get!(v2_avg_history, b, Float64[]), v2bar[j])
         end
 
         update_duals_v2_all!(
             duals_v2, partitions, zone_ids, v2bar, v2bar_prev, rhoV2[],
-            α_used, shared_buses_sorted, shared_buses_idx,
+            α_used, shared_buses_sorted, shared_buses_to_pos,
         )
         update_duals_pq_all!(dualsP, dualsQ, partitions, zone_ids, zP, zQ, rhoP[], rhoQ[])
         update_duals_rt_all!(dualsR, dualsT, partitions, zone_ids, zR, zT, rhoR[], rhoT[])
 
         r_bus = primal_residual_bus_socp_vec(
-            partitions, v2bar, shared_buses_sorted, shared_buses_idx,
+            partitions, v2bar, shared_buses_sorted, shared_buses_to_pos,
         )
         r_pq = primal_residual_branch_pq_socp(partitions, zP, zQ, cut_edges)
         r_rt = primal_residual_branch_rt_socp(partitions, zR, zT, cut_edges)
@@ -738,7 +738,7 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
 
         eps_r = begin
             epsb = eps_primal_bus_socp_vec(
-                partitions, v2bar, shared_buses_sorted, shared_buses_idx, eps_abs,
+                partitions, v2bar, shared_buses_sorted, shared_buses_to_pos, eps_abs,
                 eps_rel,
             )
             epspq = eps_primal_branch_pq_socp(

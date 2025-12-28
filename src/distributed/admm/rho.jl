@@ -258,7 +258,7 @@ end
     theta_consensus_prev,
     vmag_consensus_prev,
     shared_buses_sorted,
-    shared_buses_idx,
+    shared_buses_to_pos,
     config,
 )
     adaptive || return nothing
@@ -268,7 +268,7 @@ end
         theta_consensus,
         vmag_consensus,
         shared_buses_sorted,
-        shared_buses_idx,
+        shared_buses_to_pos,
     )
     sθ, sV = dual_residual_bus_ac_components(
         theta_consensus,
@@ -332,7 +332,7 @@ end
     theta_consensus_prev,
     vmag_consensus_prev,
     shared_buses_sorted,
-    shared_buses_idx,
+    shared_buses_to_pos,
     rho_p::Base.RefValue{Float64},
     rho_q::Base.RefValue{Float64},
     r_br::Float64,
@@ -351,7 +351,7 @@ end
         theta_consensus_prev,
         vmag_consensus_prev,
         shared_buses_sorted,
-        shared_buses_idx,
+        shared_buses_to_pos,
         config,
     )
     maybe_adapt_rho_socp!(true, rho_p, rho_q, r_br, s_br, config)

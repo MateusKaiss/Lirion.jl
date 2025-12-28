@@ -217,7 +217,7 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_idx = sorted_ids_and_id2idx(shared_buses)
+    shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
     duals_theta = Dict{Int, Vector{Float64}}(
@@ -283,7 +283,7 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
             lin = _build_linear_bus_expr_ac!(
                 part,
                 shared_buses_sorted,
-                shared_buses_idx,
+                shared_buses_to_pos,
                 theta_target,
                 vmag_target,
                 lambdatheta,
@@ -317,11 +317,11 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
             vmag_consensus,
             partitions,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
         )
 
         @inbounds for b in shared_buses_sorted
-            j = shared_buses_idx[b]
+            j = shared_buses_to_pos[b]
             push!(get!(theta_avg_hist, b, Float64[]), theta_consensus[j])
             push!(get!(vmag_avg_hist, b, Float64[]), vmag_consensus[j])
         end
@@ -336,7 +336,7 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
             rho_theta,
             rho_v,
             shared_buses_sorted,
-            shared_buses_idx;
+            shared_buses_to_pos;
             α = α_used,
             theta_consensus_prev = theta_consensus_prev,
             vmag_consensus_prev = vmag_consensus_prev,
@@ -347,7 +347,7 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
             theta_consensus,
             vmag_consensus,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
         )
         s = dual_residual_bus_ac_vec(
             theta_consensus,
@@ -361,7 +361,7 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
             theta_consensus,
             vmag_consensus,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
             eps_abs,
             eps_rel,
         )
@@ -397,7 +397,7 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
             theta_consensus_prev,
             vmag_consensus_prev,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
             config,
         )
     end
@@ -637,7 +637,7 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_idx = sorted_ids_and_id2idx(shared_buses)
+    shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
     duals_theta = Dict{Int, Vector{Float64}}(
@@ -712,7 +712,7 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             lin_bus = _build_linear_bus_expr_ac!(
                 part,
                 shared_buses_sorted,
-                shared_buses_idx,
+                shared_buses_to_pos,
                 theta_target,
                 vmag_target,
                 lambdatheta,
@@ -763,11 +763,11 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             vmag_consensus,
             partitions,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
         )
 
         @inbounds for b in shared_buses_sorted
-            j = shared_buses_idx[b]
+            j = shared_buses_to_pos[b]
             push!(get!(theta_avg_hist, b, Float64[]), theta_consensus[j])
             push!(get!(vmag_avg_hist, b, Float64[]), vmag_consensus[j])
         end
@@ -784,7 +784,7 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             rho_theta,
             rho_v,
             shared_buses_sorted,
-            shared_buses_idx;
+            shared_buses_to_pos;
             α = α_used,
             theta_consensus_prev = theta_consensus_prev,
             vmag_consensus_prev = vmag_consensus_prev,
@@ -809,7 +809,7 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             theta_consensus,
             vmag_consensus,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
         )
         r_br = primal_residual_branch_ac(partitions, zP, zQ, cut_edges)
         r_tot = hypot(r_bus, r_br)
@@ -828,7 +828,7 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             theta_consensus,
             vmag_consensus,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
             eps_abs,
             eps_rel,
         )
@@ -874,7 +874,7 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             theta_consensus_prev,
             vmag_consensus_prev,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
             rho_p,
             rho_q,
             r_br,

@@ -211,7 +211,7 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_idx = sorted_ids_and_id2idx(shared_buses)
+    shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
     dual_theta = Dict{Int, Vector{Float64}}(
@@ -258,7 +258,7 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
             lin = _build_linear_bus_expr(
                 part,
                 shared_buses_sorted,
-                shared_buses_idx,
+                shared_buses_to_pos,
                 theta_consensus,
                 lambda_z,
                 rho[],
@@ -305,11 +305,11 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
             theta_consensus,
             partitions,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
         )
 
         @inbounds for b in shared_buses_sorted
-            j = shared_buses_idx[b]
+            j = shared_buses_to_pos[b]
             push!(get!(theta_avg_history, b, Float64[]), theta_consensus[j])
         end
 
@@ -320,14 +320,14 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
             theta_consensus,
             rho,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
         )
 
         r = primal_residual_bus_dc(
             partitions,
             theta_consensus,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
         )
         s = dual_residual_bus_dc(theta_consensus, theta_consensus_prev)
 
@@ -335,7 +335,7 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
             partitions,
             theta_consensus,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
             eps_abs,
             eps_rel,
         )
@@ -566,7 +566,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_idx = sorted_ids_and_id2idx(shared_buses)
+    shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
     theta_consensus = zeros(Float64, n_shared_buses)
@@ -624,7 +624,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             lin_bus = _build_linear_bus_expr(
                 part,
                 shared_buses_sorted,
-                shared_buses_idx,
+                shared_buses_to_pos,
                 theta_consensus,
                 lambdatheta,
                 rho_theta[],
@@ -666,10 +666,10 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             theta_consensus,
             partitions,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
         )
         @inbounds for b in shared_buses_sorted
-            j = shared_buses_idx[b]
+            j = shared_buses_to_pos[b]
             push!(get!(theta_avg_history, b, Float64[]), theta_consensus[j])
         end
 
@@ -682,7 +682,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             theta_consensus,
             rho_theta,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
         )
         update_duals_flow!(duals_flow, partitions, z_flow, cut_edges, rho_flow[])
 
@@ -690,7 +690,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             partitions,
             theta_consensus,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
         )
         r_br = primal_residual_branch_dc(partitions, z_flow, cut_edges)
         r_tot = hypot(r_bus, r_br)
@@ -703,7 +703,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             partitions,
             theta_consensus,
             shared_buses_sorted,
-            shared_buses_idx,
+            shared_buses_to_pos,
             eps_abs,
             eps_rel,
         )

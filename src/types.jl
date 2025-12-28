@@ -189,19 +189,14 @@ Base.@kwdef struct ADMMHistory <: AbstractRunDiagnostics
     r_dual::Vector{Float64} = Float64[]
     eps_primal::Vector{Float64} = Float64[]
     eps_dual::Vector{Float64} = Float64[]
-
-    # rhos por “canal”: :rho, :rho_theta, :rhoV, :rhoP, :rhoQ, :rhoV2, :rhoR, :rhoT...
     rhos::Dict{Symbol, Vector{Float64}} = Dict{Symbol, Vector{Float64}}()
-
-    # heatmaps opcionais (ex.: :theta_avg => Dict{Int,Vector}, :theta_local => Dict{Int,Dict{Int,Vector}})
     heatmaps::Dict{Symbol, Any} = Dict{Symbol, Any}()
-
-    meta::Dict{Symbol, Any} = Dict{Symbol, Any}()  # opcional p/ infos (iters, zones, etc.)
+    meta::Dict{Symbol, Any} = Dict{Symbol, Any}()
 end
 
 Base.@kwdef struct LirionRunResult
-    result::Any = nothing         # Dict/NamedTuple/etc
-    model::Any = nothing          # JuMP.Model ou nothing
-    system::Any = nothing         # SystemData ou nothing
+    result::Any = nothing
+    model::Any = nothing
+    system::Any = nothing
     diagnostics::AbstractRunDiagnostics = NoDiagnostics()
 end
