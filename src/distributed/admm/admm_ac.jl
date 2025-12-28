@@ -17,7 +17,7 @@ function init_ac_bus_partition!(
     rho_theta::Float64,
     rhoV::Float64,
 )
-    prepare_hotpaths_ac!(part)
+    prepare_hotpaths!(part)
 
     m = build_model(sys_zone, AC; optimizer = optimizer_factory)
     part.model = m
@@ -73,7 +73,7 @@ function init_ac_branch_partition!(
     rhoQ::Float64,
     cut_edges,
 )
-    prepare_hotpaths_ac!(part)
+    prepare_hotpaths!(part)
     part.zone_edges = _zone_cut_edges(part, cut_edges)
 
     m = build_model(sys_zone, AC; optimizer = optimizer_factory)
@@ -134,7 +134,7 @@ function init_ac_hybrid_partition!(
     rhoQ::Float64,
     cut_edges,
 )
-    prepare_hotpaths_ac!(part)
+    prepare_hotpaths!(part)
     part.zone_edges = _zone_cut_edges(part, cut_edges)
 
     m = build_model(sys_zone, AC; optimizer = optimizer_factory)

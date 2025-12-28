@@ -115,7 +115,7 @@ function update_duals_branch_ac!(
             l_local = get(part.edge_to_local, e, 0)
             l_local == 0 && continue
 
-            P_loc, Q_loc = _ac_flow_from_exprs_existing(part, l_local)
+            P_loc, Q_loc = _pq_flow_from_exprs(part, l_local)
             pval = JuMP.value(P_loc)
             qval = JuMP.value(Q_loc)
 
@@ -311,7 +311,7 @@ end
         @inbounds for e in sub.zone_edges
             l = get(sub.edge_to_local, e, 0)
             l == 0 && continue
-            R, T = _rt_from_exprs_socp(m, l)
+            R, T = _rt_from_exprs(m, l)
             dR[e] = get(dR, e, 0.0) + rhoR * (JuMP.value(R) - get(rflow_consensus, e, 0.0))
             dT[e] = get(dT, e, 0.0) + rhoT * (JuMP.value(T) - get(tflow_consensus, e, 0.0))
         end
@@ -342,7 +342,7 @@ end
         @inbounds for e in sub.zone_edges
             l = get(sub.edge_to_local, e, 0)
             l == 0 && continue
-            P, Q = _socp_flow_from_exprs_existing(m, l)
+            P, Q = _pq_flow_from_exprs(m, l)
             dP[e] = get(dP, e, 0.0) + rhoP * (JuMP.value(P) - get(pflow_consensus, e, 0.0))
             dQ[e] = get(dQ, e, 0.0) + rhoQ * (JuMP.value(Q) - get(qflow_consensus, e, 0.0))
         end

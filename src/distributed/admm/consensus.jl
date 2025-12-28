@@ -127,7 +127,7 @@ function compute_ac_branch_consensus!(
             l_local = get(part.edge_to_local, e, 0)
             l_local == 0 && continue
 
-            P_loc, Q_loc = _ac_flow_from_exprs_existing(part, l_local)
+            P_loc, Q_loc = _pq_flow_from_exprs(part, l_local)
             pval = JuMP.value(P_loc)
             qval = JuMP.value(Q_loc)
 
@@ -200,7 +200,7 @@ function compute_rt_consensus!(
         @inbounds for e in sub.zone_edges
             l = get(sub.edge_to_local, e, 0)
             l == 0 && continue
-            R, T = _rt_from_exprs_socp(m, l)
+            R, T = _rt_from_exprs(m, l)
             sumsR[e] = get(sumsR, e, 0.0) + JuMP.value(R)
             sumsT[e] = get(sumsT, e, 0.0) + JuMP.value(T)
             cnts[e] = get(cnts, e, 0) + 1
@@ -232,7 +232,7 @@ function compute_pq_consensus!(
         @inbounds for e in sub.zone_edges
             l = get(sub.edge_to_local, e, 0)
             l == 0 && continue
-            P, Q = _socp_flow_from_exprs_existing(m, l)
+            P, Q = _pq_flow_from_exprs(m, l)
             sumsP[e] = get(sumsP, e, 0.0) + JuMP.value(P)
             sumsQ[e] = get(sumsQ, e, 0.0) + JuMP.value(Q)
             cnts[e] = get(cnts, e, 0) + 1

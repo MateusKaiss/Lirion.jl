@@ -128,7 +128,7 @@ function _build_quad_branch_expr_ac!(
     for e in zone_edges
         l_local = get(part.edge_to_local, e, nothing)
         l_local === nothing && continue
-        P_loc, Q_loc = _ac_flow_from_exprs_existing(part, l_local)
+        P_loc, Q_loc = _pq_flow_from_exprs(part, l_local)
         q += 0.5 * rhoP * P_loc^2 + 0.5 * rhoQ * Q_loc^2
     end
 
@@ -183,7 +183,7 @@ function _build_linear_branch_expr_ac!(
     for e in zone_edges
         l_local = get(part.edge_to_local, e, nothing)
         l_local === nothing && continue
-        P_loc, Q_loc = _ac_flow_from_exprs_existing(part, l_local)
+        P_loc, Q_loc = _pq_flow_from_exprs(part, l_local)
         lambdaP = get(dualsP_zone, e, 0.0)
         lambdaQ = get(dualsQ_zone, e, 0.0)
         pflow_consensuse = get(pflow_consensus, e, 0.0)
@@ -227,7 +227,7 @@ function _build_quad_branch_rt_expr!(
     @inbounds for e in zone_edges
         l_local = get(sub.edge_to_local, e, nothing)
         l_local === nothing && continue
-        Rloc, Tloc = _rt_from_exprs_socp(m, l_local)
+        Rloc, Tloc = _rt_from_exprs(m, l_local)
         q += 0.5 * rhoR * Rloc^2 + 0.5 * rhoT * Tloc^2
     end
 
@@ -249,7 +249,7 @@ function _build_quad_branch_pq_expr!(
     @inbounds for e in zone_edges
         l_local = get(sub.edge_to_local, e, nothing)
         l_local === nothing && continue
-        P_loc, Q_loc = _socp_flow_from_exprs_existing(m, l_local)
+        P_loc, Q_loc = _pq_flow_from_exprs(m, l_local)
         q += 0.5 * rhoP * P_loc^2 + 0.5 * rhoQ * Q_loc^2
     end
 
@@ -299,7 +299,7 @@ function _build_linear_branch_rt_expr(
     @inbounds for e in zone_edges
         l_local = get(sub.edge_to_local, e, nothing)
         l_local === nothing && continue
-        Rloc, Tloc = _rt_from_exprs_socp(m, l_local)
+        Rloc, Tloc = _rt_from_exprs(m, l_local)
         lin += (get(lambdaR_zone, e, 0.0) - rhoR * get(rflow_consensus, e, 0.0)) * Rloc
         lin += (get(lambdaT_zone, e, 0.0) - rhoT * get(tflow_consensus, e, 0.0)) * Tloc
     end
@@ -323,7 +323,7 @@ function _build_linear_branch_pq_expr(
     @inbounds for e in zone_edges
         l_local = get(sub.edge_to_local, e, nothing)
         l_local === nothing && continue
-        P_loc, Q_loc = _socp_flow_from_exprs_existing(m, l_local)
+        P_loc, Q_loc = _pq_flow_from_exprs(m, l_local)
         lin += (get(lambdaP_zone, e, 0.0) - rhoP * get(pflow_consensus, e, 0.0)) * P_loc
         lin += (get(lambdaQ_zone, e, 0.0) - rhoQ * get(qflow_consensus, e, 0.0)) * Q_loc
     end
@@ -360,7 +360,7 @@ function _soft_anchor_branch_expr!(
         for e in sub.zone_edges
             l = get(sub.edge_to_local, e, nothing)
             l === nothing && continue
-            P, Q = _socp_flow_from_exprs_existing(m, l) # deve ser AffExpr!
+            P, Q = _pq_flow_from_exprs(m, l) # deve ser AffExpr!
             q += 0.5 * κPQ * (P^2 + Q^2)
         end
     end

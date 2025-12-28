@@ -32,7 +32,7 @@ function primal_residual_bus_ac_components(
     partitions::Partitions{PartitionAC},
     theta_consensus_vec::Vector{Float64},
     vmag_consensus_vec::Vector{Float64},
-    shared_buses_sorted::Vector{Int},   # compat
+    shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
 )
     rtheta = 0.0
@@ -58,12 +58,15 @@ function primal_residual_branch_ac(
 )
     acc = 0.0
     for part in partitions
-        @inbounds for e in part.zone_edges
+        # mais robusto: mede residual só nos cut_edges globais
+        @inbounds for e in cut_edges
             l_local = get(part.edge_to_local, e, 0)
             l_local == 0 && continue
-            P_loc, Q_loc = _ac_flow_from_exprs_existing(part, l_local)
+
+            P_loc, Q_loc = _pq_flow_from_exprs(part, l_local; t = 1)
             p = JuMP.value(P_loc)
             q = JuMP.value(Q_loc)
+
             if isfinite(p)
                 acc += (p - get(pflow_consensus, e, 0.0))^2
             end
@@ -133,7 +136,7 @@ function eps_primal_bus_ac_vec(
     theta_consensus_vec::Vector{Float64},
     vmag_consensus_vec::Vector{Float64},
     shared_buses_sorted::Vector{Int},
-    b2pos::Dict{Int, Int},     # compat
+    b2pos::Dict{Int, Int},
     eps_abs::Float64,
     eps_rel::Float64,
 )
@@ -143,7 +146,7 @@ function eps_primal_bus_ac_vec(
     end
 
     z_norm_sq = 0.0
-    @inbounds for j in eachindex(shared_buses_sorted)
+    @inbounds for j in eachindex(theta_consensus_vec)
         z_norm_sq += theta_consensus_vec[j]^2 + vmag_consensus_vec[j]^2
     end
 
@@ -160,7 +163,8 @@ function eps_primal_branch_ac(
 )
     dim = 0
     for part in partitions
-        dim += 2 * length(part.zone_edges)
+        # mais consistente com o residual: só edges presentes (cut-local)
+        dim += 2 * length(_zone_cut_edges(part, cut_edges))
     end
 
     z_norm_sq = 0.0
@@ -216,7 +220,7 @@ end
 function primal_residual_bus_dc(
     partitions::Partitions{PartitionDC},
     theta_consensus_vec::Vector{Float64},
-    shared_buses_sorted::Vector{Int},  # compat
+    shared_buses_sorted::Vector{Int}, # compat (não usado)
     b2pos::Dict{Int, Int},
 )
     acc = 0.0
@@ -348,7 +352,7 @@ end
 function primal_residual_bus_socp_vec(
     partitions::Partitions{PartitionSOCP},
     v2_consensus_vec::Vector{Float64},
-    shared_buses_sorted::Vector{Int},  # compat
+    shared_buses_sorted::Vector{Int}, # compat (não usado)
     b2pos::Dict{Int, Int},
 )
     acc = 0.0
@@ -375,7 +379,7 @@ function primal_residual_branch_rt_socp(
         @inbounds for e in cut_edges
             l = get(sub.edge_to_local, e, 0)
             l == 0 && continue
-            R, T = _rt_from_exprs_socp(m, l)
+            R, T = _rt_from_exprs(m, l, 1)
             acc +=
                 (value(R) - get(rflow_consensus, e, 0.0))^2 +
                 (value(T) - get(tflow_consensus, e, 0.0))^2
@@ -396,7 +400,7 @@ function primal_residual_branch_pq_socp(
         @inbounds for e in cut_edges
             l = get(sub.edge_to_local, e, 0)
             l == 0 && continue
-            P, Q = _socp_flow_from_exprs_existing(m, l)
+            P, Q = _pq_flow_from_exprs(m, l, 1)
             acc +=
                 (value(P) - get(pflow_consensus, e, 0.0))^2 +
                 (value(Q) - get(qflow_consensus, e, 0.0))^2
