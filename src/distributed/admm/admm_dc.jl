@@ -619,14 +619,15 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             part = getzone(partitions, zone_id)
             m = part.model::JuMP.Model
 
-            lambdatheta = gather_zone_lambda!(dual_theta_buf[zone_id], duals_theta[zone_id])
+            lambda_theta =
+                gather_zone_lambda!(dual_theta_buf[zone_id], duals_theta[zone_id])
 
             lin_bus = _build_linear_bus_expr(
                 part,
                 shared_buses_sorted,
                 shared_buses_to_pos,
                 theta_consensus,
-                lambdatheta,
+                lambda_theta,
                 rho_theta[],
             )
             lin_branch = _build_linear_branch_expr(

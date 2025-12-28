@@ -227,10 +227,10 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
 
-    lambdatheta_zone_buf = Dict{Int, Vector{Float64}}(
+    lambda_theta_zone_buf = Dict{Int, Vector{Float64}}(
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
-    lambdaV_zone_buf = Dict{Int, Vector{Float64}}(
+    lambda_v_zone_buf = Dict{Int, Vector{Float64}}(
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
 
@@ -239,7 +239,6 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
     theta_consensus_prev = similar(theta_consensus)
     vmag_consensus_prev = similar(vmag_consensus)
 
-    # ---------- diagnostics ----------
     hist = ADMMHistory()
     hist.meta[:kind] = :ac_bus
     hist.meta[:tag] = "admm_ac_bus"
@@ -277,8 +276,8 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
             part = getzone(partitions, zone_id)
             m = part.model::JuMP.Model
 
-            lambdatheta = (lambdatheta_zone_buf[zone_id] .= duals_theta[zone_id])
-            lambdaV = (lambdaV_zone_buf[zone_id] .= duals_v[zone_id])
+            lambda_theta = (lambda_theta_zone_buf[zone_id] .= duals_theta[zone_id])
+            lambda_v = (lambda_v_zone_buf[zone_id] .= duals_v[zone_id])
 
             lin = _build_linear_bus_expr_ac!(
                 part,
@@ -286,8 +285,8 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
                 shared_buses_to_pos,
                 theta_target,
                 vmag_target,
-                lambdatheta,
-                lambdaV,
+                lambda_theta,
+                lambda_v,
                 rho_theta[],
                 rho_v[],
             )
@@ -402,7 +401,6 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
         )
     end
 
-    # heatmaps/séries opcionais p/ build_plots()
     hist.heatmaps[:theta_avg] = theta_avg_hist
     hist.heatmaps[:vmag_avg] = vmag_avg_hist
 
@@ -459,7 +457,7 @@ function run_admm_ac_branch(
 
     optimizer_factory = resolve_optimizer_ac(config)
 
-    partitions = build_ac_partitions(sys)   # ::Partitions{PartitionAC}
+    partitions = build_ac_partitions(sys)
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
@@ -470,12 +468,11 @@ function run_admm_ac_branch(
         zone_id => Dict{Int, Float64}() for zone_id in zone_ids
     )
 
-    zP = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
-    zQ = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
-    zP_prev = Dict{Int, Float64}()
-    zQ_prev = Dict{Int, Float64}()
+    pflow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    qflow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    pflow_consensus_prev = Dict{Int, Float64}()
+    qflow_consensus_prev = Dict{Int, Float64}()
 
-    # ---------- diagnostics ----------
     hist = ADMMHistory()
     hist.meta[:kind] = :ac_branch
     hist.meta[:tag] = "admm_ac_branch"
@@ -512,8 +509,8 @@ function run_admm_ac_branch(
             lin = _build_linear_branch_expr_ac!(
                 part,
                 part.zone_edges,
-                zP,
-                zQ,
+                pflow_consensus,
+                qflow_consensus,
                 duals_p[zone_id],
                 duals_q[zone_id],
                 rho_p[],
@@ -537,30 +534,61 @@ function run_admm_ac_branch(
             part.real_generation_cost = out.real_cost
         end
 
-        zP_prev = copy(zP)
-        zQ_prev = copy(zQ)
+        pflow_consensus_prev = copy(pflow_consensus)
+        qflow_consensus_prev = copy(qflow_consensus)
 
-        compute_ac_branch_consensus!(zP, zQ, partitions, cut_edges)
+        compute_ac_branch_consensus!(
+            pflow_consensus,
+            qflow_consensus,
+            partitions,
+            cut_edges,
+        )
 
         update_duals_branch_ac!(
             duals_p,
             duals_q,
             partitions,
-            zP,
-            zQ,
+            pflow_consensus,
+            qflow_consensus,
             cut_edges,
             rho_p[],
             rho_q[];
             α = α_used,
-            zP_prev = zP_prev,
-            zQ_prev = zQ_prev,
+            pflow_consensus_prev = pflow_consensus_prev,
+            qflow_consensus_prev = qflow_consensus_prev,
         )
 
-        r = primal_residual_branch_ac(partitions, zP, zQ, cut_edges)
-        s = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
+        r = primal_residual_branch_ac(
+            partitions,
+            pflow_consensus,
+            qflow_consensus,
+            cut_edges,
+        )
+        s = dual_residual_branch_ac(
+            pflow_consensus,
+            qflow_consensus,
+            pflow_consensus_prev,
+            qflow_consensus_prev,
+            cut_edges,
+        )
 
-        eps_r = eps_primal_branch_ac(partitions, zP, zQ, cut_edges, eps_abs, eps_rel)
-        eps_s = eps_dual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges, eps_abs, eps_rel)
+        eps_r = eps_primal_branch_ac(
+            partitions,
+            pflow_consensus,
+            qflow_consensus,
+            cut_edges,
+            eps_abs,
+            eps_rel,
+        )
+        eps_s = eps_dual_branch_ac(
+            pflow_consensus,
+            qflow_consensus,
+            pflow_consensus_prev,
+            qflow_consensus_prev,
+            cut_edges,
+            eps_abs,
+            eps_rel,
+        )
 
         _record_iter!(
             hist, r, s, eps_r, eps_s;
@@ -633,7 +661,7 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
 
     optimizer_factory = resolve_optimizer_ac(config)
 
-    partitions = build_ac_partitions(sys)   # ::Partitions{PartitionAC}
+    partitions = build_ac_partitions(sys)
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
@@ -647,10 +675,10 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
 
-    lambdatheta_zone_buf = Dict{Int, Vector{Float64}}(
+    lambda_theta_zone_buf = Dict{Int, Vector{Float64}}(
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
-    lambdaV_zone_buf = Dict{Int, Vector{Float64}}(
+    lambda_v_zone_buf = Dict{Int, Vector{Float64}}(
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
 
@@ -666,12 +694,11 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
     theta_consensus_prev = similar(theta_consensus)
     vmag_consensus_prev = similar(vmag_consensus)
 
-    zP = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
-    zQ = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
-    zP_prev = Dict{Int, Float64}()
-    zQ_prev = Dict{Int, Float64}()
+    pflow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    qflow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    pflow_consensus_prev = Dict{Int, Float64}()
+    qflow_consensus_prev = Dict{Int, Float64}()
 
-    # ---------- diagnostics ----------
     hist = ADMMHistory()
     hist.meta[:kind] = :ac_hybrid
     hist.meta[:tag] = "admm_ac_hybrid"
@@ -706,8 +733,8 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             part = getzone(partitions, zone_id)
             m = part.model::JuMP.Model
 
-            lambdatheta = (lambdatheta_zone_buf[zone_id] .= duals_theta[zone_id])
-            lambdaV = (lambdaV_zone_buf[zone_id] .= duals_v[zone_id])
+            lambda_theta = (lambda_theta_zone_buf[zone_id] .= duals_theta[zone_id])
+            lambda_v = (lambda_v_zone_buf[zone_id] .= duals_v[zone_id])
 
             lin_bus = _build_linear_bus_expr_ac!(
                 part,
@@ -715,16 +742,16 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
                 shared_buses_to_pos,
                 theta_target,
                 vmag_target,
-                lambdatheta,
-                lambdaV,
+                lambda_theta,
+                lambda_v,
                 rho_theta[],
                 rho_v[],
             )
             lin_br = _build_linear_branch_expr_ac!(
                 part,
                 part.zone_edges,
-                zP,
-                zQ,
+                pflow_consensus,
+                qflow_consensus,
                 duals_p[zone_id],
                 duals_q[zone_id],
                 rho_p[],
@@ -755,8 +782,8 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
 
         theta_consensus_prev .= theta_consensus
         vmag_consensus_prev .= vmag_consensus
-        zP_prev = copy(zP)
-        zQ_prev = copy(zQ)
+        pflow_consensus_prev = copy(pflow_consensus)
+        qflow_consensus_prev = copy(qflow_consensus)
 
         compute_ac_bus_consensus_vec!(
             theta_consensus,
@@ -772,7 +799,12 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             push!(get!(vmag_avg_hist, b, Float64[]), vmag_consensus[j])
         end
 
-        compute_ac_branch_consensus!(zP, zQ, partitions, cut_edges)
+        compute_ac_branch_consensus!(
+            pflow_consensus,
+            qflow_consensus,
+            partitions,
+            cut_edges,
+        )
 
         update_duals_bus_ac_all!(
             duals_theta,
@@ -794,14 +826,14 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             duals_p,
             duals_q,
             partitions,
-            zP,
-            zQ,
+            pflow_consensus,
+            qflow_consensus,
             cut_edges,
             rho_p[],
             rho_q[];
             α = α_used,
-            zP_prev = zP_prev,
-            zQ_prev = zQ_prev,
+            pflow_consensus_prev = pflow_consensus_prev,
+            qflow_consensus_prev = qflow_consensus_prev,
         )
 
         r_bus = primal_residual_bus_ac_vec(
@@ -811,7 +843,12 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             shared_buses_sorted,
             shared_buses_to_pos,
         )
-        r_br = primal_residual_branch_ac(partitions, zP, zQ, cut_edges)
+        r_br = primal_residual_branch_ac(
+            partitions,
+            pflow_consensus,
+            qflow_consensus,
+            cut_edges,
+        )
         r_tot = hypot(r_bus, r_br)
 
         s_bus = dual_residual_bus_ac_vec(
@@ -820,7 +857,13 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             theta_consensus_prev,
             vmag_consensus_prev,
         )
-        s_br = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
+        s_br = dual_residual_branch_ac(
+            pflow_consensus,
+            qflow_consensus,
+            pflow_consensus_prev,
+            qflow_consensus_prev,
+            cut_edges,
+        )
         s_tot = hypot(s_bus, s_br)
 
         eps_bus_r = eps_primal_bus_ac_vec(
@@ -832,7 +875,14 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             eps_abs,
             eps_rel,
         )
-        eps_br_r = eps_primal_branch_ac(partitions, zP, zQ, cut_edges, eps_abs, eps_rel)
+        eps_br_r = eps_primal_branch_ac(
+            partitions,
+            pflow_consensus,
+            qflow_consensus,
+            cut_edges,
+            eps_abs,
+            eps_rel,
+        )
         eps_r_tot = hypot(eps_bus_r, eps_br_r)
 
         eps_bus_s = eps_dual_bus_ac_vec(
@@ -843,7 +893,15 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             eps_abs,
             eps_rel,
         )
-        eps_br_s = eps_dual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges, eps_abs, eps_rel)
+        eps_br_s = eps_dual_branch_ac(
+            pflow_consensus,
+            qflow_consensus,
+            pflow_consensus_prev,
+            qflow_consensus_prev,
+            cut_edges,
+            eps_abs,
+            eps_rel,
+        )
         eps_s_tot = hypot(eps_bus_s, eps_br_s)
 
         _record_iter!(

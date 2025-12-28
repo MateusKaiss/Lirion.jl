@@ -111,8 +111,8 @@ end
 # ------------------------------------------------------------
 
 function compute_ac_branch_consensus!(
-    zP::Dict{Int, Float64},
-    zQ::Dict{Int, Float64},
+    pflow_consensus::Dict{Int, Float64},
+    qflow_consensus::Dict{Int, Float64},
     partitions::Partitions{PartitionAC},
     cut_edges::Vector{Int},
 )
@@ -145,8 +145,8 @@ function compute_ac_branch_consensus!(
     @inbounds for e in cut_edges
         nP = get(cntsP, e, 0)
         nQ = get(cntsQ, e, 0)
-        nP > 0 && (zP[e] = sumsP[e] / nP)
-        nQ > 0 && (zQ[e] = sumsQ[e] / nQ)
+        nP > 0 && (pflow_consensus[e] = sumsP[e] / nP)
+        nQ > 0 && (qflow_consensus[e] = sumsQ[e] / nQ)
     end
 
     return nothing
@@ -218,8 +218,8 @@ function compute_rt_consensus!(
 end
 
 function compute_pq_consensus!(
-    zP::Dict{Int, Float64},
-    zQ::Dict{Int, Float64},
+    pflow_consensus::Dict{Int, Float64},
+    qflow_consensus::Dict{Int, Float64},
     partitions::Partitions{PartitionSOCP},
     cut_edges::Vector{Int},
 )
@@ -242,8 +242,8 @@ function compute_pq_consensus!(
     @inbounds for e in cut_edges
         n = get(cnts, e, 0)
         if n > 0
-            zP[e] = sumsP[e] / n
-            zQ[e] = sumsQ[e] / n
+            pflow_consensus[e] = sumsP[e] / n
+            qflow_consensus[e] = sumsQ[e] / n
         end
     end
     return nothing

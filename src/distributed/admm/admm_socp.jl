@@ -459,10 +459,10 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    zP = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
-    zQ = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
-    zP_prev = Dict{Int, Float64}()
-    zQ_prev = Dict{Int, Float64}()
+    pflow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    qflow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    pflow_consensus_prev = Dict{Int, Float64}()
+    qflow_consensus_prev = Dict{Int, Float64}()
 
     dualsP = Dict{Int, Dict{Int, Float64}}(
         zone_id => Dict{Int, Float64}() for zone_id in zone_ids
@@ -493,7 +493,8 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
             m = sub.model::JuMP.Model
 
             lin = _build_linear_branch_pq_expr(
-                sub, sub.zone_edges, zP, zQ, dualsP[zone_id], dualsQ[zone_id], rhoP[],
+                sub, sub.zone_edges, pflow_consensus, qflow_consensus, dualsP[zone_id],
+                dualsQ[zone_id], rhoP[],
                 rhoQ[],
             )
 
@@ -505,19 +506,54 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
             sub.real_generation_cost = compute_real_generation_cost(m, sub.objective_params)
         end
 
-        zP_prev = copy(zP)
-        zQ_prev = copy(zQ)
+        pflow_consensus_prev = copy(pflow_consensus)
+        qflow_consensus_prev = copy(qflow_consensus)
 
-        compute_pq_consensus!(zP, zQ, partitions, cut_edges)
+        compute_pq_consensus!(pflow_consensus, qflow_consensus, partitions, cut_edges)
 
-        update_duals_pq_all!(dualsP, dualsQ, partitions, zone_ids, zP, zQ, rhoP[], rhoQ[])
+        update_duals_pq_all!(
+            dualsP,
+            dualsQ,
+            partitions,
+            zone_ids,
+            pflow_consensus,
+            qflow_consensus,
+            rhoP[],
+            rhoQ[],
+        )
 
-        r = primal_residual_branch_pq_socp(partitions, zP, zQ, cut_edges)
-        s = dual_residual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges)
+        r = primal_residual_branch_pq_socp(
+            partitions,
+            pflow_consensus,
+            qflow_consensus,
+            cut_edges,
+        )
+        s = dual_residual_branch_pq_socp(
+            pflow_consensus,
+            qflow_consensus,
+            pflow_consensus_prev,
+            qflow_consensus_prev,
+            cut_edges,
+        )
 
-        eps_r = eps_primal_branch_pq_socp(partitions, zP, zQ, cut_edges, eps_abs, eps_rel)
+        eps_r = eps_primal_branch_pq_socp(
+            partitions,
+            pflow_consensus,
+            qflow_consensus,
+            cut_edges,
+            eps_abs,
+            eps_rel,
+        )
         eps_s =
-            eps_dual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges, eps_abs, eps_rel)
+            eps_dual_branch_pq_socp(
+                pflow_consensus,
+                qflow_consensus,
+                pflow_consensus_prev,
+                qflow_consensus_prev,
+                cut_edges,
+                eps_abs,
+                eps_rel,
+            )
 
         _record_iter!(
             hist, r, s, eps_r, eps_s;
@@ -631,13 +667,13 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
 
-    zP = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
-    zQ = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    pflow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    qflow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zR = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
     zT = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
 
-    zP_prev = Dict{Int, Float64}()
-    zQ_prev = Dict{Int, Float64}()
+    pflow_consensus_prev = Dict{Int, Float64}()
+    qflow_consensus_prev = Dict{Int, Float64}()
     zR_prev = Dict{Int, Float64}()
     zT_prev = Dict{Int, Float64}()
 
@@ -694,7 +730,8 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
                 rhoV2[],
             )
             lin_pq = _build_linear_branch_pq_expr(
-                sub, sub.zone_edges, zP, zQ, dualsP[zone_id], dualsQ[zone_id], rhoP[],
+                sub, sub.zone_edges, pflow_consensus, qflow_consensus, dualsP[zone_id],
+                dualsQ[zone_id], rhoP[],
                 rhoQ[],
             )
             lin_rt = _build_linear_branch_rt_expr(
@@ -711,8 +748,8 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
         end
 
         v2bar_prev .= v2bar
-        zP_prev = copy(zP)
-        zQ_prev = copy(zQ)
+        pflow_consensus_prev = copy(pflow_consensus)
+        qflow_consensus_prev = copy(qflow_consensus)
         zR_prev = copy(zR)
         zT_prev = copy(zT)
 
@@ -722,7 +759,7 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
             shared_buses_sorted,
             shared_buses_to_pos,
         )
-        compute_pq_consensus!(zP, zQ, partitions, cut_edges)
+        compute_pq_consensus!(pflow_consensus, qflow_consensus, partitions, cut_edges)
         compute_rt_consensus!(zR, zT, partitions, cut_edges)
 
         @inbounds for b in shared_buses_sorted
@@ -734,18 +771,38 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
             duals_v2, partitions, zone_ids, v2bar, v2bar_prev, rhoV2[],
             α_used, shared_buses_sorted, shared_buses_to_pos,
         )
-        update_duals_pq_all!(dualsP, dualsQ, partitions, zone_ids, zP, zQ, rhoP[], rhoQ[])
+        update_duals_pq_all!(
+            dualsP,
+            dualsQ,
+            partitions,
+            zone_ids,
+            pflow_consensus,
+            qflow_consensus,
+            rhoP[],
+            rhoQ[],
+        )
         update_duals_rt_all!(dualsR, dualsT, partitions, zone_ids, zR, zT, rhoR[], rhoT[])
 
         r_bus = primal_residual_bus_socp_vec(
             partitions, v2bar, shared_buses_sorted, shared_buses_to_pos,
         )
-        r_pq = primal_residual_branch_pq_socp(partitions, zP, zQ, cut_edges)
+        r_pq = primal_residual_branch_pq_socp(
+            partitions,
+            pflow_consensus,
+            qflow_consensus,
+            cut_edges,
+        )
         r_rt = primal_residual_branch_rt_socp(partitions, zR, zT, cut_edges)
         r = sqrt(r_bus^2 + r_pq^2 + r_rt^2)
 
         s_bus = dual_residual_bus_socp_vec(v2bar, v2bar_prev)
-        s_pq = dual_residual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges)
+        s_pq = dual_residual_branch_pq_socp(
+            pflow_consensus,
+            qflow_consensus,
+            pflow_consensus_prev,
+            qflow_consensus_prev,
+            cut_edges,
+        )
         s_rt = dual_residual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges)
         s = sqrt(s_bus^2 + s_pq^2 + s_rt^2)
 
@@ -757,8 +814,8 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
             )
             epspq = eps_primal_branch_pq_socp(
                 partitions,
-                zP,
-                zQ,
+                pflow_consensus,
+                qflow_consensus,
                 cut_edges,
                 eps_abs,
                 eps_rel,
@@ -776,10 +833,10 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
         eps_s = begin
             epsb = eps_dual_bus_socp_vec(v2bar, v2bar_prev, eps_abs, eps_rel)
             epspq = eps_dual_branch_pq_socp(
-                zP,
-                zQ,
-                zP_prev,
-                zQ_prev,
+                pflow_consensus,
+                qflow_consensus,
+                pflow_consensus_prev,
+                qflow_consensus_prev,
                 cut_edges,
                 eps_abs,
                 eps_rel,

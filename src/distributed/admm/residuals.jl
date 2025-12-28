@@ -52,8 +52,8 @@ end
 
 function primal_residual_branch_ac(
     partitions::Partitions{PartitionAC},
-    zP::Dict{Int, Float64},
-    zQ::Dict{Int, Float64},
+    pflow_consensus::Dict{Int, Float64},
+    qflow_consensus::Dict{Int, Float64},
     cut_edges::Vector{Int},
 )
     acc = 0.0
@@ -65,10 +65,10 @@ function primal_residual_branch_ac(
             p = JuMP.value(P_loc)
             q = JuMP.value(Q_loc)
             if isfinite(p)
-                acc += (p - get(zP, e, 0.0))^2
+                acc += (p - get(pflow_consensus, e, 0.0))^2
             end
             if isfinite(q)
-                acc += (q - get(zQ, e, 0.0))^2
+                acc += (q - get(qflow_consensus, e, 0.0))^2
             end
         end
     end
@@ -110,16 +110,16 @@ function dual_residual_bus_ac_components(
 end
 
 function dual_residual_branch_ac(
-    zP::Dict{Int, Float64},
-    zQ::Dict{Int, Float64},
-    zP_prev::Dict{Int, Float64},
-    zQ_prev::Dict{Int, Float64},
+    pflow_consensus::Dict{Int, Float64},
+    qflow_consensus::Dict{Int, Float64},
+    pflow_consensus_prev::Dict{Int, Float64},
+    qflow_consensus_prev::Dict{Int, Float64},
     cut_edges::Vector{Int},
 )
     s = 0.0
     @inbounds for e in cut_edges
-        s += (get(zP, e, 0.0) - get(zP_prev, e, 0.0))^2
-        s += (get(zQ, e, 0.0) - get(zQ_prev, e, 0.0))^2
+        s += (get(pflow_consensus, e, 0.0) - get(pflow_consensus_prev, e, 0.0))^2
+        s += (get(qflow_consensus, e, 0.0) - get(qflow_consensus_prev, e, 0.0))^2
     end
     return sqrt(s)
 end
@@ -152,8 +152,8 @@ end
 
 function eps_primal_branch_ac(
     partitions::Partitions{PartitionAC},
-    zP::Dict{Int, Float64},
-    zQ::Dict{Int, Float64},
+    pflow_consensus::Dict{Int, Float64},
+    qflow_consensus::Dict{Int, Float64},
     cut_edges::Vector{Int},
     eps_abs::Float64,
     eps_rel::Float64,
@@ -165,7 +165,7 @@ function eps_primal_branch_ac(
 
     z_norm_sq = 0.0
     @inbounds for e in cut_edges
-        z_norm_sq += get(zP, e, 0.0)^2 + get(zQ, e, 0.0)^2
+        z_norm_sq += get(pflow_consensus, e, 0.0)^2 + get(qflow_consensus, e, 0.0)^2
     end
 
     return sqrt(max(1, dim)) * eps_abs + eps_rel * max(sqrt(z_norm_sq), 1e-12)
@@ -190,16 +190,22 @@ function eps_dual_bus_ac_vec(
 end
 
 function eps_dual_branch_ac(
-    zP::Dict{Int, Float64},
-    zQ::Dict{Int, Float64},
-    zP_prev::Dict{Int, Float64},
-    zQ_prev::Dict{Int, Float64},
+    pflow_consensus::Dict{Int, Float64},
+    qflow_consensus::Dict{Int, Float64},
+    pflow_consensus_prev::Dict{Int, Float64},
+    qflow_consensus_prev::Dict{Int, Float64},
     cut_edges::Vector{Int},
     eps_abs::Float64,
     eps_rel::Float64,
 )
     dim = 2 * max(1, length(cut_edges))
-    s = dual_residual_branch_ac(zP, zQ, zP_prev, zQ_prev, cut_edges)
+    s = dual_residual_branch_ac(
+        pflow_consensus,
+        qflow_consensus,
+        pflow_consensus_prev,
+        qflow_consensus_prev,
+        cut_edges,
+    )
     return sqrt(dim) * eps_abs + eps_rel * s
 end
 
@@ -378,8 +384,8 @@ end
 
 function primal_residual_branch_pq_socp(
     partitions::Partitions{PartitionSOCP},
-    zP::Dict{Int, Float64},
-    zQ::Dict{Int, Float64},
+    pflow_consensus::Dict{Int, Float64},
+    qflow_consensus::Dict{Int, Float64},
     cut_edges::Vector{Int},
 )
     acc = 0.0
@@ -389,7 +395,9 @@ function primal_residual_branch_pq_socp(
             l = get(sub.edge_to_local, e, 0)
             l == 0 && continue
             P, Q = _socp_flow_from_exprs_existing(m, l)
-            acc += (value(P) - get(zP, e, 0.0))^2 + (value(Q) - get(zQ, e, 0.0))^2
+            acc +=
+                (value(P) - get(pflow_consensus, e, 0.0))^2 +
+                (value(Q) - get(qflow_consensus, e, 0.0))^2
         end
     end
     return sqrt(acc)
@@ -411,11 +419,17 @@ dual_residual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges) =
         ),
     )
 
-dual_residual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges) =
+dual_residual_branch_pq_socp(
+    pflow_consensus,
+    qflow_consensus,
+    pflow_consensus_prev,
+    qflow_consensus_prev,
+    cut_edges,
+) =
     sqrt(
         sum(
-            (get(zP, e, 0.0) - get(zP_prev, e, 0.0))^2 +
-            (get(zQ, e, 0.0) - get(zQ_prev, e, 0.0))^2
+            (get(pflow_consensus, e, 0.0) - get(pflow_consensus_prev, e, 0.0))^2 +
+            (get(qflow_consensus, e, 0.0) - get(qflow_consensus_prev, e, 0.0))^2
             for e in cut_edges
         ),
     )
@@ -466,8 +480,8 @@ end
 
 function eps_primal_branch_pq_socp(
     partitions::Partitions{PartitionSOCP},
-    zP::Dict{Int, Float64},
-    zQ::Dict{Int, Float64},
+    pflow_consensus::Dict{Int, Float64},
+    qflow_consensus::Dict{Int, Float64},
     cut_edges::Vector{Int},
     eps_abs::Float64,
     eps_rel::Float64,
@@ -478,7 +492,7 @@ function eps_primal_branch_pq_socp(
     end
     z_norm_sq = 0.0
     @inbounds for e in cut_edges
-        z_norm_sq += get(zP, e, 0.0)^2 + get(zQ, e, 0.0)^2
+        z_norm_sq += get(pflow_consensus, e, 0.0)^2 + get(qflow_consensus, e, 0.0)^2
     end
     return sqrt(max(1, dim)) * eps_abs + eps_rel * max(sqrt(z_norm_sq), 1e-12)
 end
@@ -495,9 +509,23 @@ function eps_dual_branch_rt_socp(zR, zT, zR_prev, zT_prev, cut_edges, eps_abs, e
     return sqrt(dim) * eps_abs + eps_rel * s
 end
 
-function eps_dual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges, eps_abs, eps_rel)
+function eps_dual_branch_pq_socp(
+    pflow_consensus,
+    qflow_consensus,
+    pflow_consensus_prev,
+    qflow_consensus_prev,
+    cut_edges,
+    eps_abs,
+    eps_rel,
+)
     dim = 2 * max(1, length(cut_edges))
-    s = dual_residual_branch_pq_socp(zP, zQ, zP_prev, zQ_prev, cut_edges)
+    s = dual_residual_branch_pq_socp(
+        pflow_consensus,
+        qflow_consensus,
+        pflow_consensus_prev,
+        qflow_consensus_prev,
+        cut_edges,
+    )
     return sqrt(dim) * eps_abs + eps_rel * s
 end
 

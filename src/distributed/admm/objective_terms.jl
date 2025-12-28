@@ -148,8 +148,8 @@ function _build_linear_bus_expr_ac!(
     b2pos::Dict{Int, Int},
     theta_consensus_vec::Vector{Float64},
     vmag_consensus_vec::Vector{Float64},
-    lambdatheta_zone::Vector{Float64},
-    lambdaV_zone::Vector{Float64},
+    lambda_theta_zone::Vector{Float64},
+    lambda_v_zone::Vector{Float64},
     rho_theta::Float64,
     rhoV::Float64,
 )
@@ -160,8 +160,8 @@ function _build_linear_bus_expr_ac!(
 
     for b in part.shared_buses_local
         j = b2pos[b]
-        lin += (lambdatheta_zone[j] - rho_theta * theta_consensus_vec[j]) * theta[b, 1]
-        lin += (lambdaV_zone[j] - rhoV * vmag_consensus_vec[j]) * V[b, 1]
+        lin += (lambda_theta_zone[j] - rho_theta * theta_consensus_vec[j]) * theta[b, 1]
+        lin += (lambda_v_zone[j] - rhoV * vmag_consensus_vec[j]) * V[b, 1]
     end
 
     return lin
@@ -170,8 +170,8 @@ end
 function _build_linear_branch_expr_ac!(
     part::PartitionAC,
     zone_edges::Vector{Int},
-    zP::Dict{Int, Float64},
-    zQ::Dict{Int, Float64},
+    pflow_consensus::Dict{Int, Float64},
+    qflow_consensus::Dict{Int, Float64},
     dualsP_zone::Dict{Int, Float64},
     dualsQ_zone::Dict{Int, Float64},
     rhoP::Float64,
@@ -186,11 +186,11 @@ function _build_linear_branch_expr_ac!(
         P_loc, Q_loc = _ac_flow_from_exprs_existing(part, l_local)
         lambdaP = get(dualsP_zone, e, 0.0)
         lambdaQ = get(dualsQ_zone, e, 0.0)
-        zPe = get(zP, e, 0.0)
-        zQe = get(zQ, e, 0.0)
+        pflow_consensuse = get(pflow_consensus, e, 0.0)
+        qflow_consensuse = get(qflow_consensus, e, 0.0)
         lin +=
-            lambdaP * (P_loc - zPe) + lambdaQ * (Q_loc - zQe) -
-            rhoP * zPe * P_loc - rhoQ * zQe * Q_loc
+            lambdaP * (P_loc - pflow_consensuse) + lambdaQ * (Q_loc - qflow_consensuse) -
+            rhoP * pflow_consensuse * P_loc - rhoQ * qflow_consensuse * Q_loc
     end
 
     return lin
@@ -310,8 +310,8 @@ end
 function _build_linear_branch_pq_expr(
     sub::PartitionSOCP,
     zone_edges::Vector{Int},
-    zP::Dict{Int, Float64},
-    zQ::Dict{Int, Float64},
+    pflow_consensus::Dict{Int, Float64},
+    qflow_consensus::Dict{Int, Float64},
     lambdaP_zone::Dict{Int, Float64},
     lambdaQ_zone::Dict{Int, Float64},
     rhoP::Float64,
@@ -324,8 +324,8 @@ function _build_linear_branch_pq_expr(
         l_local = get(sub.edge_to_local, e, nothing)
         l_local === nothing && continue
         P_loc, Q_loc = _socp_flow_from_exprs_existing(m, l_local)
-        lin += (get(lambdaP_zone, e, 0.0) - rhoP * get(zP, e, 0.0)) * P_loc
-        lin += (get(lambdaQ_zone, e, 0.0) - rhoQ * get(zQ, e, 0.0)) * Q_loc
+        lin += (get(lambdaP_zone, e, 0.0) - rhoP * get(pflow_consensus, e, 0.0)) * P_loc
+        lin += (get(lambdaQ_zone, e, 0.0) - rhoQ * get(qflow_consensus, e, 0.0)) * Q_loc
     end
 
     return lin
