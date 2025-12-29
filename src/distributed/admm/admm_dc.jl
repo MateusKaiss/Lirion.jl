@@ -1,9 +1,9 @@
 # ============================================================
-# ADMM-DC
+# ADMM-DC - HELPERS
 # ============================================================
 
 # ------------------------------------------------------------
-# Diagnostics / history helpers
+# Diagnostics / history
 # ------------------------------------------------------------
 
 @inline function _record_iter!(
@@ -28,9 +28,7 @@ end
 # Partition initialization
 # ------------------------------------------------------------
 
-# ----------------------------
-# DC / bus partition
-# ----------------------------
+# ---------- dc bus partition ----------
 
 function init_dc_bus_partition!(
     part::PartitionDC,
@@ -46,7 +44,6 @@ function init_dc_bus_partition!(
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
-    _set_model_silent!(m)
     for I in keys(part.theta_var)
         set_start_value(part.theta_var[I], 0.0)
     end
@@ -75,9 +72,7 @@ function init_dc_bus_partition!(
     return nothing
 end
 
-# ----------------------------
-# DC / branch partition
-# ----------------------------
+# ---------- dc branch partition ----------
 
 function init_dc_branch_partition!(
     part::PartitionDC,
@@ -96,7 +91,6 @@ function init_dc_branch_partition!(
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
-    _set_model_silent!(m)
     for I in keys(part.theta_var)
         set_start_value(part.theta_var[I], 0.0)
     end
@@ -127,9 +121,7 @@ function init_dc_branch_partition!(
     return nothing
 end
 
-# ----------------------------
-# DC / hybrid partition
-# ----------------------------
+# ---------- dc hybrid partition ----------
 
 function init_dc_hybrid_partition!(
     part::PartitionDC,
@@ -149,7 +141,6 @@ function init_dc_hybrid_partition!(
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
-    _set_model_silent!(m)
     for I in keys(part.theta_var)
         set_start_value(part.theta_var[I], 0.0)
     end
@@ -189,7 +180,7 @@ end
 # ============================================================
 
 # ------------------------------------------------------------
-# Runner: ADMM bus/DC
+# Runner: ADMM DC bus
 # ------------------------------------------------------------
 
 function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
@@ -384,7 +375,7 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
 end
 
 # ------------------------------------------------------------
-# Runner: ADMM branch/DC
+# Runner: ADMM DC branch
 # ------------------------------------------------------------
 
 function run_admm_branch(
@@ -540,7 +531,7 @@ function run_admm_branch(
 end
 
 # ------------------------------------------------------------
-# Runner: ADMM hybrid/DC
+# Runner: ADMM DC hybrid
 # ------------------------------------------------------------
 
 function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult

@@ -12,7 +12,6 @@ end
     return [e for e in cut_edges if haskey(part.edge_to_local, e)]
 end
 
-
 # ------------------------------------------------------------
 # Hotpaths preparation (shared mapping)
 # ------------------------------------------------------------

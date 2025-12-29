@@ -28,7 +28,6 @@ function init_socp_v2rt_partition!(
     sub.v2_var = m[:v_magnitude_sq]
     sub.objective_params = sys_zone.objective
     sub.has_solution = false
-    _set_model_silent!(m)
 
     for I in keys(sub.v2_var)
         set_start_value(sub.v2_var[I], 1.0)
@@ -88,7 +87,6 @@ function init_socp_pq_partition!(
     sub.obj_base = m[:generation_cost]
     sub.objective_params = sys_zone.objective
     sub.has_solution = false
-    _set_model_silent!(m)
 
     if is_gurobi(m)
         _soft_anchor_branch_expr!(
@@ -156,7 +154,6 @@ function init_socp_hybrid_partition!(
     sub.v2_var = m[:v_magnitude_sq]
     sub.objective_params = sys_zone.objective
     sub.has_solution = false
-    _set_model_silent!(m)
 
     for I in keys(sub.v2_var)
         set_start_value(sub.v2_var[I], 1.0)

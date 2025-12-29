@@ -27,7 +27,6 @@ function init_ac_bus_partition!(
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
-    _set_model_silent!(m)
     for I in keys(part.theta_var)
         set_start_value(part.theta_var[I], 0.0)
     end
@@ -84,7 +83,6 @@ function init_ac_branch_partition!(
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
-    _set_model_silent!(m)
     for I in keys(part.theta_var)
         set_start_value(part.theta_var[I], 0.0)
     end
@@ -145,7 +143,6 @@ function init_ac_hybrid_partition!(
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
-    _set_model_silent!(m)
     for I in keys(part.theta_var)
         set_start_value(part.theta_var[I], 0.0)
     end

@@ -16,6 +16,37 @@ end
 # Optimizer resolution
 # ============================================================
 
+@inline function _silent_factory(opt)
+    if opt === Ipopt.Optimizer
+        return optimizer_with_attributes(
+            Ipopt.Optimizer,
+            "print_level" => 0,
+            "sb" => "yes",
+            "print_timing_statistics" => "no",
+            "print_user_options" => "no",
+            "file_print_level" => 0,
+        )
+    elseif opt === Gurobi.Optimizer
+        return optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0)
+    elseif opt === SCS.Optimizer
+        return optimizer_with_attributes(SCS.Optimizer, "verbose" => 0)
+    elseif opt === Clarabel.Optimizer
+        return optimizer_with_attributes(Clarabel.Optimizer, "verbose" => false)
+    elseif isdefined(Main, :HiGHS) && opt === HiGHS.Optimizer
+        return optimizer_with_attributes(
+            HiGHS.Optimizer,
+            "log_to_console" => false,
+            "output_flag" => false,
+        )
+    elseif isdefined(Main, :GLPK) && opt === GLPK.Optimizer
+        return optimizer_with_attributes(GLPK.Optimizer, "msg_lev" => 0)
+    elseif opt === COSMO.Optimizer
+        return optimizer_with_attributes(COSMO.Optimizer, "verbose" => false)
+    else
+        return opt
+    end
+end
+
 # ----------------------------
 # DC
 # ----------------------------
@@ -32,7 +63,7 @@ function resolve_optimizer(::Val{:dc}, config)
                 "decompose" => true,
             )
         end
-        return opt
+        return _silent_factory(opt)
     end
 
     eps_abs = _getopt(config, :eps_primal, 1e-6)
@@ -54,7 +85,66 @@ end
 # ----------------------------
 function resolve_optimizer(::Val{:ac}, config)
     opt = _getopt(config, :optimizer, nothing)
-    opt !== nothing && return opt
+    if opt !== nothing
+        if opt == Ipopt.Optimizer
+            return optimizer_with_attributes(
+                Ipopt.Optimizer,
+                # saída silenciosa
+                "print_level" => 0,
+                "sb" => "yes",
+                "print_timing_statistics" => "no",
+                "print_user_options" => "no",
+                "file_print_level" => 0,
+
+                # critérios
+                "tol" => 1e-7,
+                "acceptable_tol" => 1e-5,
+                "acceptable_iter" => 10,
+                "dual_inf_tol" => 1e-4,
+                "constr_viol_tol" => 1e-4,
+                "compl_inf_tol" => 1e-4,
+                "acceptable_dual_inf_tol" => 1e-2,
+                "acceptable_constr_viol_tol" => 1e-3,
+                "acceptable_compl_inf_tol" => 1e-3,
+
+                # NLP & bounds
+                "fixed_variable_treatment" => "make_parameter_nodual",
+                "bound_relax_factor" => 1e-6,
+                "check_derivatives_for_naninf" => "no",
+                "jacobian_approximation" => "exact",
+                "gradient_approximation" => "exact",
+                "kappa_d" => 1e-5,
+
+                # scaling
+                "nlp_scaling_max_gradient" => 100.0,
+                "nlp_scaling_min_value" => 1e-8,
+
+                # init
+                "bound_push" => 1e-8,
+                "bound_frac" => 1e-6,
+                "slack_bound_push" => 1e-8,
+                "slack_bound_frac" => 1e-6,
+
+                # linear solver
+                "linear_solver" => "mumps",
+                "linear_scaling_on_demand" => "yes",
+                "fast_step_computation" => "no",
+                "min_refinement_steps" => 1,
+                "max_refinement_steps" => 8,
+                "neg_curv_test_tol" => 1e-12,
+                "neg_curv_test_reg" => "yes",
+                "max_hessian_perturbation" => 1e20,
+                "min_hessian_perturbation" => 1e-20,
+                "mumps_mem_percent" => 500,
+                "mumps_pivtol" => 1e-6,
+                "mumps_pivtolmax" => 0.1,
+                "mumps_pivot_order" => 7,
+                "hessian_approximation" => "exact",
+                "limited_memory_max_history" => 6,
+            )
+        end
+        return _silent_factory(opt)
+    end
 
     return optimizer_with_attributes(
         Ipopt.Optimizer,
@@ -120,7 +210,7 @@ is_gurobi(m::JuMP.Model)::Bool = occursin("Gurobi", MOI.get(m, MOI.SolverName())
 
 function resolve_optimizer(::Val{:socp}, config)
     opt = _getopt(config, :optimizer, nothing)
-    opt !== nothing && return opt
+    opt !== nothing && return _silent_factory(opt)
 
     prefer = _getopt(config, :prefer_socp_solver, :auto)
 
@@ -133,16 +223,16 @@ function resolve_optimizer(::Val{:socp}, config)
     for s in order
         try
             if s === :gurobi
-                return Gurobi.Optimizer
+                return _silent_factory(Gurobi.Optimizer)
             elseif s === :clarabel
-                return Clarabel.Optimizer
+                return _silent_factory(Clarabel.Optimizer)
             else
-                return SCS.Optimizer
+                return _silent_factory(SCS.Optimizer)
             end
         catch
         end
     end
-    return SCS.Optimizer
+    return _silent_factory(SCS.Optimizer)
 end
 
 @inline base_model_tag(::Type{DC}) = Val(:dc)
@@ -157,9 +247,9 @@ end
     if sec < 60
         return "$(round(sec; digits = 3)) s"
     elseif sec < 3600
-        return "$(round(sec/60; digits = 2)) min"
+        return "$(round(sec / 60; digits = 2)) min"
     else
-        return "$(round(sec/3600; digits = 2)) h"
+        return "$(round(sec / 3600; digits = 2)) h"
     end
 end
 
@@ -175,58 +265,10 @@ function compute_real_generation_cost(model, params)
             pgen = value(model[:p_generation][g, t]) * params.sbase
             coefs = params.generator_costs[t][g]
             degree = length(coefs)
-            for i in 1:degree
+            @inbounds for i in 1:degree
                 total_cost += coefs[i] * pgen^(degree - i)
             end
         end
     end
     return total_cost
-end
-
-function _set_model_silent!(m::JuMP.Model)
-    _safe(k, v) = (
-        try
-            set_optimizer_attribute(m, k, v)
-        catch
-        end
-    )
-
-    try
-        set_silent(m)
-    catch
-    end
-    try
-        set_optimizer_attribute(m, JuMP.MOI.Silent(), true)
-    catch
-    end
-
-    solver = ""
-    try
-        backend = JuMP.backend(m)
-        solver = lowercase(JuMP.MOI.get(backend, JuMP.MOI.SolverName()))
-    catch
-    end
-
-    if occursin("ipopt", solver)
-        _safe("print_level", 0)
-        _safe("sb", "yes")
-    elseif occursin("gurobi", solver)
-        _safe("OutputFlag", 0)
-    elseif occursin("cplex", solver)
-        _safe("CPXPARAM_ScreenOutput", 0)
-    elseif occursin("highs", solver)
-        _safe("log_to_console", false)
-        _safe("output_flag", false)
-    elseif occursin("scs", solver)
-        _safe("verbose", false)
-    elseif occursin("clarabel", solver)
-        _safe("verbose", false)
-    elseif occursin("glpk", solver)
-        _safe("msg_lev", 0)
-    else
-        _safe("verbose", false)
-        _safe("output_flag", 0)
-        _safe("print_level", 0)
-    end
-    return nothing
 end
