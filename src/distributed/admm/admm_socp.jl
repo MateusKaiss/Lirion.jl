@@ -55,7 +55,7 @@ function init_socp_v2rt_partition!(
 )
     for zone_id in zone_ids
         init_socp_v2rt_partition!(
-            getzone(partitions, zone_id),
+            get_partition(partitions, zone_id),
             sys.parts[zone_id],
             optimizer_factory,
             rhoV2,
@@ -119,7 +119,7 @@ function init_socp_pq_partition!(
 )
     for zone_id in zone_ids
         init_socp_pq_partition!(
-            getzone(partitions, zone_id),
+            get_partition(partitions, zone_id),
             sys.parts[zone_id],
             optimizer_factory,
             rhoP,
@@ -186,7 +186,7 @@ function init_socp_hybrid_partition!(
 )
     for zone_id in zone_ids
         init_socp_hybrid_partition!(
-            getzone(partitions, zone_id),
+            get_partition(partitions, zone_id),
             sys.parts[zone_id],
             optimizer_factory,
             rhoV2,
@@ -286,7 +286,7 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            sub = getzone(partitions, zone_id)
+            sub = get_partition(partitions, zone_id)
             model = sub.model::JuMP.Model
 
             lambda_z = (dual_v2_buf[zone_id] .= duals_v2[zone_id])
@@ -311,7 +311,7 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
         end
 
         for (i, zone_id) in enumerate(zone_ids)
-            sub = getzone(partitions, zone_id)
+            sub = get_partition(partitions, zone_id)
             out = results[i]
             sub.has_solution = true
             sub.generation_cost_model_expr = out.gen_cost_expr
@@ -504,7 +504,7 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            sub = getzone(partitions, zone_id)
+            sub = get_partition(partitions, zone_id)
             model = sub.model::JuMP.Model
 
             lin = _build_linear_branch_pq_expr(
@@ -735,7 +735,7 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            sub = getzone(partitions, zone_id)
+            sub = get_partition(partitions, zone_id)
             model = sub.model::JuMP.Model
 
             lambda_z = (dual_v2_buf[zone_id] .= duals_v2[zone_id])

@@ -24,7 +24,7 @@
     ρv = rho_v[]
 
     @inbounds for z in zone_ids
-        part = getzone(partitions, z)
+        part = get_partition(partitions, z)
         update_duals_bus_ac_vec!(
             duals_theta[z],
             duals_v[z],
@@ -170,7 +170,7 @@ end
 )
     ρ = rho[]
     @inbounds for z in zone_ids
-        part = getzone(partitions, z)
+        part = get_partition(partitions, z)
         update_duals_theta_vec!(
             dual_theta[z],
             part,
@@ -273,7 +273,7 @@ end
     shared_buses_to_pos::Dict{Int, Int},
 )
     @inbounds for z in zone_ids
-        sub = getzone(partitions, z)
+        sub = get_partition(partitions, z)
         update_duals_v2_vec!(
             duals_v2[z],
             sub,
@@ -303,7 +303,7 @@ end
     rhoT::Float64,
 )
     @inbounds for z in zone_ids
-        sub = getzone(partitions, z)
+        sub = get_partition(partitions, z)
         m = sub.model::JuMP.Model
         dR = get!(dualsR, z, Dict{Int, Float64}())
         dT = get!(dualsT, z, Dict{Int, Float64}())
@@ -334,7 +334,7 @@ end
     rhoQ::Float64,
 )
     @inbounds for z in zone_ids
-        sub = getzone(partitions, z)
+        sub = get_partition(partitions, z)
         m = sub.model::JuMP.Model
         dP = get!(dualsP, z, Dict{Int, Float64}())
         dQ = get!(dualsQ, z, Dict{Int, Float64}())

@@ -9,7 +9,7 @@ Base.iterate(ps::Partitions, st::Int = 1) =
     st > length(ps.parts) ? nothing : (ps.parts[st], st + 1)
 Base.getindex(ps::Partitions, i::Int) = ps.parts[i]
 
-@inline getzone(ps::Partitions, zone::Int) = ps.parts[ps.zone_to_idx[zone]]
+@inline get_partition(ps::Partitions, zone::Int) = ps.parts[ps.zone_to_idx[zone]]
 @inline zoneindex(ps::Partitions, zone::Int) = ps.zone_to_idx[zone]
 
 # =======================================================================

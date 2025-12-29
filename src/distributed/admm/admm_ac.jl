@@ -50,7 +50,7 @@ function init_ac_bus_partition!(
 )
     for zone_id in zone_ids
         init_ac_bus_partition!(
-            getzone(partitions, zone_id),
+            get_partition(partitions, zone_id),
             sys.parts[zone_id],
             optimizer_factory,
             rho_theta,
@@ -107,7 +107,7 @@ function init_ac_branch_partition!(
 )
     for zone_id in zone_ids
         init_ac_branch_partition!(
-            getzone(partitions, zone_id),
+            get_partition(partitions, zone_id),
             sys.parts[zone_id],
             optimizer_factory,
             rhoP,
@@ -171,7 +171,7 @@ function init_ac_hybrid_partition!(
 )
     for zone_id in zone_ids
         init_ac_hybrid_partition!(
-            getzone(partitions, zone_id),
+            get_partition(partitions, zone_id),
             sys.parts[zone_id],
             optimizer_factory,
             rho_theta,
@@ -270,7 +270,7 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            part = getzone(partitions, zone_id)
+            part = get_partition(partitions, zone_id)
             model = part.model::JuMP.Model
 
             lambda_theta = (dual_theta_buf[zone_id] .= duals_theta[zone_id])
@@ -298,7 +298,7 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
         end
 
         for (i, zone_id) in enumerate(zone_ids)
-            part = getzone(partitions, zone_id)
+            part = get_partition(partitions, zone_id)
             out = results[i]
             part.has_solution = true
             part.generation_cost_model_expr = out.expr_cost
@@ -500,7 +500,7 @@ function run_admm_ac_branch(
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            part = getzone(partitions, zone_id)
+            part = get_partition(partitions, zone_id)
             model = part.model::JuMP.Model
 
             lin = _build_linear_branch_expr_ac!(
@@ -524,7 +524,7 @@ function run_admm_ac_branch(
         end
 
         for (i, zone_id) in enumerate(zone_ids)
-            part = getzone(partitions, zone_id)
+            part = get_partition(partitions, zone_id)
             out = results[i]
             part.has_solution = true
             part.generation_cost_model_expr = out.expr_cost
@@ -727,7 +727,7 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            part = getzone(partitions, zone_id)
+            part = get_partition(partitions, zone_id)
             model = part.model::JuMP.Model
 
             lambda_theta = (dual_theta_buf[zone_id] .= duals_theta[zone_id])
@@ -770,7 +770,7 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
         end
 
         for (i, zone_id) in enumerate(zone_ids)
-            part = getzone(partitions, zone_id)
+            part = get_partition(partitions, zone_id)
             out = results[i]
             part.has_solution = true
             part.generation_cost_model_expr = out.expr_cost
