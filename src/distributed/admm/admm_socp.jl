@@ -518,7 +518,8 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
 
             sub.has_solution = true
             sub.generation_cost_model_expr = value(model[:generation_cost])
-            sub.real_generation_cost = compute_real_generation_cost(model, sub.objective_params)
+            sub.real_generation_cost =
+                compute_real_generation_cost(model, sub.objective_params)
         end
 
         pflow_consensus_prev = copy(pflow_consensus)
@@ -760,7 +761,8 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
 
             sub.has_solution = true
             sub.generation_cost_model_expr = value(model[:generation_cost])
-            sub.real_generation_cost = compute_real_generation_cost(model, sub.objective_params)
+            sub.real_generation_cost =
+                compute_real_generation_cost(model, sub.objective_params)
         end
 
         v2_consensus_prev .= v2_consensus

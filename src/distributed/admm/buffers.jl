@@ -22,12 +22,12 @@ function _prepare_bus_maps!(part)
 
     part.bus_local_index = Dict{Int, Int}(ids[i] => i for i in 1:n_bus)
 
-    lbs = part.shared_buses_local
-    n_shared = length(lbs)
+    shared_bus_ids = part.shared_buses_local
+    n_shared = length(shared_bus_ids)
 
     part.shared_pos_local = Vector{Int}(undef, n_shared)
     @inbounds for i in 1:n_shared
-        part.shared_pos_local[i] = part.bus_local_index[lbs[i]]
+        part.shared_pos_local[i] = part.bus_local_index[shared_bus_ids[i]]
     end
 
     return n_bus, n_shared

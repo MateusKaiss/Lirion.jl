@@ -18,9 +18,9 @@ function compute_theta_consensus_vec!(
     # mean theta over shared buses
     for part in partitions
         thetas = snapshot_theta_shared!(part)
-        lbs = part.shared_buses_local
-        @inbounds for i in eachindex(lbs)
-            j = b2pos[lbs[i]]
+        shared_bus_ids = part.shared_buses_local
+        @inbounds for i in eachindex(shared_bus_ids)
+            j = b2pos[shared_bus_ids[i]]
             theta_consensus_vec[j] += thetas[i]
             counts[j] += 1
         end
@@ -85,10 +85,10 @@ function compute_ac_bus_consensus_vec!(
     for part in partitions
         thetas = snapshot_theta_ac_shared!(part)
         Vs = snapshot_vmag_shared!(part)
-        lbs = part.shared_buses_local
+        shared_bus_ids = part.shared_buses_local
 
-        @inbounds for i in eachindex(lbs)
-            j = b2pos[lbs[i]]
+        @inbounds for i in eachindex(shared_bus_ids)
+            j = b2pos[shared_bus_ids[i]]
             s, c = sincos(thetas[i])
             sums_sin[j] += s
             sums_cos[j] += c
@@ -167,9 +167,9 @@ function compute_v2_consensus_vec!(
 
     for sub in partitions
         v2s = snapshot_v2_shared!(sub)
-        lbs = sub.shared_buses_local
-        @inbounds for i in eachindex(lbs)
-            j = b2pos[lbs[i]]
+        shared_bus_ids = sub.shared_buses_local
+        @inbounds for i in eachindex(shared_bus_ids)
+            j = b2pos[shared_bus_ids[i]]
             v2_consensus_vec[j] += v2s[i]
             counts[j] += 1
         end

@@ -262,8 +262,9 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
             real_cost = compute_real_generation_cost(model, part.objective_params)
 
             thetas = snapshot_theta_shared!(part)
-            lbs = part.shared_buses_local
-            theta_snap = Dict{Int, Float64}(b => thetas[j] for (j, b) in pairs(lbs))
+            shared_bus_ids = part.shared_buses_local
+            theta_snap =
+                Dict{Int, Float64}(b => thetas[j] for (j, b) in pairs(shared_bus_ids))
 
             results[i] = (
                 gen_cost_expr = gen_cost_expr,
