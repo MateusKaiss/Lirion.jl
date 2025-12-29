@@ -10,17 +10,16 @@ function compute_theta_consensus_vec!(
     theta_consensus_vec::Vector{Float64},
     partitions::Partitions{PartitionDC},
     shared_buses_sorted::Vector{Int},
-    b2pos::Dict{Int, Int},
+    shared_buses_to_pos::Dict{Int, Int},
 )
     fill!(theta_consensus_vec, 0.0)
     counts = zeros(Int, length(shared_buses_sorted))
 
-    # mean theta over shared buses
     for part in partitions
         thetas = snapshot_theta_shared!(part)
         shared_bus_ids = part.shared_buses_local
         @inbounds for i in eachindex(shared_bus_ids)
-            j = b2pos[shared_bus_ids[i]]
+            j = shared_buses_to_pos[shared_bus_ids[i]]
             theta_consensus_vec[j] += thetas[i]
             counts[j] += 1
         end
@@ -73,7 +72,7 @@ function compute_ac_bus_consensus_vec!(
     vmag_consensus_vec::Vector{Float64},
     partitions::Partitions{PartitionAC},
     shared_buses_sorted::Vector{Int},
-    b2pos::Dict{Int, Int},
+    shared_buses_to_pos::Dict{Int, Int},
 )
     fill!(theta_consensus_vec, 0.0)
     fill!(vmag_consensus_vec, 0.0)
@@ -88,7 +87,7 @@ function compute_ac_bus_consensus_vec!(
         shared_bus_ids = part.shared_buses_local
 
         @inbounds for i in eachindex(shared_bus_ids)
-            j = b2pos[shared_bus_ids[i]]
+            j = shared_buses_to_pos[shared_bus_ids[i]]
             s, c = sincos(thetas[i])
             sums_sin[j] += s
             sums_cos[j] += c
@@ -160,7 +159,7 @@ function compute_v2_consensus_vec!(
     v2_consensus_vec::Vector{Float64},
     partitions::Partitions{PartitionSOCP},
     shared_buses_sorted::Vector{Int},
-    b2pos::Dict{Int, Int},
+    shared_buses_to_pos::Dict{Int, Int},
 )
     fill!(v2_consensus_vec, 0.0)
     counts = zeros(Int, length(shared_buses_sorted))
@@ -169,7 +168,7 @@ function compute_v2_consensus_vec!(
         v2s = snapshot_v2_shared!(sub)
         shared_bus_ids = sub.shared_buses_local
         @inbounds for i in eachindex(shared_bus_ids)
-            j = b2pos[shared_bus_ids[i]]
+            j = shared_buses_to_pos[shared_bus_ids[i]]
             v2_consensus_vec[j] += v2s[i]
             counts[j] += 1
         end
