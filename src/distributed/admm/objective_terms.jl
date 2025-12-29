@@ -9,15 +9,15 @@
 function _build_quad_bus_expr!(part::PartitionDC, rho::Float64)
     m = part.model::JuMP.Model
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
-    q = zero(JuMP.QuadExpr)
+    quad_bus_penalty = zero(JuMP.QuadExpr)
 
     for b in part.shared_buses_local
-        q += 0.5 * rho * theta[b, 1]^2
+        quad_bus_penalty += 0.5 * rho * theta[b, 1]^2
     end
 
-    part.quad_bus_expr = q
+    part.quad_bus_expr = quad_bus_penalty
     part.rho_bus_cached = rho
-    return q
+    return quad_bus_penalty
 end
 
 function _build_quad_branch_expr!(
@@ -27,7 +27,7 @@ function _build_quad_branch_expr!(
 )
     m = part.model::JuMP.Model
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
-    q = zero(JuMP.QuadExpr)
+    quad_bus_penalty = zero(JuMP.QuadExpr)
 
     # termo (rho/2)*‖p_flow(e)‖² para cada ramo de corte da zona
     for e in zone_edges
@@ -38,12 +38,12 @@ function _build_quad_branch_expr!(
         x = part.branch.x[l_local]
         @assert abs(x) > 1e-10 "x≈0 no ramo global $e (DC)."
         p = (theta[f, 1] - theta[t, 1]) / x
-        q += 0.5 * rho * p^2
+        quad_bus_penalty += 0.5 * rho * p^2
     end
 
-    part.quad_branch_expr = q
+    part.quad_branch_expr = quad_bus_penalty
     part.rho_branch_cached = rho
-    return q
+    return quad_bus_penalty
 end
 
 # ------------------------------------------------------------
@@ -77,7 +77,6 @@ function _build_linear_branch_expr(
     lambdae_zone::Dict{Int, Float64},
     rho::Float64,
 )
-    # soma_e ( lambda_e - rho z_e ) p_flow_e(theta)
     m = part.model::JuMP.Model
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     lin = zero(JuMP.AffExpr)
@@ -104,16 +103,16 @@ function _build_quad_bus_expr_ac!(part::PartitionAC, rho_theta::Float64, rhoV::F
     m = part.model::JuMP.Model
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     V = part.vmag_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
-    q = zero(JuMP.QuadExpr)
+    quad_bus_penalty = zero(JuMP.QuadExpr)
 
     for b in part.shared_buses_local
-        q += 0.5 * rho_theta * theta[b, 1]^2 + 0.5 * rhoV * V[b, 1]^2
+        quad_bus_penalty += 0.5 * rho_theta * theta[b, 1]^2 + 0.5 * rhoV * V[b, 1]^2
     end
 
-    part.quad_bus_expr_ac = q
+    part.quad_bus_expr_ac = quad_bus_penalty
     part.rho_bus_theta_cached = rho_theta
     part.rho_bus_v_cached = rhoV
-    return q
+    return quad_bus_penalty
 end
 
 function _build_quad_branch_expr_ac!(
@@ -123,19 +122,19 @@ function _build_quad_branch_expr_ac!(
     zone_edges::Vector{Int},
 )
     m = part.model::JuMP.Model
-    q = zero(JuMP.QuadExpr)
+    quad_bus_penalty = zero(JuMP.QuadExpr)
 
     for e in zone_edges
         l_local = get(part.edge_to_local, e, nothing)
         l_local === nothing && continue
         P_loc, Q_loc = _pq_flow_from_exprs(part, l_local)
-        q += 0.5 * rhoP * P_loc^2 + 0.5 * rhoQ * Q_loc^2
+        quad_bus_penalty += 0.5 * rhoP * P_loc^2 + 0.5 * rhoQ * Q_loc^2
     end
 
-    part.quad_branch_expr_ac = q
+    part.quad_branch_expr_ac = quad_bus_penalty
     part.rho_branch_p_cached = rhoP
     part.rho_branch_q_cached = rhoQ
-    return q
+    return quad_bus_penalty
 end
 
 # ------------------------------------------------------------
@@ -203,14 +202,13 @@ end
 function _build_quad_bus_expr_socp!(sub::PartitionSOCP, rho::Float64)
     m = sub.model::JuMP.Model
     V2 = m[:v_magnitude_sq]
-    q = zero(JuMP.QuadExpr)
+    quad_bus_penalty = zero(JuMP.QuadExpr)
 
-    # penaliza APENAS barras compartilhadas (padrão ADMM/DC/AC)
     for b in sub.shared_buses_local
-        q += 0.5 * rho * V2[b, 1]^2
+        quad_bus_penalty += 0.5 * rho * V2[b, 1]^2
     end
 
-    sub.quad_bus_expr_socp = q
+    sub.quad_bus_expr_socp = quad_bus_penalty
     sub.rho_bus_v2_cached = rho
     return sub.quad_bus_expr_socp
 end
@@ -222,19 +220,19 @@ function _build_quad_branch_rt_expr!(
     zone_edges::Vector{Int},
 )
     m = sub.model::JuMP.Model
-    q = zero(JuMP.QuadExpr)
+    quad_bus_penalty = zero(JuMP.QuadExpr)
 
     @inbounds for e in zone_edges
         l_local = get(sub.edge_to_local, e, nothing)
         l_local === nothing && continue
         Rloc, Tloc = _rt_from_exprs(m, l_local)
-        q += 0.5 * rhoR * Rloc^2 + 0.5 * rhoT * Tloc^2
+        quad_bus_penalty += 0.5 * rhoR * Rloc^2 + 0.5 * rhoT * Tloc^2
     end
 
-    sub.quad_rt_expr_socp = q
+    sub.quad_rt_expr_socp = quad_bus_penalty
     sub.rho_branch_r_cached = rhoR
     sub.rho_branch_t_cached = rhoT
-    return q
+    return quad_bus_penalty
 end
 
 function _build_quad_branch_pq_expr!(
@@ -244,19 +242,19 @@ function _build_quad_branch_pq_expr!(
     zone_edges::Vector{Int},
 )
     m = sub.model::JuMP.Model
-    q = zero(JuMP.QuadExpr)
+    quad_bus_penalty = zero(JuMP.QuadExpr)
 
     @inbounds for e in zone_edges
         l_local = get(sub.edge_to_local, e, nothing)
         l_local === nothing && continue
         P_loc, Q_loc = _pq_flow_from_exprs(m, l_local)
-        q += 0.5 * rhoP * P_loc^2 + 0.5 * rhoQ * Q_loc^2
+        quad_bus_penalty += 0.5 * rhoP * P_loc^2 + 0.5 * rhoQ * Q_loc^2
     end
 
-    sub.quad_pq_expr_socp = q
+    sub.quad_pq_expr_socp = quad_bus_penalty
     sub.rho_branch_p_cached = rhoP
     sub.rho_branch_q_cached = rhoQ
-    return q
+    return quad_bus_penalty
 end
 
 # ------------------------------------------------------------
@@ -342,17 +340,15 @@ function _soft_anchor_branch_expr!(
     use_pq::Bool = true,
 )
     m = sub.model::JuMP.Model
-    q = zero(JuMP.QuadExpr)
+    quad_bus_penalty = zero(JuMP.QuadExpr)
 
     if use_bus && haskey(m, :v_magnitude_sq)
         V2 = m[:v_magnitude_sq]
         sub.v2_var = V2
-        # ancora TODAS as barras da zona (não só compartilhadas)
         for I in keys(V2)
             x = V2[I]
-            # start_value se houver, senão 1.0 (flat seguro p/ SOCP)
             xref = (JuMP.start_value(x) === nothing) ? 1.0 : JuMP.start_value(x)
-            q += 0.5 * κV2 * (x - xref)^2
+            quad_bus_penalty += 0.5 * κV2 * (x - xref)^2
         end
     end
 
@@ -360,11 +356,11 @@ function _soft_anchor_branch_expr!(
         for e in sub.zone_edges
             l = get(sub.edge_to_local, e, nothing)
             l === nothing && continue
-            P, Q = _pq_flow_from_exprs(m, l) # deve ser AffExpr!
-            q += 0.5 * κPQ * (P^2 + Q^2)
+            P, Q = _pq_flow_from_exprs(m, l)
+            quad_bus_penalty += 0.5 * κPQ * (P^2 + Q^2)
         end
     end
 
-    sub.soft_anchor_expr = q
-    return q
+    sub.soft_anchor_expr = quad_bus_penalty
+    return quad_bus_penalty
 end
