@@ -37,10 +37,10 @@ function init_dc_bus_partition!(
     rho_theta::Float64,
 )
     prepare_hotpaths!(part)
-    m = build_model(sys_zone, DC; optimizer = optimizer_factory)
-    part.model = m
-    part.obj_base = m[:generation_cost]
-    part.theta_var = m[:theta]
+    model = build_model(sys_zone, DC; optimizer = optimizer_factory)
+    part.model = model
+    part.obj_base = model[:generation_cost]
+    part.theta_var = model[:theta]
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
@@ -49,7 +49,7 @@ function init_dc_bus_partition!(
     end
 
     _build_quad_bus_expr!(part, rho_theta)
-    @objective(m, Min, part.obj_base + part.quad_bus_expr)
+    @objective(model, Min, part.obj_base + part.quad_bus_expr)
 
     return nothing
 end
@@ -84,10 +84,10 @@ function init_dc_branch_partition!(
     prepare_hotpaths!(part)
     part.zone_edges = _zone_cut_edges(part, cut_edges)
 
-    m = build_model(sys_zone, DC; optimizer = optimizer_factory)
-    part.model = m
-    part.obj_base = m[:generation_cost]
-    part.theta_var = m[:theta]
+    model = build_model(sys_zone, DC; optimizer = optimizer_factory)
+    part.model = model
+    part.obj_base = model[:generation_cost]
+    part.theta_var = model[:theta]
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
@@ -96,7 +96,7 @@ function init_dc_branch_partition!(
     end
 
     _build_quad_branch_expr!(part, rho, part.zone_edges)
-    @objective(m, Min, part.obj_base + part.quad_branch_expr)
+    @objective(model, Min, part.obj_base + part.quad_branch_expr)
 
     return nothing
 end
@@ -134,10 +134,10 @@ function init_dc_hybrid_partition!(
     prepare_hotpaths!(part)
     part.zone_edges = _zone_cut_edges(part, cut_edges)
 
-    m = build_model(sys_zone, DC; optimizer = optimizer_factory)
-    part.model = m
-    part.obj_base = m[:generation_cost]
-    part.theta_var = m[:theta]
+    model = build_model(sys_zone, DC; optimizer = optimizer_factory)
+    part.model = model
+    part.obj_base = model[:generation_cost]
+    part.theta_var = model[:theta]
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
@@ -148,7 +148,7 @@ function init_dc_hybrid_partition!(
     _build_quad_bus_expr!(part, rho_theta)
     _build_quad_branch_expr!(part, rho, part.zone_edges)
 
-    @objective(m, Min, part.obj_base + part.quad_bus_expr + part.quad_branch_expr)
+    @objective(model, Min, part.obj_base + part.quad_bus_expr + part.quad_branch_expr)
 
     return nothing
 end
@@ -242,7 +242,7 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             part = getzone(partitions, zone_id)
-            m = part.model::JuMP.Model
+            model = part.model::JuMP.Model
 
             lambda_z = gather_zone_lambda!(dual_theta_buf[zone_id], dual_theta[zone_id])
 
@@ -255,11 +255,11 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
                 rho[],
             )
 
-            @objective(m, Min, part.obj_base + part.quad_bus_expr + lin)
-            optimize!(m)
+            @objective(model, Min, part.obj_base + part.quad_bus_expr + lin)
+            optimize!(model)
 
-            gen_cost_expr = value(m[:generation_cost])
-            real_cost = compute_real_generation_cost(m, part.objective_params)
+            gen_cost_expr = value(model[:generation_cost])
+            real_cost = compute_real_generation_cost(model, part.objective_params)
 
             thetas = snapshot_theta_shared!(part)
             lbs = part.shared_buses_local
@@ -437,7 +437,7 @@ function run_admm_branch(
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             part = getzone(partitions, zone_id)
-            m = part.model::JuMP.Model
+            model = part.model::JuMP.Model
 
             lin = _build_linear_branch_expr(
                 part,
@@ -447,12 +447,12 @@ function run_admm_branch(
                 rho[],
             )
 
-            @objective(m, Min, part.obj_base + part.quad_branch_expr + lin)
-            optimize!(m)
+            @objective(model, Min, part.obj_base + part.quad_branch_expr + lin)
+            optimize!(model)
 
             results[i] = (
-                gen_cost_expr = value(m[:generation_cost]),
-                real_cost = compute_real_generation_cost(m, part.objective_params),
+                gen_cost_expr = value(model[:generation_cost]),
+                real_cost = compute_real_generation_cost(model, part.objective_params),
             )
         end
 
@@ -608,7 +608,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             part = getzone(partitions, zone_id)
-            m = part.model::JuMP.Model
+            model = part.model::JuMP.Model
 
             lambda_theta =
                 gather_zone_lambda!(dual_theta_buf[zone_id], duals_theta[zone_id])
@@ -630,16 +630,16 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             )
 
             @objective(
-                m,
+                model,
                 Min,
                 part.obj_base + part.quad_bus_expr + part.quad_branch_expr + lin_bus +
                 lin_branch
             )
-            optimize!(m)
+            optimize!(model)
 
             results[i] = (
-                gen_cost_expr = value(m[:generation_cost]),
-                real_cost = compute_real_generation_cost(m, part.objective_params),
+                gen_cost_expr = value(model[:generation_cost]),
+                real_cost = compute_real_generation_cost(model, part.objective_params),
             )
         end
 

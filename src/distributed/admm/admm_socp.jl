@@ -22,10 +22,10 @@ function init_socp_v2rt_partition!(
     prepare_hotpaths!(sub)
     sub.zone_edges = _zone_cut_edges(sub, cut_edges)
 
-    m = build_model(sys_zone, SOCP; optimizer = optimizer_factory)
-    sub.model = m
-    sub.obj_base = m[:generation_cost]
-    sub.v2_var = m[:v_magnitude_sq]
+    model = build_model(sys_zone, SOCP; optimizer = optimizer_factory)
+    sub.model = model
+    sub.obj_base = model[:generation_cost]
+    sub.v2_var = model[:v_magnitude_sq]
     sub.objective_params = sys_zone.objective
     sub.has_solution = false
 
@@ -37,8 +37,8 @@ function init_socp_v2rt_partition!(
     _build_quad_branch_rt_expr!(sub, rhoR, rhoT, sub.zone_edges)
 
     sub.obj_static = sub.obj_base + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
-    @objective(m, Min, sub.obj_static)
-    optimize!(m)
+    @objective(model, Min, sub.obj_static)
+    optimize!(model)
 
     return nothing
 end
@@ -82,13 +82,13 @@ function init_socp_pq_partition!(
     prepare_hotpaths!(sub)
     sub.zone_edges = _zone_cut_edges(sub, cut_edges)
 
-    m = build_model(sys_zone, SOCP; optimizer = optimizer_factory)
-    sub.model = m
-    sub.obj_base = m[:generation_cost]
+    model = build_model(sys_zone, SOCP; optimizer = optimizer_factory)
+    sub.model = model
+    sub.obj_base = model[:generation_cost]
     sub.objective_params = sys_zone.objective
     sub.has_solution = false
 
-    if is_gurobi(m)
+    if is_gurobi(model)
         _soft_anchor_branch_expr!(
             sub;
             κV2 = 1e-6,
@@ -102,8 +102,8 @@ function init_socp_pq_partition!(
 
     _build_quad_branch_pq_expr!(sub, rhoP, rhoQ, sub.zone_edges)
     sub.obj_static = sub.obj_base + sub.quad_pq_expr_socp + sub.soft_anchor_expr
-    @objective(m, Min, sub.obj_static)
-    optimize!(m)
+    @objective(model, Min, sub.obj_static)
+    optimize!(model)
 
     return nothing
 end
@@ -148,10 +148,10 @@ function init_socp_hybrid_partition!(
     prepare_hotpaths!(sub)
     sub.zone_edges = _zone_cut_edges(sub, cut_edges)
 
-    m = build_model(sys_zone, SOCP; optimizer = optimizer_factory)
-    sub.model = m
-    sub.obj_base = m[:generation_cost]
-    sub.v2_var = m[:v_magnitude_sq]
+    model = build_model(sys_zone, SOCP; optimizer = optimizer_factory)
+    sub.model = model
+    sub.obj_base = model[:generation_cost]
+    sub.v2_var = model[:v_magnitude_sq]
     sub.objective_params = sys_zone.objective
     sub.has_solution = false
 
@@ -166,8 +166,8 @@ function init_socp_hybrid_partition!(
     sub.obj_static =
         sub.obj_base + sub.quad_bus_expr_socp + sub.quad_pq_expr_socp +
         sub.quad_rt_expr_socp
-    @objective(m, Min, sub.obj_static)
-    optimize!(m)
+    @objective(model, Min, sub.obj_static)
+    optimize!(model)
 
     return nothing
 end
@@ -287,7 +287,7 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             sub = getzone(partitions, zone_id)
-            m = sub.model::JuMP.Model
+            model = sub.model::JuMP.Model
 
             lambda_z = (dual_v2_buf[zone_id] .= duals_v2[zone_id])
 
@@ -301,12 +301,12 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
                 rhoT[],
             )
 
-            @objective(m, Min, sub.obj_static + (lin_bus + lin_rt))
-            optimize!(m)
+            @objective(model, Min, sub.obj_static + (lin_bus + lin_rt))
+            optimize!(model)
 
             results[i] = (
-                gen_cost_expr = value(m[:generation_cost]),
-                real_cost = compute_real_generation_cost(m, sub.objective_params),
+                gen_cost_expr = value(model[:generation_cost]),
+                real_cost = compute_real_generation_cost(model, sub.objective_params),
             )
         end
 
@@ -505,7 +505,7 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             sub = getzone(partitions, zone_id)
-            m = sub.model::JuMP.Model
+            model = sub.model::JuMP.Model
 
             lin = _build_linear_branch_pq_expr(
                 sub, sub.zone_edges, pflow_consensus, qflow_consensus, dualsP[zone_id],
@@ -513,12 +513,12 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
                 rhoQ[],
             )
 
-            @objective(m, Min, sub.obj_static + lin)
-            optimize!(m)
+            @objective(model, Min, sub.obj_static + lin)
+            optimize!(model)
 
             sub.has_solution = true
-            sub.generation_cost_model_expr = value(m[:generation_cost])
-            sub.real_generation_cost = compute_real_generation_cost(m, sub.objective_params)
+            sub.generation_cost_model_expr = value(model[:generation_cost])
+            sub.real_generation_cost = compute_real_generation_cost(model, sub.objective_params)
         end
 
         pflow_consensus_prev = copy(pflow_consensus)
@@ -736,7 +736,7 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             sub = getzone(partitions, zone_id)
-            m = sub.model::JuMP.Model
+            model = sub.model::JuMP.Model
 
             lambda_z = (dual_v2_buf[zone_id] .= duals_v2[zone_id])
 
@@ -755,12 +755,12 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
                 rhoT[],
             )
 
-            @objective(m, Min, sub.obj_static + (lin_bus + lin_pq + lin_rt))
-            optimize!(m)
+            @objective(model, Min, sub.obj_static + (lin_bus + lin_pq + lin_rt))
+            optimize!(model)
 
             sub.has_solution = true
-            sub.generation_cost_model_expr = value(m[:generation_cost])
-            sub.real_generation_cost = compute_real_generation_cost(m, sub.objective_params)
+            sub.generation_cost_model_expr = value(model[:generation_cost])
+            sub.real_generation_cost = compute_real_generation_cost(model, sub.objective_params)
         end
 
         v2_consensus_prev .= v2_consensus

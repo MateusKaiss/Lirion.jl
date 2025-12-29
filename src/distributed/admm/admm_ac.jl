@@ -19,11 +19,11 @@ function init_ac_bus_partition!(
 )
     prepare_hotpaths!(part)
 
-    m = build_model(sys_zone, AC; optimizer = optimizer_factory)
-    part.model = m
-    part.obj_base = m[:generation_cost]
-    part.theta_var = m[:theta]
-    part.vmag_var = m[:v_magnitude]
+    model = build_model(sys_zone, AC; optimizer = optimizer_factory)
+    part.model = model
+    part.obj_base = model[:generation_cost]
+    part.theta_var = model[:theta]
+    part.vmag_var = model[:v_magnitude]
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
@@ -35,7 +35,7 @@ function init_ac_bus_partition!(
     end
 
     _build_quad_bus_expr_ac!(part, rho_theta, rhoV)
-    @objective(m, Min, part.obj_base + part.quad_bus_expr_ac)
+    @objective(model, Min, part.obj_base + part.quad_bus_expr_ac)
 
     return nothing
 end
@@ -75,11 +75,11 @@ function init_ac_branch_partition!(
     prepare_hotpaths!(part)
     part.zone_edges = _zone_cut_edges(part, cut_edges)
 
-    m = build_model(sys_zone, AC; optimizer = optimizer_factory)
-    part.model = m
-    part.obj_base = m[:generation_cost]
-    part.theta_var = m[:theta]
-    part.vmag_var = m[:v_magnitude]
+    model = build_model(sys_zone, AC; optimizer = optimizer_factory)
+    part.model = model
+    part.obj_base = model[:generation_cost]
+    part.theta_var = model[:theta]
+    part.vmag_var = model[:v_magnitude]
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
@@ -91,7 +91,7 @@ function init_ac_branch_partition!(
     end
 
     _build_quad_branch_expr_ac!(part, rhoP, rhoQ, part.zone_edges)
-    @objective(m, Min, part.obj_base + part.quad_branch_expr_ac)
+    @objective(model, Min, part.obj_base + part.quad_branch_expr_ac)
 
     return nothing
 end
@@ -135,11 +135,11 @@ function init_ac_hybrid_partition!(
     prepare_hotpaths!(part)
     part.zone_edges = _zone_cut_edges(part, cut_edges)
 
-    m = build_model(sys_zone, AC; optimizer = optimizer_factory)
-    part.model = m
-    part.obj_base = m[:generation_cost]
-    part.theta_var = m[:theta]
-    part.vmag_var = m[:v_magnitude]
+    model = build_model(sys_zone, AC; optimizer = optimizer_factory)
+    part.model = model
+    part.obj_base = model[:generation_cost]
+    part.theta_var = model[:theta]
+    part.vmag_var = model[:v_magnitude]
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
@@ -153,7 +153,7 @@ function init_ac_hybrid_partition!(
     _build_quad_bus_expr_ac!(part, rho_theta, rhoV)
     _build_quad_branch_expr_ac!(part, rhoP, rhoQ, part.zone_edges)
 
-    @objective(m, Min, part.obj_base + part.quad_bus_expr_ac + part.quad_branch_expr_ac)
+    @objective(model, Min, part.obj_base + part.quad_bus_expr_ac + part.quad_branch_expr_ac)
 
     return nothing
 end
@@ -271,7 +271,7 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             part = getzone(partitions, zone_id)
-            m = part.model::JuMP.Model
+            model = part.model::JuMP.Model
 
             lambda_theta = (dual_theta_buf[zone_id] .= duals_theta[zone_id])
             lambda_v = (dual_v_buf[zone_id] .= duals_v[zone_id])
@@ -288,12 +288,12 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
                 rho_v[],
             )
 
-            @objective(m, Min, part.obj_base + part.quad_bus_expr_ac + lin)
-            optimize!(m)
+            @objective(model, Min, part.obj_base + part.quad_bus_expr_ac + lin)
+            optimize!(model)
 
             results[i] = (
-                expr_cost = value(m[:generation_cost]),
-                real_cost = compute_real_generation_cost(m, part.objective_params),
+                expr_cost = value(model[:generation_cost]),
+                real_cost = compute_real_generation_cost(model, part.objective_params),
             )
         end
 
@@ -501,7 +501,7 @@ function run_admm_ac_branch(
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             part = getzone(partitions, zone_id)
-            m = part.model::JuMP.Model
+            model = part.model::JuMP.Model
 
             lin = _build_linear_branch_expr_ac!(
                 part,
@@ -514,12 +514,12 @@ function run_admm_ac_branch(
                 rho_q[],
             )
 
-            @objective(m, Min, part.obj_base + part.quad_branch_expr_ac + lin)
-            optimize!(m)
+            @objective(model, Min, part.obj_base + part.quad_branch_expr_ac + lin)
+            optimize!(model)
 
             results[i] = (
-                expr_cost = value(m[:generation_cost]),
-                real_cost = compute_real_generation_cost(m, part.objective_params),
+                expr_cost = value(model[:generation_cost]),
+                real_cost = compute_real_generation_cost(model, part.objective_params),
             )
         end
 
@@ -728,7 +728,7 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             part = getzone(partitions, zone_id)
-            m = part.model::JuMP.Model
+            model = part.model::JuMP.Model
 
             lambda_theta = (dual_theta_buf[zone_id] .= duals_theta[zone_id])
             lambda_v = (dual_v_buf[zone_id] .= duals_v[zone_id])
@@ -756,16 +756,16 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             )
 
             @objective(
-                m,
+                model,
                 Min,
                 part.obj_base + part.quad_bus_expr_ac + part.quad_branch_expr_ac +
                 (lin_bus + lin_br)
             )
-            optimize!(m)
+            optimize!(model)
 
             results[i] = (
-                expr_cost = value(m[:generation_cost]),
-                real_cost = compute_real_generation_cost(m, part.objective_params),
+                expr_cost = value(model[:generation_cost]),
+                real_cost = compute_real_generation_cost(model, part.objective_params),
             )
         end
 

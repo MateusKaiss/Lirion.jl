@@ -18,41 +18,41 @@ end
 
 function _prepare_bus_maps!(part)
     ids = part.bus.id
-    nbus = length(ids)
+    n_bus = length(ids)
 
-    part.bus_local_index = Dict{Int, Int}(ids[i] => i for i in 1:nbus)
+    part.bus_local_index = Dict{Int, Int}(ids[i] => i for i in 1:n_bus)
 
     lbs = part.shared_buses_local
-    nshared = length(lbs)
+    n_shared = length(lbs)
 
-    part.shared_pos_local = Vector{Int}(undef, nshared)
-    @inbounds for i in 1:nshared
+    part.shared_pos_local = Vector{Int}(undef, n_shared)
+    @inbounds for i in 1:n_shared
         part.shared_pos_local[i] = part.bus_local_index[lbs[i]]
     end
 
-    return nbus, nshared
+    return n_bus, n_shared
 end
 
 function prepare_hotpaths!(part::PartitionDC)
-    nbus, nshared = _prepare_bus_maps!(part)
-    part.theta_buf = zeros(nbus)
-    part.theta_shared_buf = zeros(nshared)
+    n_bus, n_shared = _prepare_bus_maps!(part)
+    part.theta_buf = zeros(n_bus)
+    part.theta_shared_buf = zeros(n_shared)
     return nothing
 end
 
 function prepare_hotpaths!(part::PartitionSOCP)
-    nbus, nshared = _prepare_bus_maps!(part)
-    part.v2_buf = zeros(nbus)
-    part.v2_shared_buf = zeros(nshared)
+    n_bus, n_shared = _prepare_bus_maps!(part)
+    part.v2_buf = zeros(n_bus)
+    part.v2_shared_buf = zeros(n_shared)
     return nothing
 end
 
 function prepare_hotpaths!(part::PartitionAC)
-    nbus, nshared = _prepare_bus_maps!(part)
-    part.theta_buf = zeros(nbus)
-    part.vmag_buf = ones(nbus)
-    part.theta_shared_buf = zeros(nshared)
-    part.vmag_shared_buf = ones(nshared)
+    n_bus, n_shared = _prepare_bus_maps!(part)
+    part.theta_buf = zeros(n_bus)
+    part.vmag_buf = ones(n_bus)
+    part.theta_shared_buf = zeros(n_shared)
+    part.vmag_shared_buf = ones(n_shared)
     return nothing
 end
 
