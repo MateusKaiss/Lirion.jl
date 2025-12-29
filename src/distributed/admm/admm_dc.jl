@@ -244,7 +244,7 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
             part = get_partition(partitions, zone_id)
             model = part.model::JuMP.Model
 
-            lambda_z = gather_zone_lambda!(dual_theta_buf[zone_id], dual_theta[zone_id])
+            lambda_z = copy_duals_to_buffer!(dual_theta_buf[zone_id], dual_theta[zone_id])
 
             lin = _build_linear_bus_expr(
                 part,
@@ -611,7 +611,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             model = part.model::JuMP.Model
 
             lambda_theta =
-                gather_zone_lambda!(dual_theta_buf[zone_id], duals_theta[zone_id])
+                copy_duals_to_buffer!(dual_theta_buf[zone_id], duals_theta[zone_id])
 
             lin_bus = _build_linear_bus_expr(
                 part,

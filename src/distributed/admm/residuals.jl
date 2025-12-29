@@ -3,6 +3,18 @@
 # ============================================================
 
 # ------------------------------------------------------------
+# Misc utilities
+# ------------------------------------------------------------
+
+@inline function copy_duals_to_buffer!(
+    dual_buf::Vector{Float64},
+    duals::Vector{Float64},
+)
+    dual_buf .= duals
+    return dual_buf
+end
+
+# ------------------------------------------------------------
 # AC residuals: primal (bus / branch)
 # ------------------------------------------------------------
 
@@ -557,16 +569,4 @@ function eps_dual_branch_pq_socp(
         cut_edges,
     )
     return sqrt(dim) * eps_abs + eps_rel * s
-end
-
-# ------------------------------------------------------------
-# Misc utilities
-# ------------------------------------------------------------
-
-@inline function gather_zone_lambda!(
-    lambda_vec_zone::Vector{Float64},
-    duals_dense_zone::Vector{Float64},
-)
-    lambda_vec_zone .= duals_dense_zone
-    return lambda_vec_zone
 end
