@@ -420,26 +420,17 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
 
     hist.heatmaps[:v2_avg] = v2_avg_history
 
-    total_real_cost = sum(p.real_generation_cost for p in partitions.parts)
-    total_expr_cost = sum(p.generation_cost_model_expr for p in partitions.parts)
-
-    elapsed_s = (time_ns() - t0_ns) / 1e9
-    println("\n[ADMM-SOCP (V²+R,T)] Resumo:")
-    println("→ Total (value(:generation_cost))     = $total_expr_cost")
-    println("→ Total (reavaliado via p_generation) = $total_real_cost")
-    println("rho(V²) inicial: $(config.rho_v) | rho(V²) final: $(rhoV2[])")
-    println("rhoR    inicial: $(config.rho_flow_p) | rhoR final: $(rhoR[])")
-    println("rhoT    inicial: $(config.rho_flow_q) | rhoT final: $(rhoT[])")
-    println("Iterações realizadas: $iter_done")
-    println("Tempo ADMM (SOCP V²+RT): $(_pretty_time(elapsed_s))")
-
-    result = (
-        total_real_cost = total_real_cost,
-        total_expr_cost = total_expr_cost,
-        partitions = partitions,
-        iter_done = iter_done,
-        elapsed_s = elapsed_s,
+    result = _finalize_admm_result(partitions, t0_ns, iter_done)
+    _print_admm_summary!(
+        "[ADMM-SOCP (V²+R,T)]",
+        result;
+        rho_lines = (
+            "rho(V²) inicial: $(config.rho_v)      | rho(V²) final: $(rhoV2[])",
+            "rhoR    inicial: $(config.rho_flow_p) | rhoR final: $(rhoR[])",
+            "rhoT    inicial: $(config.rho_flow_q) | rhoT final: $(rhoT[])",
+        ),
     )
+
     return LirionRunResult(;
         result = result,
         model = nothing,
@@ -486,7 +477,6 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
         zone_id => Dict{Int, Float64}() for zone_id in zone_ids
     )
 
-    # ---------- diagnostics ----------
     hist = ADMMHistory()
     hist.meta[:kind] = :socp_pq
     hist.meta[:tag] = "admm_socp_pq"
@@ -562,14 +552,14 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
         )
         eps_s =
             eps_dual_branch_pq_socp(
-                pflow_consensus,
-                qflow_consensus,
-                pflow_consensus_prev,
-                qflow_consensus_prev,
-                cut_edges,
-                eps_abs,
-                eps_rel,
-            )
+            pflow_consensus,
+            qflow_consensus,
+            pflow_consensus_prev,
+            qflow_consensus_prev,
+            cut_edges,
+            eps_abs,
+            eps_rel,
+        )
 
         _record_iter!(
             hist, r, s, eps_r, eps_s;
@@ -587,25 +577,16 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
         maybe_adapt_rho!(adaptive, rhoP, rhoQ, r, s, config)
     end
 
-    total_real_cost = sum(p.real_generation_cost for p in partitions.parts)
-    total_expr_cost = sum(p.generation_cost_model_expr for p in partitions.parts)
-
-    elapsed_s = (time_ns() - t0_ns) / 1e9
-    println("\n[ADMM-SOCP-branch (P,Q)] Resumo:")
-    println("→ Total (value(:generation_cost))     = $total_expr_cost")
-    println("→ Total (reavaliado via p_generation) = $total_real_cost")
-    println("rhoP inicial: $(config.rho_flow_p) | rhoP final: $(rhoP[])")
-    println("rhoQ inicial: $(config.rho_flow_q) | rhoQ final: $(rhoQ[])")
-    println("Iterações realizadas: $iter_done")
-    println("Tempo ADMM (SOCP P/Q): $(_pretty_time(elapsed_s))")
-
-    result = (
-        total_real_cost = total_real_cost,
-        total_expr_cost = total_expr_cost,
-        partitions = partitions,
-        iter_done = iter_done,
-        elapsed_s = elapsed_s,
+    result = _finalize_admm_result(partitions, t0_ns, iter_done)
+    _print_admm_summary!(
+        "[ADMM-SOCP-branch (P,Q)]",
+        result;
+        rho_lines = (
+            "rhoP inicial: $(config.rho_flow_p) | rhoP final: $(rhoP[])",
+            "rhoQ inicial: $(config.rho_flow_q) | rhoQ final: $(rhoQ[])",
+        ),
     )
+
     return LirionRunResult(;
         result = result,
         model = nothing,
@@ -666,7 +647,7 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
 
     optimizer_factory = resolve_optimizer(config)
 
-    partitions = build_socp_partitions(sys)   # ::Partitions{PartitionSOCP}
+    partitions = build_socp_partitions(sys)
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
@@ -706,7 +687,6 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
         zone_id => Dict{Int, Float64}() for zone_id in zone_ids
     )
 
-    # ---------- diagnostics ----------
     hist = ADMMHistory()
     hist.meta[:kind] = :socp_hybrid
     hist.meta[:tag] = "admm_socp_hybrid"
@@ -921,28 +901,19 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
 
     hist.heatmaps[:v2_avg] = v2_avg_history
 
-    total_real_cost = sum(p.real_generation_cost for p in partitions.parts)
-    total_expr_cost = sum(p.generation_cost_model_expr for p in partitions.parts)
-
-    elapsed_s = (time_ns() - t0_ns) / 1e9
-    println("\n[ADMM-SOCP-hybrid] Resumo:")
-    println("→ Total (value(:generation_cost))     = $total_expr_cost")
-    println("→ Total (reavaliado via p_generation) = $total_real_cost")
-    println("rho(V²) inicial: $(config.rho_v) | rho(V²) final: $(rhoV2[])")
-    println("rhoP    inicial: $(config.rho_flow_p) | rhoP final: $(rhoP[])")
-    println("rhoQ    inicial: $(config.rho_flow_q) | rhoQ final: $(rhoQ[])")
-    println("rhoR    inicial: $(ρr0) | rhoR final: $(rhoR[])")
-    println("rhoT    inicial: $(ρt0) | rhoT final: $(rhoT[])")
-    println("Iterações realizadas: $iter_done")
-    println("Tempo ADMM (SOCP híbrido): $(_pretty_time(elapsed_s))")
-
-    result = (
-        total_real_cost = total_real_cost,
-        total_expr_cost = total_expr_cost,
-        partitions = partitions,
-        iter_done = iter_done,
-        elapsed_s = elapsed_s,
+    result = _finalize_admm_result(partitions, t0_ns, iter_done)
+    _print_admm_summary!(
+        "[ADMM-SOCP-hybrid]",
+        result;
+        rho_lines = (
+            "rho(V²) inicial: $(config.rho_v)      | rho(V²) final: $(rhoV2[])",
+            "rhoP    inicial: $(config.rho_flow_p) | rhoP final: $(rhoP[])",
+            "rhoQ    inicial: $(config.rho_flow_q) | rhoQ final: $(rhoQ[])",
+            "rhoR    inicial: $(ρr0)               | rhoR final: $(rhoR[])",
+            "rhoT    inicial: $(ρt0)               | rhoT final: $(rhoT[])",
+        ),
     )
+
     return LirionRunResult(;
         result = result,
         model = nothing,

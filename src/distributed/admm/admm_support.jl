@@ -243,6 +243,10 @@ end
     return resolve_optimizer(base_model_tag(config.base_model), config)
 end
 
+# ============================================================
+# Pretty time + misc
+# ============================================================
+
 @inline function _pretty_time(sec::Real)
     if sec < 60
         return "$(round(sec; digits = 3)) s"
@@ -271,4 +275,50 @@ function compute_real_generation_cost(model, params)
         end
     end
     return total_cost
+end
+
+# ============================================================
+# Finalization + summary
+# ============================================================
+
+@inline function _admm_totals(partitions)
+    parts = partitions.parts
+    total_real = 0.0
+    total_expr = 0.0
+    @inbounds @simd for k in eachindex(parts)
+        p = parts[k]
+        total_real += p.real_generation_cost
+        total_expr += p.generation_cost_model_expr
+    end
+    return total_real, total_expr
+end
+
+@inline _elapsed_s(t0_ns::Integer) = (time_ns() - t0_ns) / 1e9
+
+@inline function _finalize_admm_result(partitions, t0_ns::Integer, iter_done::Integer)
+    total_real_cost, total_expr_cost = _admm_totals(partitions)
+    elapsed_s = _elapsed_s(t0_ns)
+    return (;
+        total_real_cost,
+        total_expr_cost,
+        partitions,
+        iter_done = Int(iter_done),
+        elapsed_s,
+    )
+end
+
+function _print_admm_summary!(
+    tag::AbstractString,
+    result;
+    rho_lines = (),
+)
+    println("\n$tag Resumo:")
+    println("→ Total (value(:generation_cost))     = $(result.total_expr_cost)")
+    println("→ Total (reavaliado via p_generation) = $(result.total_real_cost)")
+    for line in rho_lines
+        println(line)
+    end
+    println("Iterações realizadas: $(result.iter_done)")
+    println("Tempo ADMM: $(_pretty_time(result.elapsed_s))")
+    return nothing
 end

@@ -401,25 +401,16 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
     hist.heatmaps[:theta_avg] = theta_avg_hist
     hist.heatmaps[:vmag_avg] = vmag_avg_hist
 
-    total_real_cost = sum(p.real_generation_cost for p in partitions.parts)
-    total_expr_cost = sum(p.generation_cost_model_expr for p in partitions.parts)
-
-    elapsed_s = (time_ns() - t0_ns) / 1e9
-    println("\n[ADMM-AC] Resumo:")
-    println("→ Total (value(:generation_cost))     = $total_expr_cost")
-    println("→ Total (reavaliado via p_generation) = $total_real_cost")
-    println("rho_theta inicial: $(config.rho_theta) | rho_theta final: $(rho_theta[])")
-    println("rho_v     inicial: $(config.rho_v)     | rho_v     final: $(rho_v[])")
-    println("Iterações realizadas: $iter_done")
-    println("Tempo ADMM (bus/AC): $(_pretty_time(elapsed_s))")
-
-    result = (
-        total_real_cost = total_real_cost,
-        total_expr_cost = total_expr_cost,
-        partitions = partitions,
-        iter_done = iter_done,
-        elapsed_s = elapsed_s,
+    result = _finalize_admm_result(partitions, t0_ns, iter_done)
+    _print_admm_summary!(
+        "[ADMM-bus/AC]",
+        result;
+        rho_lines = (
+            "rho_theta inicial: $(config.rho_theta) | rho_theta final: $(rho_theta[])",
+            "rho_v     inicial: $(config.rho_v)     | rho_v     final: $(rho_v[])",
+        ),
     )
+
     return LirionRunResult(;
         result = result,
         model = nothing,
@@ -603,25 +594,16 @@ function run_admm_ac_branch(
         maybe_adapt_rho_socp!(adaptive, rho_p, rho_q, r, s, config)
     end
 
-    total_real_cost = sum(p.real_generation_cost for p in partitions.parts)
-    total_expr_cost = sum(p.generation_cost_model_expr for p in partitions.parts)
-
-    elapsed_s = (time_ns() - t0_ns) / 1e9
-    println("\n[ADMM-AC-branch] Resumo:")
-    println("→ Total (value(:generation_cost))     = $total_expr_cost")
-    println("→ Total (reavaliado via p_generation) = $total_real_cost")
-    println("rhoP inicial: $(config.rho_flow_p) | rhoP final: $(rho_p[])")
-    println("rhoQ inicial: $(config.rho_flow_q) | rhoQ final: $(rho_q[])")
-    println("Iterações realizadas: $iter_done")
-    println("Tempo ADMM (branch/AC): $(_pretty_time(elapsed_s))")
-
-    result = (
-        total_real_cost = total_real_cost,
-        total_expr_cost = total_expr_cost,
-        partitions = partitions,
-        iter_done = iter_done,
-        elapsed_s = elapsed_s,
+    result = _finalize_admm_result(partitions, t0_ns, iter_done)
+    _print_admm_summary!(
+        "[ADMM-branch/AC]",
+        result;
+        rho_lines = (
+            "rhoP inicial: $(config.rho_flow_p) | rhoP final: $(rho_p[])",
+            "rhoQ inicial: $(config.rho_flow_q) | rhoQ final: $(rho_q[])",
+        ),
     )
+
     return LirionRunResult(;
         result = result,
         model = nothing,
@@ -941,27 +923,18 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
     hist.heatmaps[:theta_avg] = theta_avg_hist
     hist.heatmaps[:vmag_avg] = vmag_avg_hist
 
-    total_real_cost = sum(p.real_generation_cost for p in partitions.parts)
-    total_expr_cost = sum(p.generation_cost_model_expr for p in partitions.parts)
-
-    elapsed_s = (time_ns() - t0_ns) / 1e9
-    println("\n[ADMM-AC-hybrid] Resumo:")
-    println("→ Total (value(:generation_cost))     = $total_expr_cost")
-    println("→ Total (reavaliado via p_generation) = $total_real_cost")
-    println("rho_theta inicial: $(config.rho_theta) | rho_theta final: $(rho_theta[])")
-    println("rho_v     inicial: $(config.rho_v)     | rho_v     final: $(rho_v[])")
-    println("rhoP      inicial: $(config.rho_flow_p)| rhoP      final: $(rho_p[])")
-    println("rhoQ      inicial: $(config.rho_flow_q)| rhoQ      final: $(rho_q[])")
-    println("Iterações realizadas: $iter_done")
-    println("Tempo ADMM (hybrid/AC): $(_pretty_time(elapsed_s))")
-
-    result = (
-        total_real_cost = total_real_cost,
-        total_expr_cost = total_expr_cost,
-        partitions = partitions,
-        iter_done = iter_done,
-        elapsed_s = elapsed_s,
+    result = _finalize_admm_result(partitions, t0_ns, iter_done)
+    _print_admm_summary!(
+        "[ADMM-hybrid/AC]",
+        result;
+        rho_lines = (
+            "rho_theta inicial: $(config.rho_theta) | rho_theta final: $(rho_theta[])",
+            "rho_v     inicial: $(config.rho_v)     | rho_v     final: $(rho_v[])",
+            "rhoP      inicial: $(config.rho_flow_p)| rhoP      final: $(rho_p[])",
+            "rhoQ      inicial: $(config.rho_flow_q)| rhoQ      final: $(rho_q[])",
+        ),
     )
+
     return LirionRunResult(;
         result = result,
         model = nothing,
