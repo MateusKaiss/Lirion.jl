@@ -6,9 +6,7 @@
 # Partition initialization
 # ------------------------------------------------------------
 
-# ----------------------------
-# AC / bus partition
-# ----------------------------
+# ---------- ac bus partition ----------
 
 function init_ac_bus_partition!(
     part::PartitionAC,
@@ -60,9 +58,7 @@ function init_ac_bus_partition!(
     return nothing
 end
 
-# ----------------------------
-# AC / branch partition
-# ----------------------------
+# ---------- ac branch partition ----------
 
 function init_ac_branch_partition!(
     part::PartitionAC,
@@ -118,9 +114,7 @@ function init_ac_branch_partition!(
     return nothing
 end
 
-# ----------------------------
-# AC / hybrid partition
-# ----------------------------
+# ---------- ac hybrid partition ----------
 
 function init_ac_hybrid_partition!(
     part::PartitionAC,

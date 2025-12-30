@@ -6,9 +6,7 @@
 # Partition initialization
 # ------------------------------------------------------------
 
-# ----------------------------
-# SOCP / V² + (R,T) partition
-# ----------------------------
+# ---------- socp bus [V² + (R,T)] partition ----------
 
 function init_socp_v2rt_partition!(
     sub::PartitionSOCP,
@@ -67,9 +65,7 @@ function init_socp_v2rt_partition!(
     return nothing
 end
 
-# ----------------------------
-# SOCP / (P,Q) partition
-# ----------------------------
+# ---------- socp branch partition ----------
 
 function init_socp_pq_partition!(
     sub::PartitionSOCP,
@@ -130,9 +126,7 @@ function init_socp_pq_partition!(
     return nothing
 end
 
-# ----------------------------
-# SOCP / hybrid partition (V² + P/Q + R/T)
-# ----------------------------
+# ---------- socp hybrid [(V² + P/Q + R/T)] partition ----------
 
 function init_socp_hybrid_partition!(
     sub::PartitionSOCP,
@@ -461,7 +455,7 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
 
     optimizer_factory = resolve_optimizer(config)
 
-    partitions = build_socp_partitions(sys)   # ::Partitions{PartitionSOCP}
+    partitions = build_socp_partitions(sys)
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
@@ -552,14 +546,14 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
         )
         eps_s =
             eps_dual_branch_pq_socp(
-            pflow_consensus,
-            qflow_consensus,
-            pflow_consensus_prev,
-            qflow_consensus_prev,
-            cut_edges,
-            eps_abs,
-            eps_rel,
-        )
+                pflow_consensus,
+                qflow_consensus,
+                pflow_consensus_prev,
+                qflow_consensus_prev,
+                cut_edges,
+                eps_abs,
+                eps_rel,
+            )
 
         _record_iter!(
             hist, r, s, eps_r, eps_s;
@@ -600,7 +594,6 @@ end
 # ------------------------------------------------------------
 
 @inline function _get_rho_rt_initial(config::DistributedOPFModel)
-    # fallback: se não existir rho_flow_r/t, usa p/q
     ρr = try
         getfield(config, :rho_flow_r)
     catch

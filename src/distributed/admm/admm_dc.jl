@@ -1,28 +1,6 @@
 # ============================================================
-# ADMM-DC - HELPERS
+# ADMM-DC
 # ============================================================
-
-# ------------------------------------------------------------
-# Diagnostics / history
-# ------------------------------------------------------------
-
-@inline function _record_iter!(
-    hist::ADMMHistory,
-    r::Float64,
-    s::Float64,
-    eps_r::Float64,
-    eps_s::Float64;
-    rhos::Dict{Symbol, <:Real} = Dict{Symbol, Real}(),
-)
-    push!(hist.r_primal, r)
-    push!(hist.r_dual, s)
-    push!(hist.eps_primal, eps_r)
-    push!(hist.eps_dual, eps_s)
-    for (k, v) in rhos
-        _push_rho!(hist, k, v)
-    end
-    return nothing
-end
 
 # ------------------------------------------------------------
 # Partition initialization
