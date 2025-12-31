@@ -66,11 +66,11 @@ function primal_residual_branch_ac(
     partitions::Partitions{PartitionAC},
     pflow_consensus::Dict{Int, Float64},
     qflow_consensus::Dict{Int, Float64},
-    cut_edges::Vector{Int},
+    interzonal_branches::Vector{Int},
 )
     acc = 0.0
     for part in partitions
-        @inbounds for e in cut_edges
+        @inbounds for e in interzonal_branches
             l_local = get(part.edge_to_local, e, 0)
             l_local == 0 && continue
 
@@ -128,10 +128,10 @@ function dual_residual_branch_ac(
     qflow_consensus::Dict{Int, Float64},
     pflow_consensus_prev::Dict{Int, Float64},
     qflow_consensus_prev::Dict{Int, Float64},
-    cut_edges::Vector{Int},
+    interzonal_branches::Vector{Int},
 )
     s = 0.0
-    @inbounds for e in cut_edges
+    @inbounds for e in interzonal_branches
         s += (get(pflow_consensus, e, 0.0) - get(pflow_consensus_prev, e, 0.0))^2
         s += (get(qflow_consensus, e, 0.0) - get(qflow_consensus_prev, e, 0.0))^2
     end
@@ -168,18 +168,18 @@ function eps_primal_branch_ac(
     partitions::Partitions{PartitionAC},
     pflow_consensus::Dict{Int, Float64},
     qflow_consensus::Dict{Int, Float64},
-    cut_edges::Vector{Int},
+    interzonal_branches::Vector{Int},
     eps_abs::Float64,
     eps_rel::Float64,
 )
     dim = 0
     for part in partitions
         # mais consistente com o residual: só edges presentes (cut-local)
-        dim += 2 * length(_zone_cut_edges(part, cut_edges))
+        dim += 2 * length(_zone_cut_edges(part, interzonal_branches))
     end
 
     z_norm_sq = 0.0
-    @inbounds for e in cut_edges
+    @inbounds for e in interzonal_branches
         z_norm_sq += get(pflow_consensus, e, 0.0)^2 + get(qflow_consensus, e, 0.0)^2
     end
 
@@ -209,17 +209,17 @@ function eps_dual_branch_ac(
     qflow_consensus::Dict{Int, Float64},
     pflow_consensus_prev::Dict{Int, Float64},
     qflow_consensus_prev::Dict{Int, Float64},
-    cut_edges::Vector{Int},
+    interzonal_branches::Vector{Int},
     eps_abs::Float64,
     eps_rel::Float64,
 )
-    dim = 2 * max(1, length(cut_edges))
+    dim = 2 * max(1, length(interzonal_branches))
     s = dual_residual_branch_ac(
         pflow_consensus,
         qflow_consensus,
         pflow_consensus_prev,
         qflow_consensus_prev,
-        cut_edges,
+        interzonal_branches,
     )
     return sqrt(dim) * eps_abs + eps_rel * s
 end
@@ -249,12 +249,12 @@ end
 function primal_residual_branch_dc(
     partitions::Partitions{PartitionDC},
     flow_consensus::Dict{Int, Float64},
-    cut_edges::Vector{Int},
+    interzonal_branches::Vector{Int},
 )
     acc = 0.0
     for part in partitions
         m = part.model::JuMP.Model
-        @inbounds for e in cut_edges
+        @inbounds for e in interzonal_branches
             l_local = get(part.edge_to_local, e, 0)
             l_local == 0 && continue
             acc += (_dc_flow_val_model(m, part, l_local) - get(flow_consensus, e, 0.0))^2
@@ -317,17 +317,17 @@ end
 function eps_primal_branch_dc(
     partitions::Partitions{PartitionDC},
     flow_consensus::Dict{Int, Float64},
-    cut_edges::Vector{Int},
+    interzonal_branches::Vector{Int},
     eps_abs::Float64,
     eps_rel::Float64,
 )
     dim_pri = 0
     for part in partitions
-        dim_pri += length(_zone_cut_edges(part, cut_edges))
+        dim_pri += length(_zone_cut_edges(part, interzonal_branches))
     end
 
     z_norm_sq = 0.0
-    @inbounds for e in cut_edges
+    @inbounds for e in interzonal_branches
         z_norm_sq += get(flow_consensus, e, 0.0)^2
     end
 
@@ -382,12 +382,12 @@ function primal_residual_branch_rt_socp(
     partitions::Partitions{PartitionSOCP},
     rflow_consensus::Dict{Int, Float64},
     tflow_consensus::Dict{Int, Float64},
-    cut_edges::Vector{Int},
+    interzonal_branches::Vector{Int},
 )
     acc = 0.0
     for sub in partitions
         m = sub.model::JuMP.Model
-        @inbounds for e in cut_edges
+        @inbounds for e in interzonal_branches
             l = get(sub.edge_to_local, e, 0)
             l == 0 && continue
             R, T = _rt_from_exprs(m, l, 1)
@@ -403,12 +403,12 @@ function primal_residual_branch_pq_socp(
     partitions::Partitions{PartitionSOCP},
     pflow_consensus::Dict{Int, Float64},
     qflow_consensus::Dict{Int, Float64},
-    cut_edges::Vector{Int},
+    interzonal_branches::Vector{Int},
 )
     acc = 0.0
     for sub in partitions
         m = sub.model::JuMP.Model
-        @inbounds for e in cut_edges
+        @inbounds for e in interzonal_branches
             l = get(sub.edge_to_local, e, 0)
             l == 0 && continue
             P, Q = _pq_flow_from_exprs(m, l, 1)
@@ -437,13 +437,13 @@ dual_residual_branch_rt_socp(
     tflow_consensus,
     rflow_consensus_prev,
     tflow_consensus_prev,
-    cut_edges,
+    interzonal_branches,
 ) =
     sqrt(
         sum(
             (get(rflow_consensus, e, 0.0) - get(rflow_consensus_prev, e, 0.0))^2 +
             (get(tflow_consensus, e, 0.0) - get(tflow_consensus_prev, e, 0.0))^2
-            for e in cut_edges
+            for e in interzonal_branches
         ),
     )
 
@@ -452,13 +452,13 @@ dual_residual_branch_pq_socp(
     qflow_consensus,
     pflow_consensus_prev,
     qflow_consensus_prev,
-    cut_edges,
+    interzonal_branches,
 ) =
     sqrt(
         sum(
             (get(pflow_consensus, e, 0.0) - get(pflow_consensus_prev, e, 0.0))^2 +
             (get(qflow_consensus, e, 0.0) - get(qflow_consensus_prev, e, 0.0))^2
-            for e in cut_edges
+            for e in interzonal_branches
         ),
     )
 
@@ -491,16 +491,16 @@ function eps_primal_branch_rt_socp(
     partitions::Partitions{PartitionSOCP},
     rflow_consensus::Dict{Int, Float64},
     tflow_consensus::Dict{Int, Float64},
-    cut_edges::Vector{Int},
+    interzonal_branches::Vector{Int},
     eps_abs::Float64,
     eps_rel::Float64,
 )
     dim = 0
     for sub in partitions
-        dim += 2 * length(_zone_cut_edges(sub, cut_edges))
+        dim += 2 * length(_zone_cut_edges(sub, interzonal_branches))
     end
     z_norm_sq = 0.0
-    @inbounds for e in cut_edges
+    @inbounds for e in interzonal_branches
         z_norm_sq += get(rflow_consensus, e, 0.0)^2 + get(tflow_consensus, e, 0.0)^2
     end
     return sqrt(max(1, dim)) * eps_abs + eps_rel * max(sqrt(z_norm_sq), 1e-12)
@@ -510,16 +510,16 @@ function eps_primal_branch_pq_socp(
     partitions::Partitions{PartitionSOCP},
     pflow_consensus::Dict{Int, Float64},
     qflow_consensus::Dict{Int, Float64},
-    cut_edges::Vector{Int},
+    interzonal_branches::Vector{Int},
     eps_abs::Float64,
     eps_rel::Float64,
 )
     dim = 0
     for sub in partitions
-        dim += 2 * length(_zone_cut_edges(sub, cut_edges))
+        dim += 2 * length(_zone_cut_edges(sub, interzonal_branches))
     end
     z_norm_sq = 0.0
-    @inbounds for e in cut_edges
+    @inbounds for e in interzonal_branches
         z_norm_sq += get(pflow_consensus, e, 0.0)^2 + get(qflow_consensus, e, 0.0)^2
     end
     return sqrt(max(1, dim)) * eps_abs + eps_rel * max(sqrt(z_norm_sq), 1e-12)
@@ -536,17 +536,17 @@ function eps_dual_branch_rt_socp(
     tflow_consensus,
     rflow_consensus_prev,
     tflow_consensus_prev,
-    cut_edges,
+    interzonal_branches,
     eps_abs,
     eps_rel,
 )
-    dim = 2 * max(1, length(cut_edges))
+    dim = 2 * max(1, length(interzonal_branches))
     s = dual_residual_branch_rt_socp(
         rflow_consensus,
         tflow_consensus,
         rflow_consensus_prev,
         tflow_consensus_prev,
-        cut_edges,
+        interzonal_branches,
     )
     return sqrt(dim) * eps_abs + eps_rel * s
 end
@@ -556,17 +556,17 @@ function eps_dual_branch_pq_socp(
     qflow_consensus,
     pflow_consensus_prev,
     qflow_consensus_prev,
-    cut_edges,
+    interzonal_branches,
     eps_abs,
     eps_rel,
 )
-    dim = 2 * max(1, length(cut_edges))
+    dim = 2 * max(1, length(interzonal_branches))
     s = dual_residual_branch_pq_socp(
         pflow_consensus,
         qflow_consensus,
         pflow_consensus_prev,
         qflow_consensus_prev,
-        cut_edges,
+        interzonal_branches,
     )
     return sqrt(dim) * eps_abs + eps_rel * s
 end

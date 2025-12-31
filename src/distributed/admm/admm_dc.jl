@@ -57,10 +57,10 @@ function init_dc_branch_partition!(
     sys_zone,
     optimizer_factory,
     rho::Float64,
-    cut_edges,
+    interzonal_branches,
 )
     prepare_hotpaths!(part)
-    part.zone_edges = _zone_cut_edges(part, cut_edges)
+    part.zone_edges = _zone_cut_edges(part, interzonal_branches)
 
     model = build_model(sys_zone, DC; optimizer = optimizer_factory)
     part.model = model
@@ -85,7 +85,7 @@ function init_dc_branch_partition!(
     zone_ids::Vector{Int},
     optimizer_factory,
     rho::Float64,
-    cut_edges,
+    interzonal_branches,
 )
     for zone_id in zone_ids
         init_dc_branch_partition!(
@@ -93,7 +93,7 @@ function init_dc_branch_partition!(
             sys.parts[zone_id],
             optimizer_factory,
             rho,
-            cut_edges,
+            interzonal_branches,
         )
     end
     return nothing
@@ -107,10 +107,10 @@ function init_dc_hybrid_partition!(
     optimizer_factory,
     rho_theta::Float64,
     rho::Float64,
-    cut_edges,
+    interzonal_branches,
 )
     prepare_hotpaths!(part)
-    part.zone_edges = _zone_cut_edges(part, cut_edges)
+    part.zone_edges = _zone_cut_edges(part, interzonal_branches)
 
     model = build_model(sys_zone, DC; optimizer = optimizer_factory)
     part.model = model
@@ -138,7 +138,7 @@ function init_dc_hybrid_partition!(
     optimizer_factory,
     rho_theta::Float64,
     rho::Float64,
-    cut_edges,
+    interzonal_branches,
 )
     for zone_id in zone_ids
         init_dc_hybrid_partition!(
@@ -147,7 +147,7 @@ function init_dc_hybrid_partition!(
             optimizer_factory,
             rho_theta,
             rho,
-            cut_edges,
+            interzonal_branches,
         )
     end
     return nothing
@@ -355,7 +355,7 @@ function run_admm_branch(
 
     @assert config.base_model == DC "ADMM-branch/DC requer base_model == DC."
 
-    cut_edges = sys.cut_edges
+    interzonal_branches = sys.interzonal_branches
     max_iter = config.max_iter
 
     rho = Ref(config.rho_flow_p)
@@ -370,7 +370,7 @@ function run_admm_branch(
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    flow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    flow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
     flow_consensus_prev = Dict{Int, Float64}()
 
     duals = Dict{Int, Dict{Int, Float64}}(
@@ -392,7 +392,7 @@ function run_admm_branch(
         zone_ids,
         optimizer_factory,
         rho[],
-        cut_edges,
+        interzonal_branches,
     )
 
     iter_done = 0
@@ -433,14 +433,20 @@ function run_admm_branch(
         end
 
         flow_consensus_prev = copy(flow_consensus)
-        compute_flow_consensus!(flow_consensus, partitions, cut_edges)
-        update_duals_flow!(duals, partitions, flow_consensus, cut_edges, rho[])
+        compute_flow_consensus!(flow_consensus, partitions, interzonal_branches)
+        update_duals_flow!(duals, partitions, flow_consensus, interzonal_branches, rho[])
 
-        r = primal_residual_branch_dc(partitions, flow_consensus, cut_edges)
+        r = primal_residual_branch_dc(partitions, flow_consensus, interzonal_branches)
         s = dual_residual_branch_dc(flow_consensus, flow_consensus_prev)
 
         eps_r =
-            eps_primal_branch_dc(partitions, flow_consensus, cut_edges, eps_abs, eps_rel)
+            eps_primal_branch_dc(
+                partitions,
+                flow_consensus,
+                interzonal_branches,
+                eps_abs,
+                eps_rel,
+            )
         eps_s = eps_dual_branch_dc(flow_consensus, flow_consensus_prev, eps_abs, eps_rel)
 
         _record_iter!(hist, r, s, eps_r, eps_s; rhos = Dict(:rho_flow => rho[]))
@@ -496,7 +502,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
     @assert config.base_model == DC "Hybrid ADMM/DC requer DC."
 
     shared_buses = sys.shared_buses
-    cut_edges = sys.cut_edges
+    interzonal_branches = sys.interzonal_branches
     max_iter = config.max_iter
 
     rho_theta = Ref(config.rho_theta)
@@ -521,7 +527,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
     theta_consensus = zeros(Float64, n_shared_buses)
     theta_consensus_prev = similar(theta_consensus)
 
-    flow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    flow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
     flow_consensus_prev = Dict{Int, Float64}()
 
     duals_theta = Dict{Int, Vector{Float64}}(
@@ -552,7 +558,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
         optimizer_factory,
         rho_theta[],
         rho_flow[],
-        cut_edges,
+        interzonal_branches,
     )
 
     iter_done = 0
@@ -623,7 +629,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             push!(get!(theta_avg_history, b, Float64[]), theta_consensus[j])
         end
 
-        compute_flow_consensus!(flow_consensus, partitions, cut_edges)
+        compute_flow_consensus!(flow_consensus, partitions, interzonal_branches)
 
         update_duals_theta_all!(
             duals_theta,
@@ -634,7 +640,13 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             shared_buses_sorted,
             shared_buses_to_pos,
         )
-        update_duals_flow!(duals_flow, partitions, flow_consensus, cut_edges, rho_flow[])
+        update_duals_flow!(
+            duals_flow,
+            partitions,
+            flow_consensus,
+            interzonal_branches,
+            rho_flow[],
+        )
 
         r_bus = primal_residual_bus_dc(
             partitions,
@@ -642,7 +654,7 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             shared_buses_sorted,
             shared_buses_to_pos,
         )
-        r_br = primal_residual_branch_dc(partitions, flow_consensus, cut_edges)
+        r_br = primal_residual_branch_dc(partitions, flow_consensus, interzonal_branches)
         r_tot = hypot(r_bus, r_br)
 
         s_bus = dual_residual_bus_dc(theta_consensus, theta_consensus_prev)
@@ -658,7 +670,13 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             eps_rel,
         )
         eps_br_r =
-            eps_primal_branch_dc(partitions, flow_consensus, cut_edges, eps_abs, eps_rel)
+            eps_primal_branch_dc(
+                partitions,
+                flow_consensus,
+                interzonal_branches,
+                eps_abs,
+                eps_rel,
+            )
         eps_r_tot = hypot(eps_bus_r, eps_br_r)
 
         eps_bus_s = eps_dual_bus_dc(theta_consensus, theta_consensus_prev, eps_abs, eps_rel)

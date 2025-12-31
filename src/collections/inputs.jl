@@ -5,7 +5,7 @@
 struct ADMMSystem
     parts::Dict{Int, SystemData}
     shared_buses::Vector{Int}
-    cut_edges::Vector{Int}
+    interzonal_branches::Vector{Int}
 end
 
 struct LirionInputs
@@ -68,14 +68,14 @@ function build_inputs(args::Args)::LirionInputs
     end
 
     parts_dict, shared_buses = prepare_admm_partitions(data)
-    cut_edges = _find_cut_edges(data)
+    interzonal_branches = _find_interzonal_branches(data)
 
     parts_system = Dict{Int, SystemData}()
     for (zone, subdict) in parts_dict
         parts_system[zone] = build_system_data(subdict)
     end
 
-    admm_sys = ADMMSystem(parts_system, shared_buses, cut_edges)
+    admm_sys = ADMMSystem(parts_system, shared_buses, interzonal_branches)
 
     return LirionInputs(
         args.database_path,

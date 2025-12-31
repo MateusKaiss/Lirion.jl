@@ -167,7 +167,7 @@ end
 # ADMM preprocessing
 # ============================================================
 
-function _find_cut_edges(full::Dict{String, Any})
+function _find_interzonal_branches(full::Dict{String, Any})
     zones = full["bus"]["zone"]
     bus_ids = full["bus"]["bus_i"]
     bus2zone = Dict(bus_ids[i] => zones[i] for i in eachindex(bus_ids))

@@ -15,10 +15,10 @@ function init_socp_v2rt_partition!(
     rhoV2::Float64,
     rhoR::Float64,
     rhoT::Float64,
-    cut_edges,
+    interzonal_branches,
 )
     prepare_hotpaths!(sub)
-    sub.zone_edges = _zone_cut_edges(sub, cut_edges)
+    sub.zone_edges = _zone_cut_edges(sub, interzonal_branches)
 
     model = build_model(sys_zone, SOCP; optimizer = optimizer_factory)
     sub.model = model
@@ -49,7 +49,7 @@ function init_socp_v2rt_partition!(
     rhoV2::Float64,
     rhoR::Float64,
     rhoT::Float64,
-    cut_edges,
+    interzonal_branches,
 )
     for zone_id in zone_ids
         init_socp_v2rt_partition!(
@@ -59,7 +59,7 @@ function init_socp_v2rt_partition!(
             rhoV2,
             rhoR,
             rhoT,
-            cut_edges,
+            interzonal_branches,
         )
     end
     return nothing
@@ -73,10 +73,10 @@ function init_socp_pq_partition!(
     optimizer_factory,
     rhoP::Float64,
     rhoQ::Float64,
-    cut_edges,
+    interzonal_branches,
 )
     prepare_hotpaths!(sub)
-    sub.zone_edges = _zone_cut_edges(sub, cut_edges)
+    sub.zone_edges = _zone_cut_edges(sub, interzonal_branches)
 
     model = build_model(sys_zone, SOCP; optimizer = optimizer_factory)
     sub.model = model
@@ -111,7 +111,7 @@ function init_socp_pq_partition!(
     optimizer_factory,
     rhoP::Float64,
     rhoQ::Float64,
-    cut_edges,
+    interzonal_branches,
 )
     for zone_id in zone_ids
         init_socp_pq_partition!(
@@ -120,7 +120,7 @@ function init_socp_pq_partition!(
             optimizer_factory,
             rhoP,
             rhoQ,
-            cut_edges,
+            interzonal_branches,
         )
     end
     return nothing
@@ -137,10 +137,10 @@ function init_socp_hybrid_partition!(
     rhoQ::Float64,
     rhoR::Float64,
     rhoT::Float64,
-    cut_edges,
+    interzonal_branches,
 )
     prepare_hotpaths!(sub)
-    sub.zone_edges = _zone_cut_edges(sub, cut_edges)
+    sub.zone_edges = _zone_cut_edges(sub, interzonal_branches)
 
     model = build_model(sys_zone, SOCP; optimizer = optimizer_factory)
     sub.model = model
@@ -176,7 +176,7 @@ function init_socp_hybrid_partition!(
     rhoQ::Float64,
     rhoR::Float64,
     rhoT::Float64,
-    cut_edges,
+    interzonal_branches,
 )
     for zone_id in zone_ids
         init_socp_hybrid_partition!(
@@ -188,7 +188,7 @@ function init_socp_hybrid_partition!(
             rhoQ,
             rhoR,
             rhoT,
-            cut_edges,
+            interzonal_branches,
         )
     end
     return nothing
@@ -207,7 +207,7 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
     @assert config.base_model == SOCP "ADMM-SOCP: base_model deve ser SOCP."
 
     shared_buses = sys.shared_buses
-    cut_edges = sys.cut_edges
+    interzonal_branches = sys.interzonal_branches
     max_iter = config.max_iter
 
     rhoV2 = Ref(config.rho_v)
@@ -241,8 +241,8 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
 
-    rflow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
-    tflow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    rflow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
+    tflow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
     rflow_consensus_prev = Dict{Int, Float64}()
     tflow_consensus_prev = Dict{Int, Float64}()
 
@@ -264,7 +264,7 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
 
     init_socp_v2rt_partition!(
         partitions, sys, zone_ids, optimizer_factory,
-        rhoV2[], rhoR[], rhoT[], cut_edges,
+        rhoV2[], rhoR[], rhoT[], interzonal_branches,
     )
 
     iter_done = 0
@@ -322,7 +322,12 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
             shared_buses_sorted,
             shared_buses_to_pos,
         )
-        compute_rt_consensus!(rflow_consensus, tflow_consensus, partitions, cut_edges)
+        compute_rt_consensus!(
+            rflow_consensus,
+            tflow_consensus,
+            partitions,
+            interzonal_branches,
+        )
         @inbounds for b in shared_buses_sorted
             j = shared_buses_to_pos[b]
             push!(get!(v2_avg_history, b, Float64[]), v2_consensus[j])
@@ -357,7 +362,7 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
             partitions,
             rflow_consensus,
             tflow_consensus,
-            cut_edges,
+            interzonal_branches,
         )
         r = hypot(r_bus, r_rt)
 
@@ -367,7 +372,7 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
             tflow_consensus,
             rflow_consensus_prev,
             tflow_consensus_prev,
-            cut_edges,
+            interzonal_branches,
         )
         s = hypot(s_bus, s_rt)
 
@@ -378,7 +383,8 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
                 eps_rel,
             )
             epsrt = eps_primal_branch_rt_socp(
-                partitions, rflow_consensus, tflow_consensus, cut_edges, eps_abs,
+                partitions, rflow_consensus, tflow_consensus, interzonal_branches,
+                eps_abs,
                 eps_rel,
             )
             hypot(epsb, epsrt)
@@ -387,7 +393,7 @@ function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunR
             epsb = eps_dual_bus_socp_vec(v2_consensus, v2_consensus_prev, eps_abs, eps_rel)
             epsrt = eps_dual_branch_rt_socp(
                 rflow_consensus, tflow_consensus, rflow_consensus_prev,
-                tflow_consensus_prev, cut_edges, eps_abs, eps_rel,
+                tflow_consensus_prev, interzonal_branches, eps_abs, eps_rel,
             )
             hypot(epsb, epsrt)
         end
@@ -441,7 +447,7 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
     t0_ns = time_ns()
     @assert config.base_model == SOCP "ADMM-SOCP-branch: base_model deve ser SOCP."
 
-    cut_edges = sys.cut_edges
+    interzonal_branches = sys.interzonal_branches
     max_iter = config.max_iter
 
     rhoP = Ref(config.rho_flow_p)
@@ -459,8 +465,8 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    pflow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
-    qflow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    pflow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
+    qflow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
     pflow_consensus_prev = Dict{Int, Float64}()
     qflow_consensus_prev = Dict{Int, Float64}()
 
@@ -476,7 +482,7 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
     hist.meta[:tag] = "admm_socp_pq"
 
     init_socp_pq_partition!(
-        partitions, sys, zone_ids, optimizer_factory, rhoP[], rhoQ[], cut_edges,
+        partitions, sys, zone_ids, optimizer_factory, rhoP[], rhoQ[], interzonal_branches,
     )
 
     iter_done = 0
@@ -509,7 +515,12 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
         pflow_consensus_prev = copy(pflow_consensus)
         qflow_consensus_prev = copy(qflow_consensus)
 
-        compute_pq_consensus!(pflow_consensus, qflow_consensus, partitions, cut_edges)
+        compute_pq_consensus!(
+            pflow_consensus,
+            qflow_consensus,
+            partitions,
+            interzonal_branches,
+        )
 
         update_duals_pq_all!(
             dualsP,
@@ -526,21 +537,21 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
             partitions,
             pflow_consensus,
             qflow_consensus,
-            cut_edges,
+            interzonal_branches,
         )
         s = dual_residual_branch_pq_socp(
             pflow_consensus,
             qflow_consensus,
             pflow_consensus_prev,
             qflow_consensus_prev,
-            cut_edges,
+            interzonal_branches,
         )
 
         eps_r = eps_primal_branch_pq_socp(
             partitions,
             pflow_consensus,
             qflow_consensus,
-            cut_edges,
+            interzonal_branches,
             eps_abs,
             eps_rel,
         )
@@ -550,7 +561,7 @@ function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::Lir
                 qflow_consensus,
                 pflow_consensus_prev,
                 qflow_consensus_prev,
-                cut_edges,
+                interzonal_branches,
                 eps_abs,
                 eps_rel,
             )
@@ -616,7 +627,7 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
     @assert config.base_model == SOCP "ADMM-SOCP-hybrid: base_model deve ser SOCP."
 
     shared_buses = sys.shared_buses
-    cut_edges = sys.cut_edges
+    interzonal_branches = sys.interzonal_branches
     max_iter = config.max_iter
 
     rhoV2 = Ref(config.rho_v)
@@ -657,10 +668,10 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
 
-    pflow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
-    qflow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
-    rflow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
-    tflow_consensus = Dict{Int, Float64}(e => 0.0 for e in cut_edges)
+    pflow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
+    qflow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
+    rflow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
+    tflow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
 
     pflow_consensus_prev = Dict{Int, Float64}()
     qflow_consensus_prev = Dict{Int, Float64}()
@@ -687,7 +698,7 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
 
     init_socp_hybrid_partition!(
         partitions, sys, zone_ids, optimizer_factory,
-        rhoV2[], rhoP[], rhoQ[], rhoR[], rhoT[], cut_edges,
+        rhoV2[], rhoP[], rhoQ[], rhoR[], rhoT[], interzonal_branches,
     )
 
     iter_done = 0
@@ -750,8 +761,18 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
             shared_buses_sorted,
             shared_buses_to_pos,
         )
-        compute_pq_consensus!(pflow_consensus, qflow_consensus, partitions, cut_edges)
-        compute_rt_consensus!(rflow_consensus, tflow_consensus, partitions, cut_edges)
+        compute_pq_consensus!(
+            pflow_consensus,
+            qflow_consensus,
+            partitions,
+            interzonal_branches,
+        )
+        compute_rt_consensus!(
+            rflow_consensus,
+            tflow_consensus,
+            partitions,
+            interzonal_branches,
+        )
 
         @inbounds for b in shared_buses_sorted
             j = shared_buses_to_pos[b]
@@ -790,13 +811,13 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
             partitions,
             pflow_consensus,
             qflow_consensus,
-            cut_edges,
+            interzonal_branches,
         )
         r_rt = primal_residual_branch_rt_socp(
             partitions,
             rflow_consensus,
             tflow_consensus,
-            cut_edges,
+            interzonal_branches,
         )
         r = sqrt(r_bus^2 + r_pq^2 + r_rt^2)
 
@@ -806,14 +827,14 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
             qflow_consensus,
             pflow_consensus_prev,
             qflow_consensus_prev,
-            cut_edges,
+            interzonal_branches,
         )
         s_rt = dual_residual_branch_rt_socp(
             rflow_consensus,
             tflow_consensus,
             rflow_consensus_prev,
             tflow_consensus_prev,
-            cut_edges,
+            interzonal_branches,
         )
         s = sqrt(s_bus^2 + s_pq^2 + s_rt^2)
 
@@ -827,7 +848,7 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
                 partitions,
                 pflow_consensus,
                 qflow_consensus,
-                cut_edges,
+                interzonal_branches,
                 eps_abs,
                 eps_rel,
             )
@@ -835,7 +856,7 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
                 partitions,
                 rflow_consensus,
                 tflow_consensus,
-                cut_edges,
+                interzonal_branches,
                 eps_abs,
                 eps_rel,
             )
@@ -848,7 +869,7 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
                 qflow_consensus,
                 pflow_consensus_prev,
                 qflow_consensus_prev,
-                cut_edges,
+                interzonal_branches,
                 eps_abs,
                 eps_rel,
             )
@@ -857,7 +878,7 @@ function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lir
                 tflow_consensus,
                 rflow_consensus_prev,
                 tflow_consensus_prev,
-                cut_edges,
+                interzonal_branches,
                 eps_abs,
                 eps_rel,
             )

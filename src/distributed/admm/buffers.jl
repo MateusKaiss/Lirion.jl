@@ -8,8 +8,8 @@ function sorted_ids_and_id2idx(ids::Vector{Int})
     return sorted, id2idx
 end
 
-@inline function _zone_cut_edges(part, cut_edges::AbstractVector{Int})
-    return [e for e in cut_edges if haskey(part.edge_to_local, e)]
+@inline function _zone_cut_edges(part, interzonal_branches::AbstractVector{Int})
+    return [e for e in interzonal_branches if haskey(part.edge_to_local, e)]
 end
 
 # ------------------------------------------------------------

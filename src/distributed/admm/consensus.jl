@@ -38,7 +38,7 @@ end
 function compute_flow_consensus!(
     flow_consensus::Dict{Int, Float64},
     partitions::Partitions{PartitionDC},
-    cut_edges::Vector{Int},
+    interzonal_branches::Vector{Int},
 )
     sums = Dict{Int, Float64}()
     cnts = Dict{Int, Int}()
@@ -55,8 +55,8 @@ function compute_flow_consensus!(
         end
     end
 
-    # escreve apenas para os cut_edges globais (mantém contrato)
-    @inbounds for e in cut_edges
+    # escreve apenas para os interzonal_branches globais (mantém contrato)
+    @inbounds for e in interzonal_branches
         n = get(cnts, e, 0)
         n > 0 && (flow_consensus[e] = sums[e] / n)
     end
@@ -113,7 +113,7 @@ function compute_ac_branch_consensus!(
     pflow_consensus::Dict{Int, Float64},
     qflow_consensus::Dict{Int, Float64},
     partitions::Partitions{PartitionAC},
-    cut_edges::Vector{Int},
+    interzonal_branches::Vector{Int},
 )
     sumsP = Dict{Int, Float64}()
     sumsQ = Dict{Int, Float64}()
@@ -141,7 +141,7 @@ function compute_ac_branch_consensus!(
         end
     end
 
-    @inbounds for e in cut_edges
+    @inbounds for e in interzonal_branches
         nP = get(cntsP, e, 0)
         nQ = get(cntsQ, e, 0)
         nP > 0 && (pflow_consensus[e] = sumsP[e] / nP)
@@ -188,7 +188,7 @@ function compute_rt_consensus!(
     rflow_consensus::Dict{Int, Float64},
     tflow_consensus::Dict{Int, Float64},
     partitions::Partitions{PartitionSOCP},
-    cut_edges::Vector{Int},
+    interzonal_branches::Vector{Int},
 )
     sumsR = Dict{Int, Float64}()
     sumsT = Dict{Int, Float64}()
@@ -206,7 +206,7 @@ function compute_rt_consensus!(
         end
     end
 
-    @inbounds for e in cut_edges
+    @inbounds for e in interzonal_branches
         n = get(cnts, e, 0)
         if n > 0
             rflow_consensus[e] = sumsR[e] / n
@@ -220,7 +220,7 @@ function compute_pq_consensus!(
     pflow_consensus::Dict{Int, Float64},
     qflow_consensus::Dict{Int, Float64},
     partitions::Partitions{PartitionSOCP},
-    cut_edges::Vector{Int},
+    interzonal_branches::Vector{Int},
 )
     sumsP = Dict{Int, Float64}()
     sumsQ = Dict{Int, Float64}()
@@ -238,7 +238,7 @@ function compute_pq_consensus!(
         end
     end
 
-    @inbounds for e in cut_edges
+    @inbounds for e in interzonal_branches
         n = get(cnts, e, 0)
         if n > 0
             pflow_consensus[e] = sumsP[e] / n

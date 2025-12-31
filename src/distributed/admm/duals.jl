@@ -98,7 +98,7 @@ function update_duals_branch_ac!(
     partitions::Partitions{PartitionAC},
     pflow_consensus::Dict{Int, Float64},
     qflow_consensus::Dict{Int, Float64},
-    cut_edges::Vector{Int},
+    interzonal_branches::Vector{Int},
     rhoP::Float64,
     rhoQ::Float64;
     alpha::Union{Nothing, Float64} = nothing,
@@ -209,7 +209,7 @@ function update_duals_flow!(
     duals::Dict{Int, Dict{Int, Float64}},
     partitions::Partitions{PartitionDC},
     flow_consensus::Dict{Int, Float64},
-    cut_edges::Vector{Int},
+    interzonal_branches::Vector{Int},
     rho::Float64,
 )
     for part in partitions
