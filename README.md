@@ -3,13 +3,11 @@
   width="550"/>
 </p>
 
-<h3 align="center">
+# Lirion.jl
+
+<h3 align="left">
   Large-scale Integrated Research in Innovative Optimization of Networks
 </h3>
-
-
-
-# Lirion.jl
 
 A Julia package for solving Optimal Power Flow (OPF) problems using both centralized and distributed algorithms.  
 Current focus: advanced ADMM (Alternating Direction Method of Multipliers) implementations, with plans to add more distributed methods.
