@@ -3,7 +3,7 @@
   width="550"/>
 </p>
 
-<h3 align="center">
+<h3 align="center" style="color:#8FA6C3;">
   Large-scale Integrated Research in Innovative Optimization of Networks
 </h3>
 
