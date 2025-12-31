@@ -117,13 +117,17 @@ function convert_timeseries_to_pu!(case::Dict{String, Any})
     return case
 end
 
+# ---------------------------------------------------------------------
+# NOTE / TODO (Timeseries review needed)
+#
+# This whole timeseries preprocessing pipeline still needs a full review.
+# ---------------------------------------------------------------------
+
 function preprocess_case_data!(
     data::Dict{String, Any},
     ::Type{T} = OPFModel,
 ) where {T <: OPFModel}
-    # TODO Define horizonte temporal (exceto para modelos distribuídos
-    # onde cada partição já vem com T bem definido).
-    if T != DistributedOPFModel
+    if is_centralized_model(T)
         all_time_steps = get_model_times(data)
         time_horizon = isempty(all_time_steps) ? 1 : maximum(all_time_steps)
         data["T"] = time_horizon
@@ -131,33 +135,28 @@ function preprocess_case_data!(
 
     time_horizon = data["T"]
 
-    # Consistência básica de tempo
     check_time_alignment(data)
 
-    # Garante tabelas timeseries mínimas
     ensure_bus_timeseries!(data, time_horizon)
     ensure_gencost_timeseries!(data, time_horizon)
     ensure_prosumer_timeseries!(data, time_horizon)
     ensure_consumer_timeseries!(data, time_horizon)
 
-    # Estende se faltar tempo
     extend_bus_timeseries!(data, time_horizon)
     extend_gencost_timeseries!(data, time_horizon)
     extend_prosumer_timeseries!(data, time_horizon)
     extend_consumer_timeseries!(data, time_horizon)
 
-    # Ordena por (time, id)
     sort_timeseries_by_time_and_id!(data)
 
-    # Mapas de índice / adjacência
     add_case_index_maps!(data)
 
-    # Converte tudo para pu
     convert_to_pu!(data)
     convert_timeseries_to_pu!(data)
 
     return nothing
 end
+
 getfieldsafe(data::Dict, field::String, default = missing) = get(data, field, default)
 
 function get_bus_index_map(bus_ids::AbstractVector)
