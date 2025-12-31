@@ -162,3 +162,281 @@ getfieldsafe(data::Dict, field::String, default = missing) = get(data, field, de
 function get_bus_index_map(bus_ids::AbstractVector)
     return Dict(b => i for (i, b) in enumerate(bus_ids))
 end
+
+# ============================================================
+# ADMM preprocessing
+# ============================================================
+
+function _find_cut_edges(full::Dict{String, Any})
+    zones = full["bus"]["zone"]
+    bus_ids = full["bus"]["bus_i"]
+    bus2zone = Dict(bus_ids[i] => zones[i] for i in eachindex(bus_ids))
+
+    f_bus = full["branch"]["f_bus"]
+    t_bus = full["branch"]["t_bus"]
+    br_status =
+        haskey(full["branch"], "br_status") ? full["branch"]["br_status"] :
+        ones(Int, length(f_bus))
+
+    cut = Int[]
+    for i in eachindex(f_bus)
+        if br_status[i] == 1 && bus2zone[f_bus[i]] != bus2zone[t_bus[i]]
+            push!(cut, i)
+        end
+    end
+    return cut
+end
+
+@inline function _active_mask(branch::AbstractDict{String, V}) where {V}
+    f = branch["f_bus"]
+    br_status = haskey(branch, "br_status") ? branch["br_status"] : ones(Int, length(f))
+    @assert length(br_status) == length(f)
+    return br_status .== 1
+end
+
+@inline _slice_table_by_mask(
+    tbl::AbstractDict{String, V},
+    mask::Vector{Int},
+    ref_len::Int,
+) where {V} =
+    Dict{String, Any}(k => v[mask] for (k, v) in tbl if length(v) == ref_len)
+
+@inline _empty_like(tbl::AbstractDict{String, V}) where {V} =
+    Dict{String, Any}(k => Any[] for k in keys(tbl))
+
+@inline function _find_extra_neighbor_buses!(
+    extra::Set{Int},
+    zone_bus_set::Set{Int},
+    f_bus_full::AbstractVector{<:Integer},
+    t_bus_full::AbstractVector{<:Integer},
+    active_mask_full::AbstractVector{Bool},
+)
+    @inbounds for i in eachindex(f_bus_full)
+        active_mask_full[i] || continue
+        f_in = in(f_bus_full[i], zone_bus_set)
+        t_in = in(t_bus_full[i], zone_bus_set)
+        if f_in ⊻ t_in
+            push!(extra, f_in ? Int(t_bus_full[i]) : Int(f_bus_full[i]))
+        end
+    end
+    return extra
+end
+
+@inline function _build_sub_meta(data::AbstractDict{String, V}, zone::Int) where {V}
+    sub = Dict{String, Any}()
+    sub["baseMVA"] = data["baseMVA"]
+    sub["T"] = get(data, "T", 1)
+    sub["source_type"] = get(data, "source_type", "matpower")
+    sub["source_version"] = get(data, "source_version", "")
+    sub["name"] = "$(get(data, "name", "case"))_zone_$zone"
+    return sub
+end
+
+@inline function _mark_virtual_buses!(
+    sub_bus::AbstractDict{String, V},
+    zone_bus_set::Set{Int},
+) where {V}
+    bus_i_any = sub_bus["bus_i"]
+    bus_i = Int.(bus_i_any)
+    is_virtual = [!in(b, zone_bus_set) for b in bus_i]
+    sub_bus["is_virtual"] = is_virtual
+
+    @inbounds for i in eachindex(bus_i)
+        if is_virtual[i]
+            sub_bus["pd"][i] = 0.0
+            sub_bus["qd"][i] = 0.0
+            sub_bus["bus_type"][i] = 1
+        end
+    end
+    return nothing
+end
+
+@inline function _infer_bus_key(tbl::AbstractDict{String, V}) where {V}
+    return haskey(tbl, "bus") ? "bus" :
+           haskey(tbl, "gen_bus") ? "gen_bus" :
+           haskey(tbl, "storage_bus") ? "storage_bus" :
+           nothing
+end
+
+@inline function _filter_table_by_zone_bus(
+    tbl::AbstractDict{String, V},
+    bus_key::String,
+    zone_bus_set::Set{Int},
+) where {V}
+    keep = findall(i -> in(Int(tbl[bus_key][i]), zone_bus_set), eachindex(tbl[bus_key]))
+    if isempty(keep)
+        return _empty_like(tbl)
+    end
+    return Dict{String, Any}(
+        k => v[keep] for (k, v) in tbl if length(v) == length(tbl[bus_key])
+    )
+end
+
+@inline function _build_branch_sub!(
+    sub::Dict{String, Any},
+    data::AbstractDict{String, V},
+    zone_bus_set::Set{Int},
+    f_bus_full::AbstractVector{<:Integer},
+    t_bus_full::AbstractVector{<:Integer},
+    active_mask_full::AbstractVector{Bool},
+) where {V}
+    keep_all = findall(
+        i ->
+            active_mask_full[i] &&
+                (in(f_bus_full[i], zone_bus_set) || in(t_bus_full[i], zone_bus_set)),
+        eachindex(f_bus_full),
+    )
+
+    branch_tbl = data["branch"]
+    sub["branch"] = _slice_table_by_mask(branch_tbl, keep_all, length(f_bus_full))
+    sub["branch_full"] = branch_tbl
+    sub["branch_local_indices"] = keep_all
+
+    edge_to_local = Dict{Int, Int}()
+    @inbounds for (loc, glob) in enumerate(keep_all)
+        edge_to_local[glob] = loc
+    end
+    sub["edge_to_local"] = edge_to_local
+    return keep_all
+end
+
+@inline function _filter_timeseries!(
+    sub::Dict{String, Any},
+    data::AbstractDict{String, V},
+    zone_bus_set::Set{Int},
+) where {V}
+    for key in ("bus_timeseries", "prosumer_timeseries", "consumer_timeseries")
+        haskey(data, key) || continue
+        ts = data[key]
+        keep = findall(i -> in(Int(ts["bus"][i]), zone_bus_set), eachindex(ts["bus"]))
+        sub[key] = Dict{String, Any}(
+            k => v[keep] for (k, v) in ts if length(v) == length(ts["bus"])
+        )
+    end
+    return nothing
+end
+
+@inline function _filter_gencosts!(
+    sub::Dict{String, Any},
+    data::AbstractDict{String, V},
+    zone_bus_set::Set{Int},
+) where {V}
+    if !haskey(data, "gen")
+        sub["gen"] = Dict{String, Vector{Any}}()
+        sub["gencost"] = Dict{String, Vector{Any}}()
+        sub["gencost_timeseries"] = Dict{String, Vector{Any}}()
+        return nothing
+    end
+
+    gtbl = data["gen"]
+    bkey = haskey(gtbl, "bus") ? "bus" : "gen_bus"
+
+    if haskey(data, "gencost")
+        keep = findall(i -> in(Int(gtbl[bkey][i]), zone_bus_set), eachindex(gtbl[bkey]))
+        sub["gencost"] = Dict{String, Any}(
+            k => v[keep] for (k, v) in data["gencost"] if length(v) == length(gtbl[bkey])
+        )
+    end
+
+    if haskey(data, "gencost_timeseries")
+        keep = findall(i -> in(Int(gtbl[bkey][i]), zone_bus_set), eachindex(gtbl[bkey]))
+        sub["gencost_timeseries"] = Dict{String, Any}(
+            k => v[keep] for
+            (k, v) in data["gencost_timeseries"] if length(v) == length(gtbl[bkey])
+        )
+    end
+
+    return nothing
+end
+
+# ============================================================
+# Prepare ADMM partitions
+# ============================================================
+
+function prepare_admm_partitions(data::Dict{String, Any})
+    bus = data["bus"]
+
+    bus_ids = Int.(bus["bus_i"])
+    zones = Int.(bus["zone"])
+    unique_zones = unique(zones)
+
+    partitions = Dict{Int, Dict{String, Any}}()
+
+    has_branch = haskey(data, "branch")
+    if has_branch
+        branch = data["branch"]
+
+        f_bus_full = Int.(branch["f_bus"])
+        t_bus_full = Int.(branch["t_bus"])
+
+        active_mask_full = _active_mask(branch)
+    end
+
+    for zone in unique_zones
+        zone_mask = findall(==(zone), zones)
+
+        zone_bus_ids = @views bus_ids[zone_mask]
+        zone_bus_set = Set{Int}(zone_bus_ids)
+
+        extra = Set{Int}()
+        if has_branch
+            _find_extra_neighbor_buses!(
+                extra,
+                zone_bus_set,
+                f_bus_full,
+                t_bus_full,
+                active_mask_full,
+            )
+        end
+
+        all_bus_set = union(zone_bus_set, extra)
+        bus_mask = findall(b -> in(b, all_bus_set), bus_ids)
+
+        sub = _build_sub_meta(data, zone)
+
+        sub["bus"] = _slice_table_by_mask(data["bus"], bus_mask, length(bus_ids))
+        _mark_virtual_buses!(sub["bus"], zone_bus_set)
+
+        for key in ("gen", "prosumer", "consumer", "storage")
+            haskey(data, key) || continue
+            tbl = data[key]
+            bus_key = _infer_bus_key(tbl)
+            sub[key] =
+                bus_key === nothing ? _empty_like(tbl) :
+                _filter_table_by_zone_bus(tbl, bus_key, zone_bus_set)
+        end
+
+        if has_branch
+            _build_branch_sub!(
+                sub,
+                data,
+                zone_bus_set,
+                f_bus_full,
+                t_bus_full,
+                active_mask_full,
+            )
+        end
+
+        _filter_timeseries!(sub, data, zone_bus_set)
+        _filter_gencosts!(sub, data, zone_bus_set)
+
+        add_case_index_maps!(sub)
+
+        sub["bus_set"] = Set(Int.(sub["bus"]["bus_i"]))
+        partitions[zone] = sub
+    end
+
+    bus_zone_appearance = Dict{Int, Set{Int}}()
+    for (zone_id, sub) in partitions, b in Int.(sub["bus"]["bus_i"])
+        push!(get!(bus_zone_appearance, b, Set{Int}()), zone_id)
+    end
+    shared_buses = [b for (b, zs) in bus_zone_appearance if length(zs) > 1]
+    shared_set = Set(shared_buses)
+
+    for (_, sub) in partitions
+        local_b = Int.(sub["bus"]["bus_i"])
+        sub["shared_buses_local"] = [b for b in local_b if in(b, shared_set)]
+    end
+
+    return partitions, shared_buses
+end
