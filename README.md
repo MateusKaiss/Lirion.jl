@@ -1,6 +1,6 @@
 <p align="center">
   <img src="docs/assets/lirion_im.png" alt="Lirion.jl" 
-  width="550"/>
+  width="600"/>
 </p>
 
 # Lirion.jl
