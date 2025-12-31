@@ -22,6 +22,7 @@ end
 
 function run_distributed(inputs::LirionInputs)::LirionRunResult
     @assert inputs.model_type isa DistributedOPFModel
+    @assert inputs.admm_system !== nothing "Distributed run requires inputs.admm_system"
 
     config = inputs.model_type::DistributedOPFModel
     admm_sys = inputs.admm_system::ADMMSystem
@@ -36,13 +37,19 @@ function run_distributed(inputs::LirionInputs)::LirionRunResult
     if output isa LirionRunResult
         r = output.result
         base_nt = r isa NamedTuple ? r : (result = r,)
-        meta_nt = (config = config, system = inputs.system, database = inputs.database_path)
+
+        meta_nt = (
+            config = config,
+            system = admm_sys,
+            database = inputs.database_path,
+        )
+
         enriched = merge(base_nt, meta_nt)
 
         return LirionRunResult(;
             result = enriched,
             model = output.model,
-            system = output.system === nothing ? inputs.system : output.system,
+            system = output.system,
             diagnostics = output.diagnostics,
         )
     end

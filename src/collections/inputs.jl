@@ -1,5 +1,8 @@
+# ============================================================
+# Core structs
+# ============================================================
+
 struct ADMMSystem
-    full::SystemData
     parts::Dict{Int, SystemData}
     shared_buses::Vector{Int}
     cut_edges::Vector{Int}
@@ -10,9 +13,13 @@ struct LirionInputs
     model_type::Union{Type{<:OPFModel}, DistributedOPFModel}
     optimizer::Any
     write_outputs::Bool
-    system::SystemData
+    system::Union{Nothing, SystemData}
     admm_system::Union{Nothing, ADMMSystem}
 end
+
+# ============================================================
+# IO helpers
+# ============================================================
 
 function parse_case_from_csv_silent(dir::String)
     with_logger(NullLogger()) do
@@ -39,6 +46,10 @@ function load_input_data(path::String)
     global_logger(ConsoleLogger(stderr, Logging.Info))
     return result
 end
+
+# ============================================================
+# ADMM preprocessing
+# ============================================================
 
 function _find_cut_edges(full::Dict{String, Any})
     zones = full["bus"]["zone"]
@@ -196,8 +207,8 @@ function prepare_admm_partitions(data::Dict{String, Any})
                 bkey = haskey(gtbl, "bus") ? "bus" : "gen_bus"
                 keep = findall(i -> in(gtbl[bkey][i], zone_bus_set), eachindex(gtbl[bkey]))
                 sub["gencost_timeseries"] = Dict(
-                    k => v[keep] for
-                    (k, v) in data["gencost_timeseries"] if length(v) == length(gtbl[bkey])
+                    k => v[keep] for (k, v) in data["gencost_timeseries"] if
+                    length(v) == length(gtbl[bkey])
                 )
             end
         else
@@ -227,15 +238,16 @@ function prepare_admm_partitions(data::Dict{String, Any})
     return partitions, shared_buses
 end
 
+# ============================================================
+# Inputs builder
+# ============================================================
+
 function build_inputs(args::Args)::LirionInputs
-    # inputs
     data = load_input_data(args.database_path)
     preprocess_case_data!(data, OPFModel)
 
-    # structs
-    full_sys = build_system_data(data)
-
     if is_centralized_model(args.model_type)
+        full_sys = build_system_data(data)
         return LirionInputs(
             args.database_path,
             args.model_type,
@@ -254,19 +266,14 @@ function build_inputs(args::Args)::LirionInputs
         parts_system[zone] = build_system_data(subdict)
     end
 
-    admm_sys = ADMMSystem(
-        full_sys,
-        parts_system,
-        shared_buses,
-        cut_edges,
-    )
+    admm_sys = ADMMSystem(parts_system, shared_buses, cut_edges)
 
     return LirionInputs(
         args.database_path,
         args.model_type,
         args.optimizer,
         args.write_outputs,
-        full_sys,
+        nothing,
         admm_sys,
     )
 end
