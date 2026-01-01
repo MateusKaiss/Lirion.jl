@@ -10,7 +10,7 @@
 
 function init_dc_bus_partition!(
     part::PartitionDC,
-    sys_zone,
+    sys_zone::SystemData,
     optimizer_factory,
     rho_theta::Float64,
 )
@@ -35,14 +35,16 @@ end
 function init_dc_bus_partition!(
     partitions::Partitions{PartitionDC},
     sys::ADMMSystem,
-    zone_ids::Vector{Int},
     optimizer_factory,
     rho_theta::Float64,
 )
-    for zone_id in zone_ids
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n "ADMMSystem.parts must be aligned with partitions.parts"
+
+    @inbounds for i in 1:n
         init_dc_bus_partition!(
-            get_partition(partitions, zone_id),
-            sys.parts[zone_id],
+            partitions.parts[i],
+            sys.parts[i],
             optimizer_factory,
             rho_theta,
         )
@@ -54,10 +56,10 @@ end
 
 function init_dc_branch_partition!(
     part::PartitionDC,
-    sys_zone,
+    sys_zone::SystemData,
     optimizer_factory,
     rho::Float64,
-    interzonal_branches,
+    interzonal_branches::Vector{Int},
 )
     prepare_hotpaths!(part)
     part.zone_edges = _zone_cut_edges(part, interzonal_branches)
@@ -82,15 +84,17 @@ end
 function init_dc_branch_partition!(
     partitions::Partitions{PartitionDC},
     sys::ADMMSystem,
-    zone_ids::Vector{Int},
     optimizer_factory,
     rho::Float64,
-    interzonal_branches,
+    interzonal_branches::Vector{Int},
 )
-    for zone_id in zone_ids
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n "ADMMSystem.parts must be aligned with partitions.parts"
+
+    @inbounds for i in 1:n
         init_dc_branch_partition!(
-            get_partition(partitions, zone_id),
-            sys.parts[zone_id],
+            partitions.parts[i],
+            sys.parts[i],
             optimizer_factory,
             rho,
             interzonal_branches,
@@ -103,11 +107,11 @@ end
 
 function init_dc_hybrid_partition!(
     part::PartitionDC,
-    sys_zone,
+    sys_zone::SystemData,
     optimizer_factory,
     rho_theta::Float64,
     rho::Float64,
-    interzonal_branches,
+    interzonal_branches::Vector{Int},
 )
     prepare_hotpaths!(part)
     part.zone_edges = _zone_cut_edges(part, interzonal_branches)
@@ -134,16 +138,18 @@ end
 function init_dc_hybrid_partition!(
     partitions::Partitions{PartitionDC},
     sys::ADMMSystem,
-    zone_ids::Vector{Int},
     optimizer_factory,
     rho_theta::Float64,
     rho::Float64,
-    interzonal_branches,
+    interzonal_branches::Vector{Int},
 )
-    for zone_id in zone_ids
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n "ADMMSystem.parts must be aligned with partitions.parts"
+
+    @inbounds for i in 1:n
         init_dc_hybrid_partition!(
-            get_partition(partitions, zone_id),
-            sys.parts[zone_id],
+            partitions.parts[i],
+            sys.parts[i],
             optimizer_factory,
             rho_theta,
             rho,
@@ -208,7 +214,7 @@ function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
         n_zones,
     )
 
-    init_dc_bus_partition!(partitions, sys, zone_ids, optimizer_factory, rho[])
+    init_dc_bus_partition!(partitions, sys, optimizer_factory, rho[])
 
     iter_done = 0
     for iter in 1:max_iter
@@ -389,7 +395,6 @@ function run_admm_branch(
     init_dc_branch_partition!(
         partitions,
         sys,
-        zone_ids,
         optimizer_factory,
         rho[],
         interzonal_branches,
@@ -439,14 +444,13 @@ function run_admm_branch(
         r = primal_residual_branch_dc(partitions, flow_consensus, interzonal_branches)
         s = dual_residual_branch_dc(flow_consensus, flow_consensus_prev)
 
-        eps_r =
-            eps_primal_branch_dc(
-                partitions,
-                flow_consensus,
-                interzonal_branches,
-                eps_abs,
-                eps_rel,
-            )
+        eps_r = eps_primal_branch_dc(
+            partitions,
+            flow_consensus,
+            interzonal_branches,
+            eps_abs,
+            eps_rel,
+        )
         eps_s = eps_dual_branch_dc(flow_consensus, flow_consensus_prev, eps_abs, eps_rel)
 
         _record_iter!(hist, r, s, eps_r, eps_s; rhos = Dict(:rho_flow => rho[]))
@@ -554,7 +558,6 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
     init_dc_hybrid_partition!(
         partitions,
         sys,
-        zone_ids,
         optimizer_factory,
         rho_theta[],
         rho_flow[],
@@ -669,14 +672,13 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             eps_abs,
             eps_rel,
         )
-        eps_br_r =
-            eps_primal_branch_dc(
-                partitions,
-                flow_consensus,
-                interzonal_branches,
-                eps_abs,
-                eps_rel,
-            )
+        eps_br_r = eps_primal_branch_dc(
+            partitions,
+            flow_consensus,
+            interzonal_branches,
+            eps_abs,
+            eps_rel,
+        )
         eps_r_tot = hypot(eps_bus_r, eps_br_r)
 
         eps_bus_s = eps_dual_bus_dc(theta_consensus, theta_consensus_prev, eps_abs, eps_rel)
@@ -696,7 +698,12 @@ function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRu
             break
         end
 
-        maybe_adapt_rho!(adaptive, rho_theta, r_bus, s_bus, rho_flow, r_br, s_br, config)
+        maybe_adapt_rho!(
+            adaptive,
+            rho_theta, r_bus, s_bus,
+            rho_flow, r_br, s_br,
+            config,
+        )
     end
 
     hist.heatmaps[:theta_avg] = theta_avg_history

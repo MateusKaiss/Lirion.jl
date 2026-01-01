@@ -10,7 +10,7 @@
 
 function init_ac_bus_partition!(
     part::PartitionAC,
-    sys_zone,
+    sys_zone::SystemData,
     optimizer_factory,
     rho_theta::Float64,
     rhoV::Float64,
@@ -41,15 +41,17 @@ end
 function init_ac_bus_partition!(
     partitions::Partitions{PartitionAC},
     sys::ADMMSystem,
-    zone_ids::Vector{Int},
     optimizer_factory,
     rho_theta::Float64,
     rhoV::Float64,
 )
-    for zone_id in zone_ids
+    n = length(partitions.parts)
+    @assert n == length(sys.parts) == length(sys.zones)
+
+    @inbounds for i in 1:n
         init_ac_bus_partition!(
-            get_partition(partitions, zone_id),
-            sys.parts[zone_id],
+            partitions.parts[i],
+            sys.parts[i],
             optimizer_factory,
             rho_theta,
             rhoV,
@@ -62,7 +64,7 @@ end
 
 function init_ac_branch_partition!(
     part::PartitionAC,
-    sys_zone,
+    sys_zone::SystemData,
     optimizer_factory,
     rhoP::Float64,
     rhoQ::Float64,
@@ -95,16 +97,18 @@ end
 function init_ac_branch_partition!(
     partitions::Partitions{PartitionAC},
     sys::ADMMSystem,
-    zone_ids::Vector{Int},
     optimizer_factory,
     rhoP::Float64,
     rhoQ::Float64,
     interzonal_branches,
 )
-    for zone_id in zone_ids
+    n = length(partitions.parts)
+    @assert n == length(sys.parts) == length(sys.zones)
+
+    @inbounds for i in 1:n
         init_ac_branch_partition!(
-            get_partition(partitions, zone_id),
-            sys.parts[zone_id],
+            partitions.parts[i],
+            sys.parts[i],
             optimizer_factory,
             rhoP,
             rhoQ,
@@ -118,7 +122,7 @@ end
 
 function init_ac_hybrid_partition!(
     part::PartitionAC,
-    sys_zone,
+    sys_zone::SystemData,
     optimizer_factory,
     rho_theta::Float64,
     rhoV::Float64,
@@ -155,7 +159,6 @@ end
 function init_ac_hybrid_partition!(
     partitions::Partitions{PartitionAC},
     sys::ADMMSystem,
-    zone_ids::Vector{Int},
     optimizer_factory,
     rho_theta::Float64,
     rhoV::Float64,
@@ -163,10 +166,13 @@ function init_ac_hybrid_partition!(
     rhoQ::Float64,
     interzonal_branches,
 )
-    for zone_id in zone_ids
+    n = length(partitions.parts)
+    @assert n == length(sys.parts) == length(sys.zones)
+
+    @inbounds for i in 1:n
         init_ac_hybrid_partition!(
-            get_partition(partitions, zone_id),
-            sys.parts[zone_id],
+            partitions.parts[i],
+            sys.parts[i],
             optimizer_factory,
             rho_theta,
             rhoV,
@@ -242,14 +248,7 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
         n_zones,
     )
 
-    init_ac_bus_partition!(
-        partitions,
-        sys,
-        zone_ids,
-        optimizer_factory,
-        rho_theta[],
-        rho_v[],
-    )
+    init_ac_bus_partition!(partitions, sys, optimizer_factory, rho_theta[], rho_v[])
 
     iter_done = 0
     for iter in 1:max_iter
@@ -291,7 +290,7 @@ function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunRes
             )
         end
 
-        for (i, zone_id) in enumerate(zone_ids)
+        @inbounds for (i, zone_id) in enumerate(zone_ids)
             part = get_partition(partitions, zone_id)
             out = results[i]
             part.has_solution = true
@@ -467,7 +466,6 @@ function run_admm_ac_branch(
     init_ac_branch_partition!(
         partitions,
         sys,
-        zone_ids,
         optimizer_factory,
         rho_p[],
         rho_q[],
@@ -508,7 +506,7 @@ function run_admm_ac_branch(
             )
         end
 
-        for (i, zone_id) in enumerate(zone_ids)
+        @inbounds for (i, zone_id) in enumerate(zone_ids)
             part = get_partition(partitions, zone_id)
             out = results[i]
             part.has_solution = true
@@ -555,11 +553,7 @@ function run_admm_ac_branch(
         )
 
         eps_r = eps_primal_branch_ac(
-            partitions,
-            pflow_consensus,
-            qflow_consensus,
-            interzonal_branches,
-            eps_abs,
+            partitions, pflow_consensus, qflow_consensus, interzonal_branches, eps_abs,
             eps_rel,
         )
         eps_s = eps_dual_branch_ac(
@@ -685,7 +679,7 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
     )
 
     init_ac_hybrid_partition!(
-        partitions, sys, zone_ids, optimizer_factory,
+        partitions, sys, optimizer_factory,
         rho_theta[], rho_v[], rho_p[], rho_q[], interzonal_branches,
     )
 
@@ -745,7 +739,7 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             )
         end
 
-        for (i, zone_id) in enumerate(zone_ids)
+        @inbounds for (i, zone_id) in enumerate(zone_ids)
             part = get_partition(partitions, zone_id)
             out = results[i]
             part.has_solution = true
@@ -810,10 +804,7 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
         )
 
         r_bus = primal_residual_bus_ac_vec(
-            partitions,
-            theta_consensus,
-            vmag_consensus,
-            shared_buses_sorted,
+            partitions, theta_consensus, vmag_consensus, shared_buses_sorted,
             shared_buses_to_pos,
         )
         r_br = primal_residual_branch_ac(
@@ -831,29 +822,17 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             vmag_consensus_prev,
         )
         s_br = dual_residual_branch_ac(
-            pflow_consensus,
-            qflow_consensus,
-            pflow_consensus_prev,
-            qflow_consensus_prev,
-            interzonal_branches,
+            pflow_consensus, qflow_consensus, pflow_consensus_prev,
+            qflow_consensus_prev, interzonal_branches,
         )
         s_tot = hypot(s_bus, s_br)
 
         eps_bus_r = eps_primal_bus_ac_vec(
-            partitions,
-            theta_consensus,
-            vmag_consensus,
-            shared_buses_sorted,
-            shared_buses_to_pos,
-            eps_abs,
-            eps_rel,
+            partitions, theta_consensus, vmag_consensus, shared_buses_sorted,
+            shared_buses_to_pos, eps_abs, eps_rel,
         )
         eps_br_r = eps_primal_branch_ac(
-            partitions,
-            pflow_consensus,
-            qflow_consensus,
-            interzonal_branches,
-            eps_abs,
+            partitions, pflow_consensus, qflow_consensus, interzonal_branches, eps_abs,
             eps_rel,
         )
         eps_r_tot = hypot(eps_bus_r, eps_br_r)
@@ -867,13 +846,8 @@ function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::Lirio
             eps_rel,
         )
         eps_br_s = eps_dual_branch_ac(
-            pflow_consensus,
-            qflow_consensus,
-            pflow_consensus_prev,
-            qflow_consensus_prev,
-            interzonal_branches,
-            eps_abs,
-            eps_rel,
+            pflow_consensus, qflow_consensus, pflow_consensus_prev,
+            qflow_consensus_prev, interzonal_branches, eps_abs, eps_rel,
         )
         eps_s_tot = hypot(eps_bus_s, eps_br_s)
 

@@ -4,13 +4,18 @@ struct Partitions{P}
     zone_to_idx::Dict{Int, Int}
 end
 
-Base.length(ps::Partitions) = length(ps.parts)
-Base.iterate(ps::Partitions, st::Int = 1) =
-    st > length(ps.parts) ? nothing : (ps.parts[st], st + 1)
-Base.getindex(ps::Partitions, i::Int) = ps.parts[i]
+@inline Base.length(ps::Partitions) = length(ps.parts)
 
-@inline get_partition(ps::Partitions, zone::Int) = ps.parts[ps.zone_to_idx[zone]]
+@inline function Base.iterate(ps::Partitions, st::Int = 1)
+    st > length(ps.parts) && return nothing
+    @inbounds return (ps.parts[st], st + 1)
+end
+
+@inline Base.getindex(ps::Partitions, i::Int) = (@inbounds ps.parts[i])
+
 @inline zoneindex(ps::Partitions, zone::Int) = ps.zone_to_idx[zone]
+@inline get_partition(ps::Partitions, zone::Int) =
+    (@inbounds ps.parts[ps.zone_to_idx[zone]])
 
 # =======================================================================
 # ADMM Partitions structs
@@ -145,12 +150,14 @@ end
 # =======================================================================
 
 function build_dc_partitions(sys::ADMMSystem)::Partitions{PartitionDC}
-    zones = sort!(collect(keys(sys.parts)))
-    parts = Vector{PartitionDC}(undef, length(zones))
-    zone_to_idx = Dict{Int, Int}(zone => i for (i, zone) in pairs(zones))
+    zones = sys.zones
+    zone_to_idx = sys.zone_to_idx
+    n = length(zones)
 
-    for (i, zone) in pairs(zones)
-        s = sys.parts[zone]
+    parts = Vector{PartitionDC}(undef, n)
+    @inbounds for i in 1:n
+        zone = zones[i]
+        s = sys.parts[i]  # aligned with zones!
         raw = s.raw
 
         parts[i] = PartitionDC(;
@@ -169,12 +176,14 @@ function build_dc_partitions(sys::ADMMSystem)::Partitions{PartitionDC}
 end
 
 function build_ac_partitions(sys::ADMMSystem)::Partitions{PartitionAC}
-    zones = sort!(collect(keys(sys.parts)))
-    parts = Vector{PartitionAC}(undef, length(zones))
-    zone_to_idx = Dict{Int, Int}(zone => i for (i, zone) in pairs(zones))
+    zones = sys.zones
+    zone_to_idx = sys.zone_to_idx
+    n = length(zones)
 
-    for (i, zone) in pairs(zones)
-        s = sys.parts[zone]
+    parts = Vector{PartitionAC}(undef, n)
+    @inbounds for i in 1:n
+        zone = zones[i]
+        s = sys.parts[i]
         raw = s.raw
 
         parts[i] = PartitionAC(;
@@ -193,12 +202,14 @@ function build_ac_partitions(sys::ADMMSystem)::Partitions{PartitionAC}
 end
 
 function build_socp_partitions(sys::ADMMSystem)::Partitions{PartitionSOCP}
-    zones = sort!(collect(keys(sys.parts)))
-    parts = Vector{PartitionSOCP}(undef, length(zones))
-    zone_to_idx = Dict{Int, Int}(zone => i for (i, zone) in pairs(zones))
+    zones = sys.zones
+    zone_to_idx = sys.zone_to_idx
+    n = length(zones)
 
-    for (i, zone) in pairs(zones)
-        s = sys.parts[zone]
+    parts = Vector{PartitionSOCP}(undef, n)
+    @inbounds for i in 1:n
+        zone = zones[i]
+        s = sys.parts[i]
         raw = s.raw
 
         parts[i] = PartitionSOCP(;

@@ -3,10 +3,15 @@
 # ============================================================
 
 struct ADMMSystem
-    parts::Dict{Int, SystemData}
+    zones::Vector{Int}
+    zone_to_idx::Dict{Int, Int}
+    parts::Vector{SystemData}
     shared_buses::Vector{Int}
     interzonal_branches::Vector{Int}
 end
+
+@inline zoneindex(sys::ADMMSystem, zone::Int) = sys.zone_to_idx[zone]
+@inline get_zone(sys::ADMMSystem, zone::Int) = @inbounds sys.parts[sys.zone_to_idx[zone]]
 
 struct LirionInputs
     database_path::String
@@ -70,12 +75,14 @@ function build_inputs(args::Args)::LirionInputs
     parts_dict, shared_buses = prepare_admm_partitions(data)
     interzonal_branches = _find_interzonal_branches(data)
 
-    parts_system = Dict{Int, SystemData}()
-    for (zone, subdict) in parts_dict
-        parts_system[zone] = build_system_data(subdict)
+    zones = sort!(collect(keys(parts_dict)))
+    zone_to_idx = Dict{Int, Int}(z => i for (i, z) in pairs(zones))
+    parts = Vector{SystemData}(undef, length(zones))
+    for (i, z) in pairs(zones)
+        parts[i] = build_system_data(parts_dict[z])
     end
 
-    admm_sys = ADMMSystem(parts_system, shared_buses, interzonal_branches)
+    admm_sys = ADMMSystem(zones, zone_to_idx, parts, shared_buses, interzonal_branches)
 
     return LirionInputs(
         args.database_path,
