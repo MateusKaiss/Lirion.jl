@@ -1,3 +1,9 @@
+struct ADMMZoneMeta
+    branch_local_indices::Vector{Int}
+    edge_to_local::Dict{Int, Int}
+    shared_buses_local::Vector{Int}
+end
+
 struct SystemData
     baseMVA::Float64
     T::Int
@@ -16,10 +22,15 @@ struct SystemData
     powerflow::PowerFlowData
     objective::ObjectiveData
 
+    admm::Union{Nothing, ADMMZoneMeta}
+
     raw::Dict{String, Any}
 end
 
-function build_system_data(data::Dict{String, Any})::SystemData
+function build_system_data(
+    data::Dict{String, Any};
+    admm_meta::Union{Nothing, ADMMZoneMeta} = nothing,
+)::SystemData
     bus_data = build_bus_data(data)
     branch_data = build_branch_data(data)
     gen_data = build_gen_data(data)
@@ -48,6 +59,7 @@ function build_system_data(data::Dict{String, Any})::SystemData
         gencost_ts_data,
         powerflow_data,
         objective_data,
+        admm_meta,
         data,
     )
 end

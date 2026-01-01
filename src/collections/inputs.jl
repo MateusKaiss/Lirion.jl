@@ -77,9 +77,18 @@ function build_inputs(args::Args)::LirionInputs
 
     zones = sort!(collect(keys(parts_dict)))
     zone_to_idx = Dict{Int, Int}(z => i for (i, z) in pairs(zones))
+
     parts = Vector{SystemData}(undef, length(zones))
-    for (i, z) in pairs(zones)
-        parts[i] = build_system_data(parts_dict[z])
+    @inbounds for (i, z) in pairs(zones)
+        zone_data = parts_dict[z]::Dict{String, Any}
+
+        admm_meta = ADMMZoneMeta(
+            zone_data["branch_local_indices"]::Vector{Int},
+            zone_data["edge_to_local"]::Dict{Int, Int},
+            zone_data["shared_buses_local"]::Vector{Int},
+        )
+
+        parts[i] = build_system_data(zone_data; admm_meta = admm_meta)
     end
 
     admm_sys = ADMMSystem(zones, zone_to_idx, parts, shared_buses, interzonal_branches)

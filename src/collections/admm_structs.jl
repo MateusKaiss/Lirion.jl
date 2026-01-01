@@ -149,6 +149,13 @@ end
 # ADMM Partitions Builders
 # =======================================================================
 
+@inline function _require_admm_meta(s::SystemData, zone::Int)
+    m = s.admm
+    m === nothing &&
+        error("Missing ADMM metadata for zone=$zone (SystemData.admm === nothing).")
+    return m::ADMMZoneMeta
+end
+
 function build_dc_partitions(sys::ADMMSystem)::Partitions{PartitionDC}
     zones = sys.zones
     zone_to_idx = sys.zone_to_idx
@@ -157,17 +164,17 @@ function build_dc_partitions(sys::ADMMSystem)::Partitions{PartitionDC}
     parts = Vector{PartitionDC}(undef, n)
     @inbounds for i in 1:n
         zone = zones[i]
-        s = sys.parts[i]  # aligned with zones!
-        raw = s.raw
+        s = sys.parts[i]
+        meta = _require_admm_meta(s, zone)
 
         parts[i] = PartitionDC(;
             id = zone,
             bus = s.bus,
             branch = s.branch,
             gen = s.gen,
-            branch_local_indices = raw["branch_local_indices"]::Vector{Int},
-            edge_to_local = raw["edge_to_local"]::Dict{Int, Int},
-            shared_buses_local = raw["shared_buses_local"]::Vector{Int},
+            branch_local_indices = meta.branch_local_indices,
+            edge_to_local = meta.edge_to_local,
+            shared_buses_local = meta.shared_buses_local,
             objective_params = s.objective,
         )
     end
@@ -184,16 +191,16 @@ function build_ac_partitions(sys::ADMMSystem)::Partitions{PartitionAC}
     @inbounds for i in 1:n
         zone = zones[i]
         s = sys.parts[i]
-        raw = s.raw
+        meta = _require_admm_meta(s, zone)
 
         parts[i] = PartitionAC(;
             id = zone,
             bus = s.bus,
             branch = s.branch,
             gen = s.gen,
-            branch_local_indices = raw["branch_local_indices"]::Vector{Int},
-            edge_to_local = raw["edge_to_local"]::Dict{Int, Int},
-            shared_buses_local = raw["shared_buses_local"]::Vector{Int},
+            branch_local_indices = meta.branch_local_indices,
+            edge_to_local = meta.edge_to_local,
+            shared_buses_local = meta.shared_buses_local,
             objective_params = s.objective,
         )
     end
@@ -210,16 +217,16 @@ function build_socp_partitions(sys::ADMMSystem)::Partitions{PartitionSOCP}
     @inbounds for i in 1:n
         zone = zones[i]
         s = sys.parts[i]
-        raw = s.raw
+        meta = _require_admm_meta(s, zone)
 
         parts[i] = PartitionSOCP(;
             id = zone,
             bus = s.bus,
             branch = s.branch,
             gen = s.gen,
-            branch_local_indices = raw["branch_local_indices"]::Vector{Int},
-            edge_to_local = raw["edge_to_local"]::Dict{Int, Int},
-            shared_buses_local = raw["shared_buses_local"]::Vector{Int},
+            branch_local_indices = meta.branch_local_indices,
+            edge_to_local = meta.edge_to_local,
+            shared_buses_local = meta.shared_buses_local,
             objective_params = s.objective,
         )
     end
