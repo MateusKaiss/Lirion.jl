@@ -292,11 +292,11 @@ end
     sub["branch_full"] = branch_tbl
     sub["branch_local_indices"] = keep_all
 
-    edge_to_local = Dict{Int, Int}()
+    branch_global_to_local = Dict{Int, Int}()
     @inbounds for (loc, glob) in enumerate(keep_all)
-        edge_to_local[glob] = loc
+        branch_global_to_local[glob] = loc
     end
-    sub["edge_to_local"] = edge_to_local
+    sub["branch_global_to_local"] = branch_global_to_local
     return keep_all
 end
 

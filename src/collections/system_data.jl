@@ -1,6 +1,6 @@
 struct ADMMZoneMeta
     branch_local_indices::Vector{Int}
-    edge_to_local::Dict{Int, Int}
+    branch_global_to_local::Dict{Int, Int}
     shared_buses_local::Vector{Int}
 end
 

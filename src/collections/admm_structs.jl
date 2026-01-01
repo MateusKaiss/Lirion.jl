@@ -30,7 +30,7 @@ Base.@kwdef mutable struct PartitionDC
 
     branch_local_indices::Vector{Int} = Int[]
     shared_buses_local::Vector{Int} = Int[]
-    edge_to_local::Dict{Int, Int} = Dict{Int, Int}()
+    branch_global_to_local::Dict{Int, Int} = Dict{Int, Int}()
 
     bus_local_index::Dict{Int, Int} = Dict{Int, Int}()
     shared_pos_local::Vector{Int} = Int[]
@@ -65,7 +65,7 @@ Base.@kwdef mutable struct PartitionAC
 
     branch_local_indices::Vector{Int} = Int[]
     shared_buses_local::Vector{Int} = Int[]
-    edge_to_local::Dict{Int, Int} = Dict{Int, Int}()
+    branch_global_to_local::Dict{Int, Int} = Dict{Int, Int}()
 
     bus_local_index::Dict{Int, Int} = Dict{Int, Int}()
     shared_pos_local::Vector{Int} = Int[]
@@ -108,7 +108,7 @@ Base.@kwdef mutable struct PartitionSOCP
 
     branch_local_indices::Vector{Int} = Int[]
     shared_buses_local::Vector{Int} = Int[]
-    edge_to_local::Dict{Int, Int} = Dict{Int, Int}()
+    branch_global_to_local::Dict{Int, Int} = Dict{Int, Int}()
 
     bus_local_index::Dict{Int, Int} = Dict{Int, Int}()
     shared_pos_local::Vector{Int} = Int[]
@@ -173,7 +173,7 @@ function build_dc_partitions(sys::ADMMSystem)::Partitions{PartitionDC}
             branch = s.branch,
             gen = s.gen,
             branch_local_indices = meta.branch_local_indices,
-            edge_to_local = meta.edge_to_local,
+            branch_global_to_local = meta.branch_global_to_local,
             shared_buses_local = meta.shared_buses_local,
             objective_params = s.objective,
         )
@@ -199,7 +199,7 @@ function build_ac_partitions(sys::ADMMSystem)::Partitions{PartitionAC}
             branch = s.branch,
             gen = s.gen,
             branch_local_indices = meta.branch_local_indices,
-            edge_to_local = meta.edge_to_local,
+            branch_global_to_local = meta.branch_global_to_local,
             shared_buses_local = meta.shared_buses_local,
             objective_params = s.objective,
         )
@@ -225,7 +225,7 @@ function build_socp_partitions(sys::ADMMSystem)::Partitions{PartitionSOCP}
             branch = s.branch,
             gen = s.gen,
             branch_local_indices = meta.branch_local_indices,
-            edge_to_local = meta.edge_to_local,
+            branch_global_to_local = meta.branch_global_to_local,
             shared_buses_local = meta.shared_buses_local,
             objective_params = s.objective,
         )

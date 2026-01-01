@@ -84,7 +84,7 @@ function build_inputs(args::Args)::LirionInputs
 
         admm_meta = ADMMZoneMeta(
             zone_data["branch_local_indices"]::Vector{Int},
-            zone_data["edge_to_local"]::Dict{Int, Int},
+            zone_data["branch_global_to_local"]::Dict{Int, Int},
             zone_data["shared_buses_local"]::Vector{Int},
         )
 

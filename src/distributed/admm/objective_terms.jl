@@ -31,7 +31,7 @@ function _build_quad_branch_expr!(
 
     # termo (rho/2)*‖p_flow(e)‖² para cada ramo de corte da zona
     for e in zone_edges
-        l_local = get(part.edge_to_local, e, nothing)
+        l_local = get(part.branch_global_to_local, e, nothing)
         l_local === nothing && continue
         f = part.branch.from[l_local]
         t = part.branch.to[l_local]
@@ -82,7 +82,7 @@ function _build_linear_branch_expr(
     lin = zero(JuMP.AffExpr)
 
     for e in zone_edges
-        l_local = get(part.edge_to_local, e, nothing)
+        l_local = get(part.branch_global_to_local, e, nothing)
         l_local === nothing && continue
         f = part.branch.from[l_local]
         t = part.branch.to[l_local]
@@ -125,7 +125,7 @@ function _build_quad_branch_expr_ac!(
     quad_bus_penalty = zero(JuMP.QuadExpr)
 
     for e in zone_edges
-        l_local = get(part.edge_to_local, e, nothing)
+        l_local = get(part.branch_global_to_local, e, nothing)
         l_local === nothing && continue
         P_loc, Q_loc = _pq_flow_from_exprs(part, l_local)
         quad_bus_penalty += 0.5 * rhoP * P_loc^2 + 0.5 * rhoQ * Q_loc^2
@@ -180,7 +180,7 @@ function _build_linear_branch_expr_ac!(
     lin = zero(JuMP.AffExpr)
 
     for e in zone_edges
-        l_local = get(part.edge_to_local, e, nothing)
+        l_local = get(part.branch_global_to_local, e, nothing)
         l_local === nothing && continue
         P_loc, Q_loc = _pq_flow_from_exprs(part, l_local)
         lambdaP = get(dualsP_zone, e, 0.0)
@@ -223,7 +223,7 @@ function _build_quad_branch_rt_expr!(
     quad_bus_penalty = zero(JuMP.QuadExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(sub.edge_to_local, e, nothing)
+        l_local = get(sub.branch_global_to_local, e, nothing)
         l_local === nothing && continue
         Rloc, Tloc = _rt_from_exprs(m, l_local)
         quad_bus_penalty += 0.5 * rhoR * Rloc^2 + 0.5 * rhoT * Tloc^2
@@ -245,7 +245,7 @@ function _build_quad_branch_pq_expr!(
     quad_bus_penalty = zero(JuMP.QuadExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(sub.edge_to_local, e, nothing)
+        l_local = get(sub.branch_global_to_local, e, nothing)
         l_local === nothing && continue
         P_loc, Q_loc = _pq_flow_from_exprs(m, l_local)
         quad_bus_penalty += 0.5 * rhoP * P_loc^2 + 0.5 * rhoQ * Q_loc^2
@@ -295,7 +295,7 @@ function _build_linear_branch_rt_expr(
     lin = zero(JuMP.AffExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(sub.edge_to_local, e, nothing)
+        l_local = get(sub.branch_global_to_local, e, nothing)
         l_local === nothing && continue
         Rloc, Tloc = _rt_from_exprs(m, l_local)
         lin += (get(lambdaR_zone, e, 0.0) - rhoR * get(rflow_consensus, e, 0.0)) * Rloc
@@ -319,7 +319,7 @@ function _build_linear_branch_pq_expr(
     lin = zero(JuMP.AffExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(sub.edge_to_local, e, nothing)
+        l_local = get(sub.branch_global_to_local, e, nothing)
         l_local === nothing && continue
         P_loc, Q_loc = _pq_flow_from_exprs(m, l_local)
         lin += (get(lambdaP_zone, e, 0.0) - rhoP * get(pflow_consensus, e, 0.0)) * P_loc
@@ -354,7 +354,7 @@ function _soft_anchor_branch_expr!(
 
     if use_pq && !isempty(sub.zone_edges)
         for e in sub.zone_edges
-            l = get(sub.edge_to_local, e, nothing)
+            l = get(sub.branch_global_to_local, e, nothing)
             l === nothing && continue
             P, Q = _pq_flow_from_exprs(m, l)
             quad_bus_penalty += 0.5 * κPQ * (P^2 + Q^2)

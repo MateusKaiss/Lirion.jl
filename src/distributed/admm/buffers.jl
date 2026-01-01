@@ -9,7 +9,7 @@ function sorted_ids_and_id2idx(ids::Vector{Int})
 end
 
 @inline function _zone_cut_edges(part, interzonal_branches::AbstractVector{Int})
-    return [e for e in interzonal_branches if haskey(part.edge_to_local, e)]
+    return [e for e in interzonal_branches if haskey(part.branch_global_to_local, e)]
 end
 
 # ------------------------------------------------------------
