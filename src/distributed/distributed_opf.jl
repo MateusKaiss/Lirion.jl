@@ -1,46 +1,45 @@
-@inline get_method_runner(config::DistributedOPFModel) =
-    get_method_runner(config.base_model, Val(config.method))
+@inline function _variant_type(::Val{m}) where {m}
+    m === :admm && return Bus
+    m === :admm_branch && return Branch
+    m === :admm_hybrid && return Hybrid
+    return error(
+        "Unknown ADMM method: $(m). Expected :admm, :admm_branch, or :admm_hybrid.",
+    )
+end
 
-# DC
-@inline get_method_runner(::Type{DC}, ::Val{:admm}) = run_admm
-@inline get_method_runner(::Type{DC}, ::Val{:admm_branch}) = run_admm_branch
-@inline get_method_runner(::Type{DC}, ::Val{:admm_hybrid}) = run_admm_hybrid
+@inline function _base_tag_type(::Type{B}) where {B <: OPFModel}
+    B === DC   && return DCTag
+    B === AC   && return ACTag
+    B === SOCP && return SOCPTag
+    error("Unknown base_model: $(B). Expected DC, AC, or SOCP.")
+end
 
-# AC
-@inline get_method_runner(::Type{AC}, ::Val{:admm}) = run_admm_ac
-@inline get_method_runner(::Type{AC}, ::Val{:admm_branch}) = run_admm_ac_branch
-@inline get_method_runner(::Type{AC}, ::Val{:admm_hybrid}) = run_admm_ac_hybrid
-
-# SOCP
-@inline get_method_runner(::Type{SOCP}, ::Val{:admm}) = run_admm_socp
-@inline get_method_runner(::Type{SOCP}, ::Val{:admm_branch}) = run_admm_socp_branch
-@inline get_method_runner(::Type{SOCP}, ::Val{:admm_hybrid}) = run_admm_socp_hybrid
-
-function get_method_runner(base::Type{<:OPFModel}, ::Val{m}) where {m}
-    return error("Distributed method $(m) with base model $(base) not implemented.")
+@inline function admm_tag(cfg::DistributedOPFModel)
+    V = _variant_type(Val(cfg.method))
+    B = _base_tag_type(cfg.base_model)
+    return ADMM{V, B}()
 end
 
 function run_distributed(inputs::LirionInputs)::LirionRunResult
     @assert inputs.model_type isa DistributedOPFModel
     @assert inputs.admm_system !== nothing "Distributed run requires inputs.admm_system"
 
-    config = inputs.model_type::DistributedOPFModel
-    admm_sys = inputs.admm_system::ADMMSystem
+    cfg = inputs.model_type::DistributedOPFModel
+    sys = inputs.admm_system::ADMMSystem
 
     @info "Running distributed OPF"
-    @info "  method     = $(config.method)"
-    @info "  base_model = $(config.base_model)"
+    @info "  method     = $(cfg.method)"
+    @info "  base_model = $(cfg.base_model)"
 
-    runner = get_method_runner(config)
-    output = runner(admm_sys, config)
+    output = run_admm(sys, cfg, admm_tag(cfg))
 
     if output isa LirionRunResult
         r = output.result
         base_nt = r isa NamedTuple ? r : (result = r,)
 
         meta_nt = (
-            config = config,
-            system = admm_sys,
+            config = cfg,
+            system = sys,
             database = inputs.database_path,
         )
 

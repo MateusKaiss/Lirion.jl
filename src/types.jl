@@ -3,14 +3,26 @@ struct DC <: OPFModel end
 struct AC <: OPFModel end
 struct SOCP <: OPFModel end
 
+abstract type ADMMVariant end
+struct Bus <: ADMMVariant end
+struct Branch <: ADMMVariant end
+struct Hybrid <: ADMMVariant end
+
+abstract type OPFTag end
+struct DCTag <: OPFTag end
+struct ACTag <: OPFTag end
+struct SOCPTag <: OPFTag end
+
+struct ADMM{V <: ADMMVariant, B <: OPFTag} end
+
 mutable struct DistributedOPFModel
     base_model::Type{<:OPFModel}
     method::Symbol
     max_iter::Int
-    rho_theta::Float64     # rho_theta (consenso de ângulo)     [AC-bus; DC-bus]
-    rho_v::Float64         # rhoV  (consenso de |V| ou V²) [AC/SOCP-bus]
-    rho_flow_p::Float64    # rhoP  (consenso de P_flow / Re(W))
-    rho_flow_q::Float64    # rhoQ  (consenso de Q_flow / Im(W))
+    rho_theta::Float64
+    rho_v::Float64
+    rho_flow_p::Float64
+    rho_flow_q::Float64
     eps_abs::Float64
     eps_rel::Float64
     alpha_overrelax::Union{Nothing, Float64}
@@ -21,8 +33,8 @@ mutable struct DistributedOPFModel
     tau_incr::Float64
     tau_decr::Float64
     accel_nesterov::Bool
-    optimizer::Any                  # pode ser nothing ou, ex., SCS.Optimizer
-    prefer_socp_solver::Symbol      # :auto | :gurobi | :cosmo | :scs
+    optimizer::Any
+    prefer_socp_solver::Symbol
 
     function DistributedOPFModel(
         base_model::Type{<:OPFModel},
@@ -74,7 +86,6 @@ mutable struct DistributedOPFModel
     end
 end
 
-# ----- construtor compacto com rho único -----
 DistributedOPFModel(
     base_model::Type{<:OPFModel},
     method::Symbol,
@@ -106,7 +117,6 @@ DistributedOPFModel(
     prefer_socp_solver = prefer_socp_solver,
 )
 
-# ----- construtor keyword-friendly (permite sobrepor rhos específicos) -----
 DistributedOPFModel(
     base_model::Type{<:OPFModel},
     method::Symbol,

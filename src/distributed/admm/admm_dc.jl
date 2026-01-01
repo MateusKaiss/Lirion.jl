@@ -167,7 +167,11 @@ end
 # Runner: ADMM bus/DC
 # ------------------------------------------------------------
 
-function run_admm(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
+function run_admm(
+    sys::ADMMSystem,
+    config::DistributedOPFModel,
+    ::ADMM{Bus, DCTag},
+)::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == DC "ADMM bus/DC requer base_model == DC."
 
@@ -352,13 +356,13 @@ end
 # Runner: ADMM branch/DC
 # ------------------------------------------------------------
 
-function run_admm_branch(
+function run_admm(
     sys::ADMMSystem,
-    config::DistributedOPFModel;
+    config::DistributedOPFModel,
+    ::ADMM{Branch, DCTag};
     use_legacy_rho::Bool = false,
 )::LirionRunResult
     t0_ns = time_ns()
-
     @assert config.base_model == DC "ADMM-branch/DC requer base_model == DC."
 
     interzonal_branches = sys.interzonal_branches
@@ -501,7 +505,11 @@ end
 # Runner: ADMM hybrid/DC
 # ------------------------------------------------------------
 
-function run_admm_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
+function run_admm(
+    sys::ADMMSystem,
+    config::DistributedOPFModel,
+    ::ADMM{Hybrid, DCTag},
+)::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == DC "Hybrid ADMM/DC requer DC."
 

@@ -192,7 +192,11 @@ end
 # Runner: ADMM bus/AC
 # ------------------------------------------------------------
 
-function run_admm_ac(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
+function run_admm(
+    sys::ADMMSystem,
+    config::DistributedOPFModel,
+    ::ADMM{Bus, ACTag},
+)::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == AC "ADMM-AC: base_model deve ser AC."
 
@@ -416,9 +420,10 @@ end
 # Runner: ADMM branch/AC
 # ------------------------------------------------------------
 
-function run_admm_ac_branch(
+function run_admm(
     sys::ADMMSystem,
     config::DistributedOPFModel,
+    ::ADMM{Branch, ACTag},
     warm_start::Bool = false,
 )::LirionRunResult
     t0_ns = time_ns()
@@ -604,7 +609,11 @@ end
 # Runner: ADMM hybrid/AC
 # ------------------------------------------------------------
 
-function run_admm_ac_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
+function run_admm(
+    sys::ADMMSystem,
+    config::DistributedOPFModel,
+    ::ADMM{Hybrid, ACTag},
+)::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == AC "Hybrid AC: base_model deve ser AC."
 

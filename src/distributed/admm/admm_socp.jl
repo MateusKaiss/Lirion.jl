@@ -208,7 +208,11 @@ end
 # Runner: ADMM SOCP (V² + R/T)
 # ------------------------------------------------------------
 
-function run_admm_socp(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
+function run_admm(
+    sys::ADMMSystem,
+    config::DistributedOPFModel,
+    ::ADMM{Bus, SOCPTag},
+)::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == SOCP "ADMM-SOCP: base_model deve ser SOCP."
 
@@ -452,7 +456,11 @@ end
 # Runner: ADMM SOCP (branch P/Q)
 # ------------------------------------------------------------
 
-function run_admm_socp_branch(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
+function run_admm(
+    sys::ADMMSystem,
+    config::DistributedOPFModel,
+    ::ADMM{Branch, SOCPTag},
+)::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == SOCP "ADMM-SOCP-branch: base_model deve ser SOCP."
 
@@ -630,7 +638,11 @@ end
 # Runner: ADMM SOCP hybrid (V² + P/Q + R/T)
 # ------------------------------------------------------------
 
-function run_admm_socp_hybrid(sys::ADMMSystem, config::DistributedOPFModel)::LirionRunResult
+function run_admm(
+    sys::ADMMSystem,
+    config::DistributedOPFModel,
+    ::ADMM{Hybrid, SOCPTag},
+)::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == SOCP "ADMM-SOCP-hybrid: base_model deve ser SOCP."
 
