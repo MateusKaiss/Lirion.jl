@@ -2,6 +2,8 @@
 # Optional-field helpers
 # ============================================================
 
+@inline _adaptive_on(config) = _getopt(config, :adaptive_rho, true)
+
 @inline function _getopt(config, name::Symbol, default)
     if hasproperty(config, name)
         v = getproperty(config, name)
@@ -9,8 +11,6 @@
     end
     return default
 end
-
-@inline _adaptive_on(config) = _getopt(config, :adaptive_rho, true)
 
 # ============================================================
 # Optimizer resolution
