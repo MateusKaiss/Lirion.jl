@@ -8,10 +8,10 @@
 end
 
 @inline function _base_tag_type(::Type{B}) where {B <: OPFModel}
-    B === DC   && return DCTag
-    B === AC   && return ACTag
+    B === DC && return DCTag
+    B === AC && return ACTag
     B === SOCP && return SOCPTag
-    error("Unknown base_model: $(B). Expected DC, AC, or SOCP.")
+    return error("Unknown base_model: $(B). Expected DC, AC, or SOCP.")
 end
 
 @inline function admm_tag(cfg::DistributedOPFModel)
