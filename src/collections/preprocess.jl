@@ -194,15 +194,22 @@ end
     return br_status .== 1
 end
 
+@inline function _build_sub_meta(data::AbstractDict{String, V}, zone::Int) where {V}
+    sub = Dict{String, Any}()
+    sub["baseMVA"] = data["baseMVA"]
+    sub["T"] = get(data, "T", 1)
+    sub["source_type"] = get(data, "source_type", "matpower")
+    sub["source_version"] = get(data, "source_version", "")
+    sub["name"] = "$(get(data, "name", "case"))_zone_$zone"
+    return sub
+end
+
 @inline _slice_table_by_mask(
     tbl::AbstractDict{String, V},
     mask::Vector{Int},
     ref_len::Int,
 ) where {V} =
     Dict{String, Any}(k => v[mask] for (k, v) in tbl if length(v) == ref_len)
-
-@inline _empty_like(tbl::AbstractDict{String, V}) where {V} =
-    Dict{String, Any}(k => Any[] for k in keys(tbl))
 
 @inline function _find_extra_neighbor_buses!(
     extra::Set{Int},
@@ -215,21 +222,11 @@ end
         branch_status_mask[i] || continue
         f_in = in(f_bus_full[i], zone_bus_set)
         t_in = in(t_bus_full[i], zone_bus_set)
-        if f_in ⊻ t_in
+        if f_in ⊻ t_in # XOR Logic
             push!(extra, f_in ? Int(t_bus_full[i]) : Int(f_bus_full[i]))
         end
     end
     return extra
-end
-
-@inline function _build_sub_meta(data::AbstractDict{String, V}, zone::Int) where {V}
-    sub = Dict{String, Any}()
-    sub["baseMVA"] = data["baseMVA"]
-    sub["T"] = get(data, "T", 1)
-    sub["source_type"] = get(data, "source_type", "matpower")
-    sub["source_version"] = get(data, "source_version", "")
-    sub["name"] = "$(get(data, "name", "case"))_zone_$zone"
-    return sub
 end
 
 @inline function _mark_virtual_buses!(
@@ -257,6 +254,9 @@ end
            haskey(tbl, "storage_bus") ? "storage_bus" :
            nothing
 end
+
+@inline _empty_like(tbl::AbstractDict{String, V}) where {V} =
+    Dict{String, Any}(k => Any[] for k in keys(tbl))
 
 @inline function _filter_table_by_zone_bus(
     tbl::AbstractDict{String, V},
@@ -328,21 +328,29 @@ end
         return nothing
     end
 
-    gtbl = data["gen"]
-    bkey = haskey(gtbl, "bus") ? "bus" : "gen_bus"
+    gen_tbl = data["gen"]
+    gen_bus_key = haskey(gen_tbl, "bus") ? "bus" : "gen_bus"
 
     if haskey(data, "gencost")
-        keep = findall(i -> in(Int(gtbl[bkey][i]), zone_bus_set), eachindex(gtbl[bkey]))
+        keep = findall(
+            i -> in(Int(gen_tbl[gen_bus_key][i]), zone_bus_set),
+            eachindex(gen_tbl[gen_bus_key]),
+        )
         sub["gencost"] = Dict{String, Any}(
-            k => v[keep] for (k, v) in data["gencost"] if length(v) == length(gtbl[bkey])
+            k => v[keep] for
+            (k, v) in data["gencost"] if length(v) == length(gen_tbl[gen_bus_key])
         )
     end
 
     if haskey(data, "gencost_timeseries")
-        keep = findall(i -> in(Int(gtbl[bkey][i]), zone_bus_set), eachindex(gtbl[bkey]))
+        keep = findall(
+            i -> in(Int(gen_tbl[gen_bus_key][i]), zone_bus_set),
+            eachindex(gen_tbl[gen_bus_key]),
+        )
         sub["gencost_timeseries"] = Dict{String, Any}(
             k => v[keep] for
-            (k, v) in data["gencost_timeseries"] if length(v) == length(gtbl[bkey])
+            (k, v) in data["gencost_timeseries"] if
+            length(v) == length(gen_tbl[gen_bus_key])
         )
     end
 
