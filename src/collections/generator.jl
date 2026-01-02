@@ -26,7 +26,6 @@ function get_generator_parameters(matpower_data::Dict{String, Any})
     gen_data = matpower_data["gen"]
 
     n = length(gen_data["gen_bus"])
-    # Concretiza tipos numéricos em Float64 (sem Vector{Any})
     pg = Float64.(gen_data["pg"])
     qg = Float64.(gen_data["qg"])
     pmin = Float64.(gen_data["pmin"])
@@ -37,7 +36,6 @@ function get_generator_parameters(matpower_data::Dict{String, Any})
     gen_status_vec = Int.(gen_data["gen_status"])
     existing = gen_status_vec .== 1
 
-    # Valores iniciais por índice de gerador (1:n), não precisa de Dict
     initial_pg = Vector{Union{Nothing, Float64}}(undef, n)
     initial_qg = Vector{Union{Nothing, Float64}}(undef, n)
 

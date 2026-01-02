@@ -18,7 +18,6 @@ struct PowerFlowData
     is_virtual::Vector{Bool}
     has_timeseries::Bool
 
-    # Agora vetores indexados por índice da barra (1:n_bus)
     bus_to_generators::Vector{Vector{Int}}
     bus_to_batteries::Vector{Vector{Int}}
     bus_to_prosumers::Vector{Vector{Int}}
