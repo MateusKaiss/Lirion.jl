@@ -362,15 +362,10 @@ function prepare_admm_partitions(data::Dict{String, Any})
 
     partitions = Dict{Int, Dict{String, Any}}()
 
-    has_branch = haskey(data, "branch")
-    if has_branch
-        branch = data["branch"]
-
-        f_bus_full = Int.(branch["f_bus"])
-        t_bus_full = Int.(branch["t_bus"])
-
-        active_mask_full = _active_mask(branch)
-    end
+    branch = data["branch"]
+    f_bus_full = Int.(branch["f_bus"])
+    t_bus_full = Int.(branch["t_bus"])
+    active_mask_full = _active_mask(branch)
 
     for zone in unique_zones
         zone_mask = findall(==(zone), zones)
@@ -379,15 +374,13 @@ function prepare_admm_partitions(data::Dict{String, Any})
         zone_bus_set = Set{Int}(zone_bus_ids)
 
         extra = Set{Int}()
-        if has_branch
-            _find_extra_neighbor_buses!(
-                extra,
-                zone_bus_set,
-                f_bus_full,
-                t_bus_full,
-                active_mask_full,
-            )
-        end
+        _find_extra_neighbor_buses!(
+            extra,
+            zone_bus_set,
+            f_bus_full,
+            t_bus_full,
+            active_mask_full,
+        )
 
         all_bus_set = union(zone_bus_set, extra)
         bus_mask = findall(b -> in(b, all_bus_set), bus_ids)
@@ -406,16 +399,14 @@ function prepare_admm_partitions(data::Dict{String, Any})
                 _filter_table_by_zone_bus(tbl, bus_key, zone_bus_set)
         end
 
-        if has_branch
-            _build_branch_sub!(
-                sub,
-                data,
-                zone_bus_set,
-                f_bus_full,
-                t_bus_full,
-                active_mask_full,
-            )
-        end
+        _build_branch_sub!(
+            sub,
+            data,
+            zone_bus_set,
+            f_bus_full,
+            t_bus_full,
+            active_mask_full,
+        )
 
         _filter_timeseries!(sub, data, zone_bus_set)
         _filter_gencosts!(sub, data, zone_bus_set)
