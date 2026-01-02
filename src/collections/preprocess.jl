@@ -170,7 +170,7 @@ end
 function _find_interzonal_branches(full::Dict{String, Any})
     zones = full["bus"]["zone"]
     bus_ids = full["bus"]["bus_i"]
-    bus2zone = Dict(bus_ids[i] => zones[i] for i in eachindex(bus_ids))
+    bus_to_zone = Dict(bus_ids[i] => zones[i] for i in eachindex(bus_ids))
 
     f_bus = full["branch"]["f_bus"]
     t_bus = full["branch"]["t_bus"]
@@ -178,13 +178,13 @@ function _find_interzonal_branches(full::Dict{String, Any})
         haskey(full["branch"], "br_status") ? full["branch"]["br_status"] :
         ones(Int, length(f_bus))
 
-    cut = Int[]
+    interzonal_branches = Int[]
     for i in eachindex(f_bus)
-        if br_status[i] == 1 && bus2zone[f_bus[i]] != bus2zone[t_bus[i]]
-            push!(cut, i)
+        if br_status[i] == 1 && bus_to_zone[f_bus[i]] != bus_to_zone[t_bus[i]]
+            push!(interzonal_branches, i)
         end
     end
-    return cut
+    return interzonal_branches
 end
 
 @inline function branch_in_service_mask(branch::AbstractDict{String, V}) where {V}
