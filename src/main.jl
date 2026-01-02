@@ -14,7 +14,7 @@ end
     if model_type isa DistributedOPFModel
         return "admm_" * string(model_type.base_model) * "_" * string(model_type.method)
     else
-        # DC/AC/SOCP (tipos)
+        # DC/AC/SOCP
         return "opf_" * lowercase(string(model_type))
     end
 end

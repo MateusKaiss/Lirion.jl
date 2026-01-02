@@ -13,10 +13,10 @@ end
 end
 
 # ------------------------------------------------------------
-# Hotpaths preparation (shared mapping)
+# Hotpaths preparation
 # ------------------------------------------------------------
 
-function _prepare_bus_maps!(part)
+@inline function _prepare_bus_maps!(part)
     ids = part.bus.id
     n_bus = length(ids)
 
@@ -30,25 +30,30 @@ function _prepare_bus_maps!(part)
         part.shared_pos_local[i] = part.bus_local_index[shared_bus_ids[i]]
     end
 
-    return n_bus, n_shared
+    return nothing
 end
 
+@inline _bus_dims(part) = (length(part.bus.id), length(part.shared_buses_local))
+
 function prepare_hotpaths!(part::PartitionDC)
-    n_bus, n_shared = _prepare_bus_maps!(part)
+    _prepare_bus_maps!(part)
+    n_bus, n_shared = _bus_dims(part)
     part.theta_buf = zeros(n_bus)
     part.theta_shared_buf = zeros(n_shared)
     return nothing
 end
 
 function prepare_hotpaths!(part::PartitionSOCP)
-    n_bus, n_shared = _prepare_bus_maps!(part)
+    _prepare_bus_maps!(part)
+    n_bus, n_shared = _bus_dims(part)
     part.v2_buf = zeros(n_bus)
     part.v2_shared_buf = zeros(n_shared)
     return nothing
 end
 
 function prepare_hotpaths!(part::PartitionAC)
-    n_bus, n_shared = _prepare_bus_maps!(part)
+    _prepare_bus_maps!(part)
+    n_bus, n_shared = _bus_dims(part)
     part.theta_buf = zeros(n_bus)
     part.vmag_buf = ones(n_bus)
     part.theta_shared_buf = zeros(n_shared)
