@@ -146,7 +146,7 @@ Base.@kwdef mutable struct PartitionSOCP
 end
 
 # =======================================================================
-# ADMM Partitions Builders
+# Utils
 # =======================================================================
 
 @inline function _require_admm_meta(s::SystemData, zone::Int)
@@ -155,6 +155,10 @@ end
         error("Missing ADMM metadata for zone=$zone (SystemData.admm === nothing).")
     return m::ADMMZoneMeta
 end
+
+# =======================================================================
+# ADMM Partitions Builders
+# =======================================================================
 
 function build_dc_partitions(sys::ADMMSystem)::Partitions{PartitionDC}
     zones = sys.zones
