@@ -232,14 +232,15 @@ function run_admm(
             part = get_partition(partitions, zone_id)
             model = part.model::JuMP.Model
 
-            lambda_z = copy_duals_to_buffer!(dual_theta_buf[zone_id], dual_theta[zone_id])
+            theta_dual_buf_z = dual_theta_buf[zone_id]
+            theta_dual_buf_z .= dual_theta[zone_id]
 
             lin = _build_linear_bus_expr(
                 part,
                 shared_buses_sorted,
                 shared_buses_to_pos,
                 theta_consensus,
-                lambda_z,
+                theta_dual_buf_z,
                 rho[],
             )
 
@@ -585,15 +586,15 @@ function run_admm(
             part = get_partition(partitions, zone_id)
             model = part.model::JuMP.Model
 
-            lambda_theta =
-                copy_duals_to_buffer!(dual_theta_buf[zone_id], duals_theta[zone_id])
+            theta_dual_buf_z = dual_theta_buf[zone_id]
+            theta_dual_buf_z .= duals_theta[zone_id]
 
             lin_bus = _build_linear_bus_expr(
                 part,
                 shared_buses_sorted,
                 shared_buses_to_pos,
                 theta_consensus,
-                lambda_theta,
+                theta_dual_buf_z,
                 rho_theta[],
             )
             lin_branch = _build_linear_branch_expr(

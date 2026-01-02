@@ -1,6 +1,41 @@
 # ============================================================
 # Adaptive rho + refreshers (ADMM)
 # ============================================================
+
+# ------------------------------------------------------------
+# DC refreshers: rebuild cached quadratic terms when rho changes
+# ------------------------------------------------------------
+
+@inline function refresh_rho_bus!(
+    partitions,
+    rho::Base.RefValue{Float64},
+    prev_rho::Base.RefValue{Float64},
+)
+    rho_val = rho[]
+    if rho_val != prev_rho[]
+        for part in values(partitions)
+            _build_quad_bus_expr!(part, rho_val)
+        end
+        prev_rho[] = rho_val
+    end
+    return nothing
+end
+
+@inline function refresh_rho_branch!(
+    partitions,
+    rho::Base.RefValue{Float64},
+    prev_rho::Base.RefValue{Float64},
+)
+    rho_val = rho[]
+    if rho_val != prev_rho[]
+        for part in values(partitions)
+            _build_quad_branch_expr!(part, rho_val, part.zone_edges)
+        end
+        prev_rho[] = rho_val
+    end
+    return nothing
+end
+
 # ------------------------------------------------------------
 # AC refreshers: rebuild cached quadratic terms when rho changes
 # ------------------------------------------------------------
@@ -41,40 +76,6 @@ end
         end
         prev_rho_p[] = rho_p_val
         prev_rho_q[] = rho_q_val
-    end
-    return nothing
-end
-
-# ------------------------------------------------------------
-# DC refreshers: rebuild cached quadratic terms when rho changes
-# ------------------------------------------------------------
-
-@inline function refresh_rho_bus!(
-    partitions,
-    rho::Base.RefValue{Float64},
-    prev_rho::Base.RefValue{Float64},
-)
-    rho_val = rho[]
-    if rho_val != prev_rho[]
-        for part in values(partitions)
-            _build_quad_bus_expr!(part, rho_val)
-        end
-        prev_rho[] = rho_val
-    end
-    return nothing
-end
-
-@inline function refresh_rho_branch!(
-    partitions,
-    rho::Base.RefValue{Float64},
-    prev_rho::Base.RefValue{Float64},
-)
-    rho_val = rho[]
-    if rho_val != prev_rho[]
-        for part in values(partitions)
-            _build_quad_branch_expr!(part, rho_val, part.zone_edges)
-        end
-        prev_rho[] = rho_val
     end
     return nothing
 end
