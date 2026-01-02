@@ -1,37 +1,62 @@
+# ============================================================
+# OPF BASE MODELS
+# ============================================================
+
 abstract type OPFModel end
 struct DC <: OPFModel end
 struct AC <: OPFModel end
 struct SOCP <: OPFModel end
+
+# ============================================================
+# ADMM VARIANTS
+# ============================================================
 
 abstract type ADMMVariant end
 struct Bus <: ADMMVariant end
 struct Branch <: ADMMVariant end
 struct Hybrid <: ADMMVariant end
 
+# ============================================================
+# OPF TAGS (TYPE-LEVEL DISPATCH)
+# ============================================================
+
 abstract type OPFTag end
 struct DCTag <: OPFTag end
 struct ACTag <: OPFTag end
 struct SOCPTag <: OPFTag end
 
+# ============================================================
+# ADMM TYPE COMBINATOR
+# ============================================================
+
 struct ADMM{V <: ADMMVariant, B <: OPFTag} end
+
+# ============================================================
+# DISTRIBUTED OPF MODEL CONFIGURATION
+# ============================================================
 
 mutable struct DistributedOPFModel
     base_model::Type{<:OPFModel}
     method::Symbol
     max_iter::Int
+
     rho_theta::Float64
     rho_v::Float64
     rho_flow_p::Float64
     rho_flow_q::Float64
+
     eps_abs::Float64
     eps_rel::Float64
+
     alpha_overrelax::Union{Nothing, Float64}
     warm_start::Bool
+
     adaptive_rho::Bool
     mu_incr::Float64
     mu_decr::Float64
     tau_incr::Float64
     tau_decr::Float64
+
     accel_nesterov::Bool
     optimizer::Any
     prefer_socp_solver::Symbol
@@ -75,16 +100,22 @@ mutable struct DistributedOPFModel
             base_model, method, Int(max_iter),
             Float64(rho_theta), Float64(rho_v),
             Float64(rho_flow_p), Float64(rho_flow_q),
-            Float64(eps_abs), Float64(eps_rel), alpha,
+            Float64(eps_abs), Float64(eps_rel),
+            alpha,
             warm_start,
             adaptive_rho,
-            Float64(mu_incr), Float64(mu_decr), Float64(tau_incr), Float64(tau_decr),
+            Float64(mu_incr), Float64(mu_decr),
+            Float64(tau_incr), Float64(tau_decr),
             accel_nesterov,
             optimizer,
             prefer_socp_solver,
         )
     end
 end
+
+# ============================================================
+# DISTRIBUTED OPF MODEL CONVENIENCE CONSTRUCTORS
+# ============================================================
 
 DistributedOPFModel(
     base_model::Type{<:OPFModel},
@@ -104,7 +135,9 @@ DistributedOPFModel(
     optimizer::Any = nothing,
     prefer_socp_solver::Symbol = :auto,
 ) = DistributedOPFModel(
-    base_model, method, max_iter, rho, rho, rho, rho, eps_abs, eps_rel;
+    base_model, method, max_iter,
+    rho, rho, rho, rho,
+    eps_abs, eps_rel;
     alpha_overrelax = alpha_overrelax,
     warm_start = warm_start,
     adaptive_rho = adaptive_rho,
@@ -158,11 +191,18 @@ DistributedOPFModel(
     prefer_socp_solver = prefer_socp_solver,
 )
 
+# ============================================================
+# MODEL TYPE CHECKS
+# ============================================================
+
 @inline is_distributed_model(::Type{<:OPFModel}) = false
 @inline is_distributed_model(::DistributedOPFModel) = true
 @inline is_centralized_model(x) = !is_distributed_model(x)
 
-# ---------- SHIM ----------
+# ============================================================
+# RHO SHIM
+# ============================================================
+
 rho(c::DistributedOPFModel) = c.rho_theta
 const rho = rho
 
@@ -183,6 +223,10 @@ Base.setproperty!(c::DistributedOPFModel, s::Symbol, v) =
 Base.propertynames(c::DistributedOPFModel, private::Bool = false) =
     (propertynames(typeof(c), private)..., :rho, :rho_flow)
 
+# ============================================================
+# SUBPROBLEM ACTIONS
+# ============================================================
+
 abstract type SubproblemAction end
 struct SubproblemBuild <: SubproblemAction end
 struct SubproblemUpdate <: SubproblemAction end
@@ -190,8 +234,11 @@ struct SubproblemGetResult <: SubproblemAction end
 struct SubproblemNameElementsDimensions <: SubproblemAction end
 struct SubproblemWriteResult <: SubproblemAction end
 
-abstract type AbstractRunDiagnostics end
+# ============================================================
+# RUN DIAGNOSTICS
+# ============================================================
 
+abstract type AbstractRunDiagnostics end
 struct NoDiagnostics <: AbstractRunDiagnostics end
 
 Base.@kwdef struct ADMMHistory <: AbstractRunDiagnostics
@@ -203,6 +250,10 @@ Base.@kwdef struct ADMMHistory <: AbstractRunDiagnostics
     heatmaps::Dict{Symbol, Any} = Dict{Symbol, Any}()
     meta::Dict{Symbol, Any} = Dict{Symbol, Any}()
 end
+
+# ============================================================
+# RUN RESULT
+# ============================================================
 
 Base.@kwdef struct LirionRunResult
     result::Any = nothing
