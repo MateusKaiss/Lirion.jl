@@ -187,7 +187,7 @@ function _find_interzonal_branches(full::Dict{String, Any})
     return cut
 end
 
-@inline function _active_mask(branch::AbstractDict{String, V}) where {V}
+@inline function branch_in_service_mask(branch::AbstractDict{String, V}) where {V}
     f = branch["f_bus"]
     br_status = haskey(branch, "br_status") ? branch["br_status"] : ones(Int, length(f))
     @assert length(br_status) == length(f)
@@ -209,10 +209,10 @@ end
     zone_bus_set::Set{Int},
     f_bus_full::AbstractVector{<:Integer},
     t_bus_full::AbstractVector{<:Integer},
-    active_mask_full::AbstractVector{Bool},
+    branch_status_mask::AbstractVector{Bool},
 )
     @inbounds for i in eachindex(f_bus_full)
-        active_mask_full[i] || continue
+        branch_status_mask[i] || continue
         f_in = in(f_bus_full[i], zone_bus_set)
         t_in = in(t_bus_full[i], zone_bus_set)
         if f_in ⊻ t_in
@@ -278,11 +278,11 @@ end
     zone_bus_set::Set{Int},
     f_bus_full::AbstractVector{<:Integer},
     t_bus_full::AbstractVector{<:Integer},
-    active_mask_full::AbstractVector{Bool},
+    branch_status_mask::AbstractVector{Bool},
 ) where {V}
     keep_all = findall(
         i ->
-            active_mask_full[i] &&
+            branch_status_mask[i] &&
                 (in(f_bus_full[i], zone_bus_set) || in(t_bus_full[i], zone_bus_set)),
         eachindex(f_bus_full),
     )
@@ -365,7 +365,7 @@ function prepare_admm_partitions(data::Dict{String, Any})
     branch = data["branch"]
     f_bus_full = Int.(branch["f_bus"])
     t_bus_full = Int.(branch["t_bus"])
-    active_mask_full = _active_mask(branch)
+    branch_status_mask = branch_in_service_mask(branch)
 
     for zone in unique_zones
         zone_mask = findall(==(zone), zones)
@@ -379,7 +379,7 @@ function prepare_admm_partitions(data::Dict{String, Any})
             zone_bus_set,
             f_bus_full,
             t_bus_full,
-            active_mask_full,
+            branch_status_mask,
         )
 
         all_bus_set = union(zone_bus_set, extra)
@@ -405,7 +405,7 @@ function prepare_admm_partitions(data::Dict{String, Any})
             zone_bus_set,
             f_bus_full,
             t_bus_full,
-            active_mask_full,
+            branch_status_mask,
         )
 
         _filter_timeseries!(sub, data, zone_bus_set)
