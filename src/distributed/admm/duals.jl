@@ -52,7 +52,7 @@ end
     rho_theta::Float64,
     rho_v_mag::Float64,
     shared_buses_sorted::Vector{Int},
-    b2pos::Dict{Int, Int};
+    shared_buses_to_pos::Dict{Int, Int};
     alpha::Union{Nothing, Float64} = nothing,
     theta_consensus_prev::Union{Nothing, Vector{Float64}} = nothing,
     v_mag_consensus_prev::Union{Nothing, Vector{Float64}} = nothing,
@@ -63,7 +63,7 @@ end
 
     if alpha === nothing
         @inbounds for i in eachindex(shared_bus_ids)
-            j = b2pos[shared_bus_ids[i]]
+            j = shared_buses_to_pos[shared_bus_ids[i]]
             dtheta = _wrap_angle_diff(thetas[i] - theta_consensus_vec[j])
             dV = (Vs[i] - v_mag_consensus_vec[j])
             duals_theta_vec_zone[j] += rho_theta * dtheta
@@ -72,7 +72,7 @@ end
     else
         alphav = something(alpha, 1.0)
         @inbounds for i in eachindex(shared_bus_ids)
-            j = b2pos[shared_bus_ids[i]]
+            j = shared_buses_to_pos[shared_bus_ids[i]]
             thetarel = _wrap_angle_diff(
                 alphav * thetas[i] + (1 - alphav) * theta_consensus_prev[j] -
                 theta_consensus_vec[j],
@@ -189,13 +189,13 @@ end
     theta_consensus_vec::Vector{Float64},
     rho::Float64,
     shared_buses_sorted::Vector{Int},
-    b2pos::Dict{Int, Int},
+    shared_buses_to_pos::Dict{Int, Int},
 )
     thetas = snapshot_theta_shared!(part)
     shared_bus_ids = part.shared_buses_zone
 
     @inbounds for i in eachindex(shared_bus_ids)
-        j = b2pos[shared_bus_ids[i]]
+        j = shared_buses_to_pos[shared_bus_ids[i]]
         dual_vec_zone[j] += rho * (thetas[i] - theta_consensus_vec[j])
     end
     return nothing
@@ -239,20 +239,20 @@ end
     rho::Float64,
     alpha::Union{Nothing, Float64},
     shared_buses_sorted::Vector{Int},
-    b2pos::Dict{Int, Int},
+    shared_buses_to_pos::Dict{Int, Int},
 )
     v2s = snapshot_v2_shared!(sub)
     shared_bus_ids = sub.shared_buses_zone
 
     if isnothing(alpha)
         @inbounds for i in eachindex(shared_bus_ids)
-            j = b2pos[shared_bus_ids[i]]
+            j = shared_buses_to_pos[shared_bus_ids[i]]
             dual_vec_zone[j] += rho * (v2s[i] - v2_consensus_vec[j])
         end
     else
         alphav = something(alpha, 1.0)
         @inbounds for i in eachindex(shared_bus_ids)
-            j = b2pos[shared_bus_ids[i]]
+            j = shared_buses_to_pos[shared_bus_ids[i]]
             v_rel = alphav * v2s[i] + (1 - alphav) * v2_consensus_prev_vec[j]
             dual_vec_zone[j] += rho * (v_rel - v2_consensus_vec[j])
         end

@@ -11,7 +11,7 @@ function primal_residual_bus_ac_vec(
     theta_consensus_vec::Vector{Float64},
     v_mag_consensus_vec::Vector{Float64},
     shared_buses_sorted::Vector{Int},
-    b2pos::Dict{Int, Int},
+    shared_buses_to_pos::Dict{Int, Int},
 )
     acc = 0.0
     for part in partitions
@@ -19,7 +19,7 @@ function primal_residual_bus_ac_vec(
         Vbuf = snapshot_v_mag!(part)
         pos = part.bus_local_index
         @inbounds for b in part.shared_buses_zone
-            j = b2pos[b]
+            j = shared_buses_to_pos[b]
             acc +=
                 _wrap_angle_diff(thetabuf[pos[b]] - theta_consensus_vec[j])^2 +
                 (Vbuf[pos[b]] - v_mag_consensus_vec[j])^2
@@ -33,7 +33,7 @@ function primal_residual_bus_ac_components(
     theta_consensus_vec::Vector{Float64},
     v_mag_consensus_vec::Vector{Float64},
     shared_buses_sorted::Vector{Int},
-    b2pos::Dict{Int, Int},
+    shared_buses_to_pos::Dict{Int, Int},
 )
     rtheta = 0.0
     rV = 0.0
@@ -42,7 +42,7 @@ function primal_residual_bus_ac_components(
         Vbuf = snapshot_v_mag!(part)
         pos = part.bus_local_index
         @inbounds for b in part.shared_buses_zone
-            j = b2pos[b]
+            j = shared_buses_to_pos[b]
             rtheta += _wrap_angle_diff(thetabuf[pos[b]] - theta_consensus_vec[j])^2
             rV += (Vbuf[pos[b]] - v_mag_consensus_vec[j])^2
         end
@@ -135,7 +135,7 @@ function eps_primal_bus_ac_vec(
     theta_consensus_vec::Vector{Float64},
     v_mag_consensus_vec::Vector{Float64},
     shared_buses_sorted::Vector{Int},
-    b2pos::Dict{Int, Int},
+    shared_buses_to_pos::Dict{Int, Int},
     eps_abs::Float64,
     eps_rel::Float64,
 )
@@ -220,14 +220,14 @@ function primal_residual_bus_dc(
     partitions::Partitions{PartitionDC},
     theta_consensus_vec::Vector{Float64},
     shared_buses_sorted::Vector{Int}, # compat (não usado)
-    b2pos::Dict{Int, Int},
+    shared_buses_to_pos::Dict{Int, Int},
 )
     acc = 0.0
     for part in partitions
         thetabuf = snapshot_theta!(part)
         pos = part.bus_local_index
         @inbounds for b in part.shared_buses_zone
-            j = b2pos[b]
+            j = shared_buses_to_pos[b]
             acc += (thetabuf[pos[b]] - theta_consensus_vec[j])^2
         end
     end
@@ -283,7 +283,7 @@ function eps_primal_bus_dc(
     partitions::Partitions{PartitionDC},
     theta_consensus_vec::Vector{Float64},
     shared_buses_sorted::Vector{Int},
-    b2pos::Dict{Int, Int},
+    shared_buses_to_pos::Dict{Int, Int},
     eps_abs::Float64,
     eps_rel::Float64,
 )
@@ -352,14 +352,14 @@ function primal_residual_bus_socp_vec(
     partitions::Partitions{PartitionSOCP},
     v2_consensus_vec::Vector{Float64},
     shared_buses_sorted::Vector{Int}, # compat (não usado)
-    b2pos::Dict{Int, Int},
+    shared_buses_to_pos::Dict{Int, Int},
 )
     acc = 0.0
     for sub in partitions
         v2buf = snapshot_v2!(sub)
         pos = sub.bus_local_index
         @inbounds for b in sub.shared_buses_zone
-            j = b2pos[b]
+            j = shared_buses_to_pos[b]
             acc += (v2buf[pos[b]] - v2_consensus_vec[j])^2
         end
     end
@@ -458,7 +458,7 @@ function eps_primal_bus_socp_vec(
     partitions::Partitions{PartitionSOCP},
     v2_consensus_vec::Vector{Float64},
     shared_buses_sorted::Vector{Int},
-    b2pos::Dict{Int, Int},
+    shared_buses_to_pos::Dict{Int, Int},
     eps_abs::Float64,
     eps_rel::Float64,
 )

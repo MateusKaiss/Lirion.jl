@@ -184,7 +184,7 @@ end
 function build_linear_bus_term(
     part::PartitionAC,
     shared_buses_sorted::Vector{Int},
-    b2pos::Dict{Int, Int},
+    shared_buses_to_pos::Dict{Int, Int},
     theta_consensus::Vector{Float64},
     v_mag_consensus::Vector{Float64},
     lambda_theta_buf::Vector{Float64},
@@ -197,7 +197,7 @@ function build_linear_bus_term(
     lin = zero(JuMP.AffExpr)
 
     @inbounds for b in part.shared_buses_zone
-        j = b2pos[b]
+        j = shared_buses_to_pos[b]
         lin += (lambda_theta_buf[j] - rho_theta * theta_consensus[j]) * theta[b, 1]
         lin += (lambda_v_buf[j] - rho_v * v_mag_consensus[j]) * v_mag[b, 1]
     end
@@ -211,7 +211,7 @@ end
 function build_linear_bus_term(
     part::PartitionDC,
     shared_buses_sorted::Vector{Int},
-    b2pos::Dict{Int, Int},
+    shared_buses_to_pos::Dict{Int, Int},
     theta_consensus::Vector{Float64},
     theta_dual_buf::Vector{Float64},
     rho_theta::Float64,
@@ -220,7 +220,7 @@ function build_linear_bus_term(
     lin = zero(JuMP.AffExpr)
 
     @inbounds for b in part.shared_buses_zone
-        j = b2pos[b]
+        j = shared_buses_to_pos[b]
         lin += (theta_dual_buf[j] - rho_theta * theta_consensus[j]) * theta[b, 1]
     end
     return lin
@@ -233,7 +233,7 @@ end
 function build_linear_bus_term(
     sub::PartitionSOCP,
     shared_buses_sorted::Vector{Int},
-    b2pos::Dict{Int, Int},
+    shared_buses_to_pos::Dict{Int, Int},
     v2_consensus::Vector{Float64},
     lambda_v2_buf::Vector{Float64},
     rho_v2::Float64,
@@ -243,7 +243,7 @@ function build_linear_bus_term(
     lin = zero(JuMP.AffExpr)
 
     @inbounds for b in sub.shared_buses_zone
-        j = b2pos[b]
+        j = shared_buses_to_pos[b]
         lin += (lambda_v2_buf[j] - rho_v2 * v2_consensus[j]) * V2[b, 1]
     end
     return lin
