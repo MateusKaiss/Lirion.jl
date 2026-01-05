@@ -360,8 +360,7 @@ end
 function run_admm(
     sys::ADMMSystem,
     config::DistributedOPFModel,
-    ::ADMM{Branch, DCTag};
-    use_legacy_rho::Bool = false,
+    ::ADMM{Branch, DCTag},
 )::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == DC "ADMM-branch/DC requer base_model == DC."
@@ -434,7 +433,7 @@ function run_admm(
             )
         end
 
-        for (i, zone_id) in enumerate(zone_ids)
+        @inbounds for (i, zone_id) in enumerate(zone_ids)
             part = get_partition(partitions, zone_id)
             out = results[i]
             part.has_solution = true
@@ -468,23 +467,7 @@ function run_admm(
             break
         end
 
-        if adaptive
-            if use_legacy_rho
-                if r > config.mu_incr * s
-                    rho[] *= config.tau_incr
-                elseif s > config.mu_decr * r
-                    rho[] *= config.tau_decr
-                end
-            else
-                adaptive_rho_dc!(
-                    rho, r, s;
-                    mu_incr = config.mu_incr,
-                    mu_decr = config.mu_decr,
-                    tau_incr = config.tau_incr,
-                    tau_decr = config.tau_decr,
-                )
-            end
-        end
+        maybe_adapt_rho!(adaptive, rho, r, s, config)
     end
 
     result = _finalize_admm_result(partitions, t0_ns, iter_done)

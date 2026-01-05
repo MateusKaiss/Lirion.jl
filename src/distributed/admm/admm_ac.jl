@@ -426,7 +426,6 @@ function run_admm(
     sys::ADMMSystem,
     config::DistributedOPFModel,
     ::ADMM{Branch, ACTag},
-    warm_start::Bool = false,
 )::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == AC "ADMM-AC-branch: base_model deve ser AC."
