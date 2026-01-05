@@ -32,7 +32,7 @@ function init_ac_bus_partition!(
         set_start_value(part.v_mag_var[I], 1.0)
     end
 
-    build_quad_bus_expr!(part, ACTag(), rho_theta, rho_v_mag)
+    build_quad_bus_expr!(part, rho_theta, rho_v_mag)
     @objective(model, Min, part.obj_base + part.quad_bus_expr_ac)
 
     return nothing
@@ -88,7 +88,7 @@ function init_ac_branch_partition!(
         set_start_value(part.v_mag_var[I], 1.0)
     end
 
-    build_quad_branch_expr!(part, ACTag(), rhoP, rhoQ, part.zone_edges)
+    build_quad_branch_expr!(part, rhoP, rhoQ, part.zone_edges)
     @objective(model, Min, part.obj_base + part.quad_branch_expr_ac)
 
     return nothing
@@ -148,8 +148,8 @@ function init_ac_hybrid_partition!(
         set_start_value(part.v_mag_var[I], 1.0)
     end
 
-    build_quad_bus_expr!(part, ACTag(), rho_theta, rho_v_mag)
-    build_quad_branch_expr!(part, ACTag(), rhoP, rhoQ, part.zone_edges)
+    build_quad_bus_expr!(part, rho_theta, rho_v_mag)
+    build_quad_branch_expr!(part, rhoP, rhoQ, part.zone_edges)
 
     @objective(
         model,
@@ -277,7 +277,6 @@ function run_admm(
 
             lin = build_linear_bus_term(
                 part,
-                ADMM{Bus, ACTag}(),
                 shared_buses_sorted,
                 shared_buses_to_pos,
                 theta_consensus,
@@ -494,7 +493,6 @@ function run_admm(
 
             lin = build_linear_branch_term(
                 part,
-                ADMM{Branch, ACTag}(),
                 part.zone_edges,
                 pflow_consensus,
                 qflow_consensus,
@@ -724,7 +722,6 @@ function run_admm(
 
             lin_bus = build_linear_bus_term(
                 part,
-                ADMM{Bus, ACTag}(),
                 shared_buses_sorted,
                 shared_buses_to_pos,
                 theta_consensus,
@@ -737,7 +734,6 @@ function run_admm(
 
             lin_br = build_linear_branch_term(
                 part,
-                ADMM{Branch, ACTag}(),
                 part.zone_edges,
                 pflow_consensus,
                 qflow_consensus,

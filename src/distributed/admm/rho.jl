@@ -18,7 +18,7 @@
 
     if (rho_theta_val != prev_rho_theta[]) || (rho_v_val != prev_rho_v[])
         @inbounds for part in partitions.parts
-            build_quad_bus_expr!(part, ACTag(), rho_theta_val, rho_v_val)
+            build_quad_bus_expr!(part, rho_theta_val, rho_v_val)
         end
         prev_rho_theta[] = rho_theta_val
         prev_rho_v[] = rho_v_val
@@ -38,7 +38,7 @@ end
 
     if (rho_p_val != prev_rho_p[]) || (rho_q_val != prev_rho_q[])
         @inbounds for part in partitions.parts
-            build_quad_branch_expr!(part, ACTag(), rho_p_val, rho_q_val, part.zone_edges)
+            build_quad_branch_expr!(part, rho_p_val, rho_q_val, part.zone_edges)
         end
         prev_rho_p[] = rho_p_val
         prev_rho_q[] = rho_q_val
@@ -58,7 +58,7 @@ end
     rho_val = rho[]
     if rho_val != prev_rho[]
         @inbounds for part in partitions.parts
-            build_quad_bus_expr!(part, DCTag(), rho_val)
+            build_quad_bus_expr!(part, rho_val)
         end
         prev_rho[] = rho_val
     end
@@ -73,7 +73,7 @@ end
     rho_val = rho[]
     if rho_val != prev_rho[]
         @inbounds for part in partitions.parts
-            build_quad_branch_expr!(part, DCTag(), rho_val, part.zone_edges)
+            build_quad_branch_expr!(part, rho_val, part.zone_edges)
         end
         prev_rho[] = rho_val
     end
@@ -92,7 +92,7 @@ end
     rho_v2_val = rhoV2[]
     if rho_v2_val != prev_rhoV2[]
         @inbounds for sub in partitions.parts
-            build_quad_bus_expr!(sub, SOCPTag(), rho_v2_val)
+            build_quad_bus_expr!(sub, rho_v2_val)
             sub.obj_static = sub.obj_base + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
         end
         prev_rhoV2[] = rho_v2_val
@@ -113,7 +113,7 @@ end
 
     if (rho_r_val != prev_rhoR[]) || (rho_t_val != prev_rhoT[])
         @inbounds for sub in partitions.parts
-            build_quad_branch_rt_expr!(sub, SOCPTag(), rho_r_val, rho_t_val, sub.zone_edges)
+            build_quad_branch_rt_expr!(sub, rho_r_val, rho_t_val, sub.zone_edges)
             sub.obj_static = sub.obj_base + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
         end
         prev_rhoR[] = rho_r_val
@@ -134,7 +134,7 @@ end
 
     if (rho_p_val != prev_rhoP[]) || (rho_q_val != prev_rhoQ[])
         @inbounds for sub in partitions.parts
-            build_quad_branch_pq_expr!(sub, SOCPTag(), rho_p_val, rho_q_val, sub.zone_edges)
+            build_quad_branch_pq_expr!(sub, rho_p_val, rho_q_val, sub.zone_edges)
             sub.obj_static = sub.obj_base + sub.quad_pq_expr_socp + sub.soft_anchor_expr
         end
         prev_rhoP[] = rho_p_val
@@ -167,12 +167,11 @@ end
        (rho_r_val != prev_rhoR[]) || (rho_t_val != prev_rhoT[])
         @inbounds for sub in partitions.parts
             (rho_v2_val != prev_rhoV2[]) &&
-                build_quad_bus_expr!(sub, SOCPTag(), rho_v2_val)
+                build_quad_bus_expr!(sub, rho_v2_val)
 
             ((rho_p_val != prev_rhoP[]) || (rho_q_val != prev_rhoQ[])) &&
                 build_quad_branch_pq_expr!(
                     sub,
-                    SOCPTag(),
                     rho_p_val,
                     rho_q_val,
                     sub.zone_edges,
@@ -181,7 +180,6 @@ end
             ((rho_r_val != prev_rhoR[]) || (rho_t_val != prev_rhoT[])) &&
                 build_quad_branch_rt_expr!(
                     sub,
-                    SOCPTag(),
                     rho_r_val,
                     rho_t_val,
                     sub.zone_edges,

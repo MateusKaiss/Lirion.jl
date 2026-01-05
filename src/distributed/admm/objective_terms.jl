@@ -11,7 +11,6 @@
 # ----------------------------
 function build_quad_bus_expr!(
     part::PartitionAC,
-    ::ACTag,
     rho_theta::Float64,
     rho_v_mag::Float64,
 )
@@ -34,7 +33,6 @@ end
 # ----------------------------
 function build_quad_bus_expr!(
     part::PartitionDC,
-    ::DCTag,
     rho_theta::Float64,
 )
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
@@ -54,7 +52,6 @@ end
 # ----------------------------
 function build_quad_bus_expr!(
     sub::PartitionSOCP,
-    ::SOCPTag,
     rho_v2::Float64,
 )
     m = sub.model::JuMP.Model
@@ -75,7 +72,6 @@ end
 # ----------------------------
 function build_quad_branch_expr!(
     part::PartitionAC,
-    ::ACTag,
     rhoP::Float64,
     rhoQ::Float64,
     zone_edges::Vector{Int},
@@ -101,7 +97,6 @@ end
 # ----------------------------
 function build_quad_branch_expr!(
     part::PartitionDC,
-    ::DCTag,
     rho_flow::Float64,
     zone_edges::Vector{Int},
 )
@@ -131,7 +126,6 @@ end
 # ----------------------------
 function build_quad_branch_rt_expr!(
     sub::PartitionSOCP,
-    ::SOCPTag,
     rhoR::Float64,
     rhoT::Float64,
     zone_edges::Vector{Int},
@@ -158,7 +152,6 @@ end
 # ----------------------------
 function build_quad_branch_pq_expr!(
     sub::PartitionSOCP,
-    ::SOCPTag,
     rhoP::Float64,
     rhoQ::Float64,
     zone_edges::Vector{Int},
@@ -190,7 +183,6 @@ end
 
 function build_linear_bus_term(
     part::PartitionAC,
-    ::ADMM{Bus, ACTag},
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
     theta_consensus::Vector{Float64},
@@ -218,7 +210,6 @@ end
 
 function build_linear_bus_term(
     part::PartitionDC,
-    ::ADMM{Bus, DCTag},
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
     theta_consensus::Vector{Float64},
@@ -241,7 +232,6 @@ end
 
 function build_linear_bus_term(
     sub::PartitionSOCP,
-    ::ADMM{Bus, SOCPTag},
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
     v2_consensus::Vector{Float64},
@@ -265,7 +255,6 @@ end
 
 function build_linear_branch_term(
     part::PartitionDC,
-    ::ADMM{Branch, DCTag},
     zone_edges::Vector{Int},
     flow_consensus::Dict{Int, Float64},
     lambda_zone::Dict{Int, Float64},
@@ -298,7 +287,6 @@ end
 
 function build_linear_branch_term(
     part::PartitionAC,
-    ::ADMM{Branch, ACTag},
     zone_edges::Vector{Int},
     p_consensus::Dict{Int, Float64},
     q_consensus::Dict{Int, Float64},
@@ -330,7 +318,6 @@ end
 # ----------------------------
 function build_linear_branch_rt_term(
     sub::PartitionSOCP,
-    ::ADMM{Branch, SOCPTag},
     zone_edges::Vector{Int},
     r_consensus::Dict{Int, Float64},
     t_consensus::Dict{Int, Float64},
@@ -359,7 +346,6 @@ end
 
 function build_linear_branch_pq_term(
     sub::PartitionSOCP,
-    ::ADMM{Branch, SOCPTag},
     zone_edges::Vector{Int},
     p_consensus::Dict{Int, Float64},
     q_consensus::Dict{Int, Float64},

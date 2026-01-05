@@ -181,7 +181,7 @@ function compute_v2_consensus_vec!(
 end
 
 # ------------------------------------------------------------
-# SOCP consensus: branch variables (Dict-based, kept for edges)
+# SOCP consensus: branch variables
 # ------------------------------------------------------------
 
 function compute_rt_consensus!(

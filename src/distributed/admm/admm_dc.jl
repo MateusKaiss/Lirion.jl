@@ -26,7 +26,7 @@ function init_dc_bus_partition!(
         set_start_value(part.theta_var[I], 0.0)
     end
 
-    build_quad_bus_expr!(part, DCTag(), rho_theta)
+    build_quad_bus_expr!(part, rho_theta)
     @objective(model, Min, part.obj_base + part.quad_bus_expr)
 
     return nothing
@@ -75,7 +75,7 @@ function init_dc_branch_partition!(
         set_start_value(part.theta_var[I], 0.0)
     end
 
-    build_quad_branch_expr!(part, DCTag(), rho, part.zone_edges)
+    build_quad_branch_expr!(part, rho, part.zone_edges)
     @objective(model, Min, part.obj_base + part.quad_branch_expr)
 
     return nothing
@@ -127,8 +127,8 @@ function init_dc_hybrid_partition!(
         set_start_value(part.theta_var[I], 0.0)
     end
 
-    build_quad_bus_expr!(part, DCTag(), rho_theta)
-    build_quad_branch_expr!(part, DCTag(), rho, part.zone_edges)
+    build_quad_bus_expr!(part, rho_theta)
+    build_quad_branch_expr!(part, rho, part.zone_edges)
 
     @objective(model, Min, part.obj_base + part.quad_bus_expr + part.quad_branch_expr)
 
@@ -237,7 +237,6 @@ function run_admm(
 
             lin = build_linear_bus_term(
                 part,
-                ADMM{Bus, DCTag}(),
                 shared_buses_sorted,
                 shared_buses_to_pos,
                 theta_consensus,
@@ -420,7 +419,6 @@ function run_admm(
 
             lin = build_linear_branch_term(
                 part,
-                ADMM{Branch, DCTag}(),
                 part.zone_edges,
                 flow_consensus,
                 duals[zone_id],
@@ -593,7 +591,6 @@ function run_admm(
 
             lin_bus = build_linear_bus_term(
                 part,
-                ADMM{Bus, DCTag}(),
                 shared_buses_sorted,
                 shared_buses_to_pos,
                 theta_consensus,
@@ -602,7 +599,6 @@ function run_admm(
             )
             lin_branch = build_linear_branch_term(
                 part,
-                ADMM{Branch, DCTag}(),
                 part.zone_edges,
                 flow_consensus,
                 duals_flow[zone_id],

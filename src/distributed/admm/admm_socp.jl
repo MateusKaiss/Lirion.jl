@@ -31,8 +31,8 @@ function init_socp_v2rt_partition!(
         set_start_value(sub.v2_var[I], 1.0)
     end
 
-    build_quad_bus_expr!(sub, SOCPTag(), rhoV2)
-    build_quad_branch_rt_expr!(sub, SOCPTag(), rhoR, rhoT, sub.zone_edges)
+    build_quad_bus_expr!(sub, rhoV2)
+    build_quad_branch_rt_expr!(sub, rhoR, rhoT, sub.zone_edges)
 
     sub.obj_static = sub.obj_base + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
     @objective(model, Min, sub.obj_static)
@@ -98,7 +98,7 @@ function init_socp_pq_partition!(
         sub.soft_anchor_expr = zero(JuMP.QuadExpr)
     end
 
-    build_quad_branch_pq_expr!(sub, SOCPTag(), rhoP, rhoQ, sub.zone_edges)
+    build_quad_branch_pq_expr!(sub, rhoP, rhoQ, sub.zone_edges)
 
     sub.obj_static = sub.obj_base + sub.quad_pq_expr_socp + sub.soft_anchor_expr
     @objective(model, Min, sub.obj_static)
@@ -158,9 +158,9 @@ function init_socp_hybrid_partition!(
         set_start_value(sub.v2_var[I], 1.0)
     end
 
-    build_quad_bus_expr!(sub, SOCPTag(), rhoV2)
-    build_quad_branch_pq_expr!(sub, SOCPTag(), rhoP, rhoQ, sub.zone_edges)
-    build_quad_branch_rt_expr!(sub, SOCPTag(), rhoR, rhoT, sub.zone_edges)
+    build_quad_bus_expr!(sub, rhoV2)
+    build_quad_branch_pq_expr!(sub, rhoP, rhoQ, sub.zone_edges)
+    build_quad_branch_rt_expr!(sub, rhoR, rhoT, sub.zone_edges)
 
     sub.obj_static =
         sub.obj_base + sub.quad_bus_expr_socp + sub.quad_pq_expr_socp +
@@ -299,7 +299,6 @@ function run_admm(
 
             lin_bus = build_linear_bus_term(
                 sub,
-                ADMM{Bus, SOCPTag}(),
                 shared_buses_sorted,
                 shared_buses_to_pos,
                 v2_consensus,
@@ -309,7 +308,6 @@ function run_admm(
 
             lin_rt = build_linear_branch_rt_term(
                 sub,
-                ADMM{Branch, SOCPTag}(),
                 sub.zone_edges,
                 rflow_consensus,
                 tflow_consensus,
@@ -535,7 +533,6 @@ function run_admm(
 
             lin = build_linear_branch_pq_term(
                 sub,
-                ADMM{Branch, SOCPTag}(),
                 sub.zone_edges,
                 pflow_consensus,
                 qflow_consensus,
@@ -768,7 +765,6 @@ function run_admm(
 
             lin_bus = build_linear_bus_term(
                 sub,
-                ADMM{Bus, SOCPTag}(),
                 shared_buses_sorted,
                 shared_buses_to_pos,
                 v2_consensus,
@@ -778,7 +774,6 @@ function run_admm(
 
             lin_pq = build_linear_branch_pq_term(
                 sub,
-                ADMM{Branch, SOCPTag}(),
                 sub.zone_edges,
                 pflow_consensus,
                 qflow_consensus,
@@ -790,7 +785,6 @@ function run_admm(
 
             lin_rt = build_linear_branch_rt_term(
                 sub,
-                ADMM{Branch, SOCPTag}(),
                 sub.zone_edges,
                 rflow_consensus,
                 tflow_consensus,
