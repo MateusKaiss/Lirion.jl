@@ -287,22 +287,32 @@ function run_admm(
         refresh_rho_rt_socp!(partitions, rhoR, prev_rhoR, rhoT, prev_rhoT)
 
         alpha_used = nothing
-        v2_target = v2_consensus
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             sub = get_partition(partitions, zone_id)
             model = sub.model::JuMP.Model
 
-            lambda_z = (dual_v2_buf[zone_id] .= duals_v2[zone_id])
+            v2_dual_buf_z = dual_v2_buf[zone_id]
+            v2_dual_buf_z .= duals_v2[zone_id]
 
             lin_bus = _build_linear_bus_expr_socp(
-                sub, shared_buses_sorted, shared_buses_to_pos, v2_target, lambda_z,
+                sub,
+                shared_buses_sorted,
+                shared_buses_to_pos,
+                v2_consensus,
+                v2_dual_buf_z,
                 rhoV2[],
             )
             lin_rt = _build_linear_branch_rt_expr(
-                sub, sub.zone_edges, rflow_consensus, tflow_consensus,
-                dualsR[zone_id], dualsT[zone_id], rhoR[], rhoT[],
+                sub,
+                sub.zone_edges,
+                rflow_consensus,
+                tflow_consensus,
+                dualsR[zone_id],
+                dualsT[zone_id],
+                rhoR[],
+                rhoT[],
             )
 
             @objective(model, Min, sub.obj_static + (lin_bus + lin_rt))
@@ -406,6 +416,7 @@ function run_admm(
             )
             hypot(epsb, epsrt)
         end
+
         eps_s = begin
             epsb = eps_dual_bus_socp_vec(v2_consensus, v2_consensus_prev, eps_abs, eps_rel)
             epsrt = eps_dual_branch_rt_socp(
@@ -736,17 +747,21 @@ function run_admm(
         )
 
         alpha_used = nothing
-        v2_target = v2_consensus
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             sub = get_partition(partitions, zone_id)
             model = sub.model::JuMP.Model
 
-            lambda_z = (dual_v2_buf[zone_id] .= duals_v2[zone_id])
+            v2_dual_buf_z = dual_v2_buf[zone_id]
+            v2_dual_buf_z .= duals_v2[zone_id]
 
             lin_bus = _build_linear_bus_expr_socp(
-                sub, shared_buses_sorted, shared_buses_to_pos, v2_target, lambda_z,
+                sub,
+                shared_buses_sorted,
+                shared_buses_to_pos,
+                v2_consensus,
+                v2_dual_buf_z,
                 rhoV2[],
             )
             lin_pq = _build_linear_branch_pq_expr(
@@ -798,8 +813,15 @@ function run_admm(
         end
 
         update_duals_v2_all!(
-            duals_v2, partitions, zone_ids, v2_consensus, v2_consensus_prev, rhoV2[],
-            alpha_used, shared_buses_sorted, shared_buses_to_pos,
+            duals_v2,
+            partitions,
+            zone_ids,
+            v2_consensus,
+            v2_consensus_prev,
+            rhoV2[],
+            alpha_used,
+            shared_buses_sorted,
+            shared_buses_to_pos,
         )
         update_duals_pq_all!(
             dualsP,
@@ -886,6 +908,7 @@ function run_admm(
             )
             sqrt(epsb^2 + epspq^2 + epsrt^2)
         end
+
         eps_s = begin
             epsb = eps_dual_bus_socp_vec(v2_consensus, v2_consensus_prev, eps_abs, eps_rel)
             epspq = eps_dual_branch_pq_socp(

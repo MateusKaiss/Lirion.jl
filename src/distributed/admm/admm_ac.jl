@@ -261,25 +261,26 @@ function run_admm(
         refresh_rho_bus_ac!(partitions, rho_theta, prev_rho_theta, rho_v, prev_rho_v)
 
         alpha_used = nothing
-        theta_target = theta_consensus
-        v_mag_target = v_mag_consensus
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             part = get_partition(partitions, zone_id)
             model = part.model::JuMP.Model
 
-            lambda_theta = (dual_theta_buf[zone_id] .= duals_theta[zone_id])
-            lambda_v = (dual_v_mag_buf[zone_id] .= duals_v_mag[zone_id])
+            theta_dual_buf_z = dual_theta_buf[zone_id]
+            v_mag_dual_buf_z = dual_v_mag_buf[zone_id]
+
+            theta_dual_buf_z .= duals_theta[zone_id]
+            v_mag_dual_buf_z .= duals_v_mag[zone_id]
 
             lin = _build_linear_bus_expr_ac!(
                 part,
                 shared_buses_sorted,
                 shared_buses_to_pos,
-                theta_target,
-                v_mag_target,
-                lambda_theta,
-                lambda_v,
+                theta_consensus,
+                v_mag_consensus,
+                theta_dual_buf_z,
+                v_mag_dual_buf_z,
                 rho_theta[],
                 rho_v[],
             )
@@ -483,8 +484,6 @@ function run_admm(
 
         refresh_rho_branch_ac!(partitions, rho_p, prev_rho_p, rho_q, prev_rho_q)
 
-        alpha_used = nothing
-
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             part = get_partition(partitions, zone_id)
@@ -537,7 +536,6 @@ function run_admm(
             interzonal_branches,
             rho_p[],
             rho_q[];
-            alpha = alpha_used,
             pflow_consensus_prev = pflow_consensus_prev,
             qflow_consensus_prev = qflow_consensus_prev,
         )
@@ -557,7 +555,11 @@ function run_admm(
         )
 
         eps_r = eps_primal_branch_ac(
-            partitions, pflow_consensus, qflow_consensus, interzonal_branches, eps_abs,
+            partitions,
+            pflow_consensus,
+            qflow_consensus,
+            interzonal_branches,
+            eps_abs,
             eps_rel,
         )
         eps_s = eps_dual_branch_ac(
@@ -687,8 +689,14 @@ function run_admm(
     )
 
     init_ac_hybrid_partition!(
-        partitions, sys, optimizer_factory,
-        rho_theta[], rho_v[], rho_p[], rho_q[], interzonal_branches,
+        partitions,
+        sys,
+        optimizer_factory,
+        rho_theta[],
+        rho_v[],
+        rho_p[],
+        rho_q[],
+        interzonal_branches,
     )
 
     iter_done = 0
@@ -700,25 +708,26 @@ function run_admm(
         refresh_rho_branch_ac!(partitions, rho_p, prev_rho_p, rho_q, prev_rho_q)
 
         alpha_used = nothing
-        theta_target = theta_consensus
-        v_mag_target = v_mag_consensus
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             part = get_partition(partitions, zone_id)
             model = part.model::JuMP.Model
 
-            lambda_theta = (dual_theta_buf[zone_id] .= duals_theta[zone_id])
-            lambda_v = (dual_v_mag_buf[zone_id] .= duals_v_mag[zone_id])
+            theta_dual_buf_z = dual_theta_buf[zone_id]
+            v_mag_dual_buf_z = dual_v_mag_buf[zone_id]
+
+            theta_dual_buf_z .= duals_theta[zone_id]
+            v_mag_dual_buf_z .= duals_v_mag[zone_id]
 
             lin_bus = _build_linear_bus_expr_ac!(
                 part,
                 shared_buses_sorted,
                 shared_buses_to_pos,
-                theta_target,
-                v_mag_target,
-                lambda_theta,
-                lambda_v,
+                theta_consensus,
+                v_mag_consensus,
+                theta_dual_buf_z,
+                v_mag_dual_buf_z,
                 rho_theta[],
                 rho_v[],
             )
@@ -812,7 +821,10 @@ function run_admm(
         )
 
         r_bus = primal_residual_bus_ac_vec(
-            partitions, theta_consensus, v_mag_consensus, shared_buses_sorted,
+            partitions,
+            theta_consensus,
+            v_mag_consensus,
+            shared_buses_sorted,
             shared_buses_to_pos,
         )
         r_br = primal_residual_branch_ac(
@@ -830,17 +842,29 @@ function run_admm(
             v_mag_consensus_prev,
         )
         s_br = dual_residual_branch_ac(
-            pflow_consensus, qflow_consensus, pflow_consensus_prev,
-            qflow_consensus_prev, interzonal_branches,
+            pflow_consensus,
+            qflow_consensus,
+            pflow_consensus_prev,
+            qflow_consensus_prev,
+            interzonal_branches,
         )
         s_tot = hypot(s_bus, s_br)
 
         eps_bus_r = eps_primal_bus_ac_vec(
-            partitions, theta_consensus, v_mag_consensus, shared_buses_sorted,
-            shared_buses_to_pos, eps_abs, eps_rel,
+            partitions,
+            theta_consensus,
+            v_mag_consensus,
+            shared_buses_sorted,
+            shared_buses_to_pos,
+            eps_abs,
+            eps_rel,
         )
         eps_br_r = eps_primal_branch_ac(
-            partitions, pflow_consensus, qflow_consensus, interzonal_branches, eps_abs,
+            partitions,
+            pflow_consensus,
+            qflow_consensus,
+            interzonal_branches,
+            eps_abs,
             eps_rel,
         )
         eps_r_tot = hypot(eps_bus_r, eps_br_r)
@@ -854,8 +878,13 @@ function run_admm(
             eps_rel,
         )
         eps_br_s = eps_dual_branch_ac(
-            pflow_consensus, qflow_consensus, pflow_consensus_prev,
-            qflow_consensus_prev, interzonal_branches, eps_abs, eps_rel,
+            pflow_consensus,
+            qflow_consensus,
+            pflow_consensus_prev,
+            qflow_consensus_prev,
+            interzonal_branches,
+            eps_abs,
+            eps_rel,
         )
         eps_s_tot = hypot(eps_bus_s, eps_br_s)
 
