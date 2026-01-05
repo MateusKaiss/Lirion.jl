@@ -7,7 +7,7 @@
 # ------------------------------------------------------------
 
 @inline function refresh_rho_bus_ac!(
-    partitions,
+    partitions::Partitions{PartitionAC},
     rho_theta::Base.RefValue{Float64},
     prev_rho_theta::Base.RefValue{Float64},
     rho_v::Base.RefValue{Float64},
@@ -17,8 +17,8 @@
     rho_v_val = rho_v[]
 
     if (rho_theta_val != prev_rho_theta[]) || (rho_v_val != prev_rho_v[])
-        for part in values(partitions)
-            _build_quad_bus_expr_ac!(part, rho_theta_val, rho_v_val)
+        @inbounds for part in partitions.parts
+            build_quad_bus_expr!(part, ACTag(), rho_theta_val, rho_v_val)
         end
         prev_rho_theta[] = rho_theta_val
         prev_rho_v[] = rho_v_val
@@ -27,7 +27,7 @@
 end
 
 @inline function refresh_rho_branch_ac!(
-    partitions,
+    partitions::Partitions{PartitionAC},
     rho_p::Base.RefValue{Float64},
     prev_rho_p::Base.RefValue{Float64},
     rho_q::Base.RefValue{Float64},
@@ -37,8 +37,8 @@ end
     rho_q_val = rho_q[]
 
     if (rho_p_val != prev_rho_p[]) || (rho_q_val != prev_rho_q[])
-        for part in values(partitions)
-            _build_quad_branch_expr_ac!(part, rho_p_val, rho_q_val, part.zone_edges)
+        @inbounds for part in partitions.parts
+            build_quad_branch_expr!(part, ACTag(), rho_p_val, rho_q_val, part.zone_edges)
         end
         prev_rho_p[] = rho_p_val
         prev_rho_q[] = rho_q_val
@@ -51,14 +51,14 @@ end
 # ------------------------------------------------------------
 
 @inline function refresh_rho_bus!(
-    partitions,
+    partitions::Partitions{PartitionDC},
     rho::Base.RefValue{Float64},
     prev_rho::Base.RefValue{Float64},
 )
     rho_val = rho[]
     if rho_val != prev_rho[]
-        for part in values(partitions)
-            _build_quad_bus_expr!(part, rho_val)
+        @inbounds for part in partitions.parts
+            build_quad_bus_expr!(part, DCTag(), rho_val)
         end
         prev_rho[] = rho_val
     end
@@ -66,14 +66,14 @@ end
 end
 
 @inline function refresh_rho_branch!(
-    partitions,
+    partitions::Partitions{PartitionDC},
     rho::Base.RefValue{Float64},
     prev_rho::Base.RefValue{Float64},
 )
     rho_val = rho[]
     if rho_val != prev_rho[]
-        for part in values(partitions)
-            _build_quad_branch_expr!(part, rho_val, part.zone_edges)
+        @inbounds for part in partitions.parts
+            build_quad_branch_expr!(part, DCTag(), rho_val, part.zone_edges)
         end
         prev_rho[] = rho_val
     end
@@ -85,14 +85,14 @@ end
 # ------------------------------------------------------------
 
 @inline function refresh_rho_v2_socp!(
-    partitions,
+    partitions::Partitions{PartitionSOCP},
     rhoV2::Base.RefValue{Float64},
     prev_rhoV2::Base.RefValue{Float64},
 )
     rho_v2_val = rhoV2[]
     if rho_v2_val != prev_rhoV2[]
-        for sub in values(partitions)
-            _build_quad_bus_expr_socp!(sub, rho_v2_val)
+        @inbounds for sub in partitions.parts
+            build_quad_bus_expr!(sub, SOCPTag(), rho_v2_val)
             sub.obj_static = sub.obj_base + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
         end
         prev_rhoV2[] = rho_v2_val
@@ -100,8 +100,9 @@ end
     return nothing
 end
 
+# v2rt: obj_static = base + bus(V2) + rt
 @inline function refresh_rho_rt_socp!(
-    partitions,
+    partitions::Partitions{PartitionSOCP},
     rhoR::Base.RefValue{Float64},
     prev_rhoR::Base.RefValue{Float64},
     rhoT::Base.RefValue{Float64},
@@ -111,8 +112,8 @@ end
     rho_t_val = rhoT[]
 
     if (rho_r_val != prev_rhoR[]) || (rho_t_val != prev_rhoT[])
-        for sub in values(partitions)
-            _build_quad_branch_rt_expr!(sub, rho_r_val, rho_t_val, sub.zone_edges)
+        @inbounds for sub in partitions.parts
+            build_quad_branch_rt_expr!(sub, SOCPTag(), rho_r_val, rho_t_val, sub.zone_edges)
             sub.obj_static = sub.obj_base + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
         end
         prev_rhoR[] = rho_r_val
@@ -122,7 +123,7 @@ end
 end
 
 @inline function refresh_rho_pq_socp!(
-    partitions,
+    partitions::Partitions{PartitionSOCP},
     rhoP::Base.RefValue{Float64},
     prev_rhoP::Base.RefValue{Float64},
     rhoQ::Base.RefValue{Float64},
@@ -132,8 +133,8 @@ end
     rho_q_val = rhoQ[]
 
     if (rho_p_val != prev_rhoP[]) || (rho_q_val != prev_rhoQ[])
-        for sub in values(partitions)
-            _build_quad_branch_pq_expr!(sub, rho_p_val, rho_q_val, sub.zone_edges)
+        @inbounds for sub in partitions.parts
+            build_quad_branch_pq_expr!(sub, SOCPTag(), rho_p_val, rho_q_val, sub.zone_edges)
             sub.obj_static = sub.obj_base + sub.quad_pq_expr_socp + sub.soft_anchor_expr
         end
         prev_rhoP[] = rho_p_val
@@ -143,7 +144,7 @@ end
 end
 
 @inline function refresh_rho_hybrid_socp!(
-    partitions,
+    partitions::Partitions{PartitionSOCP},
     rhoV2::Base.RefValue{Float64},
     prev_rhoV2::Base.RefValue{Float64},
     rhoP::Base.RefValue{Float64},
@@ -164,14 +165,27 @@ end
     if (rho_v2_val != prev_rhoV2[]) || (rho_p_val != prev_rhoP[]) ||
        (rho_q_val != prev_rhoQ[]) ||
        (rho_r_val != prev_rhoR[]) || (rho_t_val != prev_rhoT[])
-        for sub in values(partitions)
-            (rho_v2_val != prev_rhoV2[]) && _build_quad_bus_expr_socp!(sub, rho_v2_val)
+        @inbounds for sub in partitions.parts
+            (rho_v2_val != prev_rhoV2[]) &&
+                build_quad_bus_expr!(sub, SOCPTag(), rho_v2_val)
 
             ((rho_p_val != prev_rhoP[]) || (rho_q_val != prev_rhoQ[])) &&
-                _build_quad_branch_pq_expr!(sub, rho_p_val, rho_q_val, sub.zone_edges)
+                build_quad_branch_pq_expr!(
+                    sub,
+                    SOCPTag(),
+                    rho_p_val,
+                    rho_q_val,
+                    sub.zone_edges,
+                )
 
             ((rho_r_val != prev_rhoR[]) || (rho_t_val != prev_rhoT[])) &&
-                _build_quad_branch_rt_expr!(sub, rho_r_val, rho_t_val, sub.zone_edges)
+                build_quad_branch_rt_expr!(
+                    sub,
+                    SOCPTag(),
+                    rho_r_val,
+                    rho_t_val,
+                    sub.zone_edges,
+                )
 
             sub.obj_static =
                 sub.obj_base + sub.quad_bus_expr_socp + sub.quad_pq_expr_socp +
@@ -191,69 +205,60 @@ end
 # Core: adaptive rho update rule
 # ------------------------------------------------------------
 
-# ---------- rho adaptativo (paridade com DC) ----------
-function adaptive_rho!(
+@inline function adaptive_rho!(
     rho::Base.RefValue{Float64},
     r::Float64,
     s::Float64;
-    mu_incr = 2.0,
-    mu_decr = 2.0,
-    tau_incr = 1.05,
-    tau_decr = 0.98,
+    mu_incr::Float64 = 2.0,
+    mu_decr::Float64 = 2.0,
+    tau_incr::Float64 = 1.05,
+    tau_decr::Float64 = 0.98,
 )
     if r > mu_incr * s
         rho[] *= tau_incr
     elseif s > mu_decr * r
         rho[] *= tau_decr
     end
+    return nothing
 end
 
 # ------------------------------------------------------------
 # Adaptive rho kernels: AC / DC
 # ------------------------------------------------------------
 
-function adaptive_rho_ac!(
+@inline function adaptive_rho_ac!(
     rho::Base.RefValue{Float64},
     r::Float64,
     s::Float64;
-    mu_incr = 2.0,
-    mu_decr = 2.0,
-    tau_incr = 1.05,
-    tau_decr = 0.98,
+    mu_incr::Float64 = 2.0,
+    mu_decr::Float64 = 2.0,
+    tau_incr::Float64 = 1.05,
+    tau_decr::Float64 = 0.98,
 )
-    if r > mu_incr * s
-        rho[] *= tau_incr
-    elseif s > mu_decr * r
-        rho[] *= tau_decr
-    end
+    return adaptive_rho!(rho, r, s; mu_incr, mu_decr, tau_incr, tau_decr)
 end
 
-function adaptive_rho_dc!(
+@inline function adaptive_rho_dc!(
     rho::Base.RefValue{Float64},
     r::Float64,
     s::Float64;
-    mu_incr = 3.0,
-    mu_decr = 3.0,
-    tau_incr = 1.05,
-    tau_decr = 0.98,
+    mu_incr::Float64 = 3.0,
+    mu_decr::Float64 = 3.0,
+    tau_incr::Float64 = 1.05,
+    tau_decr::Float64 = 0.98,
 )
-    if r > mu_incr * s
-        rho[] *= tau_incr
-    elseif s > mu_decr * r
-        rho[] *= tau_decr
-    end
+    return adaptive_rho!(rho, r, s; mu_incr, mu_decr, tau_incr, tau_decr)
 end
 
 # ------------------------------------------------------------
 # AC adaptive rho: bus (θ,V via components) + branch (P,Q)
 # ------------------------------------------------------------
 
-# --- ADAPTIVE RHO (bus AC: θ e V separados via componentes) ---
 @inline function maybe_adapt_rho!(
     adaptive::Bool,
     rho_theta::Base.RefValue{Float64},
     rho_v::Base.RefValue{Float64},
-    partitions,
+    partitions::Partitions{PartitionAC},
     theta_consensus,
     v_mag_consensus,
     theta_consensus_prev,
@@ -278,24 +283,17 @@ end
         v_mag_consensus_prev,
     )
 
-    adaptive_rho_ac!(
-        rho_theta, rθ, sθ;
-        mu_incr = config.mu_incr,
-        mu_decr = config.mu_decr,
-        tau_incr = config.tau_incr,
-        tau_decr = config.tau_decr,
+    adaptive_rho_ac!(rho_theta, rθ, sθ;
+        mu_incr = config.mu_incr, mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr, tau_decr = config.tau_decr,
     )
-    adaptive_rho_ac!(
-        rho_v, rV, sV;
-        mu_incr = config.mu_incr,
-        mu_decr = config.mu_decr,
-        tau_incr = config.tau_incr,
-        tau_decr = config.tau_decr,
+    adaptive_rho_ac!(rho_v, rV, sV;
+        mu_incr = config.mu_incr, mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr, tau_decr = config.tau_decr,
     )
     return nothing
 end
 
-# --- ADAPTIVE RHO (branch AC/SOCP-style: usa r,s do branch pros dois) ---
 @inline function maybe_adapt_rho_socp!(
     adaptive::Bool,
     rho_p::Base.RefValue{Float64},
@@ -305,29 +303,22 @@ end
     config,
 )
     adaptive || return nothing
-    adaptive_rho_ac!(
-        rho_p, r, s;
-        mu_incr = config.mu_incr,
-        mu_decr = config.mu_decr,
-        tau_incr = config.tau_incr,
-        tau_decr = config.tau_decr,
+    adaptive_rho_ac!(rho_p, r, s;
+        mu_incr = config.mu_incr, mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr, tau_decr = config.tau_decr,
     )
-    adaptive_rho_ac!(
-        rho_q, r, s;
-        mu_incr = config.mu_incr,
-        mu_decr = config.mu_decr,
-        tau_incr = config.tau_incr,
-        tau_decr = config.tau_decr,
+    adaptive_rho_ac!(rho_q, r, s;
+        mu_incr = config.mu_incr, mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr, tau_decr = config.tau_decr,
     )
     return nothing
 end
 
-# --- ADAPTIVE RHO (hybrid AC: θ,V por componentes + P,Q via r_br,s_br) ---
 @inline function maybe_adapt_rho!(
     adaptive::Bool,
     rho_theta::Base.RefValue{Float64},
     rho_v::Base.RefValue{Float64},
-    partitions,
+    partitions::Partitions{PartitionAC},
     theta_consensus,
     v_mag_consensus,
     theta_consensus_prev,
@@ -344,19 +335,14 @@ end
 
     maybe_adapt_rho!(
         true,
-        rho_theta,
-        rho_v,
+        rho_theta, rho_v,
         partitions,
-        theta_consensus,
-        v_mag_consensus,
-        theta_consensus_prev,
-        v_mag_consensus_prev,
-        shared_buses_sorted,
-        shared_buses_to_pos,
+        theta_consensus, v_mag_consensus,
+        theta_consensus_prev, v_mag_consensus_prev,
+        shared_buses_sorted, shared_buses_to_pos,
         config,
     )
     maybe_adapt_rho_socp!(true, rho_p, rho_q, r_br, s_br, config)
-
     return nothing
 end
 
@@ -364,9 +350,8 @@ end
 # DC helpers: stop + maybe_adapt_rho overloads
 # ------------------------------------------------------------
 
-@inline function stop_if_converged!(r::Float64, s::Float64, eps_r::Float64, eps_s::Float64)
-    return (r < eps_r) && (s < eps_s)
-end
+@inline stop_if_converged!(r::Float64, s::Float64, eps_r::Float64, eps_s::Float64) =
+    (r < eps_r) && (s < eps_s)
 
 @inline function maybe_adapt_rho!(
     adaptive::Bool,
@@ -376,12 +361,9 @@ end
     config::DistributedOPFModel,
 )
     adaptive || return nothing
-    adaptive_rho_dc!(
-        rho, r, s;
-        mu_incr = config.mu_incr,
-        mu_decr = config.mu_decr,
-        tau_incr = config.tau_incr,
-        tau_decr = config.tau_decr,
+    adaptive_rho_dc!(rho, r, s;
+        mu_incr = config.mu_incr, mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr, tau_decr = config.tau_decr,
     )
     return nothing
 end
@@ -397,19 +379,13 @@ end
     config::DistributedOPFModel,
 )
     adaptive || return nothing
-    adaptive_rho_dc!(
-        rho_theta, r_bus, s_bus;
-        mu_incr = config.mu_incr,
-        mu_decr = config.mu_decr,
-        tau_incr = config.tau_incr,
-        tau_decr = config.tau_decr,
+    adaptive_rho_dc!(rho_theta, r_bus, s_bus;
+        mu_incr = config.mu_incr, mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr, tau_decr = config.tau_decr,
     )
-    adaptive_rho_dc!(
-        rho_flow, r_br, s_br;
-        mu_incr = config.mu_incr,
-        mu_decr = config.mu_decr,
-        tau_incr = config.tau_incr,
-        tau_decr = config.tau_decr,
+    adaptive_rho_dc!(rho_flow, r_br, s_br;
+        mu_incr = config.mu_incr, mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr, tau_decr = config.tau_decr,
     )
     return nothing
 end
@@ -440,26 +416,19 @@ end
     config,
 )
     adaptive || return nothing
-    adaptive_rho_dc!(
-        rhoV2, r_bus, s_bus;
-        mu_incr = config.mu_incr,
-        mu_decr = config.mu_decr,
-        tau_incr = config.tau_incr,
-        tau_decr = config.tau_decr,
+
+    adaptive_rho_dc!(rhoV2, r_bus, s_bus;
+        mu_incr = config.mu_incr, mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr, tau_decr = config.tau_decr,
     )
-    adaptive_rho_dc!(
-        rhoR, r_rt / sqrt(2), s_rt / sqrt(2);
-        mu_incr = config.mu_incr,
-        mu_decr = config.mu_decr,
-        tau_incr = config.tau_incr,
-        tau_decr = config.tau_decr,
+
+    adaptive_rho_dc!(rhoR, r_rt / sqrt(2), s_rt / sqrt(2);
+        mu_incr = config.mu_incr, mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr, tau_decr = config.tau_decr,
     )
-    adaptive_rho_dc!(
-        rhoT, r_rt / sqrt(2), s_rt / sqrt(2);
-        mu_incr = config.mu_incr,
-        mu_decr = config.mu_decr,
-        tau_incr = config.tau_incr,
-        tau_decr = config.tau_decr,
+    adaptive_rho_dc!(rhoT, r_rt / sqrt(2), s_rt / sqrt(2);
+        mu_incr = config.mu_incr, mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr, tau_decr = config.tau_decr,
     )
     return nothing
 end
@@ -473,19 +442,14 @@ end
     config,
 )
     adaptive || return nothing
-    adaptive_rho_dc!(
-        rhoP, r / sqrt(2), s / sqrt(2);
-        mu_incr = config.mu_incr,
-        mu_decr = config.mu_decr,
-        tau_incr = config.tau_incr,
-        tau_decr = config.tau_decr,
+
+    adaptive_rho_dc!(rhoP, r / sqrt(2), s / sqrt(2);
+        mu_incr = config.mu_incr, mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr, tau_decr = config.tau_decr,
     )
-    adaptive_rho_dc!(
-        rhoQ, r / sqrt(2), s / sqrt(2);
-        mu_incr = config.mu_incr,
-        mu_decr = config.mu_decr,
-        tau_incr = config.tau_incr,
-        tau_decr = config.tau_decr,
+    adaptive_rho_dc!(rhoQ, r / sqrt(2), s / sqrt(2);
+        mu_incr = config.mu_incr, mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr, tau_decr = config.tau_decr,
     )
     return nothing
 end
@@ -507,42 +471,27 @@ end
 )
     adaptive || return nothing
 
-    adaptive_rho_dc!(
-        rhoV2, r_bus, s_bus;
-        mu_incr = config.mu_incr,
-        mu_decr = config.mu_decr,
-        tau_incr = config.tau_incr,
-        tau_decr = config.tau_decr,
+    adaptive_rho_dc!(rhoV2, r_bus, s_bus;
+        mu_incr = config.mu_incr, mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr, tau_decr = config.tau_decr,
     )
 
-    adaptive_rho_dc!(
-        rhoP, r_pq / sqrt(2), s_pq / sqrt(2);
-        mu_incr = config.mu_incr,
-        mu_decr = config.mu_decr,
-        tau_incr = config.tau_incr,
-        tau_decr = config.tau_decr,
+    adaptive_rho_dc!(rhoP, r_pq / sqrt(2), s_pq / sqrt(2);
+        mu_incr = config.mu_incr, mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr, tau_decr = config.tau_decr,
     )
-    adaptive_rho_dc!(
-        rhoQ, r_pq / sqrt(2), s_pq / sqrt(2);
-        mu_incr = config.mu_incr,
-        mu_decr = config.mu_decr,
-        tau_incr = config.tau_incr,
-        tau_decr = config.tau_decr,
+    adaptive_rho_dc!(rhoQ, r_pq / sqrt(2), s_pq / sqrt(2);
+        mu_incr = config.mu_incr, mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr, tau_decr = config.tau_decr,
     )
 
-    adaptive_rho_dc!(
-        rhoR, r_rt / sqrt(2), s_rt / sqrt(2);
-        mu_incr = config.mu_incr,
-        mu_decr = config.mu_decr,
-        tau_incr = config.tau_incr,
-        tau_decr = config.tau_decr,
+    adaptive_rho_dc!(rhoR, r_rt / sqrt(2), s_rt / sqrt(2);
+        mu_incr = config.mu_incr, mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr, tau_decr = config.tau_decr,
     )
-    adaptive_rho_dc!(
-        rhoT, r_rt / sqrt(2), s_rt / sqrt(2);
-        mu_incr = config.mu_incr,
-        mu_decr = config.mu_decr,
-        tau_incr = config.tau_incr,
-        tau_decr = config.tau_decr,
+    adaptive_rho_dc!(rhoT, r_rt / sqrt(2), s_rt / sqrt(2);
+        mu_incr = config.mu_incr, mu_decr = config.mu_decr,
+        tau_incr = config.tau_incr, tau_decr = config.tau_decr,
     )
 
     return nothing

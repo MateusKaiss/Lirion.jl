@@ -31,8 +31,8 @@ function init_socp_v2rt_partition!(
         set_start_value(sub.v2_var[I], 1.0)
     end
 
-    _build_quad_bus_expr_socp!(sub, rhoV2)
-    _build_quad_branch_rt_expr!(sub, rhoR, rhoT, sub.zone_edges)
+    build_quad_bus_expr!(sub, SOCPTag(), rhoV2)
+    build_quad_branch_rt_expr!(sub, SOCPTag(), rhoR, rhoT, sub.zone_edges)
 
     sub.obj_static = sub.obj_base + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
     @objective(model, Min, sub.obj_static)
@@ -87,7 +87,7 @@ function init_socp_pq_partition!(
     sub.has_solution = false
 
     if is_gurobi(model)
-        _soft_anchor_branch_expr!(
+        soft_anchor_branch_expr!(
             sub;
             κV2 = 1e-6,
             κPQ = 1e-8,
@@ -98,7 +98,8 @@ function init_socp_pq_partition!(
         sub.soft_anchor_expr = zero(JuMP.QuadExpr)
     end
 
-    _build_quad_branch_pq_expr!(sub, rhoP, rhoQ, sub.zone_edges)
+    build_quad_branch_pq_expr!(sub, SOCPTag(), rhoP, rhoQ, sub.zone_edges)
+
     sub.obj_static = sub.obj_base + sub.quad_pq_expr_socp + sub.soft_anchor_expr
     @objective(model, Min, sub.obj_static)
     optimize!(model)
@@ -157,9 +158,9 @@ function init_socp_hybrid_partition!(
         set_start_value(sub.v2_var[I], 1.0)
     end
 
-    _build_quad_bus_expr_socp!(sub, rhoV2)
-    _build_quad_branch_pq_expr!(sub, rhoP, rhoQ, sub.zone_edges)
-    _build_quad_branch_rt_expr!(sub, rhoR, rhoT, sub.zone_edges)
+    build_quad_bus_expr!(sub, SOCPTag(), rhoV2)
+    build_quad_branch_pq_expr!(sub, SOCPTag(), rhoP, rhoQ, sub.zone_edges)
+    build_quad_branch_rt_expr!(sub, SOCPTag(), rhoR, rhoT, sub.zone_edges)
 
     sub.obj_static =
         sub.obj_base + sub.quad_bus_expr_socp + sub.quad_pq_expr_socp +
@@ -296,16 +297,19 @@ function run_admm(
             v2_dual_buf_z = dual_v2_buf[zone_id]
             v2_dual_buf_z .= duals_v2[zone_id]
 
-            lin_bus = _build_linear_bus_expr_socp(
+            lin_bus = build_linear_bus_term(
                 sub,
+                ADMM{Bus, SOCPTag}(),
                 shared_buses_sorted,
                 shared_buses_to_pos,
                 v2_consensus,
                 v2_dual_buf_z,
                 rhoV2[],
             )
-            lin_rt = _build_linear_branch_rt_expr(
+
+            lin_rt = build_linear_branch_rt_term(
                 sub,
+                ADMM{Branch, SOCPTag}(),
                 sub.zone_edges,
                 rflow_consensus,
                 tflow_consensus,
@@ -314,7 +318,6 @@ function run_admm(
                 rhoR[],
                 rhoT[],
             )
-
             @objective(model, Min, sub.obj_static + (lin_bus + lin_rt))
             optimize!(model)
 
@@ -530,9 +533,16 @@ function run_admm(
             sub = get_partition(partitions, zone_id)
             model = sub.model::JuMP.Model
 
-            lin = _build_linear_branch_pq_expr(
-                sub, sub.zone_edges, pflow_consensus, qflow_consensus,
-                dualsP[zone_id], dualsQ[zone_id], rhoP[], rhoQ[],
+            lin = build_linear_branch_pq_term(
+                sub,
+                ADMM{Branch, SOCPTag}(),
+                sub.zone_edges,
+                pflow_consensus,
+                qflow_consensus,
+                dualsP[zone_id],
+                dualsQ[zone_id],
+                rhoP[],
+                rhoQ[],
             )
 
             @objective(model, Min, sub.obj_static + lin)
@@ -756,21 +766,38 @@ function run_admm(
             v2_dual_buf_z = dual_v2_buf[zone_id]
             v2_dual_buf_z .= duals_v2[zone_id]
 
-            lin_bus = _build_linear_bus_expr_socp(
+            lin_bus = build_linear_bus_term(
                 sub,
+                ADMM{Bus, SOCPTag}(),
                 shared_buses_sorted,
                 shared_buses_to_pos,
                 v2_consensus,
                 v2_dual_buf_z,
                 rhoV2[],
             )
-            lin_pq = _build_linear_branch_pq_expr(
-                sub, sub.zone_edges, pflow_consensus, qflow_consensus,
-                dualsP[zone_id], dualsQ[zone_id], rhoP[], rhoQ[],
+
+            lin_pq = build_linear_branch_pq_term(
+                sub,
+                ADMM{Branch, SOCPTag}(),
+                sub.zone_edges,
+                pflow_consensus,
+                qflow_consensus,
+                dualsP[zone_id],
+                dualsQ[zone_id],
+                rhoP[],
+                rhoQ[],
             )
-            lin_rt = _build_linear_branch_rt_expr(
-                sub, sub.zone_edges, rflow_consensus, tflow_consensus,
-                dualsR[zone_id], dualsT[zone_id], rhoR[], rhoT[],
+
+            lin_rt = build_linear_branch_rt_term(
+                sub,
+                ADMM{Branch, SOCPTag}(),
+                sub.zone_edges,
+                rflow_consensus,
+                tflow_consensus,
+                dualsR[zone_id],
+                dualsT[zone_id],
+                rhoR[],
+                rhoT[],
             )
 
             @objective(model, Min, sub.obj_static + (lin_bus + lin_pq + lin_rt))

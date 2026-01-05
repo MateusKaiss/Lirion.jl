@@ -16,7 +16,7 @@ function primal_residual_bus_ac_vec(
     acc = 0.0
     for part in partitions
         thetabuf = snapshot_theta_ac!(part)
-        Vbuf = snapshot_vmag!(part)
+        Vbuf = snapshot_v_mag!(part)
         pos = part.bus_local_index
         @inbounds for b in part.shared_buses_zone
             j = b2pos[b]
@@ -39,7 +39,7 @@ function primal_residual_bus_ac_components(
     rV = 0.0
     for part in partitions
         thetabuf = snapshot_theta_ac!(part)
-        Vbuf = snapshot_vmag!(part)
+        Vbuf = snapshot_v_mag!(part)
         pos = part.bus_local_index
         @inbounds for b in part.shared_buses_zone
             j = b2pos[b]

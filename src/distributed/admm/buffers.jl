@@ -141,7 +141,7 @@ end
 @inline snapshot_theta_ac!(p::PartitionAC) =
     _snapshot_bus_var!(p.theta_buf, p.model, p.theta_var, p.bus.id, 0.0)
 
-@inline snapshot_vmag!(p::PartitionAC) =
+@inline snapshot_v_mag!(p::PartitionAC) =
     _snapshot_bus_var!(p.v_mag_buf, p.model, p.v_mag_var, p.bus.id, 1.0)
 
 @inline snapshot_theta_ac_shared!(p::PartitionAC) =

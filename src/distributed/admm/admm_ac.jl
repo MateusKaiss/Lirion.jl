@@ -32,7 +32,7 @@ function init_ac_bus_partition!(
         set_start_value(part.v_mag_var[I], 1.0)
     end
 
-    _build_quad_bus_expr_ac!(part, rho_theta, rho_v_mag)
+    build_quad_bus_expr!(part, ACTag(), rho_theta, rho_v_mag)
     @objective(model, Min, part.obj_base + part.quad_bus_expr_ac)
 
     return nothing
@@ -88,7 +88,7 @@ function init_ac_branch_partition!(
         set_start_value(part.v_mag_var[I], 1.0)
     end
 
-    _build_quad_branch_expr_ac!(part, rhoP, rhoQ, part.zone_edges)
+    build_quad_branch_expr!(part, ACTag(), rhoP, rhoQ, part.zone_edges)
     @objective(model, Min, part.obj_base + part.quad_branch_expr_ac)
 
     return nothing
@@ -148,10 +148,14 @@ function init_ac_hybrid_partition!(
         set_start_value(part.v_mag_var[I], 1.0)
     end
 
-    _build_quad_bus_expr_ac!(part, rho_theta, rho_v_mag)
-    _build_quad_branch_expr_ac!(part, rhoP, rhoQ, part.zone_edges)
+    build_quad_bus_expr!(part, ACTag(), rho_theta, rho_v_mag)
+    build_quad_branch_expr!(part, ACTag(), rhoP, rhoQ, part.zone_edges)
 
-    @objective(model, Min, part.obj_base + part.quad_bus_expr_ac + part.quad_branch_expr_ac)
+    @objective(
+        model,
+        Min,
+        part.obj_base + part.quad_bus_expr_ac + part.quad_branch_expr_ac,
+    )
 
     return nothing
 end
@@ -260,8 +264,6 @@ function run_admm(
 
         refresh_rho_bus_ac!(partitions, rho_theta, prev_rho_theta, rho_v, prev_rho_v)
 
-        alpha_used = nothing
-
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             part = get_partition(partitions, zone_id)
@@ -273,8 +275,9 @@ function run_admm(
             theta_dual_buf_z .= duals_theta[zone_id]
             v_mag_dual_buf_z .= duals_v_mag[zone_id]
 
-            lin = _build_linear_bus_expr_ac!(
+            lin = build_linear_bus_term(
                 part,
+                ADMM{Bus, ACTag}(),
                 shared_buses_sorted,
                 shared_buses_to_pos,
                 theta_consensus,
@@ -330,7 +333,7 @@ function run_admm(
             rho_v,
             shared_buses_sorted,
             shared_buses_to_pos;
-            alpha = alpha_used,
+            alpha = nothing,
             theta_consensus_prev = theta_consensus_prev,
             v_mag_consensus_prev = v_mag_consensus_prev,
         )
@@ -489,8 +492,9 @@ function run_admm(
             part = get_partition(partitions, zone_id)
             model = part.model::JuMP.Model
 
-            lin = _build_linear_branch_expr_ac!(
+            lin = build_linear_branch_term(
                 part,
+                ADMM{Branch, ACTag}(),
                 part.zone_edges,
                 pflow_consensus,
                 qflow_consensus,
@@ -707,8 +711,6 @@ function run_admm(
         refresh_rho_bus_ac!(partitions, rho_theta, prev_rho_theta, rho_v, prev_rho_v)
         refresh_rho_branch_ac!(partitions, rho_p, prev_rho_p, rho_q, prev_rho_q)
 
-        alpha_used = nothing
-
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             part = get_partition(partitions, zone_id)
@@ -720,8 +722,9 @@ function run_admm(
             theta_dual_buf_z .= duals_theta[zone_id]
             v_mag_dual_buf_z .= duals_v_mag[zone_id]
 
-            lin_bus = _build_linear_bus_expr_ac!(
+            lin_bus = build_linear_bus_term(
                 part,
+                ADMM{Bus, ACTag}(),
                 shared_buses_sorted,
                 shared_buses_to_pos,
                 theta_consensus,
@@ -731,8 +734,10 @@ function run_admm(
                 rho_theta[],
                 rho_v[],
             )
-            lin_br = _build_linear_branch_expr_ac!(
+
+            lin_br = build_linear_branch_term(
                 part,
+                ADMM{Branch, ACTag}(),
                 part.zone_edges,
                 pflow_consensus,
                 qflow_consensus,
@@ -801,7 +806,7 @@ function run_admm(
             rho_v,
             shared_buses_sorted,
             shared_buses_to_pos;
-            alpha = alpha_used,
+            alpha = nothing,
             theta_consensus_prev = theta_consensus_prev,
             v_mag_consensus_prev = v_mag_consensus_prev,
         )
@@ -815,7 +820,7 @@ function run_admm(
             interzonal_branches,
             rho_p[],
             rho_q[];
-            alpha = alpha_used,
+            alpha = nothing,
             pflow_consensus_prev = pflow_consensus_prev,
             qflow_consensus_prev = qflow_consensus_prev,
         )
