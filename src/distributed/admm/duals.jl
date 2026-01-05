@@ -267,7 +267,7 @@ end
     zone_ids::AbstractVector{Int},
     v2_consensus::Vector{Float64},
     v2_consensus_prev::Vector{Float64},
-    rhoV2::Float64,
+    rho_v2::Float64,
     alpha_used,
     shared_buses_sorted::AbstractVector{Int},
     shared_buses_to_pos::Dict{Int, Int},
@@ -279,7 +279,7 @@ end
             sub,
             v2_consensus,
             v2_consensus_prev,
-            rhoV2,
+            rho_v2,
             alpha_used,
             shared_buses_sorted,
             shared_buses_to_pos,
@@ -299,8 +299,8 @@ end
     zone_ids::AbstractVector{Int},
     rflow_consensus::Dict{Int, Float64},
     tflow_consensus::Dict{Int, Float64},
-    rhoR::Float64,
-    rhoT::Float64,
+    rho_r::Float64,
+    rho_t::Float64,
 )
     @inbounds for z in zone_ids
         sub = get_partition(partitions, z)
@@ -312,8 +312,8 @@ end
             l = get(sub.branch_global_to_local, e, 0)
             l == 0 && continue
             R, T = _rt_from_exprs(m, l)
-            dR[e] = get(dR, e, 0.0) + rhoR * (JuMP.value(R) - get(rflow_consensus, e, 0.0))
-            dT[e] = get(dT, e, 0.0) + rhoT * (JuMP.value(T) - get(tflow_consensus, e, 0.0))
+            dR[e] = get(dR, e, 0.0) + rho_r * (JuMP.value(R) - get(rflow_consensus, e, 0.0))
+            dT[e] = get(dT, e, 0.0) + rho_t * (JuMP.value(T) - get(tflow_consensus, e, 0.0))
         end
     end
     return nothing

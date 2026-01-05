@@ -126,8 +126,8 @@ end
 # ----------------------------
 function build_quad_branch_rt_expr!(
     sub::PartitionSOCP,
-    rhoR::Float64,
-    rhoT::Float64,
+    rho_r::Float64,
+    rho_t::Float64,
     zone_edges::Vector{Int},
 )
     m = sub.model::JuMP.Model
@@ -138,12 +138,12 @@ function build_quad_branch_rt_expr!(
         l_local === nothing && continue
 
         Rloc, Tloc = _rt_from_exprs(m, l_local)
-        quad += 0.5 * rhoR * Rloc^2 + 0.5 * rhoT * Tloc^2
+        quad += 0.5 * rho_r * Rloc^2 + 0.5 * rho_t * Tloc^2
     end
 
     sub.quad_rt_expr_socp = quad
-    sub.rho_branch_r_cached = rhoR
-    sub.rho_branch_t_cached = rhoT
+    sub.rho_branch_r_cached = rho_r
+    sub.rho_branch_t_cached = rho_t
     return quad
 end
 
@@ -323,8 +323,8 @@ function build_linear_branch_rt_term(
     t_consensus::Dict{Int, Float64},
     lambdaR_zone::Dict{Int, Float64},
     lambdaT_zone::Dict{Int, Float64},
-    rhoR::Float64,
-    rhoT::Float64,
+    rho_r::Float64,
+    rho_t::Float64,
 )::JuMP.AffExpr
     m = sub.model::JuMP.Model
     lin = zero(JuMP.AffExpr)
@@ -334,8 +334,8 @@ function build_linear_branch_rt_term(
         l_local === nothing && continue
 
         R, T = _rt_from_exprs(m, l_local)
-        lin += (get(lambdaR_zone, e, 0.0) - rhoR * get(r_consensus, e, 0.0)) * R
-        lin += (get(lambdaT_zone, e, 0.0) - rhoT * get(t_consensus, e, 0.0)) * T
+        lin += (get(lambdaR_zone, e, 0.0) - rho_r * get(r_consensus, e, 0.0)) * R
+        lin += (get(lambdaT_zone, e, 0.0) - rho_t * get(t_consensus, e, 0.0)) * T
     end
     return lin
 end

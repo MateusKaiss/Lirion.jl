@@ -188,14 +188,6 @@ end
 # API única (recomendada)
 # ----------------------------
 
-"""
-Gera plots a partir do ADMMHistory.
-
-Convenções:
-- hist.rhos pode conter chaves: :rho, :rho_theta, :rho_v, :rhoP, :rhoQ, :rhoV2, :rhoR, :rhoT...
-- hist.heatmaps pode conter: :theta_avg, :theta_local
-- hist.meta pode conter: :tag (String) ou :kind (Symbol) para nomear arquivos (opcional)
-"""
 function build_plots(hist::ADMMHistory; outdir::String = ".", stem::String = "admm")
     mkpath(outdir)
 
