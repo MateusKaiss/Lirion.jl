@@ -29,7 +29,7 @@ Base.@kwdef mutable struct PartitionDC
     gen::GenData
 
     branch_local_indices::Vector{Int} = Int[]
-    shared_buses_local::Vector{Int} = Int[]
+    shared_buses_zone::Vector{Int} = Int[]
     branch_global_to_local::Dict{Int, Int} = Dict{Int, Int}()
 
     bus_local_index::Dict{Int, Int} = Dict{Int, Int}()
@@ -64,20 +64,20 @@ Base.@kwdef mutable struct PartitionAC
     gen::GenData
 
     branch_local_indices::Vector{Int} = Int[]
-    shared_buses_local::Vector{Int} = Int[]
+    shared_buses_zone::Vector{Int} = Int[]
     branch_global_to_local::Dict{Int, Int} = Dict{Int, Int}()
 
     bus_local_index::Dict{Int, Int} = Dict{Int, Int}()
     shared_pos_local::Vector{Int} = Int[]
 
     theta_buf::Vector{Float64} = Float64[]
-    vmag_buf::Vector{Float64} = Float64[]
+    v_mag_buf::Vector{Float64} = Float64[]
     theta_shared_buf::Vector{Float64} = Float64[]
-    vmag_shared_buf::Vector{Float64} = Float64[]
+    v_mag_shared_buf::Vector{Float64} = Float64[]
 
     model::Union{Nothing, JuMP.Model} = nothing
     theta_var::Union{Nothing, JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}} = nothing
-    vmag_var::Union{Nothing, JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}} = nothing
+    v_mag_var::Union{Nothing, JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}} = nothing
 
     obj_base::Union{Nothing, Float64, JuMP.AffExpr, JuMP.QuadExpr, JuMP.NonlinearExpr} =
         nothing
@@ -107,7 +107,7 @@ Base.@kwdef mutable struct PartitionSOCP
     gen::GenData
 
     branch_local_indices::Vector{Int} = Int[]
-    shared_buses_local::Vector{Int} = Int[]
+    shared_buses_zone::Vector{Int} = Int[]
     branch_global_to_local::Dict{Int, Int} = Dict{Int, Int}()
 
     bus_local_index::Dict{Int, Int} = Dict{Int, Int}()
@@ -178,7 +178,7 @@ function build_dc_partitions(sys::ADMMSystem)::Partitions{PartitionDC}
             gen = s.gen,
             branch_local_indices = meta.branch_local_indices,
             branch_global_to_local = meta.branch_global_to_local,
-            shared_buses_local = meta.shared_buses_local,
+            shared_buses_zone = meta.shared_buses_zone,
             objective_params = s.objective,
         )
     end
@@ -204,7 +204,7 @@ function build_ac_partitions(sys::ADMMSystem)::Partitions{PartitionAC}
             gen = s.gen,
             branch_local_indices = meta.branch_local_indices,
             branch_global_to_local = meta.branch_global_to_local,
-            shared_buses_local = meta.shared_buses_local,
+            shared_buses_zone = meta.shared_buses_zone,
             objective_params = s.objective,
         )
     end
@@ -230,7 +230,7 @@ function build_socp_partitions(sys::ADMMSystem)::Partitions{PartitionSOCP}
             gen = s.gen,
             branch_local_indices = meta.branch_local_indices,
             branch_global_to_local = meta.branch_global_to_local,
-            shared_buses_local = meta.shared_buses_local,
+            shared_buses_zone = meta.shared_buses_zone,
             objective_params = s.objective,
         )
     end

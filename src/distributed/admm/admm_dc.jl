@@ -251,7 +251,7 @@ function run_admm(
             real_cost = compute_real_generation_cost(model, part.objective_params)
 
             thetas = snapshot_theta_shared!(part)
-            shared_bus_ids = part.shared_buses_local
+            shared_bus_ids = part.shared_buses_zone
             theta_snap =
                 Dict{Int, Float64}(b => thetas[j] for (j, b) in pairs(shared_bus_ids))
 

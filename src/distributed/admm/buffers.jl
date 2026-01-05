@@ -22,7 +22,7 @@ end
 
     part.bus_local_index = Dict{Int, Int}(ids[i] => i for i in 1:n_bus)
 
-    shared_bus_ids = part.shared_buses_local
+    shared_bus_ids = part.shared_buses_zone
     n_shared = length(shared_bus_ids)
 
     part.shared_pos_local = Vector{Int}(undef, n_shared)
@@ -33,7 +33,17 @@ end
     return nothing
 end
 
-@inline _bus_dims(part) = (length(part.bus.id), length(part.shared_buses_local))
+@inline _bus_dims(part) = (length(part.bus.id), length(part.shared_buses_zone))
+
+function prepare_hotpaths!(part::PartitionAC)
+    _prepare_bus_maps!(part)
+    n_bus, n_shared = _bus_dims(part)
+    part.theta_buf = zeros(n_bus)
+    part.v_mag_buf = ones(n_bus)
+    part.theta_shared_buf = zeros(n_shared)
+    part.v_mag_shared_buf = ones(n_shared)
+    return nothing
+end
 
 function prepare_hotpaths!(part::PartitionDC)
     _prepare_bus_maps!(part)
@@ -48,16 +58,6 @@ function prepare_hotpaths!(part::PartitionSOCP)
     n_bus, n_shared = _bus_dims(part)
     part.v2_buf = zeros(n_bus)
     part.v2_shared_buf = zeros(n_shared)
-    return nothing
-end
-
-function prepare_hotpaths!(part::PartitionAC)
-    _prepare_bus_maps!(part)
-    n_bus, n_shared = _bus_dims(part)
-    part.theta_buf = zeros(n_bus)
-    part.vmag_buf = ones(n_bus)
-    part.theta_shared_buf = zeros(n_shared)
-    part.vmag_shared_buf = ones(n_shared)
     return nothing
 end
 
@@ -142,7 +142,7 @@ end
     _snapshot_bus_var!(p.theta_buf, p.model, p.theta_var, p.bus.id, 0.0)
 
 @inline snapshot_vmag!(p::PartitionAC) =
-    _snapshot_bus_var!(p.vmag_buf, p.model, p.vmag_var, p.bus.id, 1.0)
+    _snapshot_bus_var!(p.v_mag_buf, p.model, p.v_mag_var, p.bus.id, 1.0)
 
 @inline snapshot_theta_ac_shared!(p::PartitionAC) =
     _snapshot_shared_var!(
@@ -150,9 +150,9 @@ end
         p.bus.id, p.shared_pos_local, 0.0,
     )
 
-@inline snapshot_vmag_shared!(p::PartitionAC) =
+@inline snapshot_v_magshared!(p::PartitionAC) =
     _snapshot_shared_var!(
-        p.vmag_shared_buf, p.model, p.vmag_var,
+        p.v_mag_shared_buf, p.model, p.v_mag_var,
         p.bus.id, p.shared_pos_local, 1.0,
     )
 

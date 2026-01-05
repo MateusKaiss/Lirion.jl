@@ -17,7 +17,7 @@ function compute_theta_consensus_vec!(
 
     for part in partitions
         thetas = snapshot_theta_shared!(part)
-        shared_bus_ids = part.shared_buses_local
+        shared_bus_ids = part.shared_buses_zone
         @inbounds for i in eachindex(shared_bus_ids)
             j = shared_buses_to_pos[shared_bus_ids[i]]
             theta_consensus_vec[j] += thetas[i]
@@ -69,13 +69,13 @@ end
 
 function compute_ac_bus_consensus_vec!(
     theta_consensus_vec::Vector{Float64},
-    vmag_consensus_vec::Vector{Float64},
+    v_mag_consensus_vec::Vector{Float64},
     partitions::Partitions{PartitionAC},
     shared_buses_sorted::Vector{Int},
     shared_buses_to_pos::Dict{Int, Int},
 )
     fill!(theta_consensus_vec, 0.0)
-    fill!(vmag_consensus_vec, 0.0)
+    fill!(v_mag_consensus_vec, 0.0)
 
     sums_sin = zeros(Float64, length(shared_buses_sorted))
     sums_cos = zeros(Float64, length(shared_buses_sorted))
@@ -83,15 +83,15 @@ function compute_ac_bus_consensus_vec!(
 
     for part in partitions
         thetas = snapshot_theta_ac_shared!(part)
-        Vs = snapshot_vmag_shared!(part)
-        shared_bus_ids = part.shared_buses_local
+        Vs = snapshot_v_magshared!(part)
+        shared_bus_ids = part.shared_buses_zone
 
         @inbounds for i in eachindex(shared_bus_ids)
             j = shared_buses_to_pos[shared_bus_ids[i]]
             s, c = sincos(thetas[i])
             sums_sin[j] += s
             sums_cos[j] += c
-            vmag_consensus_vec[j] += Vs[i]
+            v_mag_consensus_vec[j] += Vs[i]
             counts[j] += 1
         end
     end
@@ -99,7 +99,7 @@ function compute_ac_bus_consensus_vec!(
     @inbounds for j in eachindex(theta_consensus_vec)
         if counts[j] != 0
             theta_consensus_vec[j] = atan(sums_sin[j], sums_cos[j])
-            vmag_consensus_vec[j] /= counts[j]
+            v_mag_consensus_vec[j] /= counts[j]
         end
     end
     return nothing
@@ -166,7 +166,7 @@ function compute_v2_consensus_vec!(
 
     for sub in partitions
         v2s = snapshot_v2_shared!(sub)
-        shared_bus_ids = sub.shared_buses_local
+        shared_bus_ids = sub.shared_buses_zone
         @inbounds for i in eachindex(shared_bus_ids)
             j = shared_buses_to_pos[shared_bus_ids[i]]
             v2_consensus_vec[j] += v2s[i]

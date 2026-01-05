@@ -434,7 +434,7 @@ function prepare_admm_partitions(data::Dict{String, Any})
 
     for (_, sub) in partitions
         local_b = Int.(sub["bus"]["bus_i"])
-        sub["shared_buses_local"] = [b for b in local_b if in(b, shared_set)]
+        sub["shared_buses_zone"] = [b for b in local_b if in(b, shared_set)]
     end
 
     return partitions, shared_buses

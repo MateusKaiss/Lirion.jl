@@ -13,7 +13,7 @@ function init_ac_bus_partition!(
     sys_zone::SystemData,
     optimizer_factory,
     rho_theta::Float64,
-    rhoV::Float64,
+    rho_v_mag::Float64,
 )
     prepare_hotpaths!(part)
 
@@ -21,18 +21,18 @@ function init_ac_bus_partition!(
     part.model = model
     part.obj_base = model[:generation_cost]
     part.theta_var = model[:theta]
-    part.vmag_var = model[:v_magnitude]
+    part.v_mag_var = model[:v_magnitude]
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
     for I in keys(part.theta_var)
         set_start_value(part.theta_var[I], 0.0)
     end
-    for I in keys(part.vmag_var)
-        set_start_value(part.vmag_var[I], 1.0)
+    for I in keys(part.v_mag_var)
+        set_start_value(part.v_mag_var[I], 1.0)
     end
 
-    _build_quad_bus_expr_ac!(part, rho_theta, rhoV)
+    _build_quad_bus_expr_ac!(part, rho_theta, rho_v_mag)
     @objective(model, Min, part.obj_base + part.quad_bus_expr_ac)
 
     return nothing
@@ -43,7 +43,7 @@ function init_ac_bus_partition!(
     sys::ADMMSystem,
     optimizer_factory,
     rho_theta::Float64,
-    rhoV::Float64,
+    rho_v_mag::Float64,
 )
     n = length(partitions.parts)
     @assert n == length(sys.parts) == length(sys.zones)
@@ -54,7 +54,7 @@ function init_ac_bus_partition!(
             sys.parts[i],
             optimizer_factory,
             rho_theta,
-            rhoV,
+            rho_v_mag,
         )
     end
     return nothing
@@ -77,15 +77,15 @@ function init_ac_branch_partition!(
     part.model = model
     part.obj_base = model[:generation_cost]
     part.theta_var = model[:theta]
-    part.vmag_var = model[:v_magnitude]
+    part.v_mag_var = model[:v_magnitude]
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
     for I in keys(part.theta_var)
         set_start_value(part.theta_var[I], 0.0)
     end
-    for I in keys(part.vmag_var)
-        set_start_value(part.vmag_var[I], 1.0)
+    for I in keys(part.v_mag_var)
+        set_start_value(part.v_mag_var[I], 1.0)
     end
 
     _build_quad_branch_expr_ac!(part, rhoP, rhoQ, part.zone_edges)
@@ -125,7 +125,7 @@ function init_ac_hybrid_partition!(
     sys_zone::SystemData,
     optimizer_factory,
     rho_theta::Float64,
-    rhoV::Float64,
+    rho_v_mag::Float64,
     rhoP::Float64,
     rhoQ::Float64,
     interzonal_branches,
@@ -137,18 +137,18 @@ function init_ac_hybrid_partition!(
     part.model = model
     part.obj_base = model[:generation_cost]
     part.theta_var = model[:theta]
-    part.vmag_var = model[:v_magnitude]
+    part.v_mag_var = model[:v_magnitude]
     part.objective_params = sys_zone.objective
     part.has_solution = false
 
     for I in keys(part.theta_var)
         set_start_value(part.theta_var[I], 0.0)
     end
-    for I in keys(part.vmag_var)
-        set_start_value(part.vmag_var[I], 1.0)
+    for I in keys(part.v_mag_var)
+        set_start_value(part.v_mag_var[I], 1.0)
     end
 
-    _build_quad_bus_expr_ac!(part, rho_theta, rhoV)
+    _build_quad_bus_expr_ac!(part, rho_theta, rho_v_mag)
     _build_quad_branch_expr_ac!(part, rhoP, rhoQ, part.zone_edges)
 
     @objective(model, Min, part.obj_base + part.quad_bus_expr_ac + part.quad_branch_expr_ac)
@@ -161,7 +161,7 @@ function init_ac_hybrid_partition!(
     sys::ADMMSystem,
     optimizer_factory,
     rho_theta::Float64,
-    rhoV::Float64,
+    rho_v_mag::Float64,
     rhoP::Float64,
     rhoQ::Float64,
     interzonal_branches,
@@ -175,7 +175,7 @@ function init_ac_hybrid_partition!(
             sys.parts[i],
             optimizer_factory,
             rho_theta,
-            rhoV,
+            rho_v_mag,
             rhoP,
             rhoQ,
             interzonal_branches,
@@ -207,7 +207,6 @@ function run_admm(
     rho_v = Ref(config.rho_v)
     prev_rho_theta = Ref(rho_theta[])
     prev_rho_v = Ref(rho_v[])
-
     eps_abs = config.eps_abs
     eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
@@ -224,28 +223,28 @@ function run_admm(
     duals_theta = Dict{Int, Vector{Float64}}(
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
-    duals_v = Dict{Int, Vector{Float64}}(
+    duals_v_mag = Dict{Int, Vector{Float64}}(
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
 
     dual_theta_buf = Dict{Int, Vector{Float64}}(
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
-    dual_v_buf = Dict{Int, Vector{Float64}}(
+    dual_v_mag_buf = Dict{Int, Vector{Float64}}(
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
 
     theta_consensus = zeros(Float64, n_shared_buses)
-    vmag_consensus = ones(Float64, n_shared_buses)
+    v_mag_consensus = ones(Float64, n_shared_buses)
     theta_consensus_prev = similar(theta_consensus)
-    vmag_consensus_prev = similar(vmag_consensus)
+    v_mag_consensus_prev = similar(v_mag_consensus)
 
     hist = ADMMHistory()
     hist.meta[:kind] = :ac_bus
     hist.meta[:tag] = "admm_ac_bus"
 
     theta_avg_hist = Dict{Int, Vector{Float64}}()
-    vmag_avg_hist = Dict{Int, Vector{Float64}}()
+    v_mag_avg_hist = Dict{Int, Vector{Float64}}()
 
     results = Vector{NamedTuple{(:expr_cost, :real_cost), Tuple{Float64, Float64}}}(
         undef,
@@ -263,7 +262,7 @@ function run_admm(
 
         alpha_used = nothing
         theta_target = theta_consensus
-        vmag_target = vmag_consensus
+        v_mag_target = v_mag_consensus
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
@@ -271,14 +270,14 @@ function run_admm(
             model = part.model::JuMP.Model
 
             lambda_theta = (dual_theta_buf[zone_id] .= duals_theta[zone_id])
-            lambda_v = (dual_v_buf[zone_id] .= duals_v[zone_id])
+            lambda_v = (dual_v_mag_buf[zone_id] .= duals_v_mag[zone_id])
 
             lin = _build_linear_bus_expr_ac!(
                 part,
                 shared_buses_sorted,
                 shared_buses_to_pos,
                 theta_target,
-                vmag_target,
+                v_mag_target,
                 lambda_theta,
                 lambda_v,
                 rho_theta[],
@@ -303,11 +302,11 @@ function run_admm(
         end
 
         theta_consensus_prev .= theta_consensus
-        vmag_consensus_prev .= vmag_consensus
+        v_mag_consensus_prev .= v_mag_consensus
 
         compute_ac_bus_consensus_vec!(
             theta_consensus,
-            vmag_consensus,
+            v_mag_consensus,
             partitions,
             shared_buses_sorted,
             shared_buses_to_pos,
@@ -316,43 +315,43 @@ function run_admm(
         @inbounds for b in shared_buses_sorted
             j = shared_buses_to_pos[b]
             push!(get!(theta_avg_hist, b, Float64[]), theta_consensus[j])
-            push!(get!(vmag_avg_hist, b, Float64[]), vmag_consensus[j])
+            push!(get!(v_mag_avg_hist, b, Float64[]), v_mag_consensus[j])
         end
 
         update_duals_bus_ac_all!(
             duals_theta,
-            duals_v,
+            duals_v_mag,
             partitions,
             zone_ids,
             theta_consensus,
-            vmag_consensus,
+            v_mag_consensus,
             rho_theta,
             rho_v,
             shared_buses_sorted,
             shared_buses_to_pos;
             alpha = alpha_used,
             theta_consensus_prev = theta_consensus_prev,
-            vmag_consensus_prev = vmag_consensus_prev,
+            v_mag_consensus_prev = v_mag_consensus_prev,
         )
 
         r = primal_residual_bus_ac_vec(
             partitions,
             theta_consensus,
-            vmag_consensus,
+            v_mag_consensus,
             shared_buses_sorted,
             shared_buses_to_pos,
         )
         s = dual_residual_bus_ac_vec(
             theta_consensus,
-            vmag_consensus,
+            v_mag_consensus,
             theta_consensus_prev,
-            vmag_consensus_prev,
+            v_mag_consensus_prev,
         )
 
         eps_r = eps_primal_bus_ac_vec(
             partitions,
             theta_consensus,
-            vmag_consensus,
+            v_mag_consensus,
             shared_buses_sorted,
             shared_buses_to_pos,
             eps_abs,
@@ -360,9 +359,9 @@ function run_admm(
         )
         eps_s = eps_dual_bus_ac_vec(
             theta_consensus,
-            vmag_consensus,
+            v_mag_consensus,
             theta_consensus_prev,
-            vmag_consensus_prev,
+            v_mag_consensus_prev,
             eps_abs,
             eps_rel,
         )
@@ -386,9 +385,9 @@ function run_admm(
             rho_v,
             partitions,
             theta_consensus,
-            vmag_consensus,
+            v_mag_consensus,
             theta_consensus_prev,
-            vmag_consensus_prev,
+            v_mag_consensus_prev,
             shared_buses_sorted,
             shared_buses_to_pos,
             config,
@@ -396,7 +395,7 @@ function run_admm(
     end
 
     hist.heatmaps[:theta_avg] = theta_avg_hist
-    hist.heatmaps[:vmag_avg] = vmag_avg_hist
+    hist.heatmaps[:v_magavg] = v_mag_avg_hist
 
     result = _finalize_admm_result(partitions, t0_ns, iter_done)
     _print_admm_summary!(
@@ -647,14 +646,14 @@ function run_admm(
     duals_theta = Dict{Int, Vector{Float64}}(
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
-    duals_v = Dict{Int, Vector{Float64}}(
+    duals_v_mag = Dict{Int, Vector{Float64}}(
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
 
     dual_theta_buf = Dict{Int, Vector{Float64}}(
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
-    dual_v_buf = Dict{Int, Vector{Float64}}(
+    dual_v_mag_buf = Dict{Int, Vector{Float64}}(
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
 
@@ -666,9 +665,9 @@ function run_admm(
     )
 
     theta_consensus = zeros(Float64, n_shared_buses)
-    vmag_consensus = ones(Float64, n_shared_buses)
+    v_mag_consensus = ones(Float64, n_shared_buses)
     theta_consensus_prev = similar(theta_consensus)
-    vmag_consensus_prev = similar(vmag_consensus)
+    v_mag_consensus_prev = similar(v_mag_consensus)
 
     pflow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
     qflow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
@@ -680,7 +679,7 @@ function run_admm(
     hist.meta[:tag] = "admm_ac_hybrid"
 
     theta_avg_hist = Dict{Int, Vector{Float64}}()
-    vmag_avg_hist = Dict{Int, Vector{Float64}}()
+    v_mag_avg_hist = Dict{Int, Vector{Float64}}()
 
     results = Vector{NamedTuple{(:expr_cost, :real_cost), Tuple{Float64, Float64}}}(
         undef,
@@ -702,7 +701,7 @@ function run_admm(
 
         alpha_used = nothing
         theta_target = theta_consensus
-        vmag_target = vmag_consensus
+        v_mag_target = v_mag_consensus
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
@@ -710,14 +709,14 @@ function run_admm(
             model = part.model::JuMP.Model
 
             lambda_theta = (dual_theta_buf[zone_id] .= duals_theta[zone_id])
-            lambda_v = (dual_v_buf[zone_id] .= duals_v[zone_id])
+            lambda_v = (dual_v_mag_buf[zone_id] .= duals_v_mag[zone_id])
 
             lin_bus = _build_linear_bus_expr_ac!(
                 part,
                 shared_buses_sorted,
                 shared_buses_to_pos,
                 theta_target,
-                vmag_target,
+                v_mag_target,
                 lambda_theta,
                 lambda_v,
                 rho_theta[],
@@ -757,13 +756,13 @@ function run_admm(
         end
 
         theta_consensus_prev .= theta_consensus
-        vmag_consensus_prev .= vmag_consensus
+        v_mag_consensus_prev .= v_mag_consensus
         pflow_consensus_prev = copy(pflow_consensus)
         qflow_consensus_prev = copy(qflow_consensus)
 
         compute_ac_bus_consensus_vec!(
             theta_consensus,
-            vmag_consensus,
+            v_mag_consensus,
             partitions,
             shared_buses_sorted,
             shared_buses_to_pos,
@@ -772,7 +771,7 @@ function run_admm(
         @inbounds for b in shared_buses_sorted
             j = shared_buses_to_pos[b]
             push!(get!(theta_avg_hist, b, Float64[]), theta_consensus[j])
-            push!(get!(vmag_avg_hist, b, Float64[]), vmag_consensus[j])
+            push!(get!(v_mag_avg_hist, b, Float64[]), v_mag_consensus[j])
         end
 
         compute_ac_branch_consensus!(
@@ -784,18 +783,18 @@ function run_admm(
 
         update_duals_bus_ac_all!(
             duals_theta,
-            duals_v,
+            duals_v_mag,
             partitions,
             zone_ids,
             theta_consensus,
-            vmag_consensus,
+            v_mag_consensus,
             rho_theta,
             rho_v,
             shared_buses_sorted,
             shared_buses_to_pos;
             alpha = alpha_used,
             theta_consensus_prev = theta_consensus_prev,
-            vmag_consensus_prev = vmag_consensus_prev,
+            v_mag_consensus_prev = v_mag_consensus_prev,
         )
 
         update_duals_branch_ac!(
@@ -813,7 +812,7 @@ function run_admm(
         )
 
         r_bus = primal_residual_bus_ac_vec(
-            partitions, theta_consensus, vmag_consensus, shared_buses_sorted,
+            partitions, theta_consensus, v_mag_consensus, shared_buses_sorted,
             shared_buses_to_pos,
         )
         r_br = primal_residual_branch_ac(
@@ -826,9 +825,9 @@ function run_admm(
 
         s_bus = dual_residual_bus_ac_vec(
             theta_consensus,
-            vmag_consensus,
+            v_mag_consensus,
             theta_consensus_prev,
-            vmag_consensus_prev,
+            v_mag_consensus_prev,
         )
         s_br = dual_residual_branch_ac(
             pflow_consensus, qflow_consensus, pflow_consensus_prev,
@@ -837,7 +836,7 @@ function run_admm(
         s_tot = hypot(s_bus, s_br)
 
         eps_bus_r = eps_primal_bus_ac_vec(
-            partitions, theta_consensus, vmag_consensus, shared_buses_sorted,
+            partitions, theta_consensus, v_mag_consensus, shared_buses_sorted,
             shared_buses_to_pos, eps_abs, eps_rel,
         )
         eps_br_r = eps_primal_branch_ac(
@@ -848,9 +847,9 @@ function run_admm(
 
         eps_bus_s = eps_dual_bus_ac_vec(
             theta_consensus,
-            vmag_consensus,
+            v_mag_consensus,
             theta_consensus_prev,
-            vmag_consensus_prev,
+            v_mag_consensus_prev,
             eps_abs,
             eps_rel,
         )
@@ -884,9 +883,9 @@ function run_admm(
             rho_v,
             partitions,
             theta_consensus,
-            vmag_consensus,
+            v_mag_consensus,
             theta_consensus_prev,
-            vmag_consensus_prev,
+            v_mag_consensus_prev,
             shared_buses_sorted,
             shared_buses_to_pos,
             rho_p,
@@ -898,7 +897,7 @@ function run_admm(
     end
 
     hist.heatmaps[:theta_avg] = theta_avg_hist
-    hist.heatmaps[:vmag_avg] = vmag_avg_hist
+    hist.heatmaps[:v_magavg] = v_mag_avg_hist
 
     result = _finalize_admm_result(partitions, t0_ns, iter_done)
     _print_admm_summary!(

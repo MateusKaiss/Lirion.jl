@@ -3,6 +3,49 @@
 # ============================================================
 
 # ------------------------------------------------------------
+# AC terms: quadratic caches (bus / branch)
+# ------------------------------------------------------------
+
+function _build_quad_bus_expr_ac!(part::PartitionAC, rho_theta::Float64, rho_v_mag::Float64)
+    m = part.model::JuMP.Model
+    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    v_mag = part.v_mag_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    quad_bus_penalty = zero(JuMP.QuadExpr)
+
+    for b in part.shared_buses_zone
+        quad_bus_penalty +=
+            0.5 * rho_theta * theta[b, 1]^2 + 0.5 * rho_v_mag * v_mag[b, 1]^2
+    end
+
+    part.quad_bus_expr_ac = quad_bus_penalty
+    part.rho_bus_theta_cached = rho_theta
+    part.rho_bus_v_cached = rho_v_mag
+    return quad_bus_penalty
+end
+
+function _build_quad_branch_expr_ac!(
+    part::PartitionAC,
+    rhoP::Float64,
+    rhoQ::Float64,
+    zone_edges::Vector{Int},
+)
+    m = part.model::JuMP.Model
+    quad_bus_penalty = zero(JuMP.QuadExpr)
+
+    for e in zone_edges
+        l_local = get(part.branch_global_to_local, e, nothing)
+        l_local === nothing && continue
+        P_loc, Q_loc = _pq_flow_from_exprs(part, l_local)
+        quad_bus_penalty += 0.5 * rhoP * P_loc^2 + 0.5 * rhoQ * Q_loc^2
+    end
+
+    part.quad_branch_expr_ac = quad_bus_penalty
+    part.rho_branch_p_cached = rhoP
+    part.rho_branch_q_cached = rhoQ
+    return quad_bus_penalty
+end
+
+# ------------------------------------------------------------
 # DC terms: quadratic caches (bus / branch)
 # ------------------------------------------------------------
 
@@ -11,7 +54,7 @@ function _build_quad_bus_expr!(part::PartitionDC, rho_theta::Float64)
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     quad_bus_penalty = zero(JuMP.QuadExpr)
 
-    for b in part.shared_buses_local
+    for b in part.shared_buses_zone
         quad_bus_penalty += 0.5 * rho_theta * theta[b, 1]^2
     end
 
@@ -32,7 +75,7 @@ function _build_linear_bus_expr(
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     lin = zero(JuMP.AffExpr)
 
-    for b in part.shared_buses_local
+    for b in part.shared_buses_zone
         j = shared_buses_to_pos[b]
         lin += (theta_dual_buf[j] - rho * theta_consensus[j]) * theta[b, 1]
     end
@@ -95,48 +138,6 @@ function _build_linear_branch_expr(
 end
 
 # ------------------------------------------------------------
-# AC terms: quadratic caches (bus / branch)
-# ------------------------------------------------------------
-
-function _build_quad_bus_expr_ac!(part::PartitionAC, rho_theta::Float64, rhoV::Float64)
-    m = part.model::JuMP.Model
-    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
-    V = part.vmag_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
-    quad_bus_penalty = zero(JuMP.QuadExpr)
-
-    for b in part.shared_buses_local
-        quad_bus_penalty += 0.5 * rho_theta * theta[b, 1]^2 + 0.5 * rhoV * V[b, 1]^2
-    end
-
-    part.quad_bus_expr_ac = quad_bus_penalty
-    part.rho_bus_theta_cached = rho_theta
-    part.rho_bus_v_cached = rhoV
-    return quad_bus_penalty
-end
-
-function _build_quad_branch_expr_ac!(
-    part::PartitionAC,
-    rhoP::Float64,
-    rhoQ::Float64,
-    zone_edges::Vector{Int},
-)
-    m = part.model::JuMP.Model
-    quad_bus_penalty = zero(JuMP.QuadExpr)
-
-    for e in zone_edges
-        l_local = get(part.branch_global_to_local, e, nothing)
-        l_local === nothing && continue
-        P_loc, Q_loc = _pq_flow_from_exprs(part, l_local)
-        quad_bus_penalty += 0.5 * rhoP * P_loc^2 + 0.5 * rhoQ * Q_loc^2
-    end
-
-    part.quad_branch_expr_ac = quad_bus_penalty
-    part.rho_branch_p_cached = rhoP
-    part.rho_branch_q_cached = rhoQ
-    return quad_bus_penalty
-end
-
-# ------------------------------------------------------------
 # AC terms: linear terms (bus / branch)
 # ------------------------------------------------------------
 
@@ -145,21 +146,21 @@ function _build_linear_bus_expr_ac!(
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int},
     theta_consensus_vec::Vector{Float64},
-    vmag_consensus_vec::Vector{Float64},
+    v_mag_consensus_vec::Vector{Float64},
     lambda_theta_zone::Vector{Float64},
     lambda_v_zone::Vector{Float64},
     rho_theta::Float64,
-    rhoV::Float64,
+    rho_v_mag::Float64,
 )
     m = part.model::JuMP.Model
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
-    V = part.vmag_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    v_mag = part.v_mag_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     lin = zero(JuMP.AffExpr)
 
-    for b in part.shared_buses_local
+    for b in part.shared_buses_zone
         j = b2pos[b]
         lin += (lambda_theta_zone[j] - rho_theta * theta_consensus_vec[j]) * theta[b, 1]
-        lin += (lambda_v_zone[j] - rhoV * vmag_consensus_vec[j]) * V[b, 1]
+        lin += (lambda_v_zone[j] - rho_v_mag * v_mag_consensus_vec[j]) * v_mag[b, 1]
     end
 
     return lin
@@ -203,7 +204,7 @@ function _build_quad_bus_expr_socp!(sub::PartitionSOCP, rho::Float64)
     V2 = m[:v_magnitude_sq]
     quad_bus_penalty = zero(JuMP.QuadExpr)
 
-    for b in sub.shared_buses_local
+    for b in sub.shared_buses_zone
         quad_bus_penalty += 0.5 * rho * V2[b, 1]^2
     end
 
@@ -272,7 +273,7 @@ function _build_linear_bus_expr_socp(
     V2 = m[:v_magnitude_sq]
     lin = zero(JuMP.AffExpr)
 
-    for b in sub.shared_buses_local
+    for b in sub.shared_buses_zone
         j = b2pos[b]
         lin += (lambda_vec_zone[j] - rhoV2 * v2_consensus_vec[j]) * V2[b, 1]
     end

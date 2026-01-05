@@ -7,18 +7,18 @@
 # ------------------------------------------------------------
 @inline function update_duals_bus_ac_all!(
     duals_theta::Dict{Int, Vector{Float64}},
-    duals_v::Dict{Int, Vector{Float64}},
+    duals_v_mag::Dict{Int, Vector{Float64}},
     partitions::Partitions{PartitionAC},
     zone_ids::AbstractVector{Int},
     theta_consensus::Vector{Float64},
-    vmag_consensus::Vector{Float64},
+    v_mag_consensus::Vector{Float64},
     rho_theta::Base.RefValue{Float64},
     rho_v::Base.RefValue{Float64},
     shared_buses_sorted::AbstractVector{Int},
     shared_buses_to_pos::Dict{Int, Int};
     alpha = nothing,
     theta_consensus_prev = nothing,
-    vmag_consensus_prev = nothing,
+    v_mag_consensus_prev = nothing,
 )
     ρθ = rho_theta[]
     ρv = rho_v[]
@@ -27,17 +27,17 @@
         part = get_partition(partitions, z)
         update_duals_bus_ac_vec!(
             duals_theta[z],
-            duals_v[z],
+            duals_v_mag[z],
             part,
             theta_consensus,
-            vmag_consensus,
+            v_mag_consensus,
             ρθ,
             ρv,
             shared_buses_sorted,
             shared_buses_to_pos;
             alpha = alpha,
             theta_consensus_prev = theta_consensus_prev,
-            vmag_consensus_prev = vmag_consensus_prev,
+            v_mag_consensus_prev = v_mag_consensus_prev,
         )
     end
     return nothing
@@ -48,26 +48,26 @@ end
     dualsV_vec_zone::Vector{Float64},
     part::PartitionAC,
     theta_consensus_vec::Vector{Float64},
-    vmag_consensus_vec::Vector{Float64},
+    v_mag_consensus_vec::Vector{Float64},
     rho_theta::Float64,
-    rhoV::Float64,
+    rho_v_mag::Float64,
     shared_buses_sorted::Vector{Int},
     b2pos::Dict{Int, Int};
     alpha::Union{Nothing, Float64} = nothing,
     theta_consensus_prev::Union{Nothing, Vector{Float64}} = nothing,
-    vmag_consensus_prev::Union{Nothing, Vector{Float64}} = nothing,
+    v_mag_consensus_prev::Union{Nothing, Vector{Float64}} = nothing,
 )
     thetas = snapshot_theta_ac_shared!(part)
-    Vs = snapshot_vmag_shared!(part)
-    shared_bus_ids = part.shared_buses_local
+    Vs = snapshot_v_magshared!(part)
+    shared_bus_ids = part.shared_buses_zone
 
     if alpha === nothing
         @inbounds for i in eachindex(shared_bus_ids)
             j = b2pos[shared_bus_ids[i]]
             dtheta = _wrap_angle_diff(thetas[i] - theta_consensus_vec[j])
-            dV = (Vs[i] - vmag_consensus_vec[j])
+            dV = (Vs[i] - v_mag_consensus_vec[j])
             duals_theta_vec_zone[j] += rho_theta * dtheta
-            dualsV_vec_zone[j] += rhoV * dV
+            dualsV_vec_zone[j] += rho_v_mag * dV
         end
     else
         alphav = something(alpha, 1.0)
@@ -78,10 +78,10 @@ end
                 theta_consensus_vec[j],
             )
             Vrel =
-                alphav * Vs[i] + (1 - alphav) * vmag_consensus_prev[j] -
-                vmag_consensus_vec[j]
+                alphav * Vs[i] + (1 - alphav) * v_mag_consensus_prev[j] -
+                v_mag_consensus_vec[j]
             duals_theta_vec_zone[j] += rho_theta * thetarel
-            dualsV_vec_zone[j] += rhoV * Vrel
+            dualsV_vec_zone[j] += rho_v_mag * Vrel
         end
     end
 
@@ -192,7 +192,7 @@ end
     b2pos::Dict{Int, Int},
 )
     thetas = snapshot_theta_shared!(part)
-    shared_bus_ids = part.shared_buses_local
+    shared_bus_ids = part.shared_buses_zone
 
     @inbounds for i in eachindex(shared_bus_ids)
         j = b2pos[shared_bus_ids[i]]
@@ -242,7 +242,7 @@ end
     b2pos::Dict{Int, Int},
 )
     v2s = snapshot_v2_shared!(sub)
-    shared_bus_ids = sub.shared_buses_local
+    shared_bus_ids = sub.shared_buses_zone
 
     if isnothing(alpha)
         @inbounds for i in eachindex(shared_bus_ids)

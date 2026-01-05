@@ -1,7 +1,7 @@
 struct ADMMZoneMeta
     branch_local_indices::Vector{Int}
     branch_global_to_local::Dict{Int, Int}
-    shared_buses_local::Vector{Int}
+    shared_buses_zone::Vector{Int}
 end
 
 struct SystemData
