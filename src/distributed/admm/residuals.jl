@@ -52,8 +52,8 @@ end
 
 function primal_residual_branch_ac(
     partitions::Partitions{PartitionAC},
-    pflow_consensus::Dict{Int, Float64},
-    qflow_consensus::Dict{Int, Float64},
+    p_flow_consensus::Dict{Int, Float64},
+    q_flow_consensus::Dict{Int, Float64},
     interzonal_branches::Vector{Int},
 )
     acc = 0.0
@@ -67,10 +67,10 @@ function primal_residual_branch_ac(
             q = JuMP.value(Q_loc)
 
             if isfinite(p)
-                acc += (p - get(pflow_consensus, e, 0.0))^2
+                acc += (p - get(p_flow_consensus, e, 0.0))^2
             end
             if isfinite(q)
-                acc += (q - get(qflow_consensus, e, 0.0))^2
+                acc += (q - get(q_flow_consensus, e, 0.0))^2
             end
         end
     end
@@ -112,16 +112,16 @@ function dual_residual_bus_ac_components(
 end
 
 function dual_residual_branch_ac(
-    pflow_consensus::Dict{Int, Float64},
-    qflow_consensus::Dict{Int, Float64},
-    pflow_consensus_prev::Dict{Int, Float64},
-    qflow_consensus_prev::Dict{Int, Float64},
+    p_flow_consensus::Dict{Int, Float64},
+    q_flow_consensus::Dict{Int, Float64},
+    p_flow_consensus_prev::Dict{Int, Float64},
+    q_flow_consensus_prev::Dict{Int, Float64},
     interzonal_branches::Vector{Int},
 )
     s = 0.0
     @inbounds for e in interzonal_branches
-        s += (get(pflow_consensus, e, 0.0) - get(pflow_consensus_prev, e, 0.0))^2
-        s += (get(qflow_consensus, e, 0.0) - get(qflow_consensus_prev, e, 0.0))^2
+        s += (get(p_flow_consensus, e, 0.0) - get(p_flow_consensus_prev, e, 0.0))^2
+        s += (get(q_flow_consensus, e, 0.0) - get(q_flow_consensus_prev, e, 0.0))^2
     end
     return sqrt(s)
 end
@@ -154,8 +154,8 @@ end
 
 function eps_primal_branch_ac(
     partitions::Partitions{PartitionAC},
-    pflow_consensus::Dict{Int, Float64},
-    qflow_consensus::Dict{Int, Float64},
+    p_flow_consensus::Dict{Int, Float64},
+    q_flow_consensus::Dict{Int, Float64},
     interzonal_branches::Vector{Int},
     eps_abs::Float64,
     eps_rel::Float64,
@@ -168,7 +168,7 @@ function eps_primal_branch_ac(
 
     z_norm_sq = 0.0
     @inbounds for e in interzonal_branches
-        z_norm_sq += get(pflow_consensus, e, 0.0)^2 + get(qflow_consensus, e, 0.0)^2
+        z_norm_sq += get(p_flow_consensus, e, 0.0)^2 + get(q_flow_consensus, e, 0.0)^2
     end
 
     return sqrt(max(1, dim)) * eps_abs + eps_rel * max(sqrt(z_norm_sq), 1e-12)
@@ -193,20 +193,20 @@ function eps_dual_bus_ac_vec(
 end
 
 function eps_dual_branch_ac(
-    pflow_consensus::Dict{Int, Float64},
-    qflow_consensus::Dict{Int, Float64},
-    pflow_consensus_prev::Dict{Int, Float64},
-    qflow_consensus_prev::Dict{Int, Float64},
+    p_flow_consensus::Dict{Int, Float64},
+    q_flow_consensus::Dict{Int, Float64},
+    p_flow_consensus_prev::Dict{Int, Float64},
+    q_flow_consensus_prev::Dict{Int, Float64},
     interzonal_branches::Vector{Int},
     eps_abs::Float64,
     eps_rel::Float64,
 )
     dim = 2 * max(1, length(interzonal_branches))
     s = dual_residual_branch_ac(
-        pflow_consensus,
-        qflow_consensus,
-        pflow_consensus_prev,
-        qflow_consensus_prev,
+        p_flow_consensus,
+        q_flow_consensus,
+        p_flow_consensus_prev,
+        q_flow_consensus_prev,
         interzonal_branches,
     )
     return sqrt(dim) * eps_abs + eps_rel * s
@@ -368,8 +368,8 @@ end
 
 function primal_residual_branch_rt_socp(
     partitions::Partitions{PartitionSOCP},
-    rflow_consensus::Dict{Int, Float64},
-    tflow_consensus::Dict{Int, Float64},
+    r_consensus::Dict{Int, Float64},
+    t_consensus::Dict{Int, Float64},
     interzonal_branches::Vector{Int},
 )
     acc = 0.0
@@ -380,8 +380,8 @@ function primal_residual_branch_rt_socp(
             l == 0 && continue
             R, T = _rt_from_exprs(m, l, 1)
             acc +=
-                (value(R) - get(rflow_consensus, e, 0.0))^2 +
-                (value(T) - get(tflow_consensus, e, 0.0))^2
+                (value(R) - get(r_consensus, e, 0.0))^2 +
+                (value(T) - get(t_consensus, e, 0.0))^2
         end
     end
     return sqrt(acc)
@@ -389,8 +389,8 @@ end
 
 function primal_residual_branch_pq_socp(
     partitions::Partitions{PartitionSOCP},
-    pflow_consensus::Dict{Int, Float64},
-    qflow_consensus::Dict{Int, Float64},
+    p_flow_consensus::Dict{Int, Float64},
+    q_flow_consensus::Dict{Int, Float64},
     interzonal_branches::Vector{Int},
 )
     acc = 0.0
@@ -401,8 +401,8 @@ function primal_residual_branch_pq_socp(
             l == 0 && continue
             P, Q = _pq_flow_from_exprs(m, l, 1)
             acc +=
-                (value(P) - get(pflow_consensus, e, 0.0))^2 +
-                (value(Q) - get(qflow_consensus, e, 0.0))^2
+                (value(P) - get(p_flow_consensus, e, 0.0))^2 +
+                (value(Q) - get(q_flow_consensus, e, 0.0))^2
         end
     end
     return sqrt(acc)
@@ -421,31 +421,31 @@ dual_residual_bus_socp_vec(v2_consensus_vec, v2_consensus_prev_vec) =
     )
 
 dual_residual_branch_rt_socp(
-    rflow_consensus,
-    tflow_consensus,
-    rflow_consensus_prev,
-    tflow_consensus_prev,
+    r_consensus,
+    t_consensus,
+    r_consensus_prev,
+    t_consensus_prev,
     interzonal_branches,
 ) =
     sqrt(
         sum(
-            (get(rflow_consensus, e, 0.0) - get(rflow_consensus_prev, e, 0.0))^2 +
-            (get(tflow_consensus, e, 0.0) - get(tflow_consensus_prev, e, 0.0))^2
+            (get(r_consensus, e, 0.0) - get(r_consensus_prev, e, 0.0))^2 +
+            (get(t_consensus, e, 0.0) - get(t_consensus_prev, e, 0.0))^2
             for e in interzonal_branches
         ),
     )
 
 dual_residual_branch_pq_socp(
-    pflow_consensus,
-    qflow_consensus,
-    pflow_consensus_prev,
-    qflow_consensus_prev,
+    p_flow_consensus,
+    q_flow_consensus,
+    p_flow_consensus_prev,
+    q_flow_consensus_prev,
     interzonal_branches,
 ) =
     sqrt(
         sum(
-            (get(pflow_consensus, e, 0.0) - get(pflow_consensus_prev, e, 0.0))^2 +
-            (get(qflow_consensus, e, 0.0) - get(qflow_consensus_prev, e, 0.0))^2
+            (get(p_flow_consensus, e, 0.0) - get(p_flow_consensus_prev, e, 0.0))^2 +
+            (get(q_flow_consensus, e, 0.0) - get(q_flow_consensus_prev, e, 0.0))^2
             for e in interzonal_branches
         ),
     )
@@ -477,8 +477,8 @@ end
 
 function eps_primal_branch_rt_socp(
     partitions::Partitions{PartitionSOCP},
-    rflow_consensus::Dict{Int, Float64},
-    tflow_consensus::Dict{Int, Float64},
+    r_consensus::Dict{Int, Float64},
+    t_consensus::Dict{Int, Float64},
     interzonal_branches::Vector{Int},
     eps_abs::Float64,
     eps_rel::Float64,
@@ -489,15 +489,15 @@ function eps_primal_branch_rt_socp(
     end
     z_norm_sq = 0.0
     @inbounds for e in interzonal_branches
-        z_norm_sq += get(rflow_consensus, e, 0.0)^2 + get(tflow_consensus, e, 0.0)^2
+        z_norm_sq += get(r_consensus, e, 0.0)^2 + get(t_consensus, e, 0.0)^2
     end
     return sqrt(max(1, dim)) * eps_abs + eps_rel * max(sqrt(z_norm_sq), 1e-12)
 end
 
 function eps_primal_branch_pq_socp(
     partitions::Partitions{PartitionSOCP},
-    pflow_consensus::Dict{Int, Float64},
-    qflow_consensus::Dict{Int, Float64},
+    p_flow_consensus::Dict{Int, Float64},
+    q_flow_consensus::Dict{Int, Float64},
     interzonal_branches::Vector{Int},
     eps_abs::Float64,
     eps_rel::Float64,
@@ -508,7 +508,7 @@ function eps_primal_branch_pq_socp(
     end
     z_norm_sq = 0.0
     @inbounds for e in interzonal_branches
-        z_norm_sq += get(pflow_consensus, e, 0.0)^2 + get(qflow_consensus, e, 0.0)^2
+        z_norm_sq += get(p_flow_consensus, e, 0.0)^2 + get(q_flow_consensus, e, 0.0)^2
     end
     return sqrt(max(1, dim)) * eps_abs + eps_rel * max(sqrt(z_norm_sq), 1e-12)
 end
@@ -520,40 +520,40 @@ function eps_dual_bus_socp_vec(v2_consensus_vec, v2_consensus_prev_vec, eps_abs,
 end
 
 function eps_dual_branch_rt_socp(
-    rflow_consensus,
-    tflow_consensus,
-    rflow_consensus_prev,
-    tflow_consensus_prev,
+    r_consensus,
+    t_consensus,
+    r_consensus_prev,
+    t_consensus_prev,
     interzonal_branches,
     eps_abs,
     eps_rel,
 )
     dim = 2 * max(1, length(interzonal_branches))
     s = dual_residual_branch_rt_socp(
-        rflow_consensus,
-        tflow_consensus,
-        rflow_consensus_prev,
-        tflow_consensus_prev,
+        r_consensus,
+        t_consensus,
+        r_consensus_prev,
+        t_consensus_prev,
         interzonal_branches,
     )
     return sqrt(dim) * eps_abs + eps_rel * s
 end
 
 function eps_dual_branch_pq_socp(
-    pflow_consensus,
-    qflow_consensus,
-    pflow_consensus_prev,
-    qflow_consensus_prev,
+    p_flow_consensus,
+    q_flow_consensus,
+    p_flow_consensus_prev,
+    q_flow_consensus_prev,
     interzonal_branches,
     eps_abs,
     eps_rel,
 )
     dim = 2 * max(1, length(interzonal_branches))
     s = dual_residual_branch_pq_socp(
-        pflow_consensus,
-        qflow_consensus,
-        pflow_consensus_prev,
-        qflow_consensus_prev,
+        p_flow_consensus,
+        q_flow_consensus,
+        p_flow_consensus_prev,
+        q_flow_consensus_prev,
         interzonal_branches,
     )
     return sqrt(dim) * eps_abs + eps_rel * s

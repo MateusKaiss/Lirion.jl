@@ -96,14 +96,14 @@ function update_duals_branch_ac!(
     dualsP::Dict{Int, Dict{Int, Float64}},
     dualsQ::Dict{Int, Dict{Int, Float64}},
     partitions::Partitions{PartitionAC},
-    pflow_consensus::Dict{Int, Float64},
-    qflow_consensus::Dict{Int, Float64},
+    p_flow_consensus::Dict{Int, Float64},
+    q_flow_consensus::Dict{Int, Float64},
     interzonal_branches::Vector{Int},
     rhoP::Float64,
     rhoQ::Float64;
     alpha::Union{Nothing, Float64} = nothing,
-    pflow_consensus_prev::Union{Nothing, Dict{Int, Float64}} = nothing,
-    qflow_consensus_prev::Union{Nothing, Dict{Int, Float64}} = nothing,
+    p_flow_consensus_prev::Union{Nothing, Dict{Int, Float64}} = nothing,
+    q_flow_consensus_prev::Union{Nothing, Dict{Int, Float64}} = nothing,
 )
     for part in partitions
         z = part.id
@@ -122,11 +122,13 @@ function update_duals_branch_ac!(
             if alpha === nothing
                 if isfinite(pval)
                     lambdaPz[e] =
-                        get(lambdaPz, e, 0.0) + rhoP * (pval - get(pflow_consensus, e, 0.0))
+                        get(lambdaPz, e, 0.0) +
+                        rhoP * (pval - get(p_flow_consensus, e, 0.0))
                 end
                 if isfinite(qval)
                     lambdaQz[e] =
-                        get(lambdaQz, e, 0.0) + rhoQ * (qval - get(qflow_consensus, e, 0.0))
+                        get(lambdaQz, e, 0.0) +
+                        rhoQ * (qval - get(q_flow_consensus, e, 0.0))
                 end
             else
                 alphav = something(alpha, 1.0)
@@ -134,19 +136,19 @@ function update_duals_branch_ac!(
                     p_rel =
                         alphav * pval +
                         (1 - alphav) *
-                        get(pflow_consensus_prev, e, get(pflow_consensus, e, 0.0))
+                        get(p_flow_consensus_prev, e, get(p_flow_consensus, e, 0.0))
                     lambdaPz[e] =
                         get(lambdaPz, e, 0.0) +
-                        rhoP * (p_rel - get(pflow_consensus, e, 0.0))
+                        rhoP * (p_rel - get(p_flow_consensus, e, 0.0))
                 end
                 if isfinite(qval)
                     q_rel =
                         alphav * qval +
                         (1 - alphav) *
-                        get(qflow_consensus_prev, e, get(qflow_consensus, e, 0.0))
+                        get(q_flow_consensus_prev, e, get(q_flow_consensus, e, 0.0))
                     lambdaQz[e] =
                         get(lambdaQz, e, 0.0) +
-                        rhoQ * (q_rel - get(qflow_consensus, e, 0.0))
+                        rhoQ * (q_rel - get(q_flow_consensus, e, 0.0))
                 end
             end
         end
@@ -293,27 +295,27 @@ end
 # ------------------------------------------------------------
 
 @inline function update_duals_rt_all!(
-    dualsR::Dict{Int, Dict{Int, Float64}},
-    dualsT::Dict{Int, Dict{Int, Float64}},
+    duals_r::Dict{Int, Dict{Int, Float64}},
+    duals_t::Dict{Int, Dict{Int, Float64}},
     partitions::Partitions{PartitionSOCP},
     zone_ids::AbstractVector{Int},
-    rflow_consensus::Dict{Int, Float64},
-    tflow_consensus::Dict{Int, Float64},
+    r_consensus::Dict{Int, Float64},
+    t_consensus::Dict{Int, Float64},
     rho_r::Float64,
     rho_t::Float64,
 )
     @inbounds for z in zone_ids
         sub = get_partition(partitions, z)
         m = sub.model::JuMP.Model
-        dR = get!(dualsR, z, Dict{Int, Float64}())
-        dT = get!(dualsT, z, Dict{Int, Float64}())
+        dR = get!(duals_r, z, Dict{Int, Float64}())
+        dT = get!(duals_t, z, Dict{Int, Float64}())
 
         @inbounds for e in sub.zone_edges
             l = get(sub.branch_global_to_local, e, 0)
             l == 0 && continue
             R, T = _rt_from_exprs(m, l)
-            dR[e] = get(dR, e, 0.0) + rho_r * (JuMP.value(R) - get(rflow_consensus, e, 0.0))
-            dT[e] = get(dT, e, 0.0) + rho_t * (JuMP.value(T) - get(tflow_consensus, e, 0.0))
+            dR[e] = get(dR, e, 0.0) + rho_r * (JuMP.value(R) - get(r_consensus, e, 0.0))
+            dT[e] = get(dT, e, 0.0) + rho_t * (JuMP.value(T) - get(t_consensus, e, 0.0))
         end
     end
     return nothing
@@ -328,8 +330,8 @@ end
     dualsQ::Dict{Int, Dict{Int, Float64}},
     partitions::Partitions{PartitionSOCP},
     zone_ids::AbstractVector{Int},
-    pflow_consensus::Dict{Int, Float64},
-    qflow_consensus::Dict{Int, Float64},
+    p_flow_consensus::Dict{Int, Float64},
+    q_flow_consensus::Dict{Int, Float64},
     rhoP::Float64,
     rhoQ::Float64,
 )
@@ -343,8 +345,8 @@ end
             l = get(sub.branch_global_to_local, e, 0)
             l == 0 && continue
             P, Q = _pq_flow_from_exprs(m, l)
-            dP[e] = get(dP, e, 0.0) + rhoP * (JuMP.value(P) - get(pflow_consensus, e, 0.0))
-            dQ[e] = get(dQ, e, 0.0) + rhoQ * (JuMP.value(Q) - get(qflow_consensus, e, 0.0))
+            dP[e] = get(dP, e, 0.0) + rhoP * (JuMP.value(P) - get(p_flow_consensus, e, 0.0))
+            dQ[e] = get(dQ, e, 0.0) + rhoQ * (JuMP.value(Q) - get(q_flow_consensus, e, 0.0))
         end
     end
     return nothing

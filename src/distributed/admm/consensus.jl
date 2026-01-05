@@ -110,8 +110,8 @@ end
 # ------------------------------------------------------------
 
 function compute_ac_branch_consensus!(
-    pflow_consensus::Dict{Int, Float64},
-    qflow_consensus::Dict{Int, Float64},
+    p_flow_consensus::Dict{Int, Float64},
+    q_flow_consensus::Dict{Int, Float64},
     partitions::Partitions{PartitionAC},
     interzonal_branches::Vector{Int},
 )
@@ -144,8 +144,8 @@ function compute_ac_branch_consensus!(
     @inbounds for e in interzonal_branches
         nP = get(cntsP, e, 0)
         nQ = get(cntsQ, e, 0)
-        nP > 0 && (pflow_consensus[e] = sumsP[e] / nP)
-        nQ > 0 && (qflow_consensus[e] = sumsQ[e] / nQ)
+        nP > 0 && (p_flow_consensus[e] = sumsP[e] / nP)
+        nQ > 0 && (q_flow_consensus[e] = sumsQ[e] / nQ)
     end
 
     return nothing
@@ -185,8 +185,8 @@ end
 # ------------------------------------------------------------
 
 function compute_rt_consensus!(
-    rflow_consensus::Dict{Int, Float64},
-    tflow_consensus::Dict{Int, Float64},
+    r_consensus::Dict{Int, Float64},
+    t_consensus::Dict{Int, Float64},
     partitions::Partitions{PartitionSOCP},
     interzonal_branches::Vector{Int},
 )
@@ -209,16 +209,16 @@ function compute_rt_consensus!(
     @inbounds for e in interzonal_branches
         n = get(cnts, e, 0)
         if n > 0
-            rflow_consensus[e] = sumsR[e] / n
-            tflow_consensus[e] = sumsT[e] / n
+            r_consensus[e] = sumsR[e] / n
+            t_consensus[e] = sumsT[e] / n
         end
     end
     return nothing
 end
 
 function compute_pq_consensus!(
-    pflow_consensus::Dict{Int, Float64},
-    qflow_consensus::Dict{Int, Float64},
+    p_flow_consensus::Dict{Int, Float64},
+    q_flow_consensus::Dict{Int, Float64},
     partitions::Partitions{PartitionSOCP},
     interzonal_branches::Vector{Int},
 )
@@ -241,8 +241,8 @@ function compute_pq_consensus!(
     @inbounds for e in interzonal_branches
         n = get(cnts, e, 0)
         if n > 0
-            pflow_consensus[e] = sumsP[e] / n
-            qflow_consensus[e] = sumsQ[e] / n
+            p_flow_consensus[e] = sumsP[e] / n
+            q_flow_consensus[e] = sumsQ[e] / n
         end
     end
     return nothing

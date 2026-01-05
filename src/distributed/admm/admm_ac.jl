@@ -455,10 +455,10 @@ function run_admm(
         zone_id => Dict{Int, Float64}() for zone_id in zone_ids
     )
 
-    pflow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
-    qflow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
-    pflow_consensus_prev = Dict{Int, Float64}()
-    qflow_consensus_prev = Dict{Int, Float64}()
+    p_flow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
+    q_flow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
+    p_flow_consensus_prev = Dict{Int, Float64}()
+    q_flow_consensus_prev = Dict{Int, Float64}()
 
     hist = ADMMHistory()
     hist.meta[:kind] = :ac_branch
@@ -493,8 +493,8 @@ function run_admm(
             lin = build_linear_branch_term(
                 part,
                 part.zone_edges,
-                pflow_consensus,
-                qflow_consensus,
+                p_flow_consensus,
+                q_flow_consensus,
                 duals_p[zone_id],
                 duals_q[zone_id],
                 rho_p[],
@@ -518,12 +518,12 @@ function run_admm(
             part.real_generation_cost = out.real_cost
         end
 
-        pflow_consensus_prev = copy(pflow_consensus)
-        qflow_consensus_prev = copy(qflow_consensus)
+        p_flow_consensus_prev = copy(p_flow_consensus)
+        q_flow_consensus_prev = copy(q_flow_consensus)
 
         compute_ac_branch_consensus!(
-            pflow_consensus,
-            qflow_consensus,
+            p_flow_consensus,
+            q_flow_consensus,
             partitions,
             interzonal_branches,
         )
@@ -532,42 +532,42 @@ function run_admm(
             duals_p,
             duals_q,
             partitions,
-            pflow_consensus,
-            qflow_consensus,
+            p_flow_consensus,
+            q_flow_consensus,
             interzonal_branches,
             rho_p[],
             rho_q[];
-            pflow_consensus_prev = pflow_consensus_prev,
-            qflow_consensus_prev = qflow_consensus_prev,
+            p_flow_consensus_prev = p_flow_consensus_prev,
+            q_flow_consensus_prev = q_flow_consensus_prev,
         )
 
         r = primal_residual_branch_ac(
             partitions,
-            pflow_consensus,
-            qflow_consensus,
+            p_flow_consensus,
+            q_flow_consensus,
             interzonal_branches,
         )
         s = dual_residual_branch_ac(
-            pflow_consensus,
-            qflow_consensus,
-            pflow_consensus_prev,
-            qflow_consensus_prev,
+            p_flow_consensus,
+            q_flow_consensus,
+            p_flow_consensus_prev,
+            q_flow_consensus_prev,
             interzonal_branches,
         )
 
         eps_r = eps_primal_branch_ac(
             partitions,
-            pflow_consensus,
-            qflow_consensus,
+            p_flow_consensus,
+            q_flow_consensus,
             interzonal_branches,
             eps_abs,
             eps_rel,
         )
         eps_s = eps_dual_branch_ac(
-            pflow_consensus,
-            qflow_consensus,
-            pflow_consensus_prev,
-            qflow_consensus_prev,
+            p_flow_consensus,
+            q_flow_consensus,
+            p_flow_consensus_prev,
+            q_flow_consensus_prev,
             interzonal_branches,
             eps_abs,
             eps_rel,
@@ -672,10 +672,10 @@ function run_admm(
     theta_consensus_prev = similar(theta_consensus)
     v_mag_consensus_prev = similar(v_mag_consensus)
 
-    pflow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
-    qflow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
-    pflow_consensus_prev = Dict{Int, Float64}()
-    qflow_consensus_prev = Dict{Int, Float64}()
+    p_flow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
+    q_flow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
+    p_flow_consensus_prev = Dict{Int, Float64}()
+    q_flow_consensus_prev = Dict{Int, Float64}()
 
     hist = ADMMHistory()
     hist.meta[:kind] = :ac_hybrid
@@ -734,8 +734,8 @@ function run_admm(
             lin_br = build_linear_branch_term(
                 part,
                 part.zone_edges,
-                pflow_consensus,
-                qflow_consensus,
+                p_flow_consensus,
+                q_flow_consensus,
                 duals_p[zone_id],
                 duals_q[zone_id],
                 rho_p[],
@@ -766,8 +766,8 @@ function run_admm(
 
         theta_consensus_prev .= theta_consensus
         v_mag_consensus_prev .= v_mag_consensus
-        pflow_consensus_prev = copy(pflow_consensus)
-        qflow_consensus_prev = copy(qflow_consensus)
+        p_flow_consensus_prev = copy(p_flow_consensus)
+        q_flow_consensus_prev = copy(q_flow_consensus)
 
         compute_ac_bus_consensus_vec!(
             theta_consensus,
@@ -784,8 +784,8 @@ function run_admm(
         end
 
         compute_ac_branch_consensus!(
-            pflow_consensus,
-            qflow_consensus,
+            p_flow_consensus,
+            q_flow_consensus,
             partitions,
             interzonal_branches,
         )
@@ -810,14 +810,14 @@ function run_admm(
             duals_p,
             duals_q,
             partitions,
-            pflow_consensus,
-            qflow_consensus,
+            p_flow_consensus,
+            q_flow_consensus,
             interzonal_branches,
             rho_p[],
             rho_q[];
             alpha = nothing,
-            pflow_consensus_prev = pflow_consensus_prev,
-            qflow_consensus_prev = qflow_consensus_prev,
+            p_flow_consensus_prev = p_flow_consensus_prev,
+            q_flow_consensus_prev = q_flow_consensus_prev,
         )
 
         r_bus = primal_residual_bus_ac_vec(
@@ -829,8 +829,8 @@ function run_admm(
         )
         r_br = primal_residual_branch_ac(
             partitions,
-            pflow_consensus,
-            qflow_consensus,
+            p_flow_consensus,
+            q_flow_consensus,
             interzonal_branches,
         )
         r_tot = hypot(r_bus, r_br)
@@ -842,10 +842,10 @@ function run_admm(
             v_mag_consensus_prev,
         )
         s_br = dual_residual_branch_ac(
-            pflow_consensus,
-            qflow_consensus,
-            pflow_consensus_prev,
-            qflow_consensus_prev,
+            p_flow_consensus,
+            q_flow_consensus,
+            p_flow_consensus_prev,
+            q_flow_consensus_prev,
             interzonal_branches,
         )
         s_tot = hypot(s_bus, s_br)
@@ -861,8 +861,8 @@ function run_admm(
         )
         eps_br_r = eps_primal_branch_ac(
             partitions,
-            pflow_consensus,
-            qflow_consensus,
+            p_flow_consensus,
+            q_flow_consensus,
             interzonal_branches,
             eps_abs,
             eps_rel,
@@ -878,10 +878,10 @@ function run_admm(
             eps_rel,
         )
         eps_br_s = eps_dual_branch_ac(
-            pflow_consensus,
-            qflow_consensus,
-            pflow_consensus_prev,
-            qflow_consensus_prev,
+            p_flow_consensus,
+            q_flow_consensus,
+            p_flow_consensus_prev,
+            q_flow_consensus_prev,
             interzonal_branches,
             eps_abs,
             eps_rel,
