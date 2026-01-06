@@ -250,38 +250,6 @@ function build_linear_bus_term(
 end
 
 # ----------------------------
-# BRANCH linear term (DC)
-# ----------------------------
-
-function build_linear_branch_term(
-    part::PartitionDC,
-    zone_edges::Vector{Int},
-    flow_consensus::Dict{Int, Float64},
-    lambda_zone::Dict{Int, Float64},
-    rho_flow::Float64,
-)::JuMP.AffExpr
-    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
-    lin = zero(JuMP.AffExpr)
-
-    @inbounds for e in zone_edges
-        l_local = get(part.branch_global_to_local, e, nothing)
-        l_local === nothing && continue
-
-        f = part.branch.from[l_local]
-        t = part.branch.to[l_local]
-        x = part.branch.x[l_local]
-        @assert abs(x) > 1e-10 "x≈0 no ramo global $e (DC)."
-
-        z = get(flow_consensus, e, 0.0)
-        λ = get(lambda_zone, e, 0.0)
-        coef = (λ - rho_flow * z)
-
-        lin += coef * (theta[f, 1] - theta[t, 1]) / x
-    end
-    return lin
-end
-
-# ----------------------------
 # BRANCH linear term (AC)
 # ----------------------------
 
@@ -309,6 +277,38 @@ function build_linear_branch_term(
         λQ = get(lambdaQ_zone, e, 0.0)
 
         lin += λP * (P - zP) + λQ * (Q - zQ) - rhoP * zP * P - rhoQ * zQ * Q
+    end
+    return lin
+end
+
+# ----------------------------
+# BRANCH linear term (DC)
+# ----------------------------
+
+function build_linear_branch_term(
+    part::PartitionDC,
+    zone_edges::Vector{Int},
+    flow_consensus::Dict{Int, Float64},
+    lambda_zone::Dict{Int, Float64},
+    rho_flow::Float64,
+)::JuMP.AffExpr
+    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    lin = zero(JuMP.AffExpr)
+
+    @inbounds for e in zone_edges
+        l_local = get(part.branch_global_to_local, e, nothing)
+        l_local === nothing && continue
+
+        f = part.branch.from[l_local]
+        t = part.branch.to[l_local]
+        x = part.branch.x[l_local]
+        @assert abs(x) > 1e-10 "x≈0 no ramo global $e (DC)."
+
+        z = get(flow_consensus, e, 0.0)
+        λ = get(lambda_zone, e, 0.0)
+        coef = (λ - rho_flow * z)
+
+        lin += coef * (theta[f, 1] - theta[t, 1]) / x
     end
     return lin
 end
