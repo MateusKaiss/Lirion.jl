@@ -38,10 +38,10 @@ function init_dc_bus_partition!(
     optimizer_factory,
     rho_theta::Float64,
 )
-    n = length(partitions.parts)
-    @assert length(sys.parts) == n "ADMMSystem.parts must be aligned with partitions.parts"
+    n_zones = length(partitions.parts)
+    @assert length(sys.parts) == n_zones "ADMMSystem.parts must be aligned with partitions.parts"
 
-    @inbounds for i in 1:n
+    @inbounds for i in 1:n_zones
         init_dc_bus_partition!(
             partitions.parts[i],
             sys.parts[i],
@@ -88,10 +88,10 @@ function init_dc_branch_partition!(
     rho::Float64,
     interzonal_branches::Vector{Int},
 )
-    n = length(partitions.parts)
-    @assert length(sys.parts) == n "ADMMSystem.parts must be aligned with partitions.parts"
+    n_zones = length(partitions.parts)
+    @assert length(sys.parts) == n_zones "ADMMSystem.parts must be aligned with partitions.parts"
 
-    @inbounds for i in 1:n
+    @inbounds for i in 1:n_zones
         init_dc_branch_partition!(
             partitions.parts[i],
             sys.parts[i],
@@ -143,10 +143,10 @@ function init_dc_hybrid_partition!(
     rho::Float64,
     interzonal_branches::Vector{Int},
 )
-    n = length(partitions.parts)
-    @assert length(sys.parts) == n "ADMMSystem.parts must be aligned with partitions.parts"
+    n_zones = length(partitions.parts)
+    @assert length(sys.parts) == n_zones "ADMMSystem.parts must be aligned with partitions.parts"
 
-    @inbounds for i in 1:n
+    @inbounds for i in 1:n_zones
         init_dc_hybrid_partition!(
             partitions.parts[i],
             sys.parts[i],

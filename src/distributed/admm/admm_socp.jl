@@ -50,10 +50,10 @@ function init_socp_v2rt_partition!(
     rho_t::Float64,
     interzonal_branches,
 )
-    n = length(partitions.parts)
-    @assert n == length(sys.parts) == length(sys.zones)
+    n_zones = length(partitions.parts)
+    @assert n_zones == length(sys.parts) == length(sys.zones)
 
-    @inbounds for i in 1:n
+    @inbounds for i in 1:n_zones
         init_socp_v2rt_partition!(
             partitions.parts[i],
             sys.parts[i],
@@ -115,10 +115,10 @@ function init_socp_pq_partition!(
     rhoQ::Float64,
     interzonal_branches,
 )
-    n = length(partitions.parts)
-    @assert n == length(sys.parts) == length(sys.zones)
+    n_zones = length(partitions.parts)
+    @assert n_zones == length(sys.parts) == length(sys.zones)
 
-    @inbounds for i in 1:n
+    @inbounds for i in 1:n_zones
         init_socp_pq_partition!(
             partitions.parts[i],
             sys.parts[i],
@@ -182,10 +182,10 @@ function init_socp_hybrid_partition!(
     rho_t::Float64,
     interzonal_branches,
 )
-    n = length(partitions.parts)
-    @assert n == length(sys.parts) == length(sys.zones)
+    n_zones = length(partitions.parts)
+    @assert n_zones == length(sys.parts) == length(sys.zones)
 
-    @inbounds for i in 1:n
+    @inbounds for i in 1:n_zones
         init_socp_hybrid_partition!(
             partitions.parts[i],
             sys.parts[i],

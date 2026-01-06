@@ -45,10 +45,10 @@ function init_ac_bus_partition!(
     rho_theta::Float64,
     rho_v_mag::Float64,
 )
-    n = length(partitions.parts)
-    @assert n == length(sys.parts) == length(sys.zones)
+    n_zones = length(partitions.parts)
+    @assert n_zones == length(sys.parts) == length(sys.zones)
 
-    @inbounds for i in 1:n
+    @inbounds for i in 1:n_zones
         init_ac_bus_partition!(
             partitions.parts[i],
             sys.parts[i],
@@ -102,10 +102,10 @@ function init_ac_branch_partition!(
     rhoQ::Float64,
     interzonal_branches,
 )
-    n = length(partitions.parts)
-    @assert n == length(sys.parts) == length(sys.zones)
+    n_zones = length(partitions.parts)
+    @assert n_zones == length(sys.parts) == length(sys.zones)
 
-    @inbounds for i in 1:n
+    @inbounds for i in 1:n_zones
         init_ac_branch_partition!(
             partitions.parts[i],
             sys.parts[i],
@@ -170,10 +170,10 @@ function init_ac_hybrid_partition!(
     rhoQ::Float64,
     interzonal_branches,
 )
-    n = length(partitions.parts)
-    @assert n == length(sys.parts) == length(sys.zones)
+    n_zones = length(partitions.parts)
+    @assert n_zones == length(sys.parts) == length(sys.zones)
 
-    @inbounds for i in 1:n
+    @inbounds for i in 1:n_zones
         init_ac_hybrid_partition!(
             partitions.parts[i],
             sys.parts[i],
