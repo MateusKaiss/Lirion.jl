@@ -9,7 +9,7 @@
 # ---------- socp bus [V² + (R,T)] partition ----------
 
 function init_socp_v2rt_partition!(
-    sub::PartitionSOCP,
+    part::PartitionSOCP,
     sys_zone::SystemData,
     optimizer_factory,
     rho_v2::Float64,
@@ -17,25 +17,25 @@ function init_socp_v2rt_partition!(
     rho_t::Float64,
     interzonal_branches,
 )
-    prepare_hotpaths!(sub)
-    sub.zone_edges = _zone_cut_edges(sub, interzonal_branches)
+    prepare_hotpaths!(part)
+    part.zone_edges = _zone_cut_edges(part, interzonal_branches)
 
     model = build_model(sys_zone, SOCP; optimizer = optimizer_factory)
-    sub.model = model
-    sub.obj_base = model[:generation_cost]
-    sub.v2_var = model[:v_magnitude_sq]
-    sub.objective_params = sys_zone.objective
-    sub.has_solution = false
+    part.model = model
+    part.obj_base = model[:generation_cost]
+    part.v2_var = model[:v_magnitude_sq]
+    part.objective_params = sys_zone.objective
+    part.has_solution = false
 
-    for I in keys(sub.v2_var)
-        set_start_value(sub.v2_var[I], 1.0)
+    for I in keys(part.v2_var)
+        set_start_value(part.v2_var[I], 1.0)
     end
 
-    build_quad_bus_expr!(sub, rho_v2)
-    build_quad_branch_rt_expr!(sub, rho_r, rho_t, sub.zone_edges)
+    build_quad_bus_expr!(part, rho_v2)
+    build_quad_branch_rt_expr!(part, rho_r, rho_t, part.zone_edges)
 
-    sub.obj_static = sub.obj_base + sub.quad_bus_expr_socp + sub.quad_rt_expr_socp
-    @objective(model, Min, sub.obj_static)
+    part.obj_static = part.obj_base + part.quad_bus_expr_socp + part.quad_rt_expr_socp
+    @objective(model, Min, part.obj_static)
     optimize!(model)
 
     return nothing
@@ -70,38 +70,38 @@ end
 # ---------- socp branch partition (P/Q) ----------
 
 function init_socp_pq_partition!(
-    sub::PartitionSOCP,
+    part::PartitionSOCP,
     sys_zone::SystemData,
     optimizer_factory,
     rhoP::Float64,
     rhoQ::Float64,
     interzonal_branches,
 )
-    prepare_hotpaths!(sub)
-    sub.zone_edges = _zone_cut_edges(sub, interzonal_branches)
+    prepare_hotpaths!(part)
+    part.zone_edges = _zone_cut_edges(part, interzonal_branches)
 
     model = build_model(sys_zone, SOCP; optimizer = optimizer_factory)
-    sub.model = model
-    sub.obj_base = model[:generation_cost]
-    sub.objective_params = sys_zone.objective
-    sub.has_solution = false
+    part.model = model
+    part.obj_base = model[:generation_cost]
+    part.objective_params = sys_zone.objective
+    part.has_solution = false
 
     if is_gurobi(model)
         soft_anchor_branch_expr!(
-            sub;
+            part;
             κV2 = 1e-6,
             κPQ = 1e-8,
             use_bus = true,
             use_pq = true,
         )
     else
-        sub.soft_anchor_expr = zero(JuMP.QuadExpr)
+        part.soft_anchor_expr = zero(JuMP.QuadExpr)
     end
 
-    build_quad_branch_pq_expr!(sub, rhoP, rhoQ, sub.zone_edges)
+    build_quad_branch_pq_expr!(part, rhoP, rhoQ, part.zone_edges)
 
-    sub.obj_static = sub.obj_base + sub.quad_pq_expr_socp + sub.soft_anchor_expr
-    @objective(model, Min, sub.obj_static)
+    part.obj_static = part.obj_base + part.quad_pq_expr_socp + part.soft_anchor_expr
+    @objective(model, Min, part.obj_static)
     optimize!(model)
 
     return nothing
@@ -134,7 +134,7 @@ end
 # ---------- socp hybrid [(V² + P/Q + R/T)] partition ----------
 
 function init_socp_hybrid_partition!(
-    sub::PartitionSOCP,
+    part::PartitionSOCP,
     sys_zone::SystemData,
     optimizer_factory,
     rho_v2::Float64,
@@ -144,28 +144,28 @@ function init_socp_hybrid_partition!(
     rho_t::Float64,
     interzonal_branches,
 )
-    prepare_hotpaths!(sub)
-    sub.zone_edges = _zone_cut_edges(sub, interzonal_branches)
+    prepare_hotpaths!(part)
+    part.zone_edges = _zone_cut_edges(part, interzonal_branches)
 
     model = build_model(sys_zone, SOCP; optimizer = optimizer_factory)
-    sub.model = model
-    sub.obj_base = model[:generation_cost]
-    sub.v2_var = model[:v_magnitude_sq]
-    sub.objective_params = sys_zone.objective
-    sub.has_solution = false
+    part.model = model
+    part.obj_base = model[:generation_cost]
+    part.v2_var = model[:v_magnitude_sq]
+    part.objective_params = sys_zone.objective
+    part.has_solution = false
 
-    for I in keys(sub.v2_var)
-        set_start_value(sub.v2_var[I], 1.0)
+    for I in keys(part.v2_var)
+        set_start_value(part.v2_var[I], 1.0)
     end
 
-    build_quad_bus_expr!(sub, rho_v2)
-    build_quad_branch_pq_expr!(sub, rhoP, rhoQ, sub.zone_edges)
-    build_quad_branch_rt_expr!(sub, rho_r, rho_t, sub.zone_edges)
+    build_quad_bus_expr!(part, rho_v2)
+    build_quad_branch_pq_expr!(part, rhoP, rhoQ, part.zone_edges)
+    build_quad_branch_rt_expr!(part, rho_r, rho_t, part.zone_edges)
 
-    sub.obj_static =
-        sub.obj_base + sub.quad_bus_expr_socp + sub.quad_pq_expr_socp +
-        sub.quad_rt_expr_socp
-    @objective(model, Min, sub.obj_static)
+    part.obj_static =
+        part.obj_base + part.quad_bus_expr_socp + part.quad_pq_expr_socp +
+        part.quad_rt_expr_socp
+    @objective(model, Min, part.obj_static)
     optimize!(model)
 
     return nothing
@@ -291,14 +291,14 @@ function run_admm(
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            sub = get_partition(partitions, zone_id)
-            model = sub.model::JuMP.Model
+            part = get_partition(partitions, zone_id)
+            model = part.model::JuMP.Model
 
             v2_dual_buf_z = dual_v2_buf[zone_id]
             v2_dual_buf_z .= duals_v2[zone_id]
 
             lin_bus = build_linear_bus_term(
-                sub,
+                part,
                 shared_buses_sorted,
                 shared_buses_to_pos,
                 v2_consensus,
@@ -307,8 +307,8 @@ function run_admm(
             )
 
             lin_rt = build_linear_branch_rt_term(
-                sub,
-                sub.zone_edges,
+                part,
+                part.zone_edges,
                 r_consensus,
                 t_consensus,
                 duals_r[zone_id],
@@ -316,21 +316,21 @@ function run_admm(
                 rho_r[],
                 rho_t[],
             )
-            @objective(model, Min, sub.obj_static + (lin_bus + lin_rt))
+            @objective(model, Min, part.obj_static + (lin_bus + lin_rt))
             optimize!(model)
 
             results[i] = (
                 gen_cost_expr = value(model[:generation_cost]),
-                real_cost = compute_real_generation_cost(model, sub.objective_params),
+                real_cost = compute_real_generation_cost(model, part.objective_params),
             )
         end
 
         @inbounds for (i, zone_id) in enumerate(zone_ids)
-            sub = get_partition(partitions, zone_id)
+            part = get_partition(partitions, zone_id)
             out = results[i]
-            sub.has_solution = true
-            sub.generation_cost_model_expr = out.gen_cost_expr
-            sub.real_generation_cost = out.real_cost
+            part.has_solution = true
+            part.generation_cost_model_expr = out.gen_cost_expr
+            part.real_generation_cost = out.real_cost
         end
 
         v2_consensus_prev .= v2_consensus
@@ -528,12 +528,12 @@ function run_admm(
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            sub = get_partition(partitions, zone_id)
-            model = sub.model::JuMP.Model
+            part = get_partition(partitions, zone_id)
+            model = part.model::JuMP.Model
 
             lin = build_linear_branch_pq_term(
-                sub,
-                sub.zone_edges,
+                part,
+                part.zone_edges,
                 p_flow_consensus,
                 q_flow_consensus,
                 dualsP[zone_id],
@@ -542,13 +542,13 @@ function run_admm(
                 rhoQ[],
             )
 
-            @objective(model, Min, sub.obj_static + lin)
+            @objective(model, Min, part.obj_static + lin)
             optimize!(model)
 
-            sub.has_solution = true
-            sub.generation_cost_model_expr = value(model[:generation_cost])
-            sub.real_generation_cost =
-                compute_real_generation_cost(model, sub.objective_params)
+            part.has_solution = true
+            part.generation_cost_model_expr = value(model[:generation_cost])
+            part.real_generation_cost =
+                compute_real_generation_cost(model, part.objective_params)
         end
 
         p_flow_consensus_prev = copy(p_flow_consensus)
@@ -757,14 +757,14 @@ function run_admm(
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            sub = get_partition(partitions, zone_id)
-            model = sub.model::JuMP.Model
+            part = get_partition(partitions, zone_id)
+            model = part.model::JuMP.Model
 
             v2_dual_buf_z = dual_v2_buf[zone_id]
             v2_dual_buf_z .= duals_v2[zone_id]
 
             lin_bus = build_linear_bus_term(
-                sub,
+                part,
                 shared_buses_sorted,
                 shared_buses_to_pos,
                 v2_consensus,
@@ -773,8 +773,8 @@ function run_admm(
             )
 
             lin_pq = build_linear_branch_pq_term(
-                sub,
-                sub.zone_edges,
+                part,
+                part.zone_edges,
                 p_flow_consensus,
                 q_flow_consensus,
                 dualsP[zone_id],
@@ -784,8 +784,8 @@ function run_admm(
             )
 
             lin_rt = build_linear_branch_rt_term(
-                sub,
-                sub.zone_edges,
+                part,
+                part.zone_edges,
                 r_consensus,
                 t_consensus,
                 duals_r[zone_id],
@@ -794,13 +794,13 @@ function run_admm(
                 rho_t[],
             )
 
-            @objective(model, Min, sub.obj_static + (lin_bus + lin_pq + lin_rt))
+            @objective(model, Min, part.obj_static + (lin_bus + lin_pq + lin_rt))
             optimize!(model)
 
-            sub.has_solution = true
-            sub.generation_cost_model_expr = value(model[:generation_cost])
-            sub.real_generation_cost =
-                compute_real_generation_cost(model, sub.objective_params)
+            part.has_solution = true
+            part.generation_cost_model_expr = value(model[:generation_cost])
+            part.real_generation_cost =
+                compute_real_generation_cost(model, part.objective_params)
         end
 
         v2_consensus_prev .= v2_consensus
