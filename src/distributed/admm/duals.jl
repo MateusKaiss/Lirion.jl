@@ -237,27 +237,16 @@ end
     dual_vec_zone::Vector{Float64},
     sub::PartitionSOCP,
     v2_consensus_vec::Vector{Float64},
-    v2_consensus_prev_vec::Vector{Float64},
     rho::Float64,
-    alpha::Union{Nothing, Float64},
     shared_buses_sorted::Vector{Int},
     shared_buses_to_pos::Dict{Int, Int},
 )
     v2s = snapshot_v2_shared!(sub)
     shared_bus_ids = sub.shared_buses_zone
 
-    if isnothing(alpha)
-        @inbounds for i in eachindex(shared_bus_ids)
-            j = shared_buses_to_pos[shared_bus_ids[i]]
-            dual_vec_zone[j] += rho * (v2s[i] - v2_consensus_vec[j])
-        end
-    else
-        alphav = something(alpha, 1.0)
-        @inbounds for i in eachindex(shared_bus_ids)
-            j = shared_buses_to_pos[shared_bus_ids[i]]
-            v_rel = alphav * v2s[i] + (1 - alphav) * v2_consensus_prev_vec[j]
-            dual_vec_zone[j] += rho * (v_rel - v2_consensus_vec[j])
-        end
+    @inbounds for i in eachindex(shared_bus_ids)
+        j = shared_buses_to_pos[shared_bus_ids[i]]
+        dual_vec_zone[j] += rho * (v2s[i] - v2_consensus_vec[j])
     end
 
     return nothing
@@ -268,9 +257,7 @@ end
     partitions::Partitions{PartitionSOCP},
     zone_ids::AbstractVector{Int},
     v2_consensus::Vector{Float64},
-    v2_consensus_prev::Vector{Float64},
     rho_v2::Float64,
-    alpha_used,
     shared_buses_sorted::AbstractVector{Int},
     shared_buses_to_pos::Dict{Int, Int},
 )
@@ -280,9 +267,7 @@ end
             duals_v2[z],
             sub,
             v2_consensus,
-            v2_consensus_prev,
             rho_v2,
-            alpha_used,
             shared_buses_sorted,
             shared_buses_to_pos,
         )

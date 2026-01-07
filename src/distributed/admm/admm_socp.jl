@@ -284,8 +284,6 @@ function run_admm(
         refresh_rho_v2_socp!(partitions, rho_v2, prev_rho_v2)
         refresh_rho_rt_socp!(partitions, rho_r, prev_rho_r, rho_t, prev_rho_t)
 
-        alpha_used = nothing
-
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             part = get_partition(partitions, zone_id)
@@ -357,9 +355,7 @@ function run_admm(
             partitions,
             zone_ids,
             v2_consensus,
-            v2_consensus_prev,
             rho_v2[],
-            alpha_used,
             shared_buses_sorted,
             shared_buses_to_pos,
         )
@@ -750,8 +746,6 @@ function run_admm(
             rho_t, prev_rho_t,
         )
 
-        alpha_used = nothing
-
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             part = get_partition(partitions, zone_id)
@@ -835,9 +829,7 @@ function run_admm(
             partitions,
             zone_ids,
             v2_consensus,
-            v2_consensus_prev,
             rho_v2[],
-            alpha_used,
             shared_buses_sorted,
             shared_buses_to_pos,
         )
