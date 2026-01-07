@@ -88,7 +88,7 @@ end
 ) = _val_or_start(m, A[b, t], default, has_vals)
 
 # ------------------------------------------------------------
-# Snapshot primitives
+# Snapshots
 # ------------------------------------------------------------
 
 @inline function _snapshot_bus_var!(
@@ -121,21 +121,6 @@ end
     return buf
 end
 
-# ------------------------------------------------------------
-# Snapshots (public API)
-# ------------------------------------------------------------
-
-# -------- DC --------
-
-@inline snapshot_theta!(p::PartitionDC) =
-    _snapshot_bus_var!(p.theta_buf, p.model, p.theta_var, p.bus.id, 0.0)
-
-@inline snapshot_theta_shared!(p::PartitionDC) =
-    _snapshot_shared_var!(
-        p.theta_shared_buf, p.model, p.theta_var,
-        p.bus.id, p.shared_pos_local, 0.0,
-    )
-
 # -------- AC --------
 
 @inline snapshot_theta_ac!(p::PartitionAC) =
@@ -154,6 +139,17 @@ end
     _snapshot_shared_var!(
         p.v_mag_shared_buf, p.model, p.v_mag_var,
         p.bus.id, p.shared_pos_local, 1.0,
+    )
+
+# -------- DC --------
+
+@inline snapshot_theta!(p::PartitionDC) =
+    _snapshot_bus_var!(p.theta_buf, p.model, p.theta_var, p.bus.id, 0.0)
+
+@inline snapshot_theta_shared!(p::PartitionDC) =
+    _snapshot_shared_var!(
+        p.theta_shared_buf, p.model, p.theta_var,
+        p.bus.id, p.shared_pos_local, 0.0,
     )
 
 # -------- SOCP --------
