@@ -29,7 +29,7 @@ Base.@kwdef mutable struct PartitionDC
     branch_global_to_local::Dict{Int, Int} = Dict{Int, Int}()
 
     bus_local_index::Dict{Int, Int} = Dict{Int, Int}()
-    shared_pos_local::Vector{Int} = Int[]
+    consensus_bus_local_idxs::Vector{Int} = Int[]
 
     theta_buf::Vector{Float64} = Float64[]
     theta_shared_buf::Vector{Float64} = Float64[]
@@ -63,7 +63,7 @@ Base.@kwdef mutable struct PartitionAC
     branch_global_to_local::Dict{Int, Int} = Dict{Int, Int}()
 
     bus_local_index::Dict{Int, Int} = Dict{Int, Int}()
-    shared_pos_local::Vector{Int} = Int[]
+    consensus_bus_local_idxs::Vector{Int} = Int[]
 
     theta_buf::Vector{Float64} = Float64[]
     v_mag_buf::Vector{Float64} = Float64[]
@@ -105,7 +105,7 @@ Base.@kwdef mutable struct PartitionSOCP
     branch_global_to_local::Dict{Int, Int} = Dict{Int, Int}()
 
     bus_local_index::Dict{Int, Int} = Dict{Int, Int}()
-    shared_pos_local::Vector{Int} = Int[]
+    consensus_bus_local_idxs::Vector{Int} = Int[]
 
     v2_buf::Vector{Float64} = Float64[]
     v2_shared_buf::Vector{Float64} = Float64[]

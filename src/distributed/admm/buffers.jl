@@ -25,9 +25,9 @@ end
     shared_bus_ids = part.shared_buses_zone
     n_shared = length(shared_bus_ids)
 
-    part.shared_pos_local = Vector{Int}(undef, n_shared)
+    part.consensus_bus_local_idxs = Vector{Int}(undef, n_shared)
     @inbounds for i in 1:n_shared
-        part.shared_pos_local[i] = part.bus_local_index[shared_bus_ids[i]]
+        part.consensus_bus_local_idxs[i] = part.bus_local_index[shared_bus_ids[i]]
     end
 
     return nothing
@@ -66,7 +66,7 @@ end
 # ------------------------------------------------------------
 
 @inline function _val_or_start(
-    m::JuMP.Model,
+    model::JuMP.Model,
     x::JuMP.VariableRef,
     default::Float64,
     has_vals::Bool,
@@ -79,13 +79,13 @@ end
 end
 
 @inline _val_at(
-    m::JuMP.Model,
-    A::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2},
+    model::JuMP.Model,
+    bus_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2},
     b::Int,
     t::Int,
     default::Float64,
     has_vals::Bool,
-) = _val_or_start(m, A[b, t], default, has_vals)
+) = _val_or_start(model, bus_var[b, t], default, has_vals)
 
 # ------------------------------------------------------------
 # Snapshots
@@ -93,74 +93,74 @@ end
 
 @inline function _snapshot_bus_var!(
     buf::Vector{Float64},
-    m::JuMP.Model,
-    A::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2},
+    model::JuMP.Model,
+    bus_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2},
     ids::Vector{Int},
     default::Float64,
 )
-    has_vals = JuMP.has_values(m)
+    has_vals = JuMP.has_values(model)
     @inbounds for i in eachindex(ids)
-        buf[i] = _val_at(m, A, ids[i], 1, default, has_vals)
+        buf[i] = _val_at(model, bus_var, ids[i], 1, default, has_vals)
     end
     return buf
 end
 
 @inline function _snapshot_shared_var!(
     buf::Vector{Float64},
-    m::JuMP.Model,
-    A::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2},
+    model::JuMP.Model,
+    bus_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2},
     ids::Vector{Int},
-    shared_pos_local::Vector{Int},
+    consensus_bus_local_idxs::Vector{Int},
     default::Float64,
 )
-    has_vals = JuMP.has_values(m)
-    @inbounds for i in eachindex(shared_pos_local)
-        bidx = shared_pos_local[i]
-        buf[i] = _val_at(m, A, ids[bidx], 1, default, has_vals)
+    has_vals = JuMP.has_values(model)
+    @inbounds for i in eachindex(consensus_bus_local_idxs)
+        bus_local_idx = consensus_bus_local_idxs[i]
+        buf[i] = _val_at(model, bus_var, ids[bus_local_idx], 1, default, has_vals)
     end
     return buf
 end
 
 # -------- AC --------
 
-@inline snapshot_theta_ac!(p::PartitionAC) =
-    _snapshot_bus_var!(p.theta_buf, p.model, p.theta_var, p.bus.id, 0.0)
+@inline snapshot_theta_ac!(part::PartitionAC) =
+    _snapshot_bus_var!(part.theta_buf, part.model, part.theta_var, part.bus.id, 0.0)
 
-@inline snapshot_v_mag!(p::PartitionAC) =
-    _snapshot_bus_var!(p.v_mag_buf, p.model, p.v_mag_var, p.bus.id, 1.0)
+@inline snapshot_v_mag!(part::PartitionAC) =
+    _snapshot_bus_var!(part.v_mag_buf, part.model, part.v_mag_var, part.bus.id, 1.0)
 
-@inline snapshot_theta_ac_shared!(p::PartitionAC) =
+@inline snapshot_theta_ac_shared!(part::PartitionAC) =
     _snapshot_shared_var!(
-        p.theta_shared_buf, p.model, p.theta_var,
-        p.bus.id, p.shared_pos_local, 0.0,
+        part.theta_shared_buf, part.model, part.theta_var,
+        part.bus.id, part.consensus_bus_local_idxs, 0.0,
     )
 
-@inline snapshot_v_magshared!(p::PartitionAC) =
+@inline snapshot_v_magshared!(part::PartitionAC) =
     _snapshot_shared_var!(
-        p.v_mag_shared_buf, p.model, p.v_mag_var,
-        p.bus.id, p.shared_pos_local, 1.0,
+        part.v_mag_shared_buf, part.model, part.v_mag_var,
+        part.bus.id, part.consensus_bus_local_idxs, 1.0,
     )
 
 # -------- DC --------
 
-@inline snapshot_theta!(p::PartitionDC) =
-    _snapshot_bus_var!(p.theta_buf, p.model, p.theta_var, p.bus.id, 0.0)
+@inline snapshot_theta!(part::PartitionDC) =
+    _snapshot_bus_var!(part.theta_buf, part.model, part.theta_var, part.bus.id, 0.0)
 
-@inline snapshot_theta_shared!(p::PartitionDC) =
+@inline snapshot_theta_shared!(part::PartitionDC) =
     _snapshot_shared_var!(
-        p.theta_shared_buf, p.model, p.theta_var,
-        p.bus.id, p.shared_pos_local, 0.0,
+        part.theta_shared_buf, part.model, part.theta_var,
+        part.bus.id, part.consensus_bus_local_idxs, 0.0,
     )
 
 # -------- SOCP --------
 
-@inline snapshot_v2!(p::PartitionSOCP) =
-    _snapshot_bus_var!(p.v2_buf, p.model, p.v2_var, p.bus.id, 1.0)
+@inline snapshot_v2!(part::PartitionSOCP) =
+    _snapshot_bus_var!(part.v2_buf, part.model, part.v2_var, part.bus.id, 1.0)
 
-@inline snapshot_v2_shared!(p::PartitionSOCP) =
+@inline snapshot_v2_shared!(part::PartitionSOCP) =
     _snapshot_shared_var!(
-        p.v2_shared_buf, p.model, p.v2_var,
-        p.bus.id, p.shared_pos_local, 1.0,
+        part.v2_shared_buf, part.model, part.v2_var,
+        part.bus.id, part.consensus_bus_local_idxs, 1.0,
     )
 
 # ------------------------------------------------------------
@@ -168,7 +168,7 @@ end
 # ------------------------------------------------------------
 
 @inline function _dc_flow_val_model(
-    m::JuMP.Model,
+    model::JuMP.Model,
     part::PartitionDC,
     l_local::Int;
     t::Int = 1,
@@ -179,21 +179,21 @@ end
     x = part.branch.x[l_local]
     @assert abs(x) > 1e-8 "x≈0 no ramo local $l_local (DC)."
 
-    has_vals = JuMP.has_values(m)
-    θf = _val_at(m, theta, f, t, 0.0, has_vals)
-    θtb = _val_at(m, theta, tb, t, 0.0, has_vals)
+    has_vals = JuMP.has_values(model)
+    θf = _val_at(model, theta, f, t, 0.0, has_vals)
+    θtb = _val_at(model, theta, tb, t, 0.0, has_vals)
 
     return (θf - θtb) / x
 end
 
-@inline _pq_flow_from_exprs(m::JuMP.Model, l::Int, t::Int = 1) =
-    (m[:p_flow_branches][l, t], m[:q_flow_branches][l, t])
+@inline _pq_flow_from_exprs(model::JuMP.Model, l::Int, t::Int = 1) =
+    (model[:p_flow_branches][l, t], model[:q_flow_branches][l, t])
 
-@inline _pq_flow_from_exprs(p::PartitionAC, l::Int; t::Int = 1) =
-    _pq_flow_from_exprs(p.model, l, t)
+@inline _pq_flow_from_exprs(part::PartitionAC, l::Int; t::Int = 1) =
+    _pq_flow_from_exprs(part.model, l, t)
 
-@inline _pq_flow_from_exprs(p::PartitionSOCP, l::Int; t::Int = 1) =
-    _pq_flow_from_exprs(p.model, l, t)
+@inline _pq_flow_from_exprs(part::PartitionSOCP, l::Int; t::Int = 1) =
+    _pq_flow_from_exprs(part.model, l, t)
 
-@inline _rt_from_exprs(m::JuMP.Model, l::Int, t::Int = 1) =
-    (m[:R][l, t], m[:T_var][l, t])
+@inline _rt_from_exprs(model::JuMP.Model, l::Int, t::Int = 1) =
+    (model[:R][l, t], model[:T_var][l, t])
