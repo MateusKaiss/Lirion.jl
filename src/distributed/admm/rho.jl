@@ -50,7 +50,7 @@ end
 # DC refreshers: rebuild cached quadratic terms when rho changes
 # ------------------------------------------------------------
 
-@inline function refresh_rho_bus!(
+@inline function refresh_rho_bus_dc!(
     partitions::Partitions{PartitionDC},
     rho::Base.RefValue{Float64},
     prev_rho::Base.RefValue{Float64},
@@ -65,7 +65,7 @@ end
     return nothing
 end
 
-@inline function refresh_rho_branch!(
+@inline function refresh_rho_branch_dc!(
     partitions::Partitions{PartitionDC},
     rho::Base.RefValue{Float64},
     prev_rho::Base.RefValue{Float64},
@@ -100,7 +100,6 @@ end
     return nothing
 end
 
-# v2rt: obj_static = base + bus(V2) + rt
 @inline function refresh_rho_rt_socp!(
     partitions::Partitions{PartitionSOCP},
     rho_r::Base.RefValue{Float64},

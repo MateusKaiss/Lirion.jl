@@ -225,7 +225,7 @@ function run_admm(
         iter_done = iter
         _FAST_USE_LOGS && println("\nIteração $iter (bus/DC)")
 
-        refresh_rho_bus!(partitions, rho, prev_rho)
+        refresh_rho_bus_dc!(partitions, rho, prev_rho)
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
@@ -409,7 +409,7 @@ function run_admm(
         iter_done = iter
         _FAST_USE_LOGS && println("\n[ADMM-branch/DC] Iteração $iter")
 
-        refresh_rho_branch!(partitions, rho, prev_rho)
+        refresh_rho_branch_dc!(partitions, rho, prev_rho)
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
@@ -561,8 +561,8 @@ function run_admm(
         iter_done = iter
         _FAST_USE_LOGS && println("\n[ADMM-hybrid/DC] Iteração $iter")
 
-        refresh_rho_bus!(partitions, rho_theta, prev_rho_theta)
-        refresh_rho_branch!(partitions, rho_flow, prev_rho_flow)
+        refresh_rho_bus_dc!(partitions, rho_theta, prev_rho_theta)
+        refresh_rho_branch_dc!(partitions, rho_flow, prev_rho_flow)
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
