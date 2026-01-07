@@ -187,8 +187,8 @@ function build_linear_bus_term(
     shared_buses_to_pos::Dict{Int, Int},
     theta_consensus::Vector{Float64},
     v_mag_consensus::Vector{Float64},
-    lambda_theta_buf::Vector{Float64},
-    lambda_v_buf::Vector{Float64},
+    theta_dual_buf_z::Vector{Float64},
+    v_mag_dual_buf_z::Vector{Float64},
     rho_theta::Float64,
     rho_v::Float64,
 )::JuMP.AffExpr
@@ -198,8 +198,8 @@ function build_linear_bus_term(
 
     @inbounds for b in part.shared_buses_zone
         j = shared_buses_to_pos[b]
-        lin += (lambda_theta_buf[j] - rho_theta * theta_consensus[j]) * theta[b, 1]
-        lin += (lambda_v_buf[j] - rho_v * v_mag_consensus[j]) * v_mag[b, 1]
+        lin += (theta_dual_buf_z[j] - rho_theta * theta_consensus[j]) * theta[b, 1]
+        lin += (v_mag_dual_buf_z[j]     - rho_v     * v_mag_consensus[j]) * v_mag[b, 1]
     end
     return lin
 end
@@ -207,13 +207,12 @@ end
 # ----------------------------
 # BUS linear term (DC)
 # ----------------------------
-
 function build_linear_bus_term(
     part::PartitionDC,
     shared_buses_sorted::Vector{Int},
     shared_buses_to_pos::Dict{Int, Int},
     theta_consensus::Vector{Float64},
-    theta_dual_buf::Vector{Float64},
+    theta_dual_buf_z::Vector{Float64},
     rho_theta::Float64,
 )::JuMP.AffExpr
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
@@ -221,7 +220,7 @@ function build_linear_bus_term(
 
     @inbounds for b in part.shared_buses_zone
         j = shared_buses_to_pos[b]
-        lin += (theta_dual_buf[j] - rho_theta * theta_consensus[j]) * theta[b, 1]
+        lin += (theta_dual_buf_z[j] - rho_theta * theta_consensus[j]) * theta[b, 1]
     end
     return lin
 end
@@ -229,13 +228,12 @@ end
 # ----------------------------
 # BUS linear term (SOCP)
 # ----------------------------
-
 function build_linear_bus_term(
     sub::PartitionSOCP,
     shared_buses_sorted::Vector{Int},
     shared_buses_to_pos::Dict{Int, Int},
     v2_consensus::Vector{Float64},
-    lambda_v2_buf::Vector{Float64},
+    v2_dual_buf_z::Vector{Float64},
     rho_v2::Float64,
 )::JuMP.AffExpr
     m = sub.model::JuMP.Model
@@ -244,7 +242,7 @@ function build_linear_bus_term(
 
     @inbounds for b in sub.shared_buses_zone
         j = shared_buses_to_pos[b]
-        lin += (lambda_v2_buf[j] - rho_v2 * v2_consensus[j]) * v2[b, 1]
+        lin += (v2_dual_buf_z[j] - rho_v2 * v2_consensus[j]) * v2[b, 1]
     end
     return lin
 end
@@ -252,14 +250,13 @@ end
 # ----------------------------
 # BRANCH linear term (AC)
 # ----------------------------
-
 function build_linear_branch_term(
     part::PartitionAC,
     zone_edges::Vector{Int},
     p_consensus::Dict{Int, Float64},
     q_consensus::Dict{Int, Float64},
-    lambdaP_zone::Dict{Int, Float64},
-    lambdaQ_zone::Dict{Int, Float64},
+    duals_p_flow::Dict{Int, Float64},
+    duals_q_flow::Dict{Int, Float64},
     rhoP::Float64,
     rhoQ::Float64,
 )::JuMP.NonlinearExpr
@@ -273,10 +270,10 @@ function build_linear_branch_term(
 
         zP = get(p_consensus, e, 0.0)
         zQ = get(q_consensus, e, 0.0)
-        λP = get(lambdaP_zone, e, 0.0)
-        λQ = get(lambdaQ_zone, e, 0.0)
+        dP = get(duals_p_flow, e, 0.0)
+        dQ = get(duals_q_flow, e, 0.0)
 
-        lin += λP * (P - zP) + λQ * (Q - zQ) - rhoP * zP * P - rhoQ * zQ * Q
+        lin += dP * (P - zP) + dQ * (Q - zQ) - rhoP * zP * P - rhoQ * zQ * Q
     end
     return lin
 end
@@ -284,12 +281,11 @@ end
 # ----------------------------
 # BRANCH linear term (DC)
 # ----------------------------
-
 function build_linear_branch_term(
     part::PartitionDC,
     zone_edges::Vector{Int},
     flow_consensus::Dict{Int, Float64},
-    lambda_zone::Dict{Int, Float64},
+    duals_flow::Dict{Int, Float64},
     rho_flow::Float64,
 )::JuMP.AffExpr
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
@@ -305,8 +301,8 @@ function build_linear_branch_term(
         @assert abs(x) > 1e-10 "x≈0 no ramo global $e (DC)."
 
         z = get(flow_consensus, e, 0.0)
-        λ = get(lambda_zone, e, 0.0)
-        coef = (λ - rho_flow * z)
+        d = get(duals_flow, e, 0.0)
+        coef = (d - rho_flow * z)
 
         lin += coef * (theta[f, 1] - theta[t, 1]) / x
     end
@@ -321,8 +317,8 @@ function build_linear_branch_rt_term(
     zone_edges::Vector{Int},
     r_consensus::Dict{Int, Float64},
     t_consensus::Dict{Int, Float64},
-    lambdaR_zone::Dict{Int, Float64},
-    lambdaT_zone::Dict{Int, Float64},
+    duals_r::Dict{Int, Float64},
+    duals_t::Dict{Int, Float64},
     rho_r::Float64,
     rho_t::Float64,
 )::JuMP.AffExpr
@@ -334,8 +330,8 @@ function build_linear_branch_rt_term(
         l_local === nothing && continue
 
         R, T = _rt_from_exprs(m, l_local)
-        lin += (get(lambdaR_zone, e, 0.0) - rho_r * get(r_consensus, e, 0.0)) * R
-        lin += (get(lambdaT_zone, e, 0.0) - rho_t * get(t_consensus, e, 0.0)) * T
+        lin += (get(duals_r, e, 0.0) - rho_r * get(r_consensus, e, 0.0)) * R
+        lin += (get(duals_t, e, 0.0) - rho_t * get(t_consensus, e, 0.0)) * T
     end
     return lin
 end
@@ -343,14 +339,13 @@ end
 # ----------------------------
 # BRANCH linear term (SOCP): PQ
 # ----------------------------
-
 function build_linear_branch_pq_term(
     sub::PartitionSOCP,
     zone_edges::Vector{Int},
     p_consensus::Dict{Int, Float64},
     q_consensus::Dict{Int, Float64},
-    lambdaP_zone::Dict{Int, Float64},
-    lambdaQ_zone::Dict{Int, Float64},
+    duals_p_flow::Dict{Int, Float64},
+    duals_q_flow::Dict{Int, Float64},
     rhoP::Float64,
     rhoQ::Float64,
 )::JuMP.AffExpr
@@ -362,8 +357,8 @@ function build_linear_branch_pq_term(
         l_local === nothing && continue
 
         P, Q = _pq_flow_from_exprs(m, l_local)
-        lin += (get(lambdaP_zone, e, 0.0) - rhoP * get(p_consensus, e, 0.0)) * P
-        lin += (get(lambdaQ_zone, e, 0.0) - rhoQ * get(q_consensus, e, 0.0)) * Q
+        lin += (get(duals_p_flow, e, 0.0) - rhoP * get(p_consensus, e, 0.0)) * P
+        lin += (get(duals_q_flow, e, 0.0) - rhoQ * get(q_consensus, e, 0.0)) * Q
     end
     return lin
 end

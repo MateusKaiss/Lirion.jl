@@ -383,7 +383,7 @@ function run_admm(
     flow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
     flow_consensus_prev = Dict{Int, Float64}()
 
-    duals = Dict{Int, Dict{Int, Float64}}(
+    duals_flow = Dict{Int, Dict{Int, Float64}}(
         zone_id => Dict{Int, Float64}() for zone_id in zone_ids
     )
 
@@ -420,7 +420,7 @@ function run_admm(
                 part,
                 part.zone_edges,
                 flow_consensus,
-                duals[zone_id],
+                duals_flow[zone_id],
                 rho[],
             )
 
@@ -443,7 +443,7 @@ function run_admm(
 
         flow_consensus_prev = copy(flow_consensus)
         compute_flow_consensus!(flow_consensus, partitions, interzonal_branches)
-        update_duals_flow!(duals, partitions, flow_consensus, interzonal_branches, rho[])
+        update_duals_flow!(duals_flow, partitions, flow_consensus, interzonal_branches, rho[])
 
         r = primal_residual_branch_dc(partitions, flow_consensus, interzonal_branches)
         s = dual_residual_branch_dc(flow_consensus, flow_consensus_prev)

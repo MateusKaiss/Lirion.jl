@@ -448,10 +448,10 @@ function run_admm(
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    duals_p = Dict{Int, Dict{Int, Float64}}(
+    duals_p_flow = Dict{Int, Dict{Int, Float64}}(
         zone_id => Dict{Int, Float64}() for zone_id in zone_ids
     )
-    duals_q = Dict{Int, Dict{Int, Float64}}(
+    duals_q_flow = Dict{Int, Dict{Int, Float64}}(
         zone_id => Dict{Int, Float64}() for zone_id in zone_ids
     )
 
@@ -495,8 +495,8 @@ function run_admm(
                 part.zone_edges,
                 p_flow_consensus,
                 q_flow_consensus,
-                duals_p[zone_id],
-                duals_q[zone_id],
+                duals_p_flow[zone_id],
+                duals_q_flow[zone_id],
                 rho_p[],
                 rho_q[],
             )
@@ -529,8 +529,8 @@ function run_admm(
         )
 
         update_duals_branch_ac!(
-            duals_p,
-            duals_q,
+            duals_p_flow,
+            duals_q_flow,
             partitions,
             p_flow_consensus,
             q_flow_consensus,
@@ -660,10 +660,10 @@ function run_admm(
         zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
     )
 
-    duals_p = Dict{Int, Dict{Int, Float64}}(
+    duals_p_flow = Dict{Int, Dict{Int, Float64}}(
         zone_id => Dict{Int, Float64}() for zone_id in zone_ids
     )
-    duals_q = Dict{Int, Dict{Int, Float64}}(
+    duals_q_flow = Dict{Int, Dict{Int, Float64}}(
         zone_id => Dict{Int, Float64}() for zone_id in zone_ids
     )
 
@@ -736,8 +736,8 @@ function run_admm(
                 part.zone_edges,
                 p_flow_consensus,
                 q_flow_consensus,
-                duals_p[zone_id],
-                duals_q[zone_id],
+                duals_p_flow[zone_id],
+                duals_q_flow[zone_id],
                 rho_p[],
                 rho_q[],
             )
@@ -807,8 +807,8 @@ function run_admm(
         )
 
         update_duals_branch_ac!(
-            duals_p,
-            duals_q,
+            duals_p_flow,
+            duals_q_flow,
             partitions,
             p_flow_consensus,
             q_flow_consensus,
