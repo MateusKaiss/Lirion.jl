@@ -443,7 +443,13 @@ function run_admm(
 
         flow_consensus_prev = copy(flow_consensus)
         compute_flow_consensus!(flow_consensus, partitions, interzonal_branches)
-        update_duals_flow!(duals_flow, partitions, flow_consensus, interzonal_branches, rho[])
+        update_duals_flow!(
+            duals_flow,
+            partitions,
+            flow_consensus,
+            interzonal_branches,
+            rho[],
+        )
 
         r = primal_residual_branch_dc(partitions, flow_consensus, interzonal_branches)
         s = dual_residual_branch_dc(flow_consensus, flow_consensus_prev)

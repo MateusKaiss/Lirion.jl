@@ -199,7 +199,7 @@ function build_linear_bus_term(
     @inbounds for b in part.shared_buses_zone
         j = shared_buses_to_pos[b]
         lin += (theta_dual_buf_z[j] - rho_theta * theta_consensus[j]) * theta[b, 1]
-        lin += (v_mag_dual_buf_z[j]     - rho_v     * v_mag_consensus[j]) * v_mag[b, 1]
+        lin += (v_mag_dual_buf_z[j] - rho_v * v_mag_consensus[j]) * v_mag[b, 1]
     end
     return lin
 end
