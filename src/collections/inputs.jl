@@ -10,7 +10,6 @@ struct ADMMSystem
     interzonal_branches::Vector{Int}
 end
 
-@inline zoneindex(sys::ADMMSystem, zone::Int) = sys.zone_to_idx[zone]
 @inline get_zone(sys::ADMMSystem, zone::Int) = @inbounds sys.parts[sys.zone_to_idx[zone]]
 
 struct LirionInputs

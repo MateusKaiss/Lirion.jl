@@ -11,9 +11,6 @@ end
     @inbounds return (ps.parts[st], st + 1)
 end
 
-@inline Base.getindex(ps::Partitions, i::Int) = (@inbounds ps.parts[i])
-
-@inline zoneindex(ps::Partitions, zone::Int) = ps.zone_to_idx[zone]
 @inline get_partition(ps::Partitions, zone::Int) =
     (@inbounds ps.parts[ps.zone_to_idx[zone]])
 
