@@ -36,7 +36,6 @@ function init_socp_v2rt_partition!(
 
     part.obj_static = part.obj_base + part.quad_bus_expr_socp + part.quad_rt_expr_socp
     @objective(model, Min, part.obj_static)
-    optimize!(model)
 
     return nothing
 end
@@ -102,7 +101,6 @@ function init_socp_pq_partition!(
 
     part.obj_static = part.obj_base + part.quad_pq_expr_socp + part.soft_anchor_expr
     @objective(model, Min, part.obj_static)
-    optimize!(model)
 
     return nothing
 end
@@ -166,7 +164,6 @@ function init_socp_hybrid_partition!(
         part.obj_base + part.quad_bus_expr_socp + part.quad_pq_expr_socp +
         part.quad_rt_expr_socp
     @objective(model, Min, part.obj_static)
-    optimize!(model)
 
     return nothing
 end
