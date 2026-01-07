@@ -55,11 +55,11 @@ function build_quad_bus_expr!(
     rho_v2::Float64,
 )
     m = sub.model::JuMP.Model
-    V2 = m[:v_magnitude_sq]
+    v2 = m[:v_magnitude_sq]
     quad = zero(JuMP.QuadExpr)
 
     @inbounds for b in sub.shared_buses_zone
-        quad += 0.5 * rho_v2 * V2[b, 1]^2
+        quad += 0.5 * rho_v2 * v2[b, 1]^2
     end
 
     sub.quad_bus_expr_socp = quad
@@ -239,12 +239,12 @@ function build_linear_bus_term(
     rho_v2::Float64,
 )::JuMP.AffExpr
     m = sub.model::JuMP.Model
-    V2 = m[:v_magnitude_sq]
+    v2 = m[:v_magnitude_sq]
     lin = zero(JuMP.AffExpr)
 
     @inbounds for b in sub.shared_buses_zone
         j = shared_buses_to_pos[b]
-        lin += (lambda_v2_buf[j] - rho_v2 * v2_consensus[j]) * V2[b, 1]
+        lin += (lambda_v2_buf[j] - rho_v2 * v2_consensus[j]) * v2[b, 1]
     end
     return lin
 end
@@ -382,11 +382,11 @@ function soft_anchor_branch_expr!(
     quad = zero(JuMP.QuadExpr)
 
     if use_bus && haskey(m, :v_magnitude_sq)
-        V2 = m[:v_magnitude_sq]
-        sub.v2_var = V2
+        v2 = m[:v_magnitude_sq]
+        sub.v2_var = v2
 
-        for I in keys(V2)
-            x = V2[I]
+        for I in keys(v2)
+            x = v2[I]
             xref = (JuMP.start_value(x) === nothing) ? 1.0 : JuMP.start_value(x)
             quad += 0.5 * κV2 * (x - xref)^2
         end
