@@ -3,67 +3,6 @@
 # ============================================================
 
 # ------------------------------------------------------------
-# DC consensus: bus variables (theta)
-# ------------------------------------------------------------
-
-function compute_theta_consensus_vec!(
-    theta_consensus_vec::Vector{Float64},
-    partitions::Partitions{PartitionDC},
-    shared_buses_sorted::Vector{Int},
-    shared_buses_to_pos::Dict{Int, Int},
-)
-    fill!(theta_consensus_vec, 0.0)
-    counts = zeros(Int, length(shared_buses_sorted))
-
-    for part in partitions
-        thetas = snapshot_theta_shared!(part)
-        shared_bus_ids = part.shared_buses_zone
-        @inbounds for i in eachindex(shared_bus_ids)
-            j = shared_buses_to_pos[shared_bus_ids[i]]
-            theta_consensus_vec[j] += thetas[i]
-            counts[j] += 1
-        end
-    end
-
-    @inbounds for j in eachindex(theta_consensus_vec)
-        counts[j] != 0 && (theta_consensus_vec[j] /= counts[j])
-    end
-    return nothing
-end
-
-# ------------------------------------------------------------
-# DC consensus: branch variables (flow on cut edges)
-# ------------------------------------------------------------
-
-function compute_flow_consensus!(
-    flow_consensus::Dict{Int, Float64},
-    partitions::Partitions{PartitionDC},
-    interzonal_branches::Vector{Int},
-)
-    sums = Dict{Int, Float64}()
-    cnts = Dict{Int, Int}()
-
-    # mean p_e over cut edges
-    for part in partitions
-        m = part.model::JuMP.Model
-        @inbounds for e in part.zone_edges
-            l_local = get(part.branch_global_to_local, e, 0)
-            l_local == 0 && continue
-            p = _dc_flow_val_model(m, part, l_local)
-            sums[e] = get(sums, e, 0.0) + p
-            cnts[e] = get(cnts, e, 0) + 1
-        end
-    end
-
-    # escreve apenas para os interzonal_branches globais (mantém contrato)
-    @inbounds for e in interzonal_branches
-        n = get(cnts, e, 0)
-        n > 0 && (flow_consensus[e] = sums[e] / n)
-    end
-    return nothing
-end
-
-# ------------------------------------------------------------
 # AC consensus: bus variables (theta, |V|)
 # ------------------------------------------------------------
 
@@ -101,6 +40,64 @@ function compute_ac_bus_consensus_vec!(
             theta_consensus_vec[j] = atan(sums_sin[j], sums_cos[j])
             v_mag_consensus_vec[j] /= counts[j]
         end
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# DC consensus: bus variables (theta)
+# ------------------------------------------------------------
+
+function compute_theta_consensus_vec!(
+    theta_consensus_vec::Vector{Float64},
+    partitions::Partitions{PartitionDC},
+    shared_buses_sorted::Vector{Int},
+    shared_buses_to_pos::Dict{Int, Int},
+)
+    fill!(theta_consensus_vec, 0.0)
+    counts = zeros(Int, length(shared_buses_sorted))
+
+    for part in partitions
+        thetas = snapshot_theta_shared!(part)
+        shared_bus_ids = part.shared_buses_zone
+        @inbounds for i in eachindex(shared_bus_ids)
+            j = shared_buses_to_pos[shared_bus_ids[i]]
+            theta_consensus_vec[j] += thetas[i]
+            counts[j] += 1
+        end
+    end
+
+    @inbounds for j in eachindex(theta_consensus_vec)
+        counts[j] != 0 && (theta_consensus_vec[j] /= counts[j])
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# SOCP consensus: bus variables (V^2)
+# ------------------------------------------------------------
+
+function compute_v2_consensus_vec!(
+    v2_consensus_vec::Vector{Float64},
+    partitions::Partitions{PartitionSOCP},
+    shared_buses_sorted::Vector{Int},
+    shared_buses_to_pos::Dict{Int, Int},
+)
+    fill!(v2_consensus_vec, 0.0)
+    counts = zeros(Int, length(shared_buses_sorted))
+
+    for sub in partitions
+        v2s = snapshot_v2_shared!(sub)
+        shared_bus_ids = sub.shared_buses_zone
+        @inbounds for i in eachindex(shared_bus_ids)
+            j = shared_buses_to_pos[shared_bus_ids[i]]
+            v2_consensus_vec[j] += v2s[i]
+            counts[j] += 1
+        end
+    end
+
+    @inbounds for j in eachindex(v2_consensus_vec)
+        counts[j] != 0 && (v2_consensus_vec[j] /= counts[j])
     end
     return nothing
 end
@@ -152,30 +149,63 @@ function compute_ac_branch_consensus!(
 end
 
 # ------------------------------------------------------------
-# SOCP consensus: bus variables (V^2)
+# DC consensus: branch variables (flow on cut edges)
 # ------------------------------------------------------------
 
-function compute_v2_consensus_vec!(
-    v2_consensus_vec::Vector{Float64},
-    partitions::Partitions{PartitionSOCP},
-    shared_buses_sorted::Vector{Int},
-    shared_buses_to_pos::Dict{Int, Int},
+function compute_flow_consensus!(
+    flow_consensus::Dict{Int, Float64},
+    partitions::Partitions{PartitionDC},
+    interzonal_branches::Vector{Int},
 )
-    fill!(v2_consensus_vec, 0.0)
-    counts = zeros(Int, length(shared_buses_sorted))
+    sums = Dict{Int, Float64}()
+    cnts = Dict{Int, Int}()
 
-    for sub in partitions
-        v2s = snapshot_v2_shared!(sub)
-        shared_bus_ids = sub.shared_buses_zone
-        @inbounds for i in eachindex(shared_bus_ids)
-            j = shared_buses_to_pos[shared_bus_ids[i]]
-            v2_consensus_vec[j] += v2s[i]
-            counts[j] += 1
+    for part in partitions
+        m = part.model::JuMP.Model
+        @inbounds for e in part.zone_edges
+            l_local = get(part.branch_global_to_local, e, 0)
+            l_local == 0 && continue
+            p = _dc_flow_val_model(m, part, l_local)
+            sums[e] = get(sums, e, 0.0) + p
+            cnts[e] = get(cnts, e, 0) + 1
         end
     end
 
-    @inbounds for j in eachindex(v2_consensus_vec)
-        counts[j] != 0 && (v2_consensus_vec[j] /= counts[j])
+    @inbounds for e in interzonal_branches
+        n = get(cnts, e, 0)
+        n > 0 && (flow_consensus[e] = sums[e] / n)
+    end
+    return nothing
+end
+
+function compute_pq_consensus!(
+    p_flow_consensus::Dict{Int, Float64},
+    q_flow_consensus::Dict{Int, Float64},
+    partitions::Partitions{PartitionSOCP},
+    interzonal_branches::Vector{Int},
+)
+    sumsP = Dict{Int, Float64}()
+    sumsQ = Dict{Int, Float64}()
+    cnts = Dict{Int, Int}()
+
+    for sub in partitions
+        m = sub.model::JuMP.Model
+        @inbounds for e in sub.zone_edges
+            l = get(sub.branch_global_to_local, e, 0)
+            l == 0 && continue
+            P, Q = _pq_flow_from_exprs(m, l)
+            sumsP[e] = get(sumsP, e, 0.0) + JuMP.value(P)
+            sumsQ[e] = get(sumsQ, e, 0.0) + JuMP.value(Q)
+            cnts[e] = get(cnts, e, 0) + 1
+        end
+    end
+
+    @inbounds for e in interzonal_branches
+        n = get(cnts, e, 0)
+        if n > 0
+            p_flow_consensus[e] = sumsP[e] / n
+            q_flow_consensus[e] = sumsQ[e] / n
+        end
     end
     return nothing
 end
@@ -211,38 +241,6 @@ function compute_rt_consensus!(
         if n > 0
             r_consensus[e] = sumsR[e] / n
             t_consensus[e] = sumsT[e] / n
-        end
-    end
-    return nothing
-end
-
-function compute_pq_consensus!(
-    p_flow_consensus::Dict{Int, Float64},
-    q_flow_consensus::Dict{Int, Float64},
-    partitions::Partitions{PartitionSOCP},
-    interzonal_branches::Vector{Int},
-)
-    sumsP = Dict{Int, Float64}()
-    sumsQ = Dict{Int, Float64}()
-    cnts = Dict{Int, Int}()
-
-    for sub in partitions
-        m = sub.model::JuMP.Model
-        @inbounds for e in sub.zone_edges
-            l = get(sub.branch_global_to_local, e, 0)
-            l == 0 && continue
-            P, Q = _pq_flow_from_exprs(m, l)
-            sumsP[e] = get(sumsP, e, 0.0) + JuMP.value(P)
-            sumsQ[e] = get(sumsQ, e, 0.0) + JuMP.value(Q)
-            cnts[e] = get(cnts, e, 0) + 1
-        end
-    end
-
-    @inbounds for e in interzonal_branches
-        n = get(cnts, e, 0)
-        if n > 0
-            p_flow_consensus[e] = sumsP[e] / n
-            q_flow_consensus[e] = sumsQ[e] / n
         end
     end
     return nothing
