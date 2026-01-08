@@ -113,7 +113,7 @@ end
 end
 
 # ------------------------------------------------------------
-# SOCP duals: bus variables (V^2) - vector form
+# SOCP duals: bus variables (V^2)
 # ------------------------------------------------------------
 
 @inline function update_duals_v2_vec!(
@@ -159,7 +159,7 @@ end
 end
 
 # ------------------------------------------------------------
-# AC duals: branch variables (P, Q) - Dict form
+# AC duals: branch variables (P, Q)
 # ------------------------------------------------------------
 
 function update_duals_branch_ac!(
@@ -228,7 +228,7 @@ function update_duals_branch_ac!(
 end
 
 # ------------------------------------------------------------
-# DC duals: branch variables (flow on cut edges) - Dict form
+# DC duals: branch variables (flow on cut edges)
 # ------------------------------------------------------------
 
 function update_duals_flow!(
@@ -254,7 +254,7 @@ function update_duals_flow!(
 end
 
 # ------------------------------------------------------------
-# SOCP duals: branch variables (R,T) - Dict form
+# SOCP duals: branch variables (R,T)
 # ------------------------------------------------------------
 
 @inline function update_duals_rt_all!(
@@ -285,7 +285,7 @@ end
 end
 
 # ------------------------------------------------------------
-# SOCP duals: branch variables (P,Q) - Dict form
+# SOCP duals: branch variables (P,Q)
 # ------------------------------------------------------------
 
 @inline function update_duals_pq_all!(
