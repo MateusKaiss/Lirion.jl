@@ -2,6 +2,51 @@
 # Dual updates (ADMM)
 # ============================================================
 
+@inline function update_duals_bus_ac_vec!(
+    duals_theta_vec_zone::Vector{Float64},
+    dualsV_vec_zone::Vector{Float64},
+    part::PartitionAC,
+    theta_consensus_vec::Vector{Float64},
+    v_mag_consensus_vec::Vector{Float64},
+    rho_theta::Float64,
+    rho_v_mag::Float64,
+    shared_buses_sorted::Vector{Int},
+    shared_buses_to_pos::Dict{Int, Int};
+    alpha::Union{Nothing, Float64} = nothing,
+    theta_consensus_prev::Union{Nothing, Vector{Float64}} = nothing,
+    v_mag_consensus_prev::Union{Nothing, Vector{Float64}} = nothing,
+)
+    thetas = snapshot_theta_shared!(part)
+    Vs = snapshot_v_mag_shared!(part)
+    shared_bus_ids = part.shared_buses_zone
+
+    if alpha === nothing
+        @inbounds for i in eachindex(shared_bus_ids)
+            j = shared_buses_to_pos[shared_bus_ids[i]]
+            dtheta = _wrap_angle_diff(thetas[i] - theta_consensus_vec[j])
+            dV = (Vs[i] - v_mag_consensus_vec[j])
+            duals_theta_vec_zone[j] += rho_theta * dtheta
+            dualsV_vec_zone[j] += rho_v_mag * dV
+        end
+    else
+        alphav = something(alpha, 1.0)
+        @inbounds for i in eachindex(shared_bus_ids)
+            j = shared_buses_to_pos[shared_bus_ids[i]]
+            thetarel = _wrap_angle_diff(
+                alphav * thetas[i] + (1 - alphav) * theta_consensus_prev[j] -
+                theta_consensus_vec[j],
+            )
+            Vrel =
+                alphav * Vs[i] + (1 - alphav) * v_mag_consensus_prev[j] -
+                v_mag_consensus_vec[j]
+            duals_theta_vec_zone[j] += rho_theta * thetarel
+            dualsV_vec_zone[j] += rho_v_mag * Vrel
+        end
+    end
+
+    return nothing
+end
+
 # ------------------------------------------------------------
 # AC duals: bus variables (theta, |V|) - vector form
 # ------------------------------------------------------------
@@ -40,51 +85,6 @@
             v_mag_consensus_prev = v_mag_consensus_prev,
         )
     end
-    return nothing
-end
-
-@inline function update_duals_bus_ac_vec!(
-    duals_theta_vec_zone::Vector{Float64},
-    dualsV_vec_zone::Vector{Float64},
-    part::PartitionAC,
-    theta_consensus_vec::Vector{Float64},
-    v_mag_consensus_vec::Vector{Float64},
-    rho_theta::Float64,
-    rho_v_mag::Float64,
-    shared_buses_sorted::Vector{Int},
-    shared_buses_to_pos::Dict{Int, Int};
-    alpha::Union{Nothing, Float64} = nothing,
-    theta_consensus_prev::Union{Nothing, Vector{Float64}} = nothing,
-    v_mag_consensus_prev::Union{Nothing, Vector{Float64}} = nothing,
-)
-    thetas = snapshot_theta_ac_shared!(part)
-    Vs = snapshot_v_magshared!(part)
-    shared_bus_ids = part.shared_buses_zone
-
-    if alpha === nothing
-        @inbounds for i in eachindex(shared_bus_ids)
-            j = shared_buses_to_pos[shared_bus_ids[i]]
-            dtheta = _wrap_angle_diff(thetas[i] - theta_consensus_vec[j])
-            dV = (Vs[i] - v_mag_consensus_vec[j])
-            duals_theta_vec_zone[j] += rho_theta * dtheta
-            dualsV_vec_zone[j] += rho_v_mag * dV
-        end
-    else
-        alphav = something(alpha, 1.0)
-        @inbounds for i in eachindex(shared_bus_ids)
-            j = shared_buses_to_pos[shared_bus_ids[i]]
-            thetarel = _wrap_angle_diff(
-                alphav * thetas[i] + (1 - alphav) * theta_consensus_prev[j] -
-                theta_consensus_vec[j],
-            )
-            Vrel =
-                alphav * Vs[i] + (1 - alphav) * v_mag_consensus_prev[j] -
-                v_mag_consensus_vec[j]
-            duals_theta_vec_zone[j] += rho_theta * thetarel
-            dualsV_vec_zone[j] += rho_v_mag * Vrel
-        end
-    end
-
     return nothing
 end
 

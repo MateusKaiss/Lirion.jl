@@ -21,16 +21,16 @@ function compute_ac_bus_consensus_vec!(
     counts = zeros(Int, length(shared_buses_sorted))
 
     for part in partitions
-        thetas = snapshot_theta_ac_shared!(part)
-        Vs = snapshot_v_magshared!(part)
+        theta_shared_local = snapshot_theta_shared!(part)
+        v_mag_shared_local = snapshot_v_mag_shared!(part)
         shared_bus_ids = part.shared_buses_zone
 
         @inbounds for i in eachindex(shared_bus_ids)
             j = shared_buses_to_pos[shared_bus_ids[i]]
-            s, c = sincos(thetas[i])
+            s, c = sincos(theta_shared_local[i])
             sums_sin[j] += s
             sums_cos[j] += c
-            v_mag_consensus_vec[j] += Vs[i]
+            v_mag_consensus_vec[j] += v_mag_shared_local[i]
             counts[j] += 1
         end
     end
@@ -58,11 +58,11 @@ function compute_theta_consensus_vec!(
     counts = zeros(Int, length(shared_buses_sorted))
 
     for part in partitions
-        thetas = snapshot_theta_shared!(part)
+        theta_shared_local = snapshot_theta_shared!(part)
         shared_bus_ids = part.shared_buses_zone
         @inbounds for i in eachindex(shared_bus_ids)
             j = shared_buses_to_pos[shared_bus_ids[i]]
-            theta_consensus_vec[j] += thetas[i]
+            theta_consensus_vec[j] += theta_shared_local[i]
             counts[j] += 1
         end
     end
@@ -118,7 +118,6 @@ function compute_ac_branch_consensus!(
     cntsQ = Dict{Int, Int}()
 
     for part in partitions
-        # itera só nos edges que existem na zona
         @inbounds for e in part.zone_edges
             l_local = get(part.branch_global_to_local, e, 0)
             l_local == 0 && continue

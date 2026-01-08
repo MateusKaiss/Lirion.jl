@@ -258,6 +258,7 @@ function run_admm(
         end
 
         theta_consensus_prev .= theta_consensus
+
         compute_theta_consensus_vec!(
             theta_consensus,
             partitions,

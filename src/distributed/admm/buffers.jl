@@ -135,20 +135,27 @@ end
     @inbounds for i in eachindex(consensus_bus_local_idxs)
         consensus_bus_local_idx = consensus_bus_local_idxs[i]
         buf[i] =
-            _val_at(model, bus_var, zone_bus_ids[consensus_bus_local_idx], 1, default, has_vals)
+            _val_at(
+                model,
+                bus_var,
+                zone_bus_ids[consensus_bus_local_idx],
+                1,
+                default,
+                has_vals,
+            )
     end
     return buf
 end
 
 # -------- AC: shared --------
 
-@inline snapshot_theta_ac_shared!(part::PartitionAC) =
+@inline snapshot_theta_shared!(part::PartitionAC) =
     _snapshot_shared_var!(
         part.theta_shared_buf, part.model, part.theta_var,
         part.bus.id, part.consensus_bus_local_idxs, 0.0,
     )
 
-@inline snapshot_v_magshared!(part::PartitionAC) =
+@inline snapshot_v_mag_shared!(part::PartitionAC) =
     _snapshot_shared_var!(
         part.v_mag_shared_buf, part.model, part.v_mag_var,
         part.bus.id, part.consensus_bus_local_idxs, 1.0,

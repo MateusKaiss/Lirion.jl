@@ -162,7 +162,6 @@ function eps_primal_branch_ac(
 )
     dim = 0
     for part in partitions
-        # mais consistente com o residual: só edges presentes (cut-local)
         dim += 2 * length(_zone_cut_edges(part, interzonal_branches))
     end
 
@@ -219,7 +218,7 @@ end
 function primal_residual_bus_dc(
     partitions::Partitions{PartitionDC},
     theta_consensus_vec::Vector{Float64},
-    shared_buses_sorted::Vector{Int}, # compat (não usado)
+    shared_buses_sorted::Vector{Int},
     shared_buses_to_pos::Dict{Int, Int},
 )
     acc = 0.0
