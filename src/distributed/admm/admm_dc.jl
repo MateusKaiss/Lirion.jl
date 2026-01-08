@@ -208,12 +208,8 @@ function run_admm(
     hist.meta[:tag] = "admm_dc_bus"
 
     theta_avg_history = Dict{Int, Vector{Float64}}()
-    theta_local_history = Dict{Int, Dict{Int, Vector{Float64}}}()
 
-    results = Vector{
-        NamedTuple{(:gen_cost_expr, :real_cost, :theta_snap),
-            Tuple{Float64, Float64, Dict{Int, Float64}}},
-    }(
+    results = Vector{NamedTuple{(:gen_cost_expr, :real_cost), Tuple{Float64, Float64}}}(
         undef,
         n_zones,
     )
@@ -247,38 +243,18 @@ function run_admm(
             @objective(model, Min, part.obj_base + part.quad_bus_expr + lin)
             optimize!(model)
 
-            gen_cost_expr = value(model[:generation_cost])
-            real_cost = compute_real_generation_cost(model, part.objective_params)
-
-            thetas = snapshot_theta_shared!(part)
-            shared_bus_ids = part.shared_buses_zone
-            theta_snap =
-                Dict{Int, Float64}(b => thetas[j] for (j, b) in pairs(shared_bus_ids))
-
             results[i] = (
-                gen_cost_expr = gen_cost_expr,
-                real_cost = real_cost,
-                theta_snap = theta_snap,
+                gen_cost_expr = value(model[:generation_cost]),
+                real_cost = compute_real_generation_cost(model, part.objective_params),
             )
         end
 
-        for (i, zone_id) in enumerate(zone_ids)
+        @inbounds for (i, zone_id) in enumerate(zone_ids)
             part = get_partition(partitions, zone_id)
             out = results[i]
             part.has_solution = true
             part.generation_cost_model_expr = out.gen_cost_expr
             part.real_generation_cost = out.real_cost
-
-            @inbounds for (b, thetab) in out.theta_snap
-                push!(
-                    get!(
-                        get!(theta_local_history, zone_id, Dict{Int, Vector{Float64}}()),
-                        b,
-                        Float64[],
-                    ),
-                    thetab,
-                )
-            end
         end
 
         theta_consensus_prev .= theta_consensus
@@ -336,7 +312,6 @@ function run_admm(
     end
 
     hist.heatmaps[:theta_avg] = theta_avg_history
-    hist.heatmaps[:theta_local] = theta_local_history
 
     result = _finalize_admm_result(partitions, t0_ns, iter_done)
     _print_admm_summary!(
@@ -608,7 +583,7 @@ function run_admm(
             )
         end
 
-        for (i, zone_id) in enumerate(zone_ids)
+        @inbounds for (i, zone_id) in enumerate(zone_ids)
             part = get_partition(partitions, zone_id)
             out = results[i]
             part.has_solution = true
