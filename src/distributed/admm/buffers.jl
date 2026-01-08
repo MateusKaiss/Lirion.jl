@@ -95,28 +95,12 @@ end
     buf::Vector{Float64},
     model::JuMP.Model,
     bus_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2},
-    ids::Vector{Int},
+    bus_ids::Vector{Int},
     default::Float64,
 )
     has_vals = JuMP.has_values(model)
-    @inbounds for i in eachindex(ids)
-        buf[i] = _val_at(model, bus_var, ids[i], 1, default, has_vals)
-    end
-    return buf
-end
-
-@inline function _snapshot_shared_var!(
-    buf::Vector{Float64},
-    model::JuMP.Model,
-    bus_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2},
-    ids::Vector{Int},
-    consensus_bus_local_idxs::Vector{Int},
-    default::Float64,
-)
-    has_vals = JuMP.has_values(model)
-    @inbounds for i in eachindex(consensus_bus_local_idxs)
-        bus_local_idx = consensus_bus_local_idxs[i]
-        buf[i] = _val_at(model, bus_var, ids[bus_local_idx], 1, default, has_vals)
+    @inbounds for i in eachindex(bus_ids)
+        buf[i] = _val_at(model, bus_var, bus_ids[i], 1, default, has_vals)
     end
     return buf
 end
@@ -128,6 +112,35 @@ end
 
 @inline snapshot_v_mag!(part::PartitionAC) =
     _snapshot_bus_var!(part.v_mag_buf, part.model, part.v_mag_var, part.bus.id, 1.0)
+
+# -------- DC --------
+
+@inline snapshot_theta!(part::PartitionDC) =
+    _snapshot_bus_var!(part.theta_buf, part.model, part.theta_var, part.bus.id, 0.0)
+
+# -------- SOCP --------
+
+@inline snapshot_v2!(part::PartitionSOCP) =
+    _snapshot_bus_var!(part.v2_buf, part.model, part.v2_var, part.bus.id, 1.0)
+
+@inline function _snapshot_shared_var!(
+    buf::Vector{Float64},
+    model::JuMP.Model,
+    bus_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2},
+    zone_bus_ids::Vector{Int},
+    consensus_bus_local_idxs::Vector{Int},
+    default::Float64,
+)
+    has_vals = JuMP.has_values(model)
+    @inbounds for i in eachindex(consensus_bus_local_idxs)
+        consensus_bus_local_idx = consensus_bus_local_idxs[i]
+        buf[i] =
+            _val_at(model, bus_var, zone_bus_ids[consensus_bus_local_idx], 1, default, has_vals)
+    end
+    return buf
+end
+
+# -------- AC: shared --------
 
 @inline snapshot_theta_ac_shared!(part::PartitionAC) =
     _snapshot_shared_var!(
@@ -141,10 +154,7 @@ end
         part.bus.id, part.consensus_bus_local_idxs, 1.0,
     )
 
-# -------- DC --------
-
-@inline snapshot_theta!(part::PartitionDC) =
-    _snapshot_bus_var!(part.theta_buf, part.model, part.theta_var, part.bus.id, 0.0)
+# -------- DC: shared --------
 
 @inline snapshot_theta_shared!(part::PartitionDC) =
     _snapshot_shared_var!(
@@ -152,11 +162,7 @@ end
         part.bus.id, part.consensus_bus_local_idxs, 0.0,
     )
 
-# -------- SOCP --------
-
-@inline snapshot_v2!(part::PartitionSOCP) =
-    _snapshot_bus_var!(part.v2_buf, part.model, part.v2_var, part.bus.id, 1.0)
-
+# -------- SOCP: shared --------
 @inline snapshot_v2_shared!(part::PartitionSOCP) =
     _snapshot_shared_var!(
         part.v2_shared_buf, part.model, part.v2_var,
