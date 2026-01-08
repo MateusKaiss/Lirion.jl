@@ -3,53 +3,37 @@
 # ============================================================
 
 @inline function update_duals_bus_ac_vec!(
-    duals_theta_vec_zone::Vector{Float64},
-    dualsV_vec_zone::Vector{Float64},
+    duals_theta::Vector{Float64},
+    duals_v_mag::Vector{Float64},
     part::PartitionAC,
-    theta_consensus_vec::Vector{Float64},
+    theta_consensus::Vector{Float64},
     v_mag_consensus_vec::Vector{Float64},
     rho_theta::Float64,
     rho_v_mag::Float64,
     shared_buses_sorted::Vector{Int},
     shared_buses_to_pos::Dict{Int, Int};
-    alpha::Union{Nothing, Float64} = nothing,
     theta_consensus_prev::Union{Nothing, Vector{Float64}} = nothing,
     v_mag_consensus_prev::Union{Nothing, Vector{Float64}} = nothing,
 )
-    thetas = snapshot_theta_shared!(part)
-    Vs = snapshot_v_mag_shared!(part)
+    theta_shared_local = snapshot_theta_shared!(part)
+    v_mag_shared_local = snapshot_v_mag_shared!(part)
     shared_bus_ids = part.shared_buses_zone
 
-    if alpha === nothing
-        @inbounds for i in eachindex(shared_bus_ids)
-            j = shared_buses_to_pos[shared_bus_ids[i]]
-            dtheta = _wrap_angle_diff(thetas[i] - theta_consensus_vec[j])
-            dV = (Vs[i] - v_mag_consensus_vec[j])
-            duals_theta_vec_zone[j] += rho_theta * dtheta
-            dualsV_vec_zone[j] += rho_v_mag * dV
-        end
-    else
-        alphav = something(alpha, 1.0)
-        @inbounds for i in eachindex(shared_bus_ids)
-            j = shared_buses_to_pos[shared_bus_ids[i]]
-            thetarel = _wrap_angle_diff(
-                alphav * thetas[i] + (1 - alphav) * theta_consensus_prev[j] -
-                theta_consensus_vec[j],
-            )
-            Vrel =
-                alphav * Vs[i] + (1 - alphav) * v_mag_consensus_prev[j] -
-                v_mag_consensus_vec[j]
-            duals_theta_vec_zone[j] += rho_theta * thetarel
-            dualsV_vec_zone[j] += rho_v_mag * Vrel
-        end
+    @inbounds for i in eachindex(shared_bus_ids)
+        j = shared_buses_to_pos[shared_bus_ids[i]]
+        dtheta = _wrap_angle_diff(theta_shared_local[i] - theta_consensus[j])
+        dV = (v_mag_shared_local[i] - v_mag_consensus_vec[j])
+        duals_theta[j] += rho_theta * dtheta
+        duals_v_mag[j] += rho_v_mag * dV
     end
 
     return nothing
 end
 
 # ------------------------------------------------------------
-# AC duals: bus variables (theta, |V|) - vector form
+# AC duals: bus variables (theta, |V|)
 # ------------------------------------------------------------
+
 @inline function update_duals_bus_ac_all!(
     duals_theta::Dict{Int, Vector{Float64}},
     duals_v_mag::Dict{Int, Vector{Float64}},
@@ -61,28 +45,114 @@ end
     rho_v::Base.RefValue{Float64},
     shared_buses_sorted::AbstractVector{Int},
     shared_buses_to_pos::Dict{Int, Int};
-    alpha = nothing,
     theta_consensus_prev = nothing,
     v_mag_consensus_prev = nothing,
 )
-    ρθ = rho_theta[]
-    ρv = rho_v[]
-
-    @inbounds for z in zone_ids
-        part = get_partition(partitions, z)
+    @inbounds for zone in zone_ids
+        part = get_partition(partitions, zone)
         update_duals_bus_ac_vec!(
-            duals_theta[z],
-            duals_v_mag[z],
+            duals_theta[zone],
+            duals_v_mag[zone],
             part,
             theta_consensus,
             v_mag_consensus,
-            ρθ,
-            ρv,
+            rho_theta[],
+            rho_v[],
             shared_buses_sorted,
             shared_buses_to_pos;
-            alpha = alpha,
             theta_consensus_prev = theta_consensus_prev,
             v_mag_consensus_prev = v_mag_consensus_prev,
+        )
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# DC duals: bus variables (theta)
+# ------------------------------------------------------------
+
+@inline function update_duals_theta_vec!(
+    dual_theta::Vector{Float64},
+    part::PartitionDC,
+    theta_consensus::Vector{Float64},
+    rho::Float64,
+    shared_buses_sorted::Vector{Int},
+    shared_buses_to_pos::Dict{Int, Int},
+)
+    theta_shared_local = snapshot_theta_shared!(part)
+    shared_bus_ids = part.shared_buses_zone
+
+    @inbounds for i in eachindex(shared_bus_ids)
+        j = shared_buses_to_pos[shared_bus_ids[i]]
+        dual_theta[j] += rho * (theta_shared_local[i] - theta_consensus[j])
+    end
+    return nothing
+end
+
+@inline function update_duals_theta_all!(
+    dual_theta::Dict{Int, Vector{Float64}},
+    partitions::Partitions{PartitionDC},
+    zone_ids::AbstractVector{Int},
+    theta_consensus::Vector{Float64},
+    rho::Base.RefValue{Float64},
+    shared_buses_sorted::AbstractVector{Int},
+    shared_buses_to_pos::Dict{Int, Int},
+)
+    @inbounds for zone in zone_ids
+        part = get_partition(partitions, zone)
+        update_duals_theta_vec!(
+            dual_theta[zone],
+            part,
+            theta_consensus,
+            rho[],
+            shared_buses_sorted,
+            shared_buses_to_pos,
+        )
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# SOCP duals: bus variables (V^2) - vector form
+# ------------------------------------------------------------
+
+@inline function update_duals_v2_vec!(
+    duals_v2::Vector{Float64},
+    part::PartitionSOCP,
+    v2_consensus::Vector{Float64},
+    rho_v2::Float64,
+    shared_buses_sorted::Vector{Int},
+    shared_buses_to_pos::Dict{Int, Int},
+)
+    v2s = snapshot_v2_shared!(part)
+    shared_bus_ids = part.shared_buses_zone
+
+    @inbounds for i in eachindex(shared_bus_ids)
+        j = shared_buses_to_pos[shared_bus_ids[i]]
+        duals_v2[j] += rho_v2 * (v2s[i] - v2_consensus[j])
+    end
+
+    return nothing
+end
+
+@inline function update_duals_v2_all!(
+    duals_v2::Dict{Int, Vector{Float64}},
+    partitions::Partitions{PartitionSOCP},
+    zone_ids::AbstractVector{Int},
+    v2_consensus::Vector{Float64},
+    rho_v2::Float64,
+    shared_buses_sorted::AbstractVector{Int},
+    shared_buses_to_pos::Dict{Int, Int},
+)
+    @inbounds for z in zone_ids
+        part = get_partition(partitions, z)
+        update_duals_v2_vec!(
+            duals_v2[z],
+            part,
+            v2_consensus,
+            rho_v2,
+            shared_buses_sorted,
+            shared_buses_to_pos,
         )
     end
     return nothing
@@ -158,52 +228,6 @@ function update_duals_branch_ac!(
 end
 
 # ------------------------------------------------------------
-# DC duals: bus variables (theta) - vector form
-# ------------------------------------------------------------
-
-@inline function update_duals_theta_all!(
-    dual_theta::Dict{Int, Vector{Float64}},
-    partitions::Partitions{PartitionDC},
-    zone_ids::AbstractVector{Int},
-    theta_consensus::Vector{Float64},
-    rho::Base.RefValue{Float64},
-    shared_buses_sorted::AbstractVector{Int},
-    shared_buses_to_pos::Dict{Int, Int},
-)
-    ρ = rho[]
-    @inbounds for z in zone_ids
-        part = get_partition(partitions, z)
-        update_duals_theta_vec!(
-            dual_theta[z],
-            part,
-            theta_consensus,
-            ρ,
-            shared_buses_sorted,
-            shared_buses_to_pos,
-        )
-    end
-    return nothing
-end
-
-@inline function update_duals_theta_vec!(
-    dual_vec_zone::Vector{Float64},
-    part::PartitionDC,
-    theta_consensus_vec::Vector{Float64},
-    rho::Float64,
-    shared_buses_sorted::Vector{Int},
-    shared_buses_to_pos::Dict{Int, Int},
-)
-    thetas = snapshot_theta_shared!(part)
-    shared_bus_ids = part.shared_buses_zone
-
-    @inbounds for i in eachindex(shared_bus_ids)
-        j = shared_buses_to_pos[shared_bus_ids[i]]
-        dual_vec_zone[j] += rho * (thetas[i] - theta_consensus_vec[j])
-    end
-    return nothing
-end
-
-# ------------------------------------------------------------
 # DC duals: branch variables (flow on cut edges) - Dict form
 # ------------------------------------------------------------
 
@@ -230,52 +254,6 @@ function update_duals_flow!(
 end
 
 # ------------------------------------------------------------
-# SOCP duals: bus variables (V^2) - vector form
-# ------------------------------------------------------------
-
-@inline function update_duals_v2_vec!(
-    dual_vec_zone::Vector{Float64},
-    sub::PartitionSOCP,
-    v2_consensus_vec::Vector{Float64},
-    rho::Float64,
-    shared_buses_sorted::Vector{Int},
-    shared_buses_to_pos::Dict{Int, Int},
-)
-    v2s = snapshot_v2_shared!(sub)
-    shared_bus_ids = sub.shared_buses_zone
-
-    @inbounds for i in eachindex(shared_bus_ids)
-        j = shared_buses_to_pos[shared_bus_ids[i]]
-        dual_vec_zone[j] += rho * (v2s[i] - v2_consensus_vec[j])
-    end
-
-    return nothing
-end
-
-@inline function update_duals_v2_all!(
-    duals_v2::Dict{Int, Vector{Float64}},
-    partitions::Partitions{PartitionSOCP},
-    zone_ids::AbstractVector{Int},
-    v2_consensus::Vector{Float64},
-    rho_v2::Float64,
-    shared_buses_sorted::AbstractVector{Int},
-    shared_buses_to_pos::Dict{Int, Int},
-)
-    @inbounds for z in zone_ids
-        sub = get_partition(partitions, z)
-        update_duals_v2_vec!(
-            duals_v2[z],
-            sub,
-            v2_consensus,
-            rho_v2,
-            shared_buses_sorted,
-            shared_buses_to_pos,
-        )
-    end
-    return nothing
-end
-
-# ------------------------------------------------------------
 # SOCP duals: branch variables (R,T) - Dict form
 # ------------------------------------------------------------
 
@@ -290,13 +268,13 @@ end
     rho_t::Float64,
 )
     @inbounds for z in zone_ids
-        sub = get_partition(partitions, z)
-        m = sub.model::JuMP.Model
+        part = get_partition(partitions, z)
+        m = part.model::JuMP.Model
         dR = get!(duals_r, z, Dict{Int, Float64}())
         dT = get!(duals_t, z, Dict{Int, Float64}())
 
-        @inbounds for e in sub.zone_edges
-            l = get(sub.branch_global_to_local, e, 0)
+        @inbounds for e in part.zone_edges
+            l = get(part.branch_global_to_local, e, 0)
             l == 0 && continue
             R, T = _rt_from_exprs(m, l)
             dR[e] = get(dR, e, 0.0) + rho_r * (JuMP.value(R) - get(r_consensus, e, 0.0))
@@ -321,13 +299,13 @@ end
     rhoQ::Float64,
 )
     @inbounds for z in zone_ids
-        sub = get_partition(partitions, z)
-        m = sub.model::JuMP.Model
+        part = get_partition(partitions, z)
+        m = part.model::JuMP.Model
         dP = get!(dualsP, z, Dict{Int, Float64}())
         dQ = get!(dualsQ, z, Dict{Int, Float64}())
 
-        @inbounds for e in sub.zone_edges
-            l = get(sub.branch_global_to_local, e, 0)
+        @inbounds for e in part.zone_edges
+            l = get(part.branch_global_to_local, e, 0)
             l == 0 && continue
             P, Q = _pq_flow_from_exprs(m, l)
             dP[e] = get(dP, e, 0.0) + rhoP * (JuMP.value(P) - get(p_flow_consensus, e, 0.0))

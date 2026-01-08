@@ -332,7 +332,6 @@ function run_admm(
             rho_v,
             shared_buses_sorted,
             shared_buses_to_pos;
-            alpha = nothing,
             theta_consensus_prev = theta_consensus_prev,
             v_mag_consensus_prev = v_mag_consensus_prev,
         )
@@ -801,7 +800,6 @@ function run_admm(
             rho_v,
             shared_buses_sorted,
             shared_buses_to_pos;
-            alpha = nothing,
             theta_consensus_prev = theta_consensus_prev,
             v_mag_consensus_prev = v_mag_consensus_prev,
         )
