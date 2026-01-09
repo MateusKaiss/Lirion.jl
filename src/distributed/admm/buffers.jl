@@ -180,6 +180,14 @@ end
 # Flow helpers
 # ------------------------------------------------------------
 
+
+# ---------------------------------------------------------------------
+# NOTE / TODO (DC flow helpers / indexing mismatch — investigate)
+
+# Try to make DC follow the same pattern as AC/SOCP (use model[:p_flow_branches] via _p_flow_from_exprs), 
+# but keep _dc_flow_val_model for now to avoid wrong indexing/results to the paper;
+# ---------------------------------------------------------------------
+
 @inline function _dc_flow_val_model(
     model::JuMP.Model,
     part::PartitionDC,
