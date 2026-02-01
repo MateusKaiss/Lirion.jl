@@ -45,64 +45,6 @@ function compute_ac_bus_consensus_vec!(
 end
 
 # ------------------------------------------------------------
-# DC consensus: bus variables (theta)
-# ------------------------------------------------------------
-
-function compute_theta_consensus_vec!(
-    theta_consensus_vec::Vector{Float64},
-    partitions::Partitions{PartitionDC},
-    shared_buses_sorted::Vector{Int},
-    shared_buses_to_pos::Dict{Int, Int},
-)
-    fill!(theta_consensus_vec, 0.0)
-    counts = zeros(Int, length(shared_buses_sorted))
-
-    for part in partitions
-        theta_shared_local = snapshot_theta_shared!(part)
-        shared_bus_ids = part.shared_buses_zone
-        @inbounds for i in eachindex(shared_bus_ids)
-            j = shared_buses_to_pos[shared_bus_ids[i]]
-            theta_consensus_vec[j] += theta_shared_local[i]
-            counts[j] += 1
-        end
-    end
-
-    @inbounds for j in eachindex(theta_consensus_vec)
-        counts[j] != 0 && (theta_consensus_vec[j] /= counts[j])
-    end
-    return nothing
-end
-
-# ------------------------------------------------------------
-# SOCP consensus: bus variables (V^2)
-# ------------------------------------------------------------
-
-function compute_v2_consensus_vec!(
-    v2_consensus_vec::Vector{Float64},
-    partitions::Partitions{PartitionSOCP},
-    shared_buses_sorted::Vector{Int},
-    shared_buses_to_pos::Dict{Int, Int},
-)
-    fill!(v2_consensus_vec, 0.0)
-    counts = zeros(Int, length(shared_buses_sorted))
-
-    for sub in partitions
-        v2s = snapshot_v2_shared!(sub)
-        shared_bus_ids = sub.shared_buses_zone
-        @inbounds for i in eachindex(shared_bus_ids)
-            j = shared_buses_to_pos[shared_bus_ids[i]]
-            v2_consensus_vec[j] += v2s[i]
-            counts[j] += 1
-        end
-    end
-
-    @inbounds for j in eachindex(v2_consensus_vec)
-        counts[j] != 0 && (v2_consensus_vec[j] /= counts[j])
-    end
-    return nothing
-end
-
-# ------------------------------------------------------------
 # AC consensus: branch variables (P, Q on cut edges)
 # ------------------------------------------------------------
 
@@ -147,6 +89,36 @@ function compute_ac_branch_consensus!(
     return nothing
 end
 
+
+# ------------------------------------------------------------
+# DC consensus: bus variables (theta)
+# ------------------------------------------------------------
+
+function compute_theta_consensus_vec!(
+    theta_consensus_vec::Vector{Float64},
+    partitions::Partitions{PartitionDC},
+    shared_buses_sorted::Vector{Int},
+    shared_buses_to_pos::Dict{Int, Int},
+)
+    fill!(theta_consensus_vec, 0.0)
+    counts = zeros(Int, length(shared_buses_sorted))
+
+    for part in partitions
+        theta_shared_local = snapshot_theta_shared!(part)
+        shared_bus_ids = part.shared_buses_zone
+        @inbounds for i in eachindex(shared_bus_ids)
+            j = shared_buses_to_pos[shared_bus_ids[i]]
+            theta_consensus_vec[j] += theta_shared_local[i]
+            counts[j] += 1
+        end
+    end
+
+    @inbounds for j in eachindex(theta_consensus_vec)
+        counts[j] != 0 && (theta_consensus_vec[j] /= counts[j])
+    end
+    return nothing
+end
+
 # ------------------------------------------------------------
 # DC consensus: branch variables (flow on cut edges)
 # ------------------------------------------------------------
@@ -173,6 +145,35 @@ function compute_flow_consensus!(
     @inbounds for e in interzonal_branches
         n = get(cnts, e, 0)
         n > 0 && (flow_consensus[e] = sums[e] / n)
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# SOCP consensus: bus variables (V^2)
+# ------------------------------------------------------------
+
+function compute_v2_consensus_vec!(
+    v2_consensus_vec::Vector{Float64},
+    partitions::Partitions{PartitionSOCP},
+    shared_buses_sorted::Vector{Int},
+    shared_buses_to_pos::Dict{Int, Int},
+)
+    fill!(v2_consensus_vec, 0.0)
+    counts = zeros(Int, length(shared_buses_sorted))
+
+    for sub in partitions
+        v2s = snapshot_v2_shared!(sub)
+        shared_bus_ids = sub.shared_buses_zone
+        @inbounds for i in eachindex(shared_bus_ids)
+            j = shared_buses_to_pos[shared_bus_ids[i]]
+            v2_consensus_vec[j] += v2s[i]
+            counts[j] += 1
+        end
+    end
+
+    @inbounds for j in eachindex(v2_consensus_vec)
+        counts[j] != 0 && (v2_consensus_vec[j] /= counts[j])
     end
     return nothing
 end
@@ -208,10 +209,6 @@ function compute_pq_consensus!(
     end
     return nothing
 end
-
-# ------------------------------------------------------------
-# SOCP consensus: branch variables
-# ------------------------------------------------------------
 
 function compute_rt_consensus!(
     r_consensus::Dict{Int, Float64},
