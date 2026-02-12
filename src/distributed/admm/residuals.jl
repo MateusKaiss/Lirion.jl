@@ -227,7 +227,6 @@ function eps_primal_branch_ac(
     return sqrt(max(1, dim)) * eps_abs + eps_rel * max(sqrt(z_norm_sq), 1e-12)
 end
 
-
 # ------------------------------------------------------------
 # DC tolerances: eps_primal / eps_dual (bus / branch)
 # ------------------------------------------------------------
@@ -279,7 +278,6 @@ function eps_primal_bus_dc(
     norm_z_sq = sum(theta_consensus_vec[j]^2 for j in eachindex(theta_consensus_vec))
     return sqrt(n) * eps_abs + eps_rel * max(sqrt(norm_x_sq), sqrt(norm_z_sq))
 end
-
 
 function eps_primal_branch_dc(
     partitions::Partitions{PartitionDC},
@@ -363,7 +361,6 @@ function eps_primal_branch_pq_socp(
     end
     return sqrt(max(1, dim)) * eps_abs + eps_rel * max(sqrt(z_norm_sq), 1e-12)
 end
-
 
 # ------------------------------------------------------------
 # AC residuals: dual (bus / branch)
@@ -492,7 +489,6 @@ function dual_residual_branch_pq_socp(
     end
     return sqrt(s)
 end
-
 
 # ------------------------------------------------------------
 # AC tolerances: eps_dual baseado no dual "não escalado" y

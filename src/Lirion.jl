@@ -135,7 +135,7 @@ include("solve.jl")
 # Public exports (API)
 # ------------------------------------------------------------------
 export solve, dc, ac, socp,
-       centralized, admm_bus, admm_branch, admm_hybrid,
-       partition_from_case, partition_metis
+    centralized, admm_bus, admm_branch, admm_hybrid,
+    partition_from_case, partition_metis
 
 end

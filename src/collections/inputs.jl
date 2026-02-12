@@ -62,7 +62,6 @@ function _build_inputs(
     optimizer::Any,
     outputs::Bool,
 )::LirionInputs
-
     data = load_input_data(path)
     preprocess_case_data!(data, OPFModel)
 
@@ -81,14 +80,11 @@ function _build_inputs(
 
     # DISTRIBUTED (ADMM config)
     cfg = algorithm
-    cfg isa DistributedOPFModel || error("Invalid algorithm: expected centralized() or an ADMM config from admm_*().")
+    cfg isa DistributedOPFModel ||
+        error("Invalid algorithm: expected centralized() or an ADMM config from admm_*().")
 
     # inject the true base model and (optionally) optimizer
     cfg.base_model = model
-    if cfg.optimizer === nothing && optimizer !== nothing
-        cfg.optimizer = optimizer
-    end
-
 
     parts_dict, shared_buses = prepare_admm_partitions(data)
     interzonal_branches = _find_interzonal_branches(data)

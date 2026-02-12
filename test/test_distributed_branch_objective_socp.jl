@@ -1,13 +1,6 @@
 # ==============================================
 # ADMM-Branch-SOCP vs SOCP (objective) – tests (API solve)
 # ==============================================
-using Test
-using Lirion
-using Glob
-using SCS
-using Gurobi
-using COSMO
-using Clarabel
 
 # -------------------------------------------------
 # (Optional) Clarabel robust attributes (as string)
@@ -18,46 +11,32 @@ const CLARABEL_ROBUST_ATTRS = (
     "tol_feas" => 1e-4,
     "tol_gap_abs" => 1e-4,
     "tol_gap_rel" => 1e-4,
-    "max_iter" => 1200,
-
-    "dynamic_regularization_enable" => true,
-    "dynamic_regularization_eps"   => 1e-10,
-    "dynamic_regularization_delta" => 1e-4,
-
-    "static_regularization_enable" => true,
-
+    "max_iter" => 1200, "dynamic_regularization_enable" => true,
+    "dynamic_regularization_eps" => 1e-10,
+    "dynamic_regularization_delta" => 1e-4, "static_regularization_enable" => true,
     "equilibrate_enable" => true,
     "equilibrate_min_scaling" => 1e-4,
-    "equilibrate_max_scaling" => 1e4,
-
-    "direct_solve_method" => :qdldl,
-
+    "equilibrate_max_scaling" => 1e4, "direct_solve_method" => :qdldl,
     "iterative_refinement_reltol" => 1e-9,
-    "iterative_refinement_abstol" => 1e-9,
-
-    "max_step_fraction" => 0.7,
-    "linesearch_backtrack_step" => 0.5,
-
-    "tol_ktratio" => 1e-5,
+    "iterative_refinement_abstol" => 1e-9, "max_step_fraction" => 0.7,
+    "linesearch_backtrack_step" => 0.5, "tol_ktratio" => 1e-5,
     "min_terminate_step_length" => 1e-6,
-    "min_switch_step_length" => 5e-2,
-
-    "reduced_tol_gap_abs" => 5e-4,
+    "min_switch_step_length" => 5e-2, "reduced_tol_gap_abs" => 5e-4,
     "reduced_tol_gap_rel" => 5e-4,
-    "reduced_tol_feas"    => 5e-4,
+    "reduced_tol_feas" => 5e-4,
     "reduced_tol_infeas_abs" => 5e-11,
     "reduced_tol_infeas_rel" => 5e-4,
-    "reduced_tol_ktratio"    => 1e-4,
+    "reduced_tol_ktratio" => 1e-4,
 )
 
 # -------- helper local (if runtests didn't define) --------
 # ENV["LIRION_SOCP_PREFER"] can be "auto" | "gurobi" | "cosmo" | "scs"
 if !@isdefined(pick_socp_optimizer)
     const _SOCP_CHAIN_MAP_LOCAL = Dict(
-        :auto   => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
+        :auto => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
         :gurobi => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
-        :cosmo  => (COSMO.Optimizer, Gurobi.Optimizer, SCS.Optimizer),
-        :scs    => (SCS.Optimizer, Gurobi.Optimizer, COSMO.Optimizer),
+        :cosmo => (COSMO.Optimizer, Gurobi.Optimizer, SCS.Optimizer),
+        :scs => (SCS.Optimizer, Gurobi.Optimizer, COSMO.Optimizer),
     )
     function pick_socp_optimizer(;
         prefer::Symbol = Symbol(lowercase(get(ENV, "LIRION_SOCP_PREFER", "auto"))),
@@ -121,7 +100,8 @@ end
 @inline function _objective_centralized(out::Lirion.LirionRunResult)
     d = out.result
     d isa AbstractDict || error("Centralized out.result must be Dict, got $(typeof(d))")
-    haskey(d, "objective") || error("Centralized result has no key 'objective'. Keys=$(collect(keys(d)))")
+    haskey(d, "objective") ||
+        error("Centralized result has no key 'objective'. Keys=$(collect(keys(d)))")
     return d["objective"]
 end
 
@@ -129,7 +109,9 @@ end
     r = out.result
     r isa NamedTuple || error("Distributed out.result must be NamedTuple, got $(typeof(r))")
     hasproperty(r, :total_expr_cost) ||
-        error("Distributed result has no field :total_expr_cost. Fields=$(propertynames(r))")
+        error(
+            "Distributed result has no field :total_expr_cost. Fields=$(propertynames(r))",
+        )
     return getproperty(r, :total_expr_cost)
 end
 
@@ -166,7 +148,8 @@ function compare_distributed_branch_socp_vs_centralized(
 
         # Centralized SOCP (Clarabel robust)
         cent_obj = try
-            opt_cent = optimizer_with_attributes(Clarabel.Optimizer, CLARABEL_ROBUST_ATTRS...)
+            opt_cent =
+                optimizer_with_attributes(Clarabel.Optimizer, CLARABEL_ROBUST_ATTRS...)
             out_cent = Lirion.solve(
                 file;
                 model = Lirion.socp(),
@@ -184,7 +167,7 @@ function compare_distributed_branch_socp_vs_centralized(
 
         # Distributed ADMM-Branch-SOCP (Clarabel + your requested params)
         dist_obj = try
-            alg = Lirion.admm_branch(
+            alg = Lirion.admm_branch(;
                 max_iter = 700,
                 rho_v = 1e8,
                 rho_flow_p = 1e8,
@@ -237,7 +220,7 @@ function compare_distributed_branch_socp_vs_centralized(
     end
 
     dist_obj = try
-        alg = Lirion.admm_branch(
+        alg = Lirion.admm_branch(;
             max_iter = admm_max_iter,
             rho_v = rho_v,
             rho_flow_p = rho_flow_p,

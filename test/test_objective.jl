@@ -126,7 +126,8 @@ end
 @inline function _objective_lirion(out::Lirion.LirionRunResult)
     d = out.result
     d isa AbstractDict || error("Lirion out.result must be Dict, got $(typeof(d))")
-    haskey(d, "objective") || error("Lirion result has no key 'objective'. Keys=$(collect(keys(d)))")
+    haskey(d, "objective") ||
+        error("Lirion result has no key 'objective'. Keys=$(collect(keys(d)))")
     return Float64(d["objective"])
 end
 
@@ -153,21 +154,31 @@ end
     # - For SOCP: SOCWRConicPowerModel (no storage) / SOCWRPowerModel (storage helper)
     if has_storage
         if model_type == Lirion.DC
-            return Float64(PowerModels._solve_opf_strg(pm_data, DCPPowerModel, optimizer)["objective"])
+            return Float64(
+                PowerModels._solve_opf_strg(pm_data, DCPPowerModel, optimizer)["objective"],
+            )
         elseif model_type == Lirion.AC
-            return Float64(PowerModels._solve_opf_strg(pm_data, ACPPowerModel, optimizer)["objective"])
+            return Float64(
+                PowerModels._solve_opf_strg(pm_data, ACPPowerModel, optimizer)["objective"],
+            )
         elseif model_type == Lirion.SOCP
-            return Float64(PowerModels._solve_opf_strg(pm_data, SOCWRPowerModel, optimizer)["objective"])
+            return Float64(
+                PowerModels._solve_opf_strg(pm_data, SOCWRPowerModel, optimizer)["objective"],
+            )
         else
             error("Model type not recognized for storage case.")
         end
     else
         if model_type == Lirion.DC
-            return Float64(PowerModels.solve_opf(pm_data, DCPPowerModel, optimizer)["objective"])
+            return Float64(
+                PowerModels.solve_opf(pm_data, DCPPowerModel, optimizer)["objective"],
+            )
         elseif model_type == Lirion.AC
             return Float64(PowerModels.solve_ac_opf(pm_data, optimizer)["objective"])
         elseif model_type == Lirion.SOCP
-            return Float64(PowerModels.solve_opf(pm_data, SOCWRConicPowerModel, optimizer)["objective"])
+            return Float64(
+                PowerModels.solve_opf(pm_data, SOCWRConicPowerModel, optimizer)["objective"],
+            )
         else
             error("Model type not recognized.")
         end

@@ -33,7 +33,8 @@ end
 @inline function _objective_centralized_dc(out::Lirion.LirionRunResult)
     d = out.result
     d isa AbstractDict || error("Centralized out.result must be Dict, got $(typeof(d))")
-    haskey(d, "objective") || error("Centralized result has no key 'objective'. Keys=$(collect(keys(d)))")
+    haskey(d, "objective") ||
+        error("Centralized result has no key 'objective'. Keys=$(collect(keys(d)))")
     return Float64(d["objective"])
 end
 
@@ -43,7 +44,9 @@ end
 
     # You used total_real_cost before; keep it as default.
     hasproperty(r, :total_real_cost) ||
-        error("Distributed result has no field :total_real_cost. Fields=$(propertynames(r))")
+        error(
+            "Distributed result has no field :total_real_cost. Fields=$(propertynames(r))",
+        )
 
     return Float64(getproperty(r, :total_real_cost))
 
@@ -94,14 +97,11 @@ function compare_distributed_branch_vs_centralized(
     # Distributed ADMM-Branch-DC -> NamedTuple
     # --------------------------------------
     dist_obj = try
-        alg = Lirion.admm_branch(
+        alg = Lirion.admm_branch(;
             max_iter = admm_max_iter,
             rho = Float64(admm_rho),
             eps_abs = Float64(admm_eps_abs),
             eps_rel = Float64(admm_eps_rel),
-            # NOTE: your config uses alpha_overrelax (not alpha)
-            alpha_overrelax = (admm_alpha == 1.0 ? nothing : Float64(admm_alpha)),
-            warm_start = Bool(admm_warm_start),
             adaptive_rho = true,  # keep old behavior unless you add a knob here
             mu_incr = Float64(admm_mu_incr),
             mu_decr = Float64(admm_mu_decr),
@@ -113,7 +113,7 @@ function compare_distributed_branch_vs_centralized(
             file;
             model = Lirion.dc(),
             algorithm = alg,
-            optimizer = distributed_optimizer, # can be nothing; solve() will keep it if cfg has it
+            optimizer = distributed_optimizer,
             outputs = false,
             plots = false,
         )

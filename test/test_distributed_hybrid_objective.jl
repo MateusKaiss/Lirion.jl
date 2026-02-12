@@ -28,14 +28,17 @@ end
 @inline function _objective_centralized_dc(out::Lirion.LirionRunResult)
     d = out.result
     d isa AbstractDict || error("Centralized out.result must be Dict, got $(typeof(d))")
-    haskey(d, "objective") || error("Centralized result has no key 'objective'. Keys=$(collect(keys(d)))")
+    haskey(d, "objective") ||
+        error("Centralized result has no key 'objective'. Keys=$(collect(keys(d)))")
     return Float64(d["objective"])
 end
 
 @inline function _objective_distributed_hybrid_dc(out::Lirion.LirionRunResult)
     r = out.result
     r isa NamedTuple || error("Distributed out.result must be NamedTuple, got $(typeof(r))")
-    hasproperty(r, :total_real_cost) || error("Distributed result has no field :total_real_cost. Fields=$(propertynames(r))")
+    hasproperty(r, :total_real_cost) || error(
+        "Distributed result has no field :total_real_cost. Fields=$(propertynames(r))",
+    )
     return Float64(getproperty(r, :total_real_cost))
     # se quiser comparar o outro: Float64(getproperty(r, :total_expr_cost))
 end
@@ -43,14 +46,34 @@ end
 # ------------------------------------------------------------
 # Helper: call solve with/without optimizer kwarg
 # ------------------------------------------------------------
-@inline function _solve_maybe_optimizer(file::String; model, algorithm, optimizer, outputs=false, plots=false)
+@inline function _solve_maybe_optimizer(
+    file::String;
+    model,
+    algorithm,
+    optimizer,
+    outputs = false,
+    plots = false,
+)
     if optimizer === nothing
-        return Lirion.solve(file; model=model, algorithm=algorithm, outputs=outputs, plots=plots)
+        return Lirion.solve(
+            file;
+            model = model,
+            algorithm = algorithm,
+            optimizer = nothing,
+            outputs = outputs,
+            plots = plots,
+        )
     else
-        return Lirion.solve(file; model=model, algorithm=algorithm, optimizer=optimizer, outputs=outputs, plots=plots)
+        return Lirion.solve(
+            file;
+            model = model,
+            algorithm = algorithm,
+            optimizer = optimizer,
+            outputs = outputs,
+            plots = plots,
+        )
     end
 end
-
 
 function compare_distributed_hybrid_dc_vs_centralized(
     file::String;
@@ -89,16 +112,13 @@ function compare_distributed_hybrid_dc_vs_centralized(
 
     # --- Distribuído ADMM-Hybrid-DC ---
     dist_obj = try
-        alg = Lirion.admm_hybrid(
+        alg = Lirion.admm_hybrid(;
             max_iter = admm_max_iter,
             rho = Float64(admm_rho),
             eps_abs = Float64(admm_eps_abs),
             eps_rel = Float64(admm_eps_rel),
-            alpha_overrelax = (admm_alpha == 1.0 ? nothing : Float64(admm_alpha)),
-            warm_start = Bool(admm_warm_start),
         )
 
-        # NÃO herda solver do central: se distributed_optimizer==nothing, deixa o default interno do Lirion.
         out_dist = _solve_maybe_optimizer(
             file;
             model = Lirion.dc(),

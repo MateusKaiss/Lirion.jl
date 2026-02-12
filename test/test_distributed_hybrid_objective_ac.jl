@@ -32,14 +32,17 @@ end
 @inline function _objective_centralized_ac(out::Lirion.LirionRunResult)
     d = out.result
     d isa AbstractDict || error("Centralized out.result must be Dict, got $(typeof(d))")
-    haskey(d, "objective") || error("Centralized result has no key 'objective'. Keys=$(collect(keys(d)))")
+    haskey(d, "objective") ||
+        error("Centralized result has no key 'objective'. Keys=$(collect(keys(d)))")
     return d["objective"]
 end
 
 @inline function _objective_distributed_hybrid_ac(out::Lirion.LirionRunResult)
     r = out.result
     r isa NamedTuple || error("Distributed out.result must be NamedTuple, got $(typeof(r))")
-    hasproperty(r, :total_expr_cost) || error("Distributed result has no field :total_expr_cost. Fields=$(propertynames(r))")
+    hasproperty(r, :total_expr_cost) || error(
+        "Distributed result has no field :total_expr_cost. Fields=$(propertynames(r))",
+    )
     return getproperty(r, :total_expr_cost)
 end
 
@@ -87,18 +90,15 @@ function compare_distributed_hybrid_ac_vs_centralized(
     dist_obj = try
         # NOTE: DistributedOPFModel constructor enforces > 0.
         # So: if you pass a rho_* kwarg, it MUST be non-nothing and > 0.
-        alg = Lirion.admm_hybrid(
+        alg = Lirion.admm_hybrid(;
             max_iter = admm_max_iter,
-
             rho = (rho_base === nothing ? 1_000.0 : Float64(rho_base)),
             rho_theta = (rho_theta === nothing ? nothing : Float64(rho_theta)),
             rho_v = (rho_v === nothing ? nothing : Float64(rho_v)),
             rho_flow_p = (rho_flow_p === nothing ? nothing : Float64(rho_flow_p)),
             rho_flow_q = (rho_flow_q === nothing ? nothing : Float64(rho_flow_q)),
-
             eps_abs = Float64(admm_eps_abs),
             eps_rel = Float64(admm_eps_rel),
-
             adaptive_rho = isnothing(admm_adaptive) ? true : Bool(admm_adaptive),
             mu_incr = Float64(admm_mu_incr),
             mu_decr = Float64(admm_mu_decr),
@@ -262,9 +262,7 @@ function run_distributed_hybrid_ac_objective_tests(;
                 rho_theta = rho_bus_base,
                 rho_v = rho_bus_base,
                 rho_flow_p = rho_flow_base,
-                rho_flow_q = rho_flow_base,
-
-                admm_max_iter = admm_max_iter_case,
+                rho_flow_q = rho_flow_base, admm_max_iter = admm_max_iter_case,
                 admm_eps_abs = admm_eps_abs_case,
                 admm_eps_rel = admm_eps_rel_case,
                 admm_mu_incr = admm_mu_incr_case,

@@ -78,8 +78,10 @@ end
 # ----------------------------
 # DC
 # ----------------------------
-function resolve_optimizer(::Val{:dc}, config)
-    opt = config.optimizer
+function resolve_optimizer(::Val{:dc}, config, inputs_optimizer)
+    opt =
+        inputs_optimizer !== nothing ? inputs_optimizer :
+        _getopt(config, :optimizer, nothing)
 
     if opt !== nothing
         if opt == COSMO.Optimizer
@@ -109,11 +111,17 @@ function resolve_optimizer(::Val{:dc}, config)
     )
 end
 
+# backward-compat (se algum lugar ainda chama o velho)
+resolve_optimizer(tag::Val{:dc}, config) = resolve_optimizer(tag, config, nothing)
+
 # ----------------------------
 # AC
 # ----------------------------
-function resolve_optimizer(::Val{:ac}, config)
-    opt = _getopt(config, :optimizer, nothing)
+function resolve_optimizer(::Val{:ac}, config, inputs_optimizer)
+    opt =
+        inputs_optimizer !== nothing ? inputs_optimizer :
+        _getopt(config, :optimizer, nothing)
+
     if opt !== nothing
         if opt == Ipopt.Optimizer
             return optimizer_with_attributes(
@@ -232,13 +240,18 @@ function resolve_optimizer(::Val{:ac}, config)
     )
 end
 
+resolve_optimizer(tag::Val{:ac}, config) = resolve_optimizer(tag, config, nothing)
+
 # ----------------------------
 # SOCP
 # ----------------------------
 is_gurobi(m::JuMP.Model)::Bool = occursin("Gurobi", MOI.get(m, MOI.SolverName()))
 
-function resolve_optimizer(::Val{:socp}, config)
-    opt = _getopt(config, :optimizer, nothing)
+function resolve_optimizer(::Val{:socp}, config, inputs_optimizer)
+    opt =
+        inputs_optimizer !== nothing ? inputs_optimizer :
+        _getopt(config, :optimizer, nothing)
+
     opt !== nothing && return _silent_factory(opt)
 
     prefer = _getopt(config, :prefer_socp_solver, :auto)
@@ -264,12 +277,19 @@ function resolve_optimizer(::Val{:socp}, config)
     return _silent_factory(SCS.Optimizer)
 end
 
+resolve_optimizer(tag::Val{:socp}, config) = resolve_optimizer(tag, config, nothing)
+
 @inline base_model_tag(::Type{DC}) = Val(:dc)
 @inline base_model_tag(::Type{AC}) = Val(:ac)
 @inline base_model_tag(::Type{SOCP}) = Val(:socp)
 
 @inline function resolve_optimizer(config)
     return resolve_optimizer(base_model_tag(config.base_model), config)
+end
+
+# NEW: resolve_optimizer(cfg, inputs.optimizer) (2 args) para o distributed_opf.jl
+@inline function resolve_optimizer(config::DistributedOPFModel, inputs_optimizer)
+    return resolve_optimizer(base_model_tag(config.base_model), config, inputs_optimizer)
 end
 
 # ============================================================

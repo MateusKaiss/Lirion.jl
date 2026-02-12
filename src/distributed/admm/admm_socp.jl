@@ -72,8 +72,8 @@ function init_socp_pq_partition!(
     part::PartitionSOCP,
     sys_zone::SystemData,
     optimizer_factory,
-    rhoP::Float64,
-    rhoQ::Float64,
+    rho_p::Float64,
+    rho_q::Float64,
     interzonal_branches,
 )
     prepare_hotpaths!(part)
@@ -97,7 +97,7 @@ function init_socp_pq_partition!(
         part.soft_anchor_expr = zero(JuMP.QuadExpr)
     end
 
-    build_quad_branch_pq_expr!(part, rhoP, rhoQ, part.zone_edges)
+    build_quad_branch_pq_expr!(part, rho_p, rho_q, part.zone_edges)
 
     part.obj_static = part.obj_base + part.quad_pq_expr_socp + part.soft_anchor_expr
     @objective(model, Min, part.obj_static)
@@ -109,8 +109,8 @@ function init_socp_pq_partition!(
     partitions::Partitions{PartitionSOCP},
     sys::ADMMSystem,
     optimizer_factory,
-    rhoP::Float64,
-    rhoQ::Float64,
+    rho_p::Float64,
+    rho_q::Float64,
     interzonal_branches,
 )
     n_zones = length(partitions.parts)
@@ -121,8 +121,8 @@ function init_socp_pq_partition!(
             partitions.parts[i],
             sys.parts[i],
             optimizer_factory,
-            rhoP,
-            rhoQ,
+            rho_p,
+            rho_q,
             interzonal_branches,
         )
     end
@@ -136,8 +136,8 @@ function init_socp_hybrid_partition!(
     sys_zone::SystemData,
     optimizer_factory,
     rho_v2::Float64,
-    rhoP::Float64,
-    rhoQ::Float64,
+    rho_p::Float64,
+    rho_q::Float64,
     rho_r::Float64,
     rho_t::Float64,
     interzonal_branches,
@@ -157,7 +157,7 @@ function init_socp_hybrid_partition!(
     end
 
     build_quad_bus_expr!(part, rho_v2)
-    build_quad_branch_pq_expr!(part, rhoP, rhoQ, part.zone_edges)
+    build_quad_branch_pq_expr!(part, rho_p, rho_q, part.zone_edges)
     build_quad_branch_rt_expr!(part, rho_r, rho_t, part.zone_edges)
 
     part.obj_static =
@@ -173,8 +173,8 @@ function init_socp_hybrid_partition!(
     sys::ADMMSystem,
     optimizer_factory,
     rho_v2::Float64,
-    rhoP::Float64,
-    rhoQ::Float64,
+    rho_p::Float64,
+    rho_q::Float64,
     rho_r::Float64,
     rho_t::Float64,
     interzonal_branches,
@@ -188,8 +188,8 @@ function init_socp_hybrid_partition!(
             sys.parts[i],
             optimizer_factory,
             rho_v2,
-            rhoP,
-            rhoQ,
+            rho_p,
+            rho_q,
             rho_r,
             rho_t,
             interzonal_branches,
@@ -209,18 +209,23 @@ end
 function run_admm(
     sys::ADMMSystem,
     config::DistributedOPFModel,
-    ::ADMM{Bus, SOCPTag},
+    ::ADMM{Bus, SOCPTag};
+    optimizer_factory = nothing,
 )::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == SOCP "ADMM-SOCP: base_model deve ser SOCP."
+
+    if optimizer_factory === nothing
+        optimizer_factory = resolve_optimizer(config)
+    end
 
     shared_buses = sys.shared_buses
     interzonal_branches = sys.interzonal_branches
     max_iter = config.max_iter
 
-    rho_v2 = Ref(config.rho_v)
-    rho_r = Ref(config.rho_flow_p)
-    rho_t = Ref(config.rho_flow_q)
+    rho_v2 = Ref(config.rho_v2)
+    rho_r = Ref(config.rho_r)
+    rho_t = Ref(config.rho_t)
 
     prev_rho_v2 = Ref(rho_v2[])
     prev_rho_r = Ref(rho_r[])
@@ -229,8 +234,6 @@ function run_admm(
     eps_abs = config.eps_abs
     eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
-
-    optimizer_factory = resolve_optimizer(config)
 
     partitions = build_socp_partitions(sys)
     zone_ids = partitions.zones
@@ -267,8 +270,7 @@ function run_admm(
     v2_avg_history = Dict{Int, Vector{Float64}}()
 
     results = Vector{NamedTuple{(:gen_cost_expr, :real_cost), Tuple{Float64, Float64}}}(
-        undef,
-        n_zones,
+        undef, n_zones,
     )
 
     init_socp_v2rt_partition!(
@@ -311,6 +313,7 @@ function run_admm(
                 rho_r[],
                 rho_t[],
             )
+
             @objective(model, Min, part.obj_static + (lin_bus + lin_rt))
             optimize!(model)
 
@@ -338,12 +341,7 @@ function run_admm(
             shared_buses_sorted,
             shared_buses_to_pos,
         )
-        compute_rt_consensus!(
-            r_consensus,
-            t_consensus,
-            partitions,
-            interzonal_branches,
-        )
+        compute_rt_consensus!(r_consensus, t_consensus, partitions, interzonal_branches)
 
         @inbounds for b in shared_buses_sorted
             j = shared_buses_to_pos[b]
@@ -437,7 +435,11 @@ function run_admm(
         end
 
         _record_iter!(
-            hist, r, s, eps_r, eps_s;
+            hist,
+            r,
+            s,
+            eps_r,
+            eps_s;
             rhos = Dict(:rho_v2 => rho_v2[], :rho_r => rho_r[], :rho_t => rho_t[]),
         )
 
@@ -459,9 +461,9 @@ function run_admm(
         "[ADMM-SOCP (V²+R,T)]",
         result;
         rho_lines = (
-            "rho(V²) inicial: $(config.rho_v)      | rho(V²) final: $(rho_v2[])",
-            "rho_r    inicial: $(config.rho_flow_p) | rho_r final: $(rho_r[])",
-            "rho_t    inicial: $(config.rho_flow_q) | rho_t final: $(rho_t[])",
+            "rho(V²) inicial: $(config.rho_v2) | rho(V²) final: $(rho_v2[])",
+            "rho_r   inicial: $(config.rho_r)  | rho_r final: $(rho_r[])",
+            "rho_t   inicial: $(config.rho_t)  | rho_t final: $(rho_t[])",
         ),
     )
 
@@ -480,24 +482,27 @@ end
 function run_admm(
     sys::ADMMSystem,
     config::DistributedOPFModel,
-    ::ADMM{Branch, SOCPTag},
+    ::ADMM{Branch, SOCPTag};
+    optimizer_factory = nothing,
 )::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == SOCP "ADMM-SOCP-branch: base_model deve ser SOCP."
 
+    if optimizer_factory === nothing
+        optimizer_factory = resolve_optimizer(config)
+    end
+
     interzonal_branches = sys.interzonal_branches
     max_iter = config.max_iter
 
-    rhoP = Ref(config.rho_flow_p)
-    rhoQ = Ref(config.rho_flow_q)
-    prev_rhoP = Ref(rhoP[])
-    prev_rhoQ = Ref(rhoQ[])
+    rho_p = Ref(config.rho_p)
+    rho_q = Ref(config.rho_q)
+    prev_rho_p = Ref(rho_p[])
+    prev_rho_q = Ref(rho_q[])
 
     eps_abs = config.eps_abs
     eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
-
-    optimizer_factory = resolve_optimizer(config)
 
     partitions = build_socp_partitions(sys)
     zone_ids = partitions.zones
@@ -523,8 +528,8 @@ function run_admm(
         partitions,
         sys,
         optimizer_factory,
-        rhoP[],
-        rhoQ[],
+        rho_p[],
+        rho_q[],
         interzonal_branches,
     )
 
@@ -533,7 +538,7 @@ function run_admm(
         iter_done = iter
         _FAST_USE_LOGS && println("\n[ADMM-SOCP-branch (P,Q)] Iteração $iter")
 
-        refresh_rho_pq_socp!(partitions, rhoP, prev_rhoP, rhoQ, prev_rhoQ)
+        refresh_rho_pq_socp!(partitions, rho_p, prev_rho_p, rho_q, prev_rho_q)
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
@@ -547,8 +552,8 @@ function run_admm(
                 q_flow_consensus,
                 dualsP[zone_id],
                 dualsQ[zone_id],
-                rhoP[],
-                rhoQ[],
+                rho_p[],
+                rho_q[],
             )
 
             @objective(model, Min, part.obj_static + lin)
@@ -577,8 +582,8 @@ function run_admm(
             zone_ids,
             p_flow_consensus,
             q_flow_consensus,
-            rhoP[],
-            rhoQ[],
+            rho_p[],
+            rho_q[],
         )
 
         r = primal_residual_branch_pq_socp(
@@ -587,15 +592,14 @@ function run_admm(
             q_flow_consensus,
             interzonal_branches,
         )
-
         s = dual_residual_branch_pq_socp(
             p_flow_consensus,
             q_flow_consensus,
             p_flow_consensus_prev,
             q_flow_consensus_prev,
             interzonal_branches,
-            rhoP[],
-            rhoQ[],
+            rho_p[],
+            rho_q[],
         )
 
         eps_r = eps_primal_branch_pq_socp(
@@ -606,7 +610,6 @@ function run_admm(
             eps_abs,
             eps_rel,
         )
-
         eps_s = eps_dual_branch_pq_socp_unscaled(
             dualsP,
             dualsQ,
@@ -622,7 +625,7 @@ function run_admm(
             s,
             eps_r,
             eps_s;
-            rhos = Dict(:rho_p => rhoP[], :rho_q => rhoQ[]),
+            rhos = Dict(:rho_p => rho_p[], :rho_q => rho_q[]),
         )
 
         _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_r")
@@ -633,7 +636,7 @@ function run_admm(
             break
         end
 
-        maybe_adapt_rho!(adaptive, rhoP, rhoQ, r, s, config)
+        maybe_adapt_rho!(adaptive, rho_p, rho_q, r, s, config)
     end
 
     result = _finalize_admm_result(partitions, t0_ns, iter_done)
@@ -641,8 +644,8 @@ function run_admm(
         "[ADMM-SOCP-branch (P,Q)]",
         result;
         rho_lines = (
-            "rhoP inicial: $(config.rho_flow_p) | rhoP final: $(rhoP[])",
-            "rhoQ inicial: $(config.rho_flow_q) | rhoQ final: $(rhoQ[])",
+            "rho_p inicial: $(config.rho_p) | rho_p final: $(rho_p[])",
+            "rho_q inicial: $(config.rho_q) | rho_q final: $(rho_q[])",
         ),
     )
 
@@ -655,59 +658,41 @@ function run_admm(
 end
 
 # ------------------------------------------------------------
-# Helpers
-# ------------------------------------------------------------
-
-@inline function _get_rho_rt_initial(config::DistributedOPFModel)
-    ρr = try
-        getfield(config, :rho_flow_r)
-    catch
-        config.rho_flow_p
-    end
-    ρt = try
-        getfield(config, :rho_flow_t)
-    catch
-        config.rho_flow_q
-    end
-    return ρr, ρt
-end
-
-# ------------------------------------------------------------
 # Runner: ADMM SOCP hybrid (V² + P/Q + R/T)
 # ------------------------------------------------------------
 
 function run_admm(
     sys::ADMMSystem,
     config::DistributedOPFModel,
-    ::ADMM{Hybrid, SOCPTag},
+    ::ADMM{Hybrid, SOCPTag};
+    optimizer_factory = nothing,
 )::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == SOCP "ADMM-SOCP-hybrid: base_model deve ser SOCP."
+
+    if optimizer_factory === nothing
+        optimizer_factory = resolve_optimizer(config)
+    end
 
     shared_buses = sys.shared_buses
     interzonal_branches = sys.interzonal_branches
     max_iter = config.max_iter
 
-    rho_v2 = Ref(config.rho_v)
-
-    rhoP = Ref(config.rho_flow_p)
-    rhoQ = Ref(config.rho_flow_q)
-
-    ρr0, ρt0 = _get_rho_rt_initial(config)
-    rho_r = Ref(ρr0)
-    rho_t = Ref(ρt0)
+    rho_v2 = Ref(config.rho_v2)
+    rho_p = Ref(config.rho_p)
+    rho_q = Ref(config.rho_q)
+    rho_r = Ref(config.rho_r)
+    rho_t = Ref(config.rho_t)
 
     prev_rho_v2 = Ref(rho_v2[])
-    prev_rhoP = Ref(rhoP[])
-    prev_rhoQ = Ref(rhoQ[])
+    prev_rho_p = Ref(rho_p[])
+    prev_rho_q = Ref(rho_q[])
     prev_rho_r = Ref(rho_r[])
     prev_rho_t = Ref(rho_t[])
 
     eps_abs = config.eps_abs
     eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
-
-    optimizer_factory = resolve_optimizer(config)
 
     partitions = build_socp_partitions(sys)
     zone_ids = partitions.zones
@@ -756,7 +741,7 @@ function run_admm(
 
     init_socp_hybrid_partition!(
         partitions, sys, optimizer_factory,
-        rho_v2[], rhoP[], rhoQ[], rho_r[], rho_t[], interzonal_branches,
+        rho_v2[], rho_p[], rho_q[], rho_r[], rho_t[], interzonal_branches,
     )
 
     iter_done = 0
@@ -767,8 +752,8 @@ function run_admm(
         refresh_rho_hybrid_socp!(
             partitions,
             rho_v2, prev_rho_v2,
-            rhoP, prev_rhoP,
-            rhoQ, prev_rhoQ,
+            rho_p, prev_rho_p,
+            rho_q, prev_rho_q,
             rho_r, prev_rho_r,
             rho_t, prev_rho_t,
         )
@@ -797,8 +782,8 @@ function run_admm(
                 q_flow_consensus,
                 dualsP[zone_id],
                 dualsQ[zone_id],
-                rhoP[],
-                rhoQ[],
+                rho_p[],
+                rho_q[],
             )
 
             lin_rt = build_linear_branch_rt_term(
@@ -839,12 +824,7 @@ function run_admm(
             partitions,
             interzonal_branches,
         )
-        compute_rt_consensus!(
-            r_consensus,
-            t_consensus,
-            partitions,
-            interzonal_branches,
-        )
+        compute_rt_consensus!(r_consensus, t_consensus, partitions, interzonal_branches)
 
         @inbounds for b in shared_buses_sorted
             j = shared_buses_to_pos[b]
@@ -867,8 +847,8 @@ function run_admm(
             zone_ids,
             p_flow_consensus,
             q_flow_consensus,
-            rhoP[],
-            rhoQ[],
+            rho_p[],
+            rho_q[],
         )
         update_duals_rt_all!(
             duals_r,
@@ -908,8 +888,8 @@ function run_admm(
             p_flow_consensus_prev,
             q_flow_consensus_prev,
             interzonal_branches,
-            rhoP[],
-            rhoQ[],
+            rho_p[],
+            rho_q[],
         )
         s_rt = dual_residual_branch_rt_socp(
             r_consensus,
@@ -982,8 +962,8 @@ function run_admm(
             hist, r, s, eps_r, eps_s;
             rhos = Dict(
                 :rho_v2 => rho_v2[],
-                :rho_p => rhoP[],
-                :rho_q => rhoQ[],
+                :rho_p => rho_p[],
+                :rho_q => rho_q[],
                 :rho_r => rho_r[],
                 :rho_t => rho_t[],
             ),
@@ -1000,7 +980,7 @@ function run_admm(
         maybe_adapt_rho!(
             adaptive,
             rho_v2, r_bus, s_bus,
-            rhoP, rhoQ, r_pq, s_pq,
+            rho_p, rho_q, r_pq, s_pq,
             rho_r, rho_t, r_rt, s_rt,
             config,
         )
@@ -1013,11 +993,11 @@ function run_admm(
         "[ADMM-SOCP-hybrid]",
         result;
         rho_lines = (
-            "rho(V²) inicial: $(config.rho_v)      | rho(V²) final: $(rho_v2[])",
-            "rhoP    inicial: $(config.rho_flow_p) | rhoP final: $(rhoP[])",
-            "rhoQ    inicial: $(config.rho_flow_q) | rhoQ final: $(rhoQ[])",
-            "rho_r    inicial: $(ρr0)               | rho_r final: $(rho_r[])",
-            "rho_t    inicial: $(ρt0)               | rho_t final: $(rho_t[])",
+            "rho(V²) inicial: $(config.rho_v2) | rho(V²) final: $(rho_v2[])",
+            "rho_p   inicial: $(config.rho_p)  | rho_p final: $(rho_p[])",
+            "rho_q   inicial: $(config.rho_q)  | rho_q final: $(rho_q[])",
+            "rho_r   inicial: $(config.rho_r)  | rho_r final: $(rho_r[])",
+            "rho_t   inicial: $(config.rho_t)  | rho_t final: $(rho_t[])",
         ),
     )
 

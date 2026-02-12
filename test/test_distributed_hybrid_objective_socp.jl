@@ -2,14 +2,6 @@
 # ADMM-Hybrid-SOCP vs SOCP (objective) – tests (API solve)
 # ==============================================
 
-using Test
-using Lirion
-using Glob
-using SCS
-using Gurobi
-using COSMO
-using Clarabel
-
 # -------------------------------------------------
 # (Opcional) pacote de atributos robustos do Clarabel
 # -------------------------------------------------
@@ -53,10 +45,10 @@ optimizer_with_attributes(Clarabel.Optimizer,
 # -------- helper local (caso o runtests não tenha definido) --------
 if !@isdefined(pick_socp_optimizer)
     const _SOCP_CHAIN_MAP_LOCAL = Dict(
-        :auto   => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
+        :auto => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
         :gurobi => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
-        :cosmo  => (COSMO.Optimizer,  Gurobi.Optimizer, SCS.Optimizer),
-        :scs    => (SCS.Optimizer,    Gurobi.Optimizer, COSMO.Optimizer),
+        :cosmo => (COSMO.Optimizer, Gurobi.Optimizer, SCS.Optimizer),
+        :scs => (SCS.Optimizer, Gurobi.Optimizer, COSMO.Optimizer),
     )
     function pick_socp_optimizer(;
         prefer::Symbol = Symbol(lowercase(get(ENV, "LIRION_SOCP_PREFER", "auto"))),
@@ -121,7 +113,8 @@ end
 @inline function _objective_centralized_socp(out::Lirion.LirionRunResult)
     d = out.result
     d isa AbstractDict || error("Centralized out.result must be Dict, got $(typeof(d))")
-    haskey(d, "objective") || error("Centralized result has no key 'objective'. Keys=$(collect(keys(d)))")
+    haskey(d, "objective") ||
+        error("Centralized result has no key 'objective'. Keys=$(collect(keys(d)))")
     return d["objective"]
 end
 
@@ -129,7 +122,9 @@ end
     r = out.result
     r isa NamedTuple || error("Distributed out.result must be NamedTuple, got $(typeof(r))")
     # ADMM distributed results expose these (same as your branch tests)
-    hasproperty(r, :total_expr_cost) || error("Distributed result has no field :total_expr_cost. Fields=$(propertynames(r))")
+    hasproperty(r, :total_expr_cost) || error(
+        "Distributed result has no field :total_expr_cost. Fields=$(propertynames(r))",
+    )
     return getproperty(r, :total_expr_cost)
 end
 
@@ -178,7 +173,7 @@ function compare_distributed_hybrid_socp_vs_centralized(
         end
 
         dist_obj = try
-            alg = Lirion.admm_hybrid(
+            alg = Lirion.admm_hybrid(;
                 max_iter = 700,
                 rho_v = 1e8,
                 rho_flow_p = 1e8,
@@ -233,7 +228,7 @@ function compare_distributed_hybrid_socp_vs_centralized(
 
     dist_obj = try
         # Hybrid-SOCP needs separate rho_v / rho_flow_p / rho_flow_q (do NOT use --admm-rho here)
-        alg = Lirion.admm_hybrid(
+        alg = Lirion.admm_hybrid(;
             max_iter = admm_max_iter,
             rho_v = Float64(rho_v),
             rho_flow_p = Float64(rho_flow_p),

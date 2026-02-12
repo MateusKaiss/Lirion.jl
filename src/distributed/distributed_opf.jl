@@ -30,8 +30,11 @@ function run_distributed(inputs::LirionInputs)::LirionRunResult
     @info "Running distributed OPF"
     @info "  method     = $(cfg.method)"
     @info "  base_model = $(cfg.base_model)"
+    @info "  optimizer  = $(inputs.optimizer)"
 
-    output = run_admm(sys, cfg, admm_tag(cfg))
+    optimizer_factory = resolve_optimizer(cfg, inputs.optimizer)
+
+    output = run_admm(sys, cfg, admm_tag(cfg); optimizer_factory = optimizer_factory)
 
     if output isa LirionRunResult
         r = output.result

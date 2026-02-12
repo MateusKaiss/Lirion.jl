@@ -34,7 +34,6 @@ function solve(
     outputs::Bool = false,
     plots::Bool = false,
 )::LirionRunResult
-
     path_str = abspath(String(path))
     if !(isfile(path_str) || isdir(path_str))
         error("Invalid path: $path_str is not a file or directory.")

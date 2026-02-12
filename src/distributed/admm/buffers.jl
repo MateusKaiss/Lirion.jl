@@ -202,7 +202,11 @@ end
 # - se não tem valores: NÃO usa start_value em AffExpr -> retorna 0.0
 @inline function _p_flow_value_or_zero(model::JuMP.Model, P; default::Float64 = 0.0)
     if JuMP.has_values(model)
-        v = try JuMP.value(P) catch; NaN end
+        v = try
+            JuMP.value(P)
+        catch
+            NaN
+        end
         return isfinite(v) ? Float64(v) : default
     end
     # sem solução ainda (iter 1, infeasible, iteration limit etc.)
@@ -214,19 +218,6 @@ end
     P = _p_flow_from_exprs(part, l_local; t = 1)
     return _p_flow_value_or_zero(model, P; default = 0.0)
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 @inline _pq_flow_from_exprs(model::JuMP.Model, l::Int, t::Int = 1) =
     (model[:p_flow_branches][l, t], model[:q_flow_branches][l, t])

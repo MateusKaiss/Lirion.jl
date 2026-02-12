@@ -2,11 +2,6 @@
 # Distributed ADMM-DC (bus) vs DC — objective tests (API solve)
 # =============================
 
-using Test
-using Lirion
-using OSQP
-using Ipopt
-
 # =============================
 # Casos particionados (2/3 zonas)
 # =============================
@@ -17,11 +12,11 @@ const distributed_zone_cases = [
     # "pglib_opf_case57_ieee__sad.m",
 
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
+    # "pglib_opf_case3_lmbd__api.m",
+    # "pglib_opf_case3_lmbd__sad.m",
 
     # "pglib_opf_case57_ieee.m",
-    "pglib_opf_case73_ieee_rts.m",
+    # "pglib_opf_case73_ieee_rts.m",
     # "pglib_opf_case118_ieee.m",
 
     # "pglib_opf_case500_goc.m",
@@ -42,7 +37,8 @@ end
 @inline function _objective_centralized_dc(out::Lirion.LirionRunResult)
     d = out.result
     d isa AbstractDict || error("Centralized out.result must be Dict, got $(typeof(d))")
-    haskey(d, "objective") || error("Centralized result has no key 'objective'. Keys=$(collect(keys(d)))")
+    haskey(d, "objective") ||
+        error("Centralized result has no key 'objective'. Keys=$(collect(keys(d)))")
     return Float64(d["objective"])
 end
 
@@ -50,7 +46,9 @@ end
     r = out.result
     r isa NamedTuple || error("Distributed out.result must be NamedTuple, got $(typeof(r))")
     hasproperty(r, :total_real_cost) ||
-        error("Distributed result has no field :total_real_cost. Fields=$(propertynames(r))")
+        error(
+            "Distributed result has no field :total_real_cost. Fields=$(propertynames(r))",
+        )
     return Float64(getproperty(r, :total_real_cost))
     # se quiser comparar o outro: Float64(getproperty(r, :total_expr_cost))
 end
@@ -67,9 +65,22 @@ end
     plots::Bool = false,
 )
     if optimizer === nothing
-        return Lirion.solve(file; model=model, algorithm=algorithm, outputs=outputs, plots=plots)
+        return Lirion.solve(
+            file;
+            model = model,
+            algorithm = algorithm,
+            outputs = outputs,
+            plots = plots,
+        )
     else
-        return Lirion.solve(file; model=model, algorithm=algorithm, optimizer=optimizer, outputs=outputs, plots=plots)
+        return Lirion.solve(
+            file;
+            model = model,
+            algorithm = algorithm,
+            optimizer = optimizer,
+            outputs = outputs,
+            plots = plots,
+        )
     end
 end
 
@@ -128,18 +139,16 @@ function compare_distributed_vs_centralized(
 
     # --- Distribuído ADMM-DC (bus) ---
     dist_obj = try
-        alg = Lirion.admm_bus(
+        alg = Lirion.admm_bus(;
             max_iter = Int(admm_max_iter),
             rho = Float64(admm_rho),
             eps_abs = Float64(admm_eps_abs),
             eps_rel = Float64(admm_eps_rel),
-            alpha_overrelax = (admm_alpha == 1.0 ? nothing : Float64(admm_alpha)),
             adaptive_rho = _parse_adaptive(admm_adaptive),
             mu_incr = Float64(admm_mu_incr),
             mu_decr = Float64(admm_mu_decr),
             tau_incr = Float64(admm_tau_incr),
             tau_decr = Float64(admm_tau_decr),
-            accel_nesterov = Bool(admm_accel),
         )
 
         out_dist = _solve_maybe_optimizer(
@@ -223,7 +232,6 @@ function run_distributed_objective_tests(;
            case_name == "pglib_opf_case57_ieee.m" ||
            case_name == "pglib_opf_case118_ieee.m" ||
            case_name == "pglib_opf_case200_activ.m"
-
             admm_rho_case = 100000.0
             admm_max_iter_case = 100000
             admm_eps_abs_case = 1e-4

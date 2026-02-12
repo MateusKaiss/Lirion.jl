@@ -32,14 +32,17 @@ end
 @inline function _objective_centralized(out::Lirion.LirionRunResult)
     d = out.result
     d isa AbstractDict || error("Centralized out.result must be Dict, got $(typeof(d))")
-    haskey(d, "objective") || error("Centralized result has no key 'objective'. Keys=$(collect(keys(d)))")
+    haskey(d, "objective") ||
+        error("Centralized result has no key 'objective'. Keys=$(collect(keys(d)))")
     return d["objective"]
 end
 
 @inline function _objective_distributed_branch_ac(out::Lirion.LirionRunResult)
     r = out.result
     r isa NamedTuple || error("Distributed out.result must be NamedTuple, got $(typeof(r))")
-    hasproperty(r, :total_expr_cost) || error("Distributed result has no field :total_expr_cost. Fields=$(propertynames(r))")
+    hasproperty(r, :total_expr_cost) || error(
+        "Distributed result has no field :total_expr_cost. Fields=$(propertynames(r))",
+    )
     return getproperty(r, :total_expr_cost)
 end
 
@@ -86,7 +89,7 @@ function compare_distributed_branch_ac_vs_centralized(
     # --- Distributed ADMM-Branch-AC ---
     dist_obj = try
         alg = if admm_rho_flow_p === nothing && admm_rho_flow_q === nothing
-            Lirion.admm_branch(
+            Lirion.admm_branch(;
                 max_iter = admm_max_iter,
                 rho_flow = Float64(admm_rho_flow),
                 eps_abs = Float64(admm_eps_abs),
@@ -100,9 +103,11 @@ function compare_distributed_branch_ac_vs_centralized(
         else
             # IMPORTANT: don't pass 0.0; your constructor requires > 0
             (admm_rho_flow_p === nothing || admm_rho_flow_q === nothing) &&
-                error("If you set rho_flow_p or rho_flow_q, you must provide BOTH (non-nothing).")
+                error(
+                    "If you set rho_flow_p or rho_flow_q, you must provide BOTH (non-nothing).",
+                )
 
-            Lirion.admm_branch(
+            Lirion.admm_branch(;
                 max_iter = admm_max_iter,
                 rho_flow_p = Float64(admm_rho_flow_p),
                 rho_flow_q = Float64(admm_rho_flow_q),

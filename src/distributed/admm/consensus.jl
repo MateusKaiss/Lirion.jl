@@ -89,7 +89,6 @@ function compute_ac_branch_consensus!(
     return nothing
 end
 
-
 # ------------------------------------------------------------
 # DC consensus: bus variables (theta)
 # ------------------------------------------------------------

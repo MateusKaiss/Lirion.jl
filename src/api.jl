@@ -18,10 +18,9 @@ centralized() = :centralized
     return DistributedOPFModel(DC, method, max_iter; kwargs...)
 end
 
-admm_bus(; kwargs...)    = _admm_cfg(:admm; kwargs...)
+admm_bus(; kwargs...) = _admm_cfg(:admm; kwargs...)
 admm_branch(; kwargs...) = _admm_cfg(:admm_branch; kwargs...)
 admm_hybrid(; kwargs...) = _admm_cfg(:admm_hybrid; kwargs...)
-
 
 # -----------------------------
 # Plot helpers

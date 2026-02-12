@@ -193,162 +193,13 @@ end
 # ============================================================
 
 # ------------------------------------------------------------
-# Runner: ADMM bus/AC
-# ------------------------------------------------------------
-
-# ============================================================
-# RUNNERS (ADMM-AC)  + DEBUG
-# ============================================================
-
-# ------------------------------------------------------------
-# Debug helpers (AC bus)
-# ------------------------------------------------------------
-
-@inline function _dbg_norm2(v::AbstractVector{<:Real})
-    s = 0.0
-    @inbounds for i in eachindex(v)
-        s += Float64(v[i])^2
-    end
-    return s
-end
-
-@inline function _dbg_norm(v::AbstractVector{<:Real})
-    return sqrt(_dbg_norm2(v))
-end
-
-@inline function _dbg_maxabs(v::AbstractVector{<:Real})
-    m = 0.0
-    @inbounds for i in eachindex(v)
-        a = abs(Float64(v[i]))
-        a > m && (m = a)
-    end
-    return m
-end
-
-"""
-Retorna estatísticas de Δz (consenso): max |Δθ|, max |ΔV|, ||Δθ||2, ||ΔV||2
-"""
-function _dbg_delta_z_stats(
-    theta::Vector{Float64},
-    vmag::Vector{Float64},
-    theta_prev::Vector{Float64},
-    vmag_prev::Vector{Float64},
-)
-    dθ = similar(theta)
-    dV = similar(vmag)
-    @inbounds for j in eachindex(theta)
-        dθ[j] = _wrap_angle_diff(theta[j] - theta_prev[j])
-        dV[j] = vmag[j] - vmag_prev[j]
-    end
-    return (
-        maxabs_dtheta = _dbg_maxabs(dθ),
-        maxabs_dV = _dbg_maxabs(dV),
-        norm_dtheta = _dbg_norm(dθ),
-        norm_dV = _dbg_norm(dV),
-        dtheta = dθ,
-        dV = dV,
-    )
-end
-
-"""
-Varre partições e acha os maiores mismatches locais vs consenso em bus compartilhado.
-Retorna um vetor de tuplas (bus, max|θ_loc-θ̄|, max|V_loc-V̄|, zone_id).
-"""
-function _dbg_top_mismatch_buses(
-    partitions::Partitions{PartitionAC},
-    theta_consensus::Vector{Float64},
-    vmag_consensus::Vector{Float64},
-    shared_buses_sorted::Vector{Int},
-    shared_buses_to_pos::Dict{Int,Int};
-    topk::Int = 10,
-)
-    # Guarda o pior por bus (em termos de theta e V)
-    # (bus => (maxθ, maxV, zone_id_of_maxθ, zone_id_of_maxV))
-    maxθ = Dict{Int, Float64}()
-    maxV = Dict{Int, Float64}()
-    whoθ = Dict{Int, Int}()
-    whoV = Dict{Int, Int}()
-
-    for part in partitions
-        z = part.id
-        thetabuf = snapshot_theta_ac!(part)
-        Vbuf = snapshot_v_mag!(part)
-        pos = part.bus_local_index
-
-        @inbounds for b in part.shared_buses_zone
-            j = shared_buses_to_pos[b]
-            dθ = abs(_wrap_angle_diff(thetabuf[pos[b]] - theta_consensus[j]))
-            dV = abs(Vbuf[pos[b]] - vmag_consensus[j])
-
-            if dθ > get(maxθ, b, -1.0)
-                maxθ[b] = dθ
-                whoθ[b] = z
-            end
-            if dV > get(maxV, b, -1.0)
-                maxV[b] = dV
-                whoV[b] = z
-            end
-        end
-    end
-
-    # cria ranking por "energia" simples: maxθ + maxV
-    scored = Vector{Tuple{Int,Float64,Float64,Int,Int}}()
-    sizehint!(scored, length(shared_buses_sorted))
-    @inbounds for b in shared_buses_sorted
-        aθ = get(maxθ, b, 0.0)
-        aV = get(maxV, b, 0.0)
-        push!(scored, (b, aθ, aV, get(whoθ, b, 0), get(whoV, b, 0)))
-    end
-    sort!(scored, by = x -> -(x[2] + x[3]))
-
-    return scored[1:min(topk, length(scored))]
-end
-
-"""
-Norma do dual "não escalado" (y) por componente, somando zonas (aprox).
-Aqui você mantém dual por zona; isso mede magnitude global só pra debug.
-"""
-function _dbg_dual_norms_bus_ac(
-    duals_theta::Dict{Int, Vector{Float64}},
-    duals_v_mag::Dict{Int, Vector{Float64}},
-    zone_ids::Vector{Int},
-)
-    yθ2 = 0.0
-    yV2 = 0.0
-    for z in zone_ids
-        yθ2 += _dbg_norm2(duals_theta[z])
-        yV2 += _dbg_norm2(duals_v_mag[z])
-    end
-    return (norm_ytheta = sqrt(yθ2), norm_yV = sqrt(yV2))
-end
-
-@inline function _dbg_should_print(
-    iter::Int,
-    debug::Bool,
-    debug_every::Int,
-    debug_only_when_s_big::Bool,
-    s::Float64,
-    eps_s::Float64,
-)
-    debug || return false
-    if debug_only_when_s_big
-        return s > 10.0 * eps_s
-    else
-        return (iter == 1) || (debug_every > 0 && iter % debug_every == 0)
-    end
-end
-
-# ------------------------------------------------------------
 # Runner: ADMM bus/AC  (with debug)
 # ------------------------------------------------------------
 function run_admm(
     sys::ADMMSystem,
     config::DistributedOPFModel,
     ::ADMM{Bus, ACTag};
-    debug::Bool = true,
-    debug_every::Int = 1,
-    debug_only_when_s_big::Bool = true,
-    debug_topk::Int = 10,
+    optimizer_factory = nothing,
 )::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == AC "ADMM-AC: base_model deve ser AC."
@@ -364,8 +215,6 @@ function run_admm(
     eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
 
-    optimizer_factory = resolve_optimizer(config)
-
     partitions = build_ac_partitions(sys)
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
@@ -376,8 +225,10 @@ function run_admm(
     duals_theta = Dict{Int, Vector{Float64}}(z => zeros(n_shared_buses) for z in zone_ids)
     duals_v_mag = Dict{Int, Vector{Float64}}(z => zeros(n_shared_buses) for z in zone_ids)
 
-    dual_theta_buf = Dict{Int, Vector{Float64}}(z => zeros(n_shared_buses) for z in zone_ids)
-    dual_v_mag_buf = Dict{Int, Vector{Float64}}(z => zeros(n_shared_buses) for z in zone_ids)
+    dual_theta_buf =
+        Dict{Int, Vector{Float64}}(z => zeros(n_shared_buses) for z in zone_ids)
+    dual_v_mag_buf =
+        Dict{Int, Vector{Float64}}(z => zeros(n_shared_buses) for z in zone_ids)
 
     theta_consensus = zeros(Float64, n_shared_buses)
     v_mag_consensus = ones(Float64, n_shared_buses)
@@ -391,7 +242,10 @@ function run_admm(
     theta_avg_hist = Dict{Int, Vector{Float64}}()
     v_mag_avg_hist = Dict{Int, Vector{Float64}}()
 
-    results = Vector{NamedTuple{(:expr_cost, :real_cost), Tuple{Float64, Float64}}}(undef, n_zones)
+    results = Vector{NamedTuple{(:expr_cost, :real_cost), Tuple{Float64, Float64}}}(
+        undef,
+        n_zones,
+    )
 
     init_ac_bus_partition!(partitions, sys, optimizer_factory, rho_theta[], rho_v[])
 
@@ -559,7 +413,6 @@ function run_admm(
             shared_buses_to_pos,
             config,
         )
-
     end
 
     hist.heatmaps[:theta_avg] = theta_avg_hist
@@ -578,12 +431,11 @@ function run_admm(
     return LirionRunResult(; result, model = nothing, system = sys, diagnostics = hist)
 end
 
-
-
 function run_admm(
     sys::ADMMSystem,
     config::DistributedOPFModel,
-    ::ADMM{Branch, ACTag},
+    ::ADMM{Branch, ACTag};
+    optimizer_factory = nothing,
 )::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == AC "ADMM-AC-branch: base_model deve ser AC."
@@ -599,8 +451,6 @@ function run_admm(
     eps_abs = config.eps_abs
     eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
-
-    optimizer_factory = resolve_optimizer(config)
 
     partitions = build_ac_partitions(sys)
     zone_ids = partitions.zones
@@ -768,7 +618,8 @@ end
 function run_admm(
     sys::ADMMSystem,
     config::DistributedOPFModel,
-    ::ADMM{Hybrid, ACTag},
+    ::ADMM{Hybrid, ACTag};
+    optimizer_factory = nothing,
 )::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == AC "Hybrid AC: base_model deve ser AC."
@@ -790,8 +641,6 @@ function run_admm(
     eps_abs = config.eps_abs
     eps_rel = config.eps_rel
     adaptive = _adaptive_on(config)
-
-    optimizer_factory = resolve_optimizer(config)
 
     partitions = build_ac_partitions(sys)
     zone_ids = partitions.zones
