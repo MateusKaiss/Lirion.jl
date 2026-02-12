@@ -1,37 +1,18 @@
 const distributed_hybrid_ac_zone_cases = [
-    # 14 buses
-    "pglib_opf_case14_2zones_ieee.m",
-    "pglib_opf_case14_3zones_ieee.m",
-    # 24 buses
-    "pglib_opf_case24_2zones_ieee_rts.m",
-    "pglib_opf_case24_3zones_ieee_rts.m",
-    # 30 buses
-    "pglib_opf_case30_2zones_as.m",
-    "pglib_opf_case30_3zones_as.m",
-    # 57 buses (descomente quando quiser)
-    # "pglib_opf_case57_2zones_ieee.m",
-    # "pglib_opf_case57_4zones_ieee.m",
-    # 118/500 buses
-    # "pglib_opf_case118_2zones_ieee.m",
-    # "pglib_opf_case118_3zones_ieee.m",
-    "pglib_opf_case118_5zones_ieee.m",
-    # # 500 buses
-    # "pglib_opf_case500_3zones_goc.m",
-    # "pglib_opf_case500_4zones_goc.m",
-    # # 793
-    # # "pglib_opf_case793_11zones_goc.m",
-    # # 2000
-    # "pglib_opf_case2000_5zones_goc.m",
-    # # 3970
-    # "pglib_opf_case3970_25zones_goc.m",
-    # # 10000
-    # "pglib_opf_case10000_50zones_goc.m",
-    # # 20758
-    # "pglib_opf_case20758_42zones_epigrids.m",
-    # # 30000
-    # "pglib_opf_case30000_20zones_goc.m",
-    # # 78484
-    # "pglib_opf_case78484_157zones_epigrids.m",
+    # "pglib_opf_case73_ieee_rts__api.m",
+    # "pglib_opf_case73_ieee_rts__sad.m",
+    ## "pglib_opf_case57_ieee__api.m",
+    # "pglib_opf_case57_ieee__sad.m",
+
+    "pglib_opf_case3_lmbd.m",
+    "pglib_opf_case3_lmbd__api.m",
+    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case73_ieee_rts.m",
+    "pglib_opf_case57_ieee.m",
+    "pglib_opf_case118_ieee.m",
+    # "pglib_opf_case200_activ.m",
+    # "pglib_opf_case500_goc.m",
+
 ]
 
 function track_failure_hybrid_ac(label::String, origin::String, case_name::String)
@@ -47,7 +28,7 @@ function compare_distributed_hybrid_ac_vs_centralized(
     label::String,
     central_optimizer = Ipopt.Optimizer,
     distributed_optimizer = Ipopt.Optimizer,
-    rtol = 0.05,
+    rtol = 0.01,
     atol = 1e-6,
     rho_base::Union{Nothing, Float64} = 1.0e3,
     rho_theta::Union{Nothing, Float64} = nothing,
@@ -138,7 +119,7 @@ function run_distributed_hybrid_ac_objective_tests(;
     label = "ADMM-Hybrid-AC vs AC",
     central_optimizer = Ipopt.Optimizer,
     distributed_optimizer = Ipopt.Optimizer,
-    rtol = 0.05, atol = 1e-6,
+    rtol = 0.01, atol = 1e-6,
     admm_eps_abs = 1e-4, admm_eps_rel = 1e-4,
     admm_mu_incr::Float64 = 2.0,
     admm_mu_decr::Float64 = 2.0,
@@ -150,12 +131,17 @@ function run_distributed_hybrid_ac_objective_tests(;
         return true
     end
 
-    test_dir = joinpath(@__DIR__, "matpower_cases")
+    test_dir = joinpath(@__DIR__, "distributed")
+
     selected_files = [
         joinpath(test_dir, fname)
         for fname in case_list
         if isfile(joinpath(test_dir, fname))
     ]
+
+    @info "hybrid-ac: test_dir = $test_dir"
+    @info "hybrid-ac: selected_files = $(length(selected_files))"
+    isempty(selected_files) && error("Nenhum arquivo encontrado. Confira nomes e pasta.")
 
     n = length(selected_files)
     for (i, file) in enumerate(selected_files)

@@ -100,20 +100,14 @@ function build_quad_branch_expr!(
     rho_flow::Float64,
     zone_edges::Vector{Int},
 )
-    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    m = part.model::JuMP.Model
     quad = zero(JuMP.QuadExpr)
 
     @inbounds for e in zone_edges
         l_local = get(part.branch_global_to_local, e, nothing)
         l_local === nothing && continue
-
-        f = part.branch.from[l_local]
-        t = part.branch.to[l_local]
-        x = part.branch.x[l_local]
-        @assert abs(x) > 1e-10 "x≈0 no ramo global $e (DC)."
-
-        p = (theta[f, 1] - theta[t, 1]) / x
-        quad += 0.5 * rho_flow * p^2
+        P = m[:p_flow_branches][l_local, 1]
+        quad += 0.5 * rho_flow * P^2
     end
 
     part.quad_branch_expr = quad
@@ -288,23 +282,18 @@ function build_linear_branch_term(
     duals_flow::Dict{Int, Float64},
     rho_flow::Float64,
 )::JuMP.AffExpr
-    theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
+    m = part.model::JuMP.Model
     lin = zero(JuMP.AffExpr)
 
     @inbounds for e in zone_edges
         l_local = get(part.branch_global_to_local, e, nothing)
         l_local === nothing && continue
 
-        f = part.branch.from[l_local]
-        t = part.branch.to[l_local]
-        x = part.branch.x[l_local]
-        @assert abs(x) > 1e-10 "x≈0 no ramo global $e (DC)."
-
+        P = m[:p_flow_branches][l_local, 1]   # <- definição única
         z = get(flow_consensus, e, 0.0)
         d = get(duals_flow, e, 0.0)
-        coef = (d - rho_flow * z)
 
-        lin += coef * (theta[f, 1] - theta[t, 1]) / x
+        lin += (d - rho_flow * z) * P
     end
     return lin
 end

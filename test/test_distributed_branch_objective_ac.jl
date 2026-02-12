@@ -2,40 +2,22 @@
 # ADMM-Branch-AC vs AC (objetivo) – testes
 # ==============================================
 const distributed_branch_ac_zone_cases = [
-    # 14 buses
-    "pglib_opf_case14_2zones_ieee.m",
-    "pglib_opf_case14_3zones_ieee.m",
-    # 24 buses
-    "pglib_opf_case24_2zones_ieee_rts.m",
-    "pglib_opf_case24_3zones_ieee_rts.m",
-    # 30 buses
-    "pglib_opf_case30_2zones_as.m",
-    "pglib_opf_case30_3zones_as.m",
-    # 57 buses (descomente quando quiser)
-    # "pglib_opf_case57_2zones_ieee.m",
-    # "pglib_opf_case57_4zones_ieee.m",
-    # 118/500 buses
-    # "pglib_opf_case118_2zones_ieee.m",
-    # "pglib_opf_case118_3zones_ieee.m",
-    "pglib_opf_case118_5zones_ieee.m",
-    # # 500 buses
-    # "pglib_opf_case500_3zones_goc.m",
-    # "pglib_opf_case500_4zones_goc.m",
-    # # 793
-    # # "pglib_opf_case793_11zones_goc.m",
-    # # 2000
-    # "pglib_opf_case2000_5zones_goc.m",
-    # # 3970
-    # "pglib_opf_case3970_25zones_goc.m",
-    # # 10000
-    # "pglib_opf_case10000_50zones_goc.m",
-    # # 20758
-    # "pglib_opf_case20758_42zones_epigrids.m",
-    # # 30000
-    # "pglib_opf_case30000_20zones_goc.m",
-    # # 78484
-    # "pglib_opf_case78484_157zones_epigrids.m",
+    # "pglib_opf_case73_ieee_rts__api.m",
+    # "pglib_opf_case73_ieee_rts__sad.m",
+    ## "pglib_opf_case57_ieee__api.m",
+    # "pglib_opf_case57_ieee__sad.m",
+
+    "pglib_opf_case3_lmbd.m",
+    "pglib_opf_case3_lmbd__api.m",
+    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case73_ieee_rts.m",
+    "pglib_opf_case57_ieee.m",
+    "pglib_opf_case118_ieee.m",
+    # "pglib_opf_case200_activ.m",
+    # "pglib_opf_case500_goc.m",
+
 ]
+
 
 function track_failure_branch_ac(label::String, origin::String, case_name::String)
     if !haskey(GLOBAL_FAILED_CASES, label)
@@ -50,12 +32,12 @@ function compare_distributed_branch_ac_vs_centralized(
     label::String,
     central_optimizer = Ipopt.Optimizer,
     distributed_optimizer = Ipopt.Optimizer,
-    rtol = 0.05,
+    rtol = 0.01,
     atol = 1e-6,
     admm_rho_flow = 1.0e5,
     admm_rho_flow_p = nothing,
     admm_rho_flow_q = nothing,
-    admm_max_iter = 400,
+    admm_max_iter = 5000,
     admm_eps_abs = 1e-4,
     admm_eps_rel = 1e-4,
     admm_mu_incr = 2.0,
@@ -128,10 +110,10 @@ function run_distributed_branch_ac_objective_tests(;
     label = "ADMM-Branch-AC vs AC",
     central_optimizer = Ipopt.Optimizer,
     distributed_optimizer = Ipopt.Optimizer,
-    rtol = 0.05, atol = 1e-6,
+    rtol = 0.01, atol = 1e-6,
     admm_eps_abs = 1e-4, admm_eps_rel = 1e-4,
-    admm_mu_incr = 2.0,
-    admm_mu_decr = 2.0,
+    admm_mu_incr = 3.0,
+    admm_mu_decr = 3.0,
     admm_tau_incr = 1.05,
     admm_tau_decr = 0.98,
 )
@@ -140,7 +122,7 @@ function run_distributed_branch_ac_objective_tests(;
         return true
     end
 
-    test_dir = joinpath(@__DIR__, "matpower_cases")
+    test_dir = joinpath(@__DIR__, "distributed")
     selected_files =
         [joinpath(test_dir, f) for f in case_list if isfile(joinpath(test_dir, f))]
 
@@ -148,14 +130,8 @@ function run_distributed_branch_ac_objective_tests(;
     for (i, file) in enumerate(selected_files)
         case_name = basename(file)
 
-        admm_max_iter_case, admm_rho_case =
-            if occursin("_3zones_", case_name)
-                (400, 1.0e6)
-            elseif occursin("_2zones_", case_name)
-                (350, 1.0e5)
-            else
-                (300, 1.0e5)
-            end
+        admm_max_iter_case, admm_rho_case = (5000, 10000.0)
+
         admm_eps_abs_case = admm_eps_abs
         admm_eps_rel_case = admm_eps_rel
         mu_incr_case = admm_mu_incr
@@ -164,74 +140,6 @@ function run_distributed_branch_ac_objective_tests(;
         tau_decr_case = admm_tau_decr
         adaptive_case = nothing
         extra_flags = String[]
-
-        if occursin("_3zones_", case_name)
-            admm_eps_abs_case = 1e-4
-            admm_eps_rel_case = 1e-4
-        end
-        if case_name == "pglib_opf_case118_2zones_ieee.m"
-            admm_max_iter_case = 500
-            admm_eps_abs_case = 1e-4
-            admm_eps_rel_case = 1e-4
-            admm_rho_case = 1.0e5
-            adaptive_case = "on"
-            mu_incr_case, mu_decr_case = 2.0, 2.0
-            tau_incr_case, tau_decr_case = 1.05, 0.95
-        end
-        if case_name in
-           ("pglib_opf_case118_5zones_ieee.m", "pglib_opf_case118_3zones_ieee.m")
-            admm_max_iter_case = 500
-            admm_eps_abs_case = 1e-4
-            admm_eps_rel_case = 1e-4
-            admm_rho_case = 1.0e5
-            adaptive_case = "on"
-            mu_incr_case, mu_decr_case = 3.0, 3.0
-            tau_incr_case, tau_decr_case = 1.1, 0.9
-        end
-
-        if case_name == "pglib_opf_case500_3zones_goc.m" ||
-           case_name == "pglib_opf_case500_4zones_goc.m"
-            admm_max_iter_case = 700
-            admm_eps_abs_case = 1e-4
-            admm_eps_rel_case = 1e-4
-            adaptive_case = "on"
-            mu_incr_case, mu_decr_case = 3.0, 3.0
-            tau_incr_case, tau_decr_case = 1.3, 0.7
-            extra_flags = String[
-                "--admm-rho-theta", "1e5",
-                "--admm-rho-v", "1e5",
-            ]
-        end
-
-        if case_name == "pglib_opf_case2000_5zones_goc.m"
-            admm_max_iter_case = 700
-            admm_eps_abs_case = 1e-4
-            admm_eps_rel_case = 1e-4
-            admm_rho_case = 1.0e4   # rho único (P e Q)
-            adaptive_case = "on"
-            mu_incr_case, mu_decr_case = 3.0, 3.0
-            tau_incr_case, tau_decr_case = 1.1, 0.9
-        end
-
-        if case_name == "pglib_opf_case3970_25zones_goc.m"
-            admm_max_iter_case = 700
-            admm_eps_abs_case = 3e-4
-            admm_eps_rel_case = 3e-4
-            admm_rho_case = 1.0e4   # rho único (P e Q)
-            adaptive_case = "on"
-            mu_incr_case, mu_decr_case = 3.0, 3.0
-            tau_incr_case, tau_decr_case = 1.1, 0.9
-        end
-
-        if case_name == "pglib_opf_case10000_goc.m"
-            admm_max_iter_case = 800
-            admm_eps_abs_case = 3e-4
-            admm_eps_rel_case = 3e-4
-            admm_rho_case = 1.0e3   # rho único (P e Q). 
-            adaptive_case = "on"
-            mu_incr_case, mu_decr_case = 3.0, 3.0
-            tau_incr_case, tau_decr_case = 1.05, 0.95
-        end
 
         @info "[$label] Rodando caso $i de $n: $case_name " *
               "(max_iter=$(admm_max_iter_case), rho_flow=$(admm_rho_case), " *

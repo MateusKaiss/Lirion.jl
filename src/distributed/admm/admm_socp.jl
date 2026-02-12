@@ -384,10 +384,15 @@ function run_admm(
         )
         r = hypot(r_bus, r_rt)
 
-        s_bus = dual_residual_bus_socp_vec(v2_consensus, v2_consensus_prev)
+        s_bus = dual_residual_bus_socp_vec(v2_consensus, v2_consensus_prev, rho_v2[])
         s_rt = dual_residual_branch_rt_socp(
-            r_consensus, t_consensus, r_consensus_prev,
-            t_consensus_prev, interzonal_branches,
+            r_consensus,
+            t_consensus,
+            r_consensus_prev,
+            t_consensus_prev,
+            interzonal_branches,
+            rho_r[],
+            rho_t[],
         )
         s = hypot(s_bus, s_rt)
 
@@ -412,10 +417,21 @@ function run_admm(
         end
 
         eps_s = begin
-            epsb = eps_dual_bus_socp_vec(v2_consensus, v2_consensus_prev, eps_abs, eps_rel)
-            epsrt = eps_dual_branch_rt_socp(
-                r_consensus, t_consensus, r_consensus_prev,
-                t_consensus_prev, interzonal_branches, eps_abs, eps_rel,
+            epsb = eps_dual_bus_socp_unscaled(
+                duals_v2,
+                partitions,
+                zone_ids,
+                shared_buses_to_pos,
+                eps_abs,
+                eps_rel,
+            )
+            epsrt = eps_dual_branch_rt_socp_unscaled(
+                duals_r,
+                duals_t,
+                zone_ids,
+                interzonal_branches,
+                eps_abs,
+                eps_rel,
             )
             hypot(epsb, epsrt)
         end
@@ -571,9 +587,15 @@ function run_admm(
             q_flow_consensus,
             interzonal_branches,
         )
+
         s = dual_residual_branch_pq_socp(
-            p_flow_consensus, q_flow_consensus, p_flow_consensus_prev,
-            q_flow_consensus_prev, interzonal_branches,
+            p_flow_consensus,
+            q_flow_consensus,
+            p_flow_consensus_prev,
+            q_flow_consensus_prev,
+            interzonal_branches,
+            rhoP[],
+            rhoQ[],
         )
 
         eps_r = eps_primal_branch_pq_socp(
@@ -584,9 +606,14 @@ function run_admm(
             eps_abs,
             eps_rel,
         )
-        eps_s = eps_dual_branch_pq_socp(
-            p_flow_consensus, q_flow_consensus, p_flow_consensus_prev,
-            q_flow_consensus_prev, interzonal_branches, eps_abs, eps_rel,
+
+        eps_s = eps_dual_branch_pq_socp_unscaled(
+            dualsP,
+            dualsQ,
+            zone_ids,
+            interzonal_branches,
+            eps_abs,
+            eps_rel,
         )
 
         _record_iter!(
@@ -874,13 +901,15 @@ function run_admm(
         )
         r = sqrt(r_bus^2 + r_pq^2 + r_rt^2)
 
-        s_bus = dual_residual_bus_socp_vec(v2_consensus, v2_consensus_prev)
+        s_bus = dual_residual_bus_socp_vec(v2_consensus, v2_consensus_prev, rho_v2[])
         s_pq = dual_residual_branch_pq_socp(
             p_flow_consensus,
             q_flow_consensus,
             p_flow_consensus_prev,
             q_flow_consensus_prev,
             interzonal_branches,
+            rhoP[],
+            rhoQ[],
         )
         s_rt = dual_residual_branch_rt_socp(
             r_consensus,
@@ -888,6 +917,8 @@ function run_admm(
             r_consensus_prev,
             t_consensus_prev,
             interzonal_branches,
+            rho_r[],
+            rho_t[],
         )
         s = sqrt(s_bus^2 + s_pq^2 + s_rt^2)
 
@@ -920,21 +951,26 @@ function run_admm(
         end
 
         eps_s = begin
-            epsb = eps_dual_bus_socp_vec(v2_consensus, v2_consensus_prev, eps_abs, eps_rel)
-            epspq = eps_dual_branch_pq_socp(
-                p_flow_consensus,
-                q_flow_consensus,
-                p_flow_consensus_prev,
-                q_flow_consensus_prev,
+            epsb = eps_dual_bus_socp_unscaled(
+                duals_v2,
+                partitions,
+                zone_ids,
+                shared_buses_to_pos,
+                eps_abs,
+                eps_rel,
+            )
+            epspq = eps_dual_branch_pq_socp_unscaled(
+                dualsP,
+                dualsQ,
+                zone_ids,
                 interzonal_branches,
                 eps_abs,
                 eps_rel,
             )
-            epsrt = eps_dual_branch_rt_socp(
-                r_consensus,
-                t_consensus,
-                r_consensus_prev,
-                t_consensus_prev,
+            epsrt = eps_dual_branch_rt_socp_unscaled(
+                duals_r,
+                duals_t,
+                zone_ids,
                 interzonal_branches,
                 eps_abs,
                 eps_rel,

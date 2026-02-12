@@ -187,24 +187,46 @@ end
 # but keep _dc_flow_val_model for now to avoid wrong indexing/results to the paper;
 # ---------------------------------------------------------------------
 
-@inline function _dc_flow_val_model(
-    model::JuMP.Model,
-    part::PartitionDC,
-    l_local::Int;
-    t::Int = 1,
-)
-    theta = part.theta_var
-    f = part.branch.from[l_local]
-    tb = part.branch.to[l_local]
-    x = part.branch.x[l_local]
-    @assert abs(x) > 1e-8 "x≈0 no ramo local $l_local (DC)."
+# ------------------------------------------------------------
+# DC flow helpers (PADRÃO: pega do modelo)
+# ------------------------------------------------------------
 
-    has_vals = JuMP.has_values(model)
-    θf = _val_at(model, theta, f, t, 0.0, has_vals)
-    θtb = _val_at(model, theta, tb, t, 0.0, has_vals)
+@inline _p_flow_from_exprs(model::JuMP.Model, l::Int, t::Int = 1) =
+    model[:p_flow_branches][l, t]
 
-    return (θf - θtb) / x
+@inline _p_flow_from_exprs(part::PartitionDC, l::Int; t::Int = 1) =
+    _p_flow_from_exprs(part.model, l, t)
+
+# avalia P com segurança:
+# - se tem valores: value(P)
+# - se não tem valores: NÃO usa start_value em AffExpr -> retorna 0.0
+@inline function _p_flow_value_or_zero(model::JuMP.Model, P; default::Float64 = 0.0)
+    if JuMP.has_values(model)
+        v = try JuMP.value(P) catch; NaN end
+        return isfinite(v) ? Float64(v) : default
+    end
+    # sem solução ainda (iter 1, infeasible, iteration limit etc.)
+    return default
 end
+
+# função única que teu consenso/duais/resíduos usam
+@inline function _dc_flow_val_model(model::JuMP.Model, part::PartitionDC, l_local::Int)
+    P = _p_flow_from_exprs(part, l_local; t = 1)
+    return _p_flow_value_or_zero(model, P; default = 0.0)
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 @inline _pq_flow_from_exprs(model::JuMP.Model, l::Int, t::Int = 1) =
     (model[:p_flow_branches][l, t], model[:q_flow_branches][l, t])

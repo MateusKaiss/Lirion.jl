@@ -211,6 +211,7 @@ end
     tau_incr::Float64 = 1.05,
     tau_decr::Float64 = 0.98,
 )
+
     if r > mu_incr * s
         rho[] *= tau_incr
     elseif s > mu_decr * r
@@ -264,7 +265,7 @@ end
     shared_buses_to_pos,
     config,
 )
-    adaptive || return nothing
+   config.adaptive_rho || return nothing
 
     rθ, rV = primal_residual_bus_ac_components(
         partitions,
@@ -299,7 +300,8 @@ end
     s::Float64,
     config,
 )
-    adaptive || return nothing
+
+   config.adaptive_rho || return nothing
     adaptive_rho_ac!(rho_p, r, s;
         mu_incr = config.mu_incr, mu_decr = config.mu_decr,
         tau_incr = config.tau_incr, tau_decr = config.tau_decr,
@@ -328,7 +330,7 @@ end
     s_br::Float64,
     config,
 )
-    adaptive || return nothing
+   config.adaptive_rho || return nothing
 
     maybe_adapt_rho!(
         true,
@@ -357,7 +359,9 @@ end
     s::Float64,
     config::DistributedOPFModel,
 )
-    adaptive || return nothing
+   config.adaptive_rho || return nothing
+
+    
     adaptive_rho_dc!(rho, r, s;
         mu_incr = config.mu_incr, mu_decr = config.mu_decr,
         tau_incr = config.tau_incr, tau_decr = config.tau_decr,
@@ -375,7 +379,7 @@ end
     s_br::Float64,
     config::DistributedOPFModel,
 )
-    adaptive || return nothing
+   config.adaptive_rho || return nothing
     adaptive_rho_dc!(rho_theta, r_bus, s_bus;
         mu_incr = config.mu_incr, mu_decr = config.mu_decr,
         tau_incr = config.tau_incr, tau_decr = config.tau_decr,
@@ -412,7 +416,7 @@ end
     s_rt::Float64,
     config,
 )
-    adaptive || return nothing
+   config.adaptive_rho || return nothing
 
     adaptive_rho_dc!(rho_v2, r_bus, s_bus;
         mu_incr = config.mu_incr, mu_decr = config.mu_decr,
@@ -438,7 +442,7 @@ end
     s::Float64,
     config,
 )
-    adaptive || return nothing
+   config.adaptive_rho || return nothing
 
     adaptive_rho_dc!(rhoP, r / sqrt(2), s / sqrt(2);
         mu_incr = config.mu_incr, mu_decr = config.mu_decr,
@@ -466,7 +470,7 @@ end
     s_rt::Float64,
     config,
 )
-    adaptive || return nothing
+   config.adaptive_rho || return nothing
 
     adaptive_rho_dc!(rho_v2, r_bus, s_bus;
         mu_incr = config.mu_incr, mu_decr = config.mu_decr,

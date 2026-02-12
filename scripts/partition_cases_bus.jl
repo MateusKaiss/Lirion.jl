@@ -657,7 +657,7 @@ end
 # )
 
 partition_cases_metis_bus(
-    raw"/home/mateus-kaiss/Projects/Lirion.jl/test/zones";
+    raw"/home/mateus-kaiss/Desktop/experiments";
     ks = :auto,
     max_zone_size = 200,        # força k≈ceil(2000/450)=5
     balance_tol = 0.08,

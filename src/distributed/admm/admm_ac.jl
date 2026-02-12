@@ -196,10 +196,159 @@ end
 # Runner: ADMM bus/AC
 # ------------------------------------------------------------
 
+# ============================================================
+# RUNNERS (ADMM-AC)  + DEBUG
+# ============================================================
+
+# ------------------------------------------------------------
+# Debug helpers (AC bus)
+# ------------------------------------------------------------
+
+@inline function _dbg_norm2(v::AbstractVector{<:Real})
+    s = 0.0
+    @inbounds for i in eachindex(v)
+        s += Float64(v[i])^2
+    end
+    return s
+end
+
+@inline function _dbg_norm(v::AbstractVector{<:Real})
+    return sqrt(_dbg_norm2(v))
+end
+
+@inline function _dbg_maxabs(v::AbstractVector{<:Real})
+    m = 0.0
+    @inbounds for i in eachindex(v)
+        a = abs(Float64(v[i]))
+        a > m && (m = a)
+    end
+    return m
+end
+
+"""
+Retorna estatísticas de Δz (consenso): max |Δθ|, max |ΔV|, ||Δθ||2, ||ΔV||2
+"""
+function _dbg_delta_z_stats(
+    theta::Vector{Float64},
+    vmag::Vector{Float64},
+    theta_prev::Vector{Float64},
+    vmag_prev::Vector{Float64},
+)
+    dθ = similar(theta)
+    dV = similar(vmag)
+    @inbounds for j in eachindex(theta)
+        dθ[j] = _wrap_angle_diff(theta[j] - theta_prev[j])
+        dV[j] = vmag[j] - vmag_prev[j]
+    end
+    return (
+        maxabs_dtheta = _dbg_maxabs(dθ),
+        maxabs_dV = _dbg_maxabs(dV),
+        norm_dtheta = _dbg_norm(dθ),
+        norm_dV = _dbg_norm(dV),
+        dtheta = dθ,
+        dV = dV,
+    )
+end
+
+"""
+Varre partições e acha os maiores mismatches locais vs consenso em bus compartilhado.
+Retorna um vetor de tuplas (bus, max|θ_loc-θ̄|, max|V_loc-V̄|, zone_id).
+"""
+function _dbg_top_mismatch_buses(
+    partitions::Partitions{PartitionAC},
+    theta_consensus::Vector{Float64},
+    vmag_consensus::Vector{Float64},
+    shared_buses_sorted::Vector{Int},
+    shared_buses_to_pos::Dict{Int,Int};
+    topk::Int = 10,
+)
+    # Guarda o pior por bus (em termos de theta e V)
+    # (bus => (maxθ, maxV, zone_id_of_maxθ, zone_id_of_maxV))
+    maxθ = Dict{Int, Float64}()
+    maxV = Dict{Int, Float64}()
+    whoθ = Dict{Int, Int}()
+    whoV = Dict{Int, Int}()
+
+    for part in partitions
+        z = part.id
+        thetabuf = snapshot_theta_ac!(part)
+        Vbuf = snapshot_v_mag!(part)
+        pos = part.bus_local_index
+
+        @inbounds for b in part.shared_buses_zone
+            j = shared_buses_to_pos[b]
+            dθ = abs(_wrap_angle_diff(thetabuf[pos[b]] - theta_consensus[j]))
+            dV = abs(Vbuf[pos[b]] - vmag_consensus[j])
+
+            if dθ > get(maxθ, b, -1.0)
+                maxθ[b] = dθ
+                whoθ[b] = z
+            end
+            if dV > get(maxV, b, -1.0)
+                maxV[b] = dV
+                whoV[b] = z
+            end
+        end
+    end
+
+    # cria ranking por "energia" simples: maxθ + maxV
+    scored = Vector{Tuple{Int,Float64,Float64,Int,Int}}()
+    sizehint!(scored, length(shared_buses_sorted))
+    @inbounds for b in shared_buses_sorted
+        aθ = get(maxθ, b, 0.0)
+        aV = get(maxV, b, 0.0)
+        push!(scored, (b, aθ, aV, get(whoθ, b, 0), get(whoV, b, 0)))
+    end
+    sort!(scored, by = x -> -(x[2] + x[3]))
+
+    return scored[1:min(topk, length(scored))]
+end
+
+"""
+Norma do dual "não escalado" (y) por componente, somando zonas (aprox).
+Aqui você mantém dual por zona; isso mede magnitude global só pra debug.
+"""
+function _dbg_dual_norms_bus_ac(
+    duals_theta::Dict{Int, Vector{Float64}},
+    duals_v_mag::Dict{Int, Vector{Float64}},
+    zone_ids::Vector{Int},
+)
+    yθ2 = 0.0
+    yV2 = 0.0
+    for z in zone_ids
+        yθ2 += _dbg_norm2(duals_theta[z])
+        yV2 += _dbg_norm2(duals_v_mag[z])
+    end
+    return (norm_ytheta = sqrt(yθ2), norm_yV = sqrt(yV2))
+end
+
+@inline function _dbg_should_print(
+    iter::Int,
+    debug::Bool,
+    debug_every::Int,
+    debug_only_when_s_big::Bool,
+    s::Float64,
+    eps_s::Float64,
+)
+    debug || return false
+    if debug_only_when_s_big
+        return s > 10.0 * eps_s
+    else
+        return (iter == 1) || (debug_every > 0 && iter % debug_every == 0)
+    end
+end
+
+# ------------------------------------------------------------
+# Runner: ADMM bus/AC  (with debug)
+# ------------------------------------------------------------
 function run_admm(
     sys::ADMMSystem,
     config::DistributedOPFModel,
-    ::ADMM{Bus, ACTag},
+    ::ADMM{Bus, ACTag};
+    debug::Bool = true,
+    debug_every::Int = 1,
+    debug_only_when_s_big::Bool = true,
+    debug_topk::Int = 10,
 )::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == AC "ADMM-AC: base_model deve ser AC."
@@ -224,19 +373,11 @@ function run_admm(
     shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
-    duals_theta = Dict{Int, Vector{Float64}}(
-        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-    )
-    duals_v_mag = Dict{Int, Vector{Float64}}(
-        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-    )
+    duals_theta = Dict{Int, Vector{Float64}}(z => zeros(n_shared_buses) for z in zone_ids)
+    duals_v_mag = Dict{Int, Vector{Float64}}(z => zeros(n_shared_buses) for z in zone_ids)
 
-    dual_theta_buf = Dict{Int, Vector{Float64}}(
-        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-    )
-    dual_v_mag_buf = Dict{Int, Vector{Float64}}(
-        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-    )
+    dual_theta_buf = Dict{Int, Vector{Float64}}(z => zeros(n_shared_buses) for z in zone_ids)
+    dual_v_mag_buf = Dict{Int, Vector{Float64}}(z => zeros(n_shared_buses) for z in zone_ids)
 
     theta_consensus = zeros(Float64, n_shared_buses)
     v_mag_consensus = ones(Float64, n_shared_buses)
@@ -250,10 +391,7 @@ function run_admm(
     theta_avg_hist = Dict{Int, Vector{Float64}}()
     v_mag_avg_hist = Dict{Int, Vector{Float64}}()
 
-    results = Vector{NamedTuple{(:expr_cost, :real_cost), Tuple{Float64, Float64}}}(
-        undef,
-        n_zones,
-    )
+    results = Vector{NamedTuple{(:expr_cost, :real_cost), Tuple{Float64, Float64}}}(undef, n_zones)
 
     init_ac_bus_partition!(partitions, sys, optimizer_factory, rho_theta[], rho_v[])
 
@@ -262,8 +400,12 @@ function run_admm(
         iter_done = iter
         _FAST_USE_LOGS && println("\n[ADMM-AC] Iteração $iter")
 
+        # rho refresh (rebuild cached quads if rho changed)
         refresh_rho_bus_ac!(partitions, rho_theta, prev_rho_theta, rho_v, prev_rho_v)
 
+        # ------------------------------
+        # 1) solve subproblems (parallel)
+        # ------------------------------
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             part = get_partition(partitions, zone_id)
@@ -271,7 +413,6 @@ function run_admm(
 
             theta_dual_buf_z = dual_theta_buf[zone_id]
             v_mag_dual_buf_z = dual_v_mag_buf[zone_id]
-
             theta_dual_buf_z .= duals_theta[zone_id]
             v_mag_dual_buf_z .= duals_v_mag[zone_id]
 
@@ -304,6 +445,9 @@ function run_admm(
             part.real_generation_cost = out.real_cost
         end
 
+        # ------------------------------
+        # 2) consensus
+        # ------------------------------
         theta_consensus_prev .= theta_consensus
         v_mag_consensus_prev .= v_mag_consensus
 
@@ -321,6 +465,9 @@ function run_admm(
             push!(get!(v_mag_avg_hist, b, Float64[]), v_mag_consensus[j])
         end
 
+        # ------------------------------
+        # 3) dual updates
+        # ------------------------------
         update_duals_bus_ac_all!(
             duals_theta,
             duals_v_mag,
@@ -336,6 +483,9 @@ function run_admm(
             v_mag_consensus_prev = v_mag_consensus_prev,
         )
 
+        # ------------------------------
+        # 4) residuals + tolerances
+        # ------------------------------
         r = primal_residual_bus_ac_vec(
             partitions,
             theta_consensus,
@@ -343,11 +493,15 @@ function run_admm(
             shared_buses_sorted,
             shared_buses_to_pos,
         )
+
+        # dual residual escalado: || [rhoθ*Δθ ; rhoV*ΔV] ||
         s = dual_residual_bus_ac_vec(
             theta_consensus,
             v_mag_consensus,
             theta_consensus_prev,
             v_mag_consensus_prev,
+            rho_theta[],
+            rho_v[],
         )
 
         eps_r = eps_primal_bus_ac_vec(
@@ -359,28 +513,39 @@ function run_admm(
             eps_abs,
             eps_rel,
         )
-        eps_s = eps_dual_bus_ac_vec(
-            theta_consensus,
-            v_mag_consensus,
-            theta_consensus_prev,
-            v_mag_consensus_prev,
+
+        eps_s = eps_dual_bus_ac_unscaled(
+            duals_theta,
+            duals_v_mag,
+            partitions,
+            zone_ids,
+            shared_buses_to_pos,
             eps_abs,
             eps_rel,
         )
 
         _record_iter!(
-            hist, r, s, eps_r, eps_s;
+            hist,
+            r,
+            s,
+            eps_r,
+            eps_s;
             rhos = Dict(:rho_theta => rho_theta[], :rho_v => rho_v[]),
         )
-
         _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_r")
         _FAST_USE_LOGS && println("‖s‖ = $s | eps_du  = $eps_s")
 
+        # ------------------------------
+        # stopping
+        # ------------------------------
         if stop_if_converged!(r, s, eps_r, eps_s)
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
         end
 
+        # ------------------------------
+        # rho adaptation
+        # ------------------------------
         maybe_adapt_rho!(
             adaptive,
             rho_theta,
@@ -394,6 +559,7 @@ function run_admm(
             shared_buses_to_pos,
             config,
         )
+
     end
 
     hist.heatmaps[:theta_avg] = theta_avg_hist
@@ -409,17 +575,10 @@ function run_admm(
         ),
     )
 
-    return LirionRunResult(;
-        result = result,
-        model = nothing,
-        system = sys,
-        diagnostics = hist,
-    )
+    return LirionRunResult(; result, model = nothing, system = sys, diagnostics = hist)
 end
 
-# ------------------------------------------------------------
-# Runner: ADMM branch/AC
-# ------------------------------------------------------------
+
 
 function run_admm(
     sys::ADMMSystem,
@@ -447,12 +606,10 @@ function run_admm(
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    duals_p_flow = Dict{Int, Dict{Int, Float64}}(
-        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
-    )
-    duals_q_flow = Dict{Int, Dict{Int, Float64}}(
-        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
-    )
+    duals_p_flow =
+        Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
+    duals_q_flow =
+        Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
 
     p_flow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
     q_flow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
@@ -464,8 +621,7 @@ function run_admm(
     hist.meta[:tag] = "admm_ac_branch"
 
     results = Vector{NamedTuple{(:expr_cost, :real_cost), Tuple{Float64, Float64}}}(
-        undef,
-        n_zones,
+        undef, n_zones,
     )
 
     init_ac_branch_partition!(
@@ -546,12 +702,16 @@ function run_admm(
             q_flow_consensus,
             interzonal_branches,
         )
+
+        # dual residual escalado: || [rhoP*ΔP ; rhoQ*ΔQ] ||
         s = dual_residual_branch_ac(
             p_flow_consensus,
             q_flow_consensus,
             p_flow_consensus_prev,
             q_flow_consensus_prev,
             interzonal_branches,
+            rho_p[],
+            rho_q[],
         )
 
         eps_r = eps_primal_branch_ac(
@@ -562,21 +722,25 @@ function run_admm(
             eps_abs,
             eps_rel,
         )
-        eps_s = eps_dual_branch_ac(
-            p_flow_consensus,
-            q_flow_consensus,
-            p_flow_consensus_prev,
-            q_flow_consensus_prev,
+
+        # eps_dual baseado no dual "não escalado" y
+        eps_s = eps_dual_branch_ac_unscaled(
+            duals_p_flow,
+            duals_q_flow,
+            zone_ids,
             interzonal_branches,
             eps_abs,
             eps_rel,
         )
 
         _record_iter!(
-            hist, r, s, eps_r, eps_s;
+            hist,
+            r,
+            s,
+            eps_r,
+            eps_s;
             rhos = Dict(:rho_p => rho_p[], :rho_q => rho_q[]),
         )
-
         _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_r")
         _FAST_USE_LOGS && println("‖s‖ = $s | eps_du  = $eps_s")
 
@@ -598,17 +762,8 @@ function run_admm(
         ),
     )
 
-    return LirionRunResult(;
-        result = result,
-        model = nothing,
-        system = sys,
-        diagnostics = hist,
-    )
+    return LirionRunResult(; result, model = nothing, system = sys, diagnostics = hist)
 end
-
-# ------------------------------------------------------------
-# Runner: ADMM hybrid/AC
-# ------------------------------------------------------------
 
 function run_admm(
     sys::ADMMSystem,
@@ -645,26 +800,18 @@ function run_admm(
     shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
-    duals_theta = Dict{Int, Vector{Float64}}(
-        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-    )
-    duals_v_mag = Dict{Int, Vector{Float64}}(
-        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-    )
+    duals_theta = Dict{Int, Vector{Float64}}(z => zeros(n_shared_buses) for z in zone_ids)
+    duals_v_mag = Dict{Int, Vector{Float64}}(z => zeros(n_shared_buses) for z in zone_ids)
 
-    dual_theta_buf = Dict{Int, Vector{Float64}}(
-        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-    )
-    dual_v_mag_buf = Dict{Int, Vector{Float64}}(
-        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-    )
+    dual_theta_buf =
+        Dict{Int, Vector{Float64}}(z => zeros(n_shared_buses) for z in zone_ids)
+    dual_v_mag_buf =
+        Dict{Int, Vector{Float64}}(z => zeros(n_shared_buses) for z in zone_ids)
 
-    duals_p_flow = Dict{Int, Dict{Int, Float64}}(
-        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
-    )
-    duals_q_flow = Dict{Int, Dict{Int, Float64}}(
-        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
-    )
+    duals_p_flow =
+        Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
+    duals_q_flow =
+        Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
 
     theta_consensus = zeros(Float64, n_shared_buses)
     v_mag_consensus = ones(Float64, n_shared_buses)
@@ -684,8 +831,7 @@ function run_admm(
     v_mag_avg_hist = Dict{Int, Vector{Float64}}()
 
     results = Vector{NamedTuple{(:expr_cost, :real_cost), Tuple{Float64, Float64}}}(
-        undef,
-        n_zones,
+        undef, n_zones,
     )
 
     init_ac_hybrid_partition!(
@@ -712,11 +858,10 @@ function run_admm(
             part = get_partition(partitions, zone_id)
             model = part.model::JuMP.Model
 
-            theta_dual_buf_z = dual_theta_buf[zone_id]
-            v_mag_dual_buf_z = dual_v_mag_buf[zone_id]
-
-            theta_dual_buf_z .= duals_theta[zone_id]
-            v_mag_dual_buf_z .= duals_v_mag[zone_id]
+            θbuf = dual_theta_buf[zone_id]
+            θbuf .= duals_theta[zone_id]
+            Vbuf = dual_v_mag_buf[zone_id]
+            Vbuf .= duals_v_mag[zone_id]
 
             lin_bus = build_linear_bus_term(
                 part,
@@ -724,8 +869,8 @@ function run_admm(
                 shared_buses_to_pos,
                 theta_consensus,
                 v_mag_consensus,
-                theta_dual_buf_z,
-                v_mag_dual_buf_z,
+                θbuf,
+                Vbuf,
                 rho_theta[],
                 rho_v[],
             )
@@ -744,8 +889,8 @@ function run_admm(
             @objective(
                 model,
                 Min,
-                part.obj_base + part.quad_bus_expr_ac + part.quad_branch_expr_ac +
-                (lin_bus + lin_br)
+                part.obj_base + part.quad_bus_expr_ac + part.quad_branch_expr_ac + lin_bus +
+                lin_br
             )
             optimize!(model)
 
@@ -775,19 +920,18 @@ function run_admm(
             shared_buses_sorted,
             shared_buses_to_pos,
         )
-
-        @inbounds for b in shared_buses_sorted
-            j = shared_buses_to_pos[b]
-            push!(get!(theta_avg_hist, b, Float64[]), theta_consensus[j])
-            push!(get!(v_mag_avg_hist, b, Float64[]), v_mag_consensus[j])
-        end
-
         compute_ac_branch_consensus!(
             p_flow_consensus,
             q_flow_consensus,
             partitions,
             interzonal_branches,
         )
+
+        @inbounds for b in shared_buses_sorted
+            j = shared_buses_to_pos[b]
+            push!(get!(theta_avg_hist, b, Float64[]), theta_consensus[j])
+            push!(get!(v_mag_avg_hist, b, Float64[]), v_mag_consensus[j])
+        end
 
         update_duals_bus_ac_all!(
             duals_theta,
@@ -813,7 +957,6 @@ function run_admm(
             interzonal_branches,
             rho_p[],
             rho_q[];
-            alpha = nothing,
             p_flow_consensus_prev = p_flow_consensus_prev,
             q_flow_consensus_prev = q_flow_consensus_prev,
         )
@@ -833,18 +976,17 @@ function run_admm(
         )
         r_tot = hypot(r_bus, r_br)
 
+        # dual residuals escalados
         s_bus = dual_residual_bus_ac_vec(
-            theta_consensus,
-            v_mag_consensus,
-            theta_consensus_prev,
-            v_mag_consensus_prev,
+            theta_consensus, v_mag_consensus,
+            theta_consensus_prev, v_mag_consensus_prev,
+            rho_theta[], rho_v[],
         )
         s_br = dual_residual_branch_ac(
-            p_flow_consensus,
-            q_flow_consensus,
-            p_flow_consensus_prev,
-            q_flow_consensus_prev,
+            p_flow_consensus, q_flow_consensus,
+            p_flow_consensus_prev, q_flow_consensus_prev,
             interzonal_branches,
+            rho_p[], rho_q[],
         )
         s_tot = hypot(s_bus, s_br)
 
@@ -867,19 +1009,20 @@ function run_admm(
         )
         eps_r_tot = hypot(eps_bus_r, eps_br_r)
 
-        eps_bus_s = eps_dual_bus_ac_vec(
-            theta_consensus,
-            v_mag_consensus,
-            theta_consensus_prev,
-            v_mag_consensus_prev,
+        # eps_dual baseado no dual "não escalado" y
+        eps_bus_s = eps_dual_bus_ac_unscaled(
+            duals_theta,
+            duals_v_mag,
+            partitions,
+            zone_ids,
+            shared_buses_to_pos,
             eps_abs,
             eps_rel,
         )
-        eps_br_s = eps_dual_branch_ac(
-            p_flow_consensus,
-            q_flow_consensus,
-            p_flow_consensus_prev,
-            q_flow_consensus_prev,
+        eps_br_s = eps_dual_branch_ac_unscaled(
+            duals_p_flow,
+            duals_q_flow,
+            zone_ids,
             interzonal_branches,
             eps_abs,
             eps_rel,
@@ -938,10 +1081,5 @@ function run_admm(
         ),
     )
 
-    return LirionRunResult(;
-        result = result,
-        model = nothing,
-        system = sys,
-        diagnostics = hist,
-    )
+    return LirionRunResult(; result, model = nothing, system = sys, diagnostics = hist)
 end

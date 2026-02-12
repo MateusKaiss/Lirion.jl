@@ -4,39 +4,20 @@
 
 # Casos particionados (2/3/4 zonas)
 const distributed_branch_zone_cases = [
-    # 14 buses
-    "pglib_opf_case14_2zones_ieee.m",
-    "pglib_opf_case14_3zones_ieee.m",
-    # 24 buses
-    "pglib_opf_case24_2zones_ieee_rts.m",
-    "pglib_opf_case24_3zones_ieee_rts.m",
-    # 30 buses
-    "pglib_opf_case30_2zones_as.m",
-    "pglib_opf_case30_3zones_as.m",
-    # 57 buses
-    # "pglib_opf_case57_2zones_ieee.m",
-    # "pglib_opf_case57_4zones_ieee.m",
-    # # 118 buses
-    # "pglib_opf_case118_2zones_ieee.m",
-    # "pglib_opf_case118_3zones_ieee.m",
-    # "pglib_opf_case118_5zones_ieee.m",
-    # # 500 buses
-    # "pglib_opf_case500_3zones_goc.m",
-    # "pglib_opf_case500_4zones_goc.m",
-    # # 793
-    # # "pglib_opf_case793_11zones_goc.m",
-    # # 2000
-    # "pglib_opf_case2000_5zones_goc.m",
-    # # 3970
-    # "pglib_opf_case3970_25zones_goc.m",
-    # # 10000
-    # "pglib_opf_case10000_50zones_goc.m",
-    # # 20758
-    # "pglib_opf_case20758_42zones_epigrids.m",
-    # # 30000
-    # "pglib_opf_case30000_20zones_goc.m",
-    # # 78484
-    # "pglib_opf_case78484_157zones_epigrids.m",
+    # "pglib_opf_case73_ieee_rts__api.m",
+    # "pglib_opf_case73_ieee_rts__sad.m",
+    ## "pglib_opf_case57_ieee__api.m",
+    # "pglib_opf_case57_ieee__sad.m",
+
+    "pglib_opf_case3_lmbd.m",
+    "pglib_opf_case3_lmbd__api.m",
+    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case73_ieee_rts.m",
+    "pglib_opf_case57_ieee.m",
+    "pglib_opf_case118_ieee.m",
+    # "pglib_opf_case200_activ.m",
+    # "pglib_opf_case500_goc.m",
+
 ]
 
 function track_failure_branch(label::String, origin::String, case_name::String)
@@ -47,30 +28,29 @@ function track_failure_branch(label::String, origin::String, case_name::String)
     return push!(GLOBAL_FAILED_CASES[label][origin], case_name)
 end
 
-"""
-Compara objetivo Centralizado DC vs Distribuído ADMM-Branch-DC no mesmo caso.
-"""
 function compare_distributed_branch_vs_centralized(
     file::String;
     label::String,
     central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
-    distributed_optimizer::Union{Nothing, Function} = nothing,
-    rtol = 0.05,
+    distributed_optimizer = nothing,
+    rtol = 0.01,
     atol = 1e-6,
     admm_rho = 1_000.0,
-    admm_max_iter = 350,
+    admm_max_iter = 5000,
     admm_eps_abs = 1e-4,
     admm_eps_rel = 1e-4,
     admm_alpha::Float64 = 1.0,
-    admm_mu_incr::Float64 = 2.0,
-    admm_mu_decr::Float64 = 2.0,
-    admm_tau_incr::Float64 = 1.0,
-    admm_tau_decr::Float64 = 1.0,
+    admm_mu_incr::Float64 = 3.0,
+    admm_mu_decr::Float64 = 3.0,
+    admm_tau_incr::Float64 = 1.05,
+    admm_tau_decr::Float64 = 0.98,
     admm_warm_start::Bool = false,
 )
     case_name = basename(file)
 
-    # --- Centralizado DC ---
+    # ----------------------------
+    # Centralizado DC -> objective
+    # ----------------------------
     cent_obj = try
         args_cent = String[
             file,
@@ -78,14 +58,16 @@ function compare_distributed_branch_vs_centralized(
             "--optimizer", string(central_optimizer),
         ]
         result_dict, _, _ = Lirion.main(args_cent)
-        result_dict["objective"]
+        Float64(result_dict["objective"])
     catch e
         @warn "Centralized DC failed on $case_name: $e"
         track_failure_branch(label, "Centralized", case_name)
         return
     end
 
-    # --- Distribuído ADMM-Branch-DC ---
+    # --------------------------------------
+    # Distribuído ADMM-Branch-DC -> NamedTuple
+    # --------------------------------------
     dist_obj = try
         args_dist = String[
             file,
@@ -94,27 +76,27 @@ function compare_distributed_branch_vs_centralized(
             "--admm-max-iter", string(admm_max_iter),
             "--admm-eps-abs", string(admm_eps_abs),
             "--admm-eps-rel", string(admm_eps_rel),
-            "--admm-alpha", string(admm_alpha),
             "--admm-mu-incr", string(admm_mu_incr),
             "--admm-mu-decr", string(admm_mu_decr),
+            "--admm-tau-incr", string(admm_tau_incr),
+            "--admm-tau-decr", string(admm_tau_decr),
         ]
-        if admm_tau_incr != 1.0
-            push!(args_dist, "--admm-tau-incr")
-            push!(args_dist, string(admm_tau_incr))
-        end
-        if admm_tau_decr != 1.0
-            push!(args_dist, "--admm-tau-decr")
-            push!(args_dist, string(admm_tau_decr))
+
+        if admm_alpha != 1.0
+            push!(args_dist, "--admm-alpha", string(admm_alpha))
         end
         if admm_warm_start
             push!(args_dist, "--admm-warm-start")
         end
-        if !isnothing(distributed_optimizer)
-            push!(args_dist, "--optimizer")
-            push!(args_dist, string(distributed_optimizer))
+        if distributed_optimizer !== nothing
+            push!(args_dist, "--optimizer", string(distributed_optimizer))
         end
-        obj, _ = Lirion.main(args_dist)
-        obj
+
+        res = Lirion.main(args_dist)
+
+        # aqui é o ponto: res é NamedTuple, pega o custo certo
+        Float64(res.total_real_cost)
+        # (se você quiser o outro: Float64(res.total_expr_cost))
     catch e
         @warn "Distributed ADMM-Branch-DC failed on $case_name: $e"
         track_failure_branch(label, "Distributed", case_name)
@@ -122,8 +104,14 @@ function compare_distributed_branch_vs_centralized(
     end
 
     @info "File $case_name | centralized = $(round(cent_obj, digits=6)) | distributed-branch = $(round(dist_obj, digits=6))"
+
+    abs_err = abs(dist_obj - cent_obj)
+    rel_err = abs_err / max(abs(cent_obj), 1.0)
+    @info "Errors: abs=$(abs_err) | rel=$(rel_err)"
+
     @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
 end
+
 
 """
 Roda a suíte de testes para ADMM-Branch-DC vs DC nos casos de zonas.
@@ -132,21 +120,21 @@ function run_distributed_branch_objective_tests(;
     case_list = distributed_branch_zone_cases,
     label = "ADMM-Branch-DC vs DC",
     central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
-    distributed_optimizer::Union{Nothing, Function} = nothing,
-    rtol = 0.05, atol = 1e-6,
+    distributed_optimizer = nothing,
+    rtol = 0.01, atol = 1e-6,
     admm_eps_abs = 1e-4, admm_eps_rel = 1e-4,
     admm_alpha::Float64 = 1.0,
-    admm_mu_incr::Float64 = 2.0,
-    admm_mu_decr::Float64 = 2.0,
-    admm_tau_incr::Float64 = 1.0,
-    admm_tau_decr::Float64 = 1.0,
+    admm_mu_incr::Float64 = 3.0,
+    admm_mu_decr::Float64 = 3.0,
+    admm_tau_incr::Float64 = 1.05,
+    admm_tau_decr::Float64 = 0.98,
 )
     if isempty(case_list)
         @info "Empty distributed (branch) case list. No tests will be run."
         return true
     end
 
-    test_dir = joinpath(@__DIR__, "matpower_cases")
+    test_dir = joinpath(@__DIR__, "distributed")
     selected_files = [
         joinpath(test_dir, fname)
         for fname in case_list
@@ -158,14 +146,8 @@ function run_distributed_branch_objective_tests(;
         case_name = basename(file)
 
         # defaults por case
-        admm_max_iter_case = if occursin("_3zones_", case_name)
-            400
-        elseif occursin("_2zones_", case_name)
-            350
-        else
-            300
-        end
-        admm_rho_case = 1_000.0
+        admm_max_iter_case = 5000
+        admm_rho_case = 100000.0
         admm_eps_abs_case = admm_eps_abs
         admm_eps_rel_case = admm_eps_rel
         admm_alpha_case = admm_alpha
@@ -176,60 +158,17 @@ function run_distributed_branch_objective_tests(;
         distributed_optimizer_case = distributed_optimizer
         admm_warm_start_case = false
 
-        if occursin("case500_", case_name)
-            admm_max_iter_case = 600
-            admm_rho_case = 1_000_000.0
-            admm_eps_abs_case = 1e-4
-            admm_eps_rel_case = 1e-4
-        elseif occursin("case2000_", case_name)
-            admm_max_iter_case = 600
-            admm_rho_case = 700.0
-            admm_eps_abs_case = 1e-4
-            admm_eps_rel_case = 1e-4
-            admm_alpha_case = 1.6
-        end
-        if occursin("case3970_25zones_", case_name)
-            admm_max_iter_case = 600
-            admm_rho_case = 1_000.0
-            admm_eps_abs_case = 1e-4
-            admm_eps_rel_case = 1e-4
-            admm_alpha_case = 1.4
-        end
-        if occursin("case10000_50zones_", case_name)
-            admm_max_iter_case = 800
-            admm_rho_case = 200.0
-            admm_eps_abs_case = 1e-4
-            admm_eps_rel_case = 1e-4
-            admm_alpha_case = 1.2
+        # --------------------------------------------
+        # Override por caso (ex: case197_snem)
+        # --------------------------------------------
+        if case_name == "pglib_opf_case500_goc.m"
+            admm_rho_case = 5000.0
+            central_optimizer_case = Ipopt.Optimizer
+            distributed_optimizer_case = Ipopt.Optimizer
         end
 
-        if occursin("case20758_42zones_", case_name)
-            admm_max_iter_case = 1000
-            admm_rho_case = 750.0
-            admm_eps_abs_case = 1e-4
-            admm_eps_rel_case = 1e-4
-            admm_alpha_case = 1.1
-        end
-        if occursin("case30000_20zones_", case_name)
-            admm_max_iter_case = 1000
-            admm_rho_case = 500.0
-            admm_eps_abs_case = 1e-4
-            admm_eps_rel_case = 1e-4
-            admm_alpha_case = 1.2
-            admm_warm_start_case = true
-        end
-        if occursin("case78484_157zones_", case_name)
-            admm_max_iter_case = 1000
-            admm_rho_case = 500.0
-            admm_eps_abs_case = 1e-4
-            admm_eps_rel_case = 1e-4
-            admm_alpha_case = 1.2
-            admm_mu_incr_case = 2.0
-            admm_mu_decr_case = 2.0
-            admm_tau_incr_case = 1.1
-            admm_tau_decr_case = 0.92
-            admm_warm_start_case = true
-        end
+
+
 
         @info "[$label] Rodando caso $i de $n: $case_name " *
               "(max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), " *

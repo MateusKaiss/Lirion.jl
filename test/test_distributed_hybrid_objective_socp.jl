@@ -88,41 +88,23 @@ const _DISTRIB_DEFAULT =
     )
 
 const distributed_hybrid_socp_zone_cases = [
-    # 14 buses
-    "pglib_opf_case14_2zones_ieee_socp.m",
-    "pglib_opf_case14_3zones_ieee_socp.m",
-    # 24 buses
-    "pglib_opf_case24_2zones_ieee_rts.m",
-    "pglib_opf_case24_3zones_ieee_rts.m",
-    # 30 buses
-    "pglib_opf_case30_2zones_as.m",
-    "pglib_opf_case30_3zones_as.m",
-    # # 57 buses
-    # # "pglib_opf_case57_2zones_ieee.m", problem
-    # # "pglib_opf_case57_4zones_ieee.m", problem
-    # # # 118 buses
-    # "pglib_opf_case118_2zones_ieee.m",
-    # "pglib_opf_case118_3zones_ieee.m",
-    "pglib_opf_case118_5zones_ieee.m",
+    # "pglib_opf_case73_ieee_rts__api.m",
+    # "pglib_opf_case73_ieee_rts__sad.m",
+    ## "pglib_opf_case57_ieee__api.m",
+    # "pglib_opf_case57_ieee__sad.m",
 
-    # # # 500 buses
-    # "pglib_opf_case500_3zones_goc.m",
-    # "pglib_opf_case500_4zones_goc.m", problema
-    # # 793
-    # # "pglib_opf_case793_11zones_goc.m",
-    # # 2000
-    # "pglib_opf_case2000_5zones_goc.m",
-    # # 3970
-    # "pglib_opf_case3970_25zones_goc.m",
-    # # 10000
-    # "pglib_opf_case10000_50zones_goc.m",
-    # # 20758
-    # "pglib_opf_case20758_42zones_epigrids.m",
-    # # 30000
-    # "pglib_opf_case30000_20zones_goc.m",
-    # # 78484
-    # "pglib_opf_case78484_157zones_epigrids.m",
+    "pglib_opf_case3_lmbd.m",
+    "pglib_opf_case3_lmbd__api.m",
+    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case73_ieee_rts.m",
+    "pglib_opf_case57_ieee.m",
+    "pglib_opf_case118_ieee.m",
+    # "pglib_opf_case200_activ.m",
+
+    # "pglib_opf_case500_goc.m",
+
 ]
+
 function track_failure_hybrid_socp(label::String, origin::String, case_name::String)
     if !haskey(GLOBAL_FAILED_CASES, label)
         GLOBAL_FAILED_CASES[label] =
@@ -136,7 +118,7 @@ function compare_distributed_hybrid_socp_vs_centralized(
     label::String,
     central_optimizer = _CENTRAL_DEFAULT,
     distributed_optimizer = _DISTRIB_DEFAULT,
-    rtol = 0.05,
+    rtol = 0.01,
     atol = 1e-6,
     rho_v::Float64 = 1.0e3,
     rho_flow_p::Float64 = 3.0e2,
@@ -221,9 +203,7 @@ function compare_distributed_hybrid_socp_vs_centralized(
             file,
             "--model", "distributed-admm-hybrid-socp",
             "--optimizer", string(distributed_optimizer),
-            "--admm-rho-v", string(rho_v),
-            "--admm-rho-flow-p", string(rho_flow_p),
-            "--admm-rho-flow-q", string(rho_flow_q),
+            "--admm-rho", string(rho_v),
             "--admm-max-iter", string(admm_max_iter),
             "--admm-eps-abs", string(admm_eps_abs),
             "--admm-eps-rel", string(admm_eps_rel),
@@ -245,7 +225,7 @@ function run_distributed_hybrid_socp_objective_tests(;
     label = "ADMM-Hybrid-SOCP vs SOCP",
     central_optimizer = _CENTRAL_DEFAULT,
     distributed_optimizer = _DISTRIB_DEFAULT,
-    rtol = 0.05, atol = 1e-6,
+    rtol = 0.01, atol = 1e-6,
     admm_eps_abs = 1e-4, admm_eps_rel = 1e-4,
 )
     if isempty(case_list)
@@ -253,7 +233,7 @@ function run_distributed_hybrid_socp_objective_tests(;
         return true
     end
 
-    test_dir = joinpath(@__DIR__, "matpower_cases")
+    test_dir = joinpath(@__DIR__, "distributed")
     selected_files = [
         joinpath(test_dir, fname)
         for fname in case_list
@@ -264,25 +244,13 @@ function run_distributed_hybrid_socp_objective_tests(;
     for (i, file) in enumerate(selected_files)
         case_name = basename(file)
 
-        rho_v_case = 1.0e3
-        rho_flow_p_case = 3.0e2
-        rho_flow_q_case = 3.0e2
-        admm_max_iter_case = 350
+        rho_v_case = 1.0e4
+        admm_max_iter_case = 5000
         admm_eps_abs_case = admm_eps_abs
         admm_eps_rel_case = admm_eps_rel
 
-        if occursin("_3zones_", case_name) || occursin("_4zones_", case_name)
-            admm_max_iter_case = max(admm_max_iter_case, 800)
-        end
-        # if occursin("case118_", case_name)
-        #     admm_max_iter_case = max(admm_max_iter_case, 1500)
-        # end
-        # if occursin("case500_", case_name)
-        #     admm_max_iter_case = max(admm_max_iter_case, 2000)
-        # end
-
         @info "[$label] Rodando caso $i de $n: $case_name " *
-              "(max_iter=$(admm_max_iter_case), rhoV²=$(rho_v_case), rhoP=$(rho_flow_p_case), rhoQ=$(rho_flow_q_case), " *
+              "(max_iter=$(admm_max_iter_case), rhoV²=$(rho_v_case), " *
               "eps_pr=$(admm_eps_abs_case), eps_dual=$(admm_eps_rel_case))"
 
         @testset "$(label) - $(case_name)" begin
@@ -294,8 +262,6 @@ function run_distributed_hybrid_socp_objective_tests(;
                 rtol = rtol,
                 atol = atol,
                 rho_v = rho_v_case,
-                rho_flow_p = rho_flow_p_case,
-                rho_flow_q = rho_flow_q_case,
                 admm_max_iter = admm_max_iter_case,
                 admm_eps_abs = admm_eps_abs_case,
                 admm_eps_rel = admm_eps_rel_case,

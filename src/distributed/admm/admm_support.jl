@@ -1,6 +1,34 @@
 # ============================================================
 # Optional-field helpers
 # ============================================================
+@inline function _require_optimal!(model::JuMP.Model; iter::Int, zone_id::Int, tag::String)
+    ts = JuMP.termination_status(model)
+    ps = JuMP.primal_status(model)
+    ds = JuMP.dual_status(model)
+
+    acceptable =
+        ts == MOI.OPTIMAL ||
+        ts == MOI.LOCALLY_SOLVED
+
+    if !acceptable
+        raw = try
+            JuMP.raw_status(model)
+        catch
+            "raw_status unavailable"
+        end
+
+        error("""
+        [$tag FAIL-FAST]
+        iter=$iter zone=$zone_id
+          termination_status = $ts
+          primal_status       = $ps
+          dual_status         = $ds
+          raw_status          = $raw
+        """)
+    end
+
+    return nothing
+end
 
 @inline _adaptive_on(config) = _getopt(config, :adaptive_rho, true)
 
@@ -51,14 +79,15 @@ end
 # DC
 # ----------------------------
 function resolve_optimizer(::Val{:dc}, config)
-    opt = _getopt(config, :optimizer, nothing)
+    opt = config.optimizer
+
     if opt !== nothing
         if opt == COSMO.Optimizer
             return optimizer_with_attributes(
                 COSMO.Optimizer,
                 "eps_abs" => 1e-6,
                 "eps_rel" => 1e-6,
-                "max_iter" => 10_000,
+                "max_iter" => 50_000,
                 "verbose" => false,
                 "decompose" => true,
             )

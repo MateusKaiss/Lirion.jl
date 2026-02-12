@@ -90,41 +90,22 @@ const _DISTRIB_DEFAULT =
 
 # --- lista de casos (inclui o 2000_5zones para acionar o caso especial) ---
 const distributed_branch_socp_zone_cases = [
-    # 14 buses
-    "pglib_opf_case14_2zones_ieee_socp.m",
-    "pglib_opf_case14_3zones_ieee_socp.m",
-    # 24 buses
-    "pglib_opf_case24_2zones_ieee_rts.m",
-    "pglib_opf_case24_3zones_ieee_rts.m",
-    # 30 buses
-    "pglib_opf_case30_2zones_as.m",
-    "pglib_opf_case30_3zones_as.m",
-    # # 57 buses
-    # # "pglib_opf_case57_2zones_ieee.m", problem
-    # # "pglib_opf_case57_4zones_ieee.m", problem
-    # # # 118 buses
-    # "pglib_opf_case118_2zones_ieee.m",
-    # "pglib_opf_case118_3zones_ieee.m",
-    "pglib_opf_case118_5zones_ieee.m",
+    # "pglib_opf_case73_ieee_rts__api.m",
+    # "pglib_opf_case73_ieee_rts__sad.m",
+    ## "pglib_opf_case57_ieee__api.m",
+    # "pglib_opf_case57_ieee__sad.m",
 
-    # # 500 buses
-    # "pglib_opf_case500_3zones_goc.m", problem
-    # "pglib_opf_case500_4zones_goc.m", problema
-    # # 793
-    # # "pglib_opf_case793_11zones_goc.m",
-    # # 2000
-    # "pglib_opf_case2000_5zones_goc.m",
-    # # 3970
-    # "pglib_opf_case3970_25zones_goc.m",
-    # # 10000
-    # "pglib_opf_case10000_50zones_goc.m",
-    # # 20758
-    # "pglib_opf_case20758_42zones_epigrids.m",
-    # # 30000
-    # "pglib_opf_case30000_20zones_goc.m",
-    # # 78484
-    # "pglib_opf_case78484_157zones_epigrids.m",
+    "pglib_opf_case3_lmbd.m",
+    "pglib_opf_case3_lmbd__api.m",
+    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case73_ieee_rts.m",
+    "pglib_opf_case118_ieee.m",
+    # "pglib_opf_case200_activ.m",
+
+    # "pglib_opf_case57_ieee.m",
+    # "pglib_opf_case500_goc.m",
 ]
+
 
 function track_failure_branch_socp(label::String, origin::String, case_name::String)
     if !haskey(GLOBAL_FAILED_CASES, label)
@@ -259,7 +240,7 @@ function run_distributed_branch_socp_objective_tests(;
         return true
     end
 
-    test_dir = joinpath(@__DIR__, "matpower_cases")
+    test_dir = joinpath(@__DIR__, "distributed")
     selected_files = [
         joinpath(test_dir, fname)
         for fname in case_list
@@ -274,17 +255,9 @@ function run_distributed_branch_socp_objective_tests(;
         rho_v_case = 1e3
         rho_flow_p_case = 1e3
         rho_flow_q_case = 1e3
-        admm_max_iter_case = 350
+        admm_max_iter_case = 5000
         admm_eps_abs_case = admm_eps_abs
         admm_eps_rel_case = admm_eps_rel
-
-        # regras simples por tamanho/zonas (mantém rhos)
-        if occursin("_3zones_", case_name) || occursin("_4zones_", case_name)
-            admm_max_iter_case = max(admm_max_iter_case, 1200)
-        end
-        if occursin("case118_", case_name)
-            admm_max_iter_case = max(admm_max_iter_case, 1500)
-        end
 
         @info "[$label] Rodando caso $i/$n: $case_name " *
               "(max_iter=$(admm_max_iter_case), rhoV²=$(rho_v_case), rhoP=$(rho_flow_p_case), rhoQ=$(rho_flow_q_case), " *
