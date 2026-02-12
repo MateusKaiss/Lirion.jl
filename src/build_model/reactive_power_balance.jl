@@ -115,7 +115,6 @@ function reactive_power_balance!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{DC},
-    ::Type{SubproblemBuild},
 )
     return nothing
 end
@@ -124,7 +123,6 @@ function reactive_power_balance!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{AC},
-    ::Type{SubproblemBuild},
 )
     pf = sys.powerflow
     T = get(model.ext, :time_periods, 1)
@@ -149,7 +147,6 @@ function reactive_power_balance!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{SOCP},
-    ::Type{SubproblemBuild},
 )
     pf = sys.powerflow
     T = get(model.ext, :time_periods, 1)

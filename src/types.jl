@@ -17,7 +17,7 @@ struct Branch <: ADMMVariant end
 struct Hybrid <: ADMMVariant end
 
 # ============================================================
-# OPF TAGS (TYPE-LEVEL DISPATCH)
+# OPF TAGS FOR DISTRIBUTED VARIANTS
 # ============================================================
 
 abstract type OPFTag end
@@ -174,10 +174,10 @@ DistributedOPFModel(
     prefer_socp_solver::Symbol = :auto,
 ) = DistributedOPFModel(
     base_model, method, max_iter,
-    coalesce(rho_theta, rho),
-    coalesce(rho_v, rho),
-    coalesce(rho_flow_p, rho_flow, rho),
-    coalesce(rho_flow_q, rho_flow, rho),
+    something(rho_theta, rho),
+    something(rho_v, rho),
+    something(rho_flow_p, rho_flow, rho),
+    something(rho_flow_q, rho_flow, rho),
     eps_abs, eps_rel;
     alpha_overrelax = alpha_overrelax,
     warm_start = warm_start,
@@ -222,17 +222,6 @@ Base.setproperty!(c::DistributedOPFModel, s::Symbol, v) =
 
 Base.propertynames(c::DistributedOPFModel, private::Bool = false) =
     (propertynames(typeof(c), private)..., :rho, :rho_flow)
-
-# ============================================================
-# SUBPROBLEM ACTIONS
-# ============================================================
-
-abstract type SubproblemAction end
-struct SubproblemBuild <: SubproblemAction end
-struct SubproblemUpdate <: SubproblemAction end
-struct SubproblemGetResult <: SubproblemAction end
-struct SubproblemNameElementsDimensions <: SubproblemAction end
-struct SubproblemWriteResult <: SubproblemAction end
 
 # ============================================================
 # RUN DIAGNOSTICS

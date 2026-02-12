@@ -28,7 +28,6 @@ using Dates
 using Statistics
 using InfrastructureModels
 using Logging
-using ArgParse
 using SCS
 using OSQP
 using Base.Threads
@@ -73,9 +72,8 @@ include("collections/system_data.jl")
 include("collections/preprocess.jl")
 
 # ------------------------------------------------------------------
-# Case parsing (.m / .csv)
+# Inputs structs (legacy CLI + shared input pipeline)
 # ------------------------------------------------------------------
-include("args/args.jl")
 include("collections/inputs.jl")
 include("collections/admm_structs.jl")
 
@@ -122,8 +120,22 @@ include("distributed/admm/admm_ac.jl")
 include("distributed/admm/admm_socp.jl")
 
 # ------------------------------------------------------------------
-# run_lirion / main / julia_main
+# Legacy runner / CLI entrypoints
+# (run_lirion is defined here today, so it must be included
+#  BEFORE solve.jl which calls run_lirion)
 # ------------------------------------------------------------------
-include("main.jl")
+include("api.jl")
+
+# ------------------------------------------------------------------
+# New function-based API (no Args required)
+# ------------------------------------------------------------------
+include("solve.jl")
+
+# ------------------------------------------------------------------
+# Public exports (API)
+# ------------------------------------------------------------------
+export solve, dc, ac, socp,
+       centralized, admm_bus, admm_branch, admm_hybrid,
+       partition_from_case, partition_metis
 
 end

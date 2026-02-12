@@ -95,7 +95,6 @@ function generators!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{DC},
-    ::Type{SubproblemBuild},
 )
     gen = sys.gen
     if gen.n == 0
@@ -113,7 +112,6 @@ function generators!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{AC},
-    ::Type{SubproblemBuild},
 )
     gen = sys.gen
     if gen.n == 0
@@ -132,7 +130,6 @@ function generators!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{SOCP},
-    ::Type{SubproblemBuild},
 )
     gen = sys.gen
     if gen.n == 0

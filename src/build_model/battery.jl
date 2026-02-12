@@ -214,7 +214,6 @@ function batteries!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{DC},
-    ::Type{SubproblemBuild},
 )
     bat = sys.battery
     if bat.n == 0
@@ -231,7 +230,6 @@ function batteries!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{AC},
-    ::Type{SubproblemBuild},
 )
     bat = sys.battery
     if bat.n == 0
@@ -248,7 +246,6 @@ function batteries!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{SOCP},
-    ::Type{SubproblemBuild},
 )
     bat = sys.battery
     if bat.n == 0

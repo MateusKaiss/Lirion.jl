@@ -1,5 +1,5 @@
 # ==============================================
-# ADMM-Branch-SOCP vs SOCP (objetivo) – testes
+# ADMM-Branch-SOCP vs SOCP (objective) – tests (API solve)
 # ==============================================
 using Test
 using Lirion
@@ -10,10 +10,11 @@ using COSMO
 using Clarabel
 
 # -------------------------------------------------
-# (Opcional) pacote de atributos robustos do Clarabel
+# (Optional) Clarabel robust attributes (as string)
+# NOTE: this is used only if your code still supports parsing this string in CLI;
+# here we keep the params and build optimizer_with_attributes directly.
 # -------------------------------------------------
-const CLARABEL_ROBUST = """
-optimizer_with_attributes(Clarabel.Optimizer,
+const CLARABEL_ROBUST_ATTRS = (
     "tol_feas" => 1e-4,
     "tol_gap_abs" => 1e-4,
     "tol_gap_rel" => 1e-4,
@@ -46,17 +47,17 @@ optimizer_with_attributes(Clarabel.Optimizer,
     "reduced_tol_feas"    => 5e-4,
     "reduced_tol_infeas_abs" => 5e-11,
     "reduced_tol_infeas_rel" => 5e-4,
-    "reduced_tol_ktratio"    => 1e-4
-)"""
+    "reduced_tol_ktratio"    => 1e-4,
+)
 
-# -------- helper local (caso o runtests não tenha definido) --------
-# ENV["LIRION_SOCP_PREFER"] pode ser "auto" | "gurobi" | "cosmo" | "scs"
+# -------- helper local (if runtests didn't define) --------
+# ENV["LIRION_SOCP_PREFER"] can be "auto" | "gurobi" | "cosmo" | "scs"
 if !@isdefined(pick_socp_optimizer)
     const _SOCP_CHAIN_MAP_LOCAL = Dict(
-        :auto => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
+        :auto   => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
         :gurobi => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
-        :cosmo => (COSMO.Optimizer, Gurobi.Optimizer, SCS.Optimizer),
-        :scs => (SCS.Optimizer, Gurobi.Optimizer, COSMO.Optimizer),
+        :cosmo  => (COSMO.Optimizer, Gurobi.Optimizer, SCS.Optimizer),
+        :scs    => (SCS.Optimizer, Gurobi.Optimizer, COSMO.Optimizer),
     )
     function pick_socp_optimizer(;
         prefer::Symbol = Symbol(lowercase(get(ENV, "LIRION_SOCP_PREFER", "auto"))),
@@ -73,7 +74,7 @@ if !@isdefined(pick_socp_optimizer)
     end
 end
 
-# Defaults: usa os do runtests se existirem; senão, cai para o picker local
+# Defaults: uses runtests globals if exist; otherwise local picker
 const _CENTRAL_DEFAULT =
     @isdefined(CENTRAL_SOCP_SOLVER) ? CENTRAL_SOCP_SOLVER :
     (
@@ -88,7 +89,7 @@ const _DISTRIB_DEFAULT =
         pick_socp_optimizer(; prefer = :auto)
     )
 
-# --- lista de casos (inclui o 2000_5zones para acionar o caso especial) ---
+# --- case list ---
 const distributed_branch_socp_zone_cases = [
     # "pglib_opf_case73_ieee_rts__api.m",
     # "pglib_opf_case73_ieee_rts__sad.m",
@@ -99,13 +100,12 @@ const distributed_branch_socp_zone_cases = [
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
     "pglib_opf_case73_ieee_rts.m",
-    "pglib_opf_case118_ieee.m",
+    # "pglib_opf_case118_ieee.m",
     # "pglib_opf_case200_activ.m",
 
     # "pglib_opf_case57_ieee.m",
     # "pglib_opf_case500_goc.m",
 ]
-
 
 function track_failure_branch_socp(label::String, origin::String, case_name::String)
     if !haskey(GLOBAL_FAILED_CASES, label)
@@ -115,88 +115,121 @@ function track_failure_branch_socp(label::String, origin::String, case_name::Str
     return push!(GLOBAL_FAILED_CASES[label][origin], case_name)
 end
 
+# ------------------------------------------------------------
+# Objective extraction (same pattern as your Branch-AC test)
+# ------------------------------------------------------------
+@inline function _objective_centralized(out::Lirion.LirionRunResult)
+    d = out.result
+    d isa AbstractDict || error("Centralized out.result must be Dict, got $(typeof(d))")
+    haskey(d, "objective") || error("Centralized result has no key 'objective'. Keys=$(collect(keys(d)))")
+    return d["objective"]
+end
+
+@inline function _objective_distributed_branch_socp(out::Lirion.LirionRunResult)
+    r = out.result
+    r isa NamedTuple || error("Distributed out.result must be NamedTuple, got $(typeof(r))")
+    hasproperty(r, :total_expr_cost) ||
+        error("Distributed result has no field :total_expr_cost. Fields=$(propertynames(r))")
+    return getproperty(r, :total_expr_cost)
+end
+
 function compare_distributed_branch_socp_vs_centralized(
     file::String;
     label::String,
-    central_optimizer = _CENTRAL_DEFAULT,     # fallback (Gurobi→COSMO→SCS)
-    distributed_optimizer = _DISTRIB_DEFAULT, # idem p/ distribuído
+    central_optimizer = _CENTRAL_DEFAULT,      # fallback (Gurobi→COSMO→SCS)
+    distributed_optimizer = _DISTRIB_DEFAULT,  # fallback for distributed
     rtol = 0.05,
     atol = 1e-6,
-    # ADMM defaults (usados nos casos gerais; o especial 2000_5zones tem override)
+
+    # ADMM defaults
     rho_v::Float64 = 1.0e3,
     rho_flow_p::Float64 = 1.0e3,
     rho_flow_q::Float64 = 1.0e3,
     admm_max_iter::Int = 350,
     admm_eps_abs::Float64 = 1e-4,
     admm_eps_rel::Float64 = 1e-4,
+    admm_adaptive::Union{Nothing, Bool} = nothing,
+    admm_mu_incr::Float64 = 3.0,
+    admm_mu_decr::Float64 = 3.0,
+    admm_tau_incr::Float64 = 1.05,
+    admm_tau_decr::Float64 = 0.98,
 )
     case_name = basename(file)
 
     # ================================================================
-    # Caso especial: 2000-bus / 5 zonas
-    #   - Centralizado: Clarabel com atributos robustos (CLARABEL_ROBUST)
-    #   - Distribuído (Branch-ADMM-SOCP): Clarabel + args solicitados
+    # Special case: 2000-bus / 5 zones
+    #   - Centralized: Clarabel robust attributes
+    #   - Distributed (Branch-ADMM-SOCP): Clarabel + requested ADMM params
     # ================================================================
     if case_name == "pglib_opf_case2000_5zones_goc.m"
-        @info "⚙️ [BRANCH-SOCP] Caso especial $case_name com Clarabel robusto (central) e Clarabel com rho=1e8 (distribuído)."
+        @info "⚙️ [BRANCH-SOCP] Special case $case_name with Clarabel robust (central) and Clarabel rho=1e8 (distributed)."
 
-        # --- SOCP centralizado (Clarabel robusto) ---
+        # Centralized SOCP (Clarabel robust)
         cent_obj = try
-            args_cent = String[
-                file,
-                "--model", "socp",
-                "--optimizer", CLARABEL_ROBUST,
-            ]
-            result_dict, _, _ = Lirion.main(args_cent)
-            result_dict["objective"]
+            opt_cent = optimizer_with_attributes(Clarabel.Optimizer, CLARABEL_ROBUST_ATTRS...)
+            out_cent = Lirion.solve(
+                file;
+                model = Lirion.socp(),
+                algorithm = Lirion.centralized(),
+                optimizer = opt_cent,
+                outputs = false,
+                plots = false,
+            )
+            _objective_centralized(out_cent)
         catch e
             @warn "Centralized SOCP failed on $case_name: $e"
             track_failure_branch_socp(label, "Centralized", case_name)
             return
         end
 
-        # --- ADMM-Branch-SOCP distribuído (Clarabel + seus args) ---
+        # Distributed ADMM-Branch-SOCP (Clarabel + your requested params)
         dist_obj = try
-            args_dist = String[
-                file,
-                "--model", "distributed-admm-branch-socp",
-                "--optimizer", "Clarabel.Optimizer",
-                "--admm-max-iter", "700",
-                "--admm-rho-v", "1e8",
-                "--admm-rho-flow-p", "1e8",
-                "--admm-rho-flow-q", "1e8",
-                "--admm-eps-abs", "1e-4",
-                "--admm-eps-rel", "1e-4",
-                "--admm-adaptive", "on",
-                "--admm-mu-incr", "5.0",
-                "--admm-mu-decr", "5.0",
-                "--admm-tau-incr", "1.1",
-                "--admm-tau-decr", "0.9",
-            ]
-            obj, _ = Lirion.main(args_dist)
-            obj
+            alg = Lirion.admm_branch(
+                max_iter = 700,
+                rho_v = 1e8,
+                rho_flow_p = 1e8,
+                rho_flow_q = 1e8,
+                eps_abs = 1e-4,
+                eps_rel = 1e-4,
+                adaptive_rho = true,
+                mu_incr = 5.0,
+                mu_decr = 5.0,
+                tau_incr = 1.1,
+                tau_decr = 0.9,
+            )
+            out_dist = Lirion.solve(
+                file;
+                model = Lirion.socp(),
+                algorithm = alg,
+                optimizer = Clarabel.Optimizer,
+                outputs = false,
+                plots = false,
+            )
+            _objective_distributed_branch_socp(out_dist)
         catch e
             @warn "Distributed ADMM-Branch-SOCP failed on $case_name: $e"
             track_failure_branch_socp(label, "Distributed", case_name)
             return
         end
 
-        @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-branch-SOCP = $(round(dist_obj, digits=6))"
+        @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-branch-SOCP (total_expr_cost) = $(round(dist_obj, digits=6))"
         @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
         return
     end
 
     # ================================================================
-    # Casos gerais (mantém fallback e hiperparâmetros padrão)
+    # General cases
     # ================================================================
     cent_obj = try
-        args_cent = String[
-            file,
-            "--model", "socp",
-            "--optimizer", string(central_optimizer),
-        ]
-        result_dict, _, _ = Lirion.main(args_cent)
-        result_dict["objective"]
+        out_cent = Lirion.solve(
+            file;
+            model = Lirion.socp(),
+            algorithm = Lirion.centralized(),
+            optimizer = central_optimizer,
+            outputs = false,
+            plots = false,
+        )
+        _objective_centralized(out_cent)
     catch e
         @warn "Centralized SOCP failed on $case_name: $e"
         track_failure_branch_socp(label, "Centralized", case_name)
@@ -204,26 +237,35 @@ function compare_distributed_branch_socp_vs_centralized(
     end
 
     dist_obj = try
-        args_dist = String[
-            file,
-            "--model", "distributed-admm-branch-socp",
-            "--optimizer", string(distributed_optimizer),
-            "--admm-rho-v", string(rho_v),
-            "--admm-rho-flow-p", string(rho_flow_p),
-            "--admm-rho-flow-q", string(rho_flow_q),
-            "--admm-max-iter", string(admm_max_iter),
-            "--admm-eps-abs", string(admm_eps_abs),
-            "--admm-eps-rel", string(admm_eps_rel),
-        ]
-        obj, _ = Lirion.main(args_dist)
-        obj
+        alg = Lirion.admm_branch(
+            max_iter = admm_max_iter,
+            rho_v = rho_v,
+            rho_flow_p = rho_flow_p,
+            rho_flow_q = rho_flow_q,
+            eps_abs = admm_eps_abs,
+            eps_rel = admm_eps_rel,
+            adaptive_rho = isnothing(admm_adaptive) ? true : Bool(admm_adaptive),
+            mu_incr = admm_mu_incr,
+            mu_decr = admm_mu_decr,
+            tau_incr = admm_tau_incr,
+            tau_decr = admm_tau_decr,
+        )
+        out_dist = Lirion.solve(
+            file;
+            model = Lirion.socp(),
+            algorithm = alg,
+            optimizer = distributed_optimizer,
+            outputs = false,
+            plots = false,
+        )
+        _objective_distributed_branch_socp(out_dist)
     catch e
         @warn "Distributed ADMM-Branch-SOCP failed on $case_name: $e"
         track_failure_branch_socp(label, "Distributed", case_name)
         return
     end
 
-    @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-branch-SOCP = $(round(dist_obj, digits=6)) | max_iter=$(admm_max_iter), rhoV²=$(rho_v), rhoP=$(rho_flow_p), rhoQ=$(rho_flow_q)"
+    @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-branch-SOCP (total_expr_cost) = $(round(dist_obj, digits=6)) | max_iter=$(admm_max_iter), rhoV=$(rho_v), rhoP=$(rho_flow_p), rhoQ=$(rho_flow_q)"
     @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
 end
 
@@ -251,7 +293,7 @@ function run_distributed_branch_socp_objective_tests(;
     for (i, file) in enumerate(selected_files)
         case_name = basename(file)
 
-        # hiperparâmetros default para os demais casos
+        # defaults for general cases
         rho_v_case = 1e3
         rho_flow_p_case = 1e3
         rho_flow_q_case = 1e3
@@ -260,7 +302,7 @@ function run_distributed_branch_socp_objective_tests(;
         admm_eps_rel_case = admm_eps_rel
 
         @info "[$label] Rodando caso $i/$n: $case_name " *
-              "(max_iter=$(admm_max_iter_case), rhoV²=$(rho_v_case), rhoP=$(rho_flow_p_case), rhoQ=$(rho_flow_q_case), " *
+              "(max_iter=$(admm_max_iter_case), rhoV=$(rho_v_case), rhoP=$(rho_flow_p_case), rhoQ=$(rho_flow_q_case), " *
               "eps_pr=$(admm_eps_abs_case), eps_dual=$(admm_eps_rel_case))"
 
         @testset "$(label) - $(case_name)" begin

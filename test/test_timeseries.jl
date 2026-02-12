@@ -2,40 +2,49 @@ function run_test_timeseries()
     @testset "Objective validation for case3_timeseries.m" begin
         case_path = joinpath(@__DIR__, "matpower_cases", "case3_timeseries.m")
 
+        # --- DC ---
         @testset "DC" begin
-            args = [
-                case_path,
-                "--model", "dc",
-                "--optimizer", string(SCS.Optimizer),
-            ]
-            result_dict, _ = Lirion.main(args)
-            obj = result_dict["objective"]
+            out = Lirion.solve(
+                case_path;
+                model = Lirion.dc(),
+                algorithm = Lirion.centralized(),
+                optimizer = SCS.Optimizer,
+                outputs = false,
+                plots = false,
+            )
+            obj = Float64(out.result["objective"])
             @info "DC objective = $obj"
             @test isapprox(obj, 17087.68770350661; atol = 1e-1)
         end
 
+        # --- AC ---
         @testset "AC" begin
-            args = [
-                case_path,
-                "--model", "ac",
-                "--optimizer", string(Ipopt.Optimizer),
-            ]
-            result_dict, _ = Lirion.main(args)
-            obj = result_dict["objective"]
+            out = Lirion.solve(
+                case_path;
+                model = Lirion.ac(),
+                algorithm = Lirion.centralized(),
+                optimizer = Ipopt.Optimizer,
+                outputs = false,
+                plots = false,
+            )
+            obj = Float64(out.result["objective"])
             @info "AC objective = $obj"
             @test isapprox(obj, 17437.9297122154; atol = 1e-1)
         end
 
+        # --- SOCP ---
         @testset "SOCP" begin
-            args = [
-                case_path,
-                "--model", "socp",
-                "--optimizer", string(SCS.Optimizer),
-            ]
-            result_dict, _ = Lirion.main(args)
-            obj = result_dict["objective"]
+            out = Lirion.solve(
+                case_path;
+                model = Lirion.socp(),
+                algorithm = Lirion.centralized(),
+                optimizer = SCS.Optimizer,
+                outputs = false,
+                plots = false,
+            )
+            obj = Float64(out.result["objective"])
             @info "SOCP objective = $obj"
-            @test isapprox(obj, 17205.621331837865; atol = 1)
+            @test isapprox(obj, 17205.621331837865; atol = 1.0)
         end
     end
 
@@ -87,6 +96,7 @@ function run_test_timeseries()
             @test sort(unique(ts["time"])) == expected_times
             for gen in unique(ts["gen_id"])
                 idxs = findall(x -> x == gen, ts["gen_id"])
+                @test length(idxs) == 3
                 for field in ["cost_coefficients"]
                     @test ts[field][idxs[3]] == ts[field][idxs[2]]
                 end

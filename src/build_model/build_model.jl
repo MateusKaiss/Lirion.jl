@@ -73,7 +73,7 @@ function _build_singleperiod_model(
     model.ext[:time_periods] = 1
     model.ext[:times] = [1]
 
-    process_subproblem(model, sys, model_type, SubproblemBuild)
+    process_subproblem(model, sys, model_type)
 
     return model
 end
@@ -93,7 +93,7 @@ function _build_multiperiod_model(
     model.ext[:time_periods] = length(times)
     model.ext[:times] = collect(times)
 
-    process_subproblem(model, sys, model_type, SubproblemBuild)
+    process_subproblem(model, sys, model_type)
 
     return model
 end
@@ -127,15 +127,14 @@ end
     model::JuMP.Model,
     sys::SystemData,
     model_type::Type{<:OPFModel},
-    action_type::Type{<:SubproblemAction},
 )
-    buses!(model, sys, model_type, action_type)
-    branches!(model, sys, model_type, action_type)
-    generators!(model, sys, model_type, action_type)
-    batteries!(model, sys, model_type, action_type)
-    prosumer!(model, sys, model_type, action_type)
-    active_power_balance!(model, sys, model_type, action_type)
-    reactive_power_balance!(model, sys, model_type, action_type)
-    objective!(model, sys, model_type, action_type)
+    buses!(model, sys, model_type)
+    branches!(model, sys, model_type)
+    generators!(model, sys, model_type)
+    batteries!(model, sys, model_type)
+    prosumer!(model, sys, model_type)
+    active_power_balance!(model, sys, model_type)
+    reactive_power_balance!(model, sys, model_type)
+    objective!(model, sys, model_type)
     return nothing
 end

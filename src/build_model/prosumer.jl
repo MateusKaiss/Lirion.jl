@@ -80,7 +80,6 @@ function prosumer!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{T},
-    ::Type{SubproblemBuild},
 ) where {T <: OPFModel}
     pros = sys.prosumer
 

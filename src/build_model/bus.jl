@@ -81,7 +81,6 @@ function buses!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{DC},
-    ::Type{SubproblemBuild},
 )
     bus = sys.bus
     create_voltage_angle_variables!(model, bus)
@@ -92,7 +91,6 @@ function buses!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{AC},
-    ::Type{SubproblemBuild},
 )
     bus = sys.bus
     create_voltage_angle_variables!(model, bus)
@@ -104,7 +102,6 @@ function buses!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{SOCP},
-    ::Type{SubproblemBuild},
 )
     bus = sys.bus
     create_voltage_angle_variables!(model, bus)

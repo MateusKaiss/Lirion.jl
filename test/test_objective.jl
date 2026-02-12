@@ -1,4 +1,9 @@
-# Short list of cases for rapid testing (comment or uncomment as you wish)
+# ==============================================
+# Lirion vs PowerModels — objective comparison (API solve)
+# ==============================================
+# ------------------------------------------------------------
+# Short list of cases for rapid testing (comment/uncomment)
+# ------------------------------------------------------------
 const reduced_list = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case5_pjm.m",
@@ -87,7 +92,7 @@ const reduced_testlist_ac = [
     # "pglib_opf_case200_activ.m",
 ]
 
-# Cases with batteries
+# Cases with batteries (matpower_cases folder)
 const battery_cases = [
     # "case5_bus_2_bat.m",
     "case14_bus_4_bat.m",
@@ -96,6 +101,9 @@ const battery_cases = [
     # "case200active_bus_20_bat.m",
 ]
 
+# ------------------------------------------------------------
+# Helpers
+# ------------------------------------------------------------
 function get_available_optimizer(preferred, fallback)
     try
         preferred()
@@ -105,34 +113,87 @@ function get_available_optimizer(preferred, fallback)
     end
     return preferred
 end
+
 const GLOBAL_FAILED_CASES = Dict{String, Dict{String, Vector{String}}}()
 
 function track_failure(label::String, origin::String, case_name::String)
     if !haskey(GLOBAL_FAILED_CASES, label)
-        GLOBAL_FAILED_CASES[label] =
-            Dict("PowerModels" => String[], "Lirion" => String[])
+        GLOBAL_FAILED_CASES[label] = Dict("PowerModels" => String[], "Lirion" => String[])
     end
     return push!(GLOBAL_FAILED_CASES[label][origin], case_name)
+end
+
+@inline function _objective_lirion(out::Lirion.LirionRunResult)
+    d = out.result
+    d isa AbstractDict || error("Lirion out.result must be Dict, got $(typeof(d))")
+    haskey(d, "objective") || error("Lirion result has no key 'objective'. Keys=$(collect(keys(d)))")
+    return Float64(d["objective"])
+end
+
+@inline function _model_from_type(model_type::Type{<:Lirion.OPFModel})
+    if model_type == Lirion.DC
+        return Lirion.dc()
+    elseif model_type == Lirion.AC
+        return Lirion.ac()
+    elseif model_type == Lirion.SOCP
+        return Lirion.socp()
+    else
+        error("Unsupported Lirion model type: $model_type")
+    end
+end
+
+@inline function _pm_objective(file::String, model_type::Type{<:Lirion.OPFModel}, optimizer)
+    pm_data = PowerModels.parse_file(file)
+
+    has_storage = haskey(pm_data, "storage") && !isempty(pm_data["storage"])
+
+    # NOTE:
+    # - For DC: DCPPowerModel
+    # - For AC: ACPPowerModel (via solve_ac_opf)
+    # - For SOCP: SOCWRConicPowerModel (no storage) / SOCWRPowerModel (storage helper)
+    if has_storage
+        if model_type == Lirion.DC
+            return Float64(PowerModels._solve_opf_strg(pm_data, DCPPowerModel, optimizer)["objective"])
+        elseif model_type == Lirion.AC
+            return Float64(PowerModels._solve_opf_strg(pm_data, ACPPowerModel, optimizer)["objective"])
+        elseif model_type == Lirion.SOCP
+            return Float64(PowerModels._solve_opf_strg(pm_data, SOCWRPowerModel, optimizer)["objective"])
+        else
+            error("Model type not recognized for storage case.")
+        end
+    else
+        if model_type == Lirion.DC
+            return Float64(PowerModels.solve_opf(pm_data, DCPPowerModel, optimizer)["objective"])
+        elseif model_type == Lirion.AC
+            return Float64(PowerModels.solve_ac_opf(pm_data, optimizer)["objective"])
+        elseif model_type == Lirion.SOCP
+            return Float64(PowerModels.solve_opf(pm_data, SOCWRConicPowerModel, optimizer)["objective"])
+        else
+            error("Model type not recognized.")
+        end
+    end
 end
 
 function compare_with_powermodels(
     file::String,
     model_type::Type{<:Lirion.OPFModel};
-    label,
+    label::String,
     optimizer = Ipopt.Optimizer,
     tol = 0.05,
 )
     case_name = basename(file)
 
-    # --- Lirion ---
+    # --- Lirion (API solve) ---
     my_obj = try
-        args = [
-            file,
-            "--model", lowercase(string(model_type.name.name)),
-            "--optimizer", string(optimizer),
-        ]
-        result_dict, _ = Lirion.main(args)
-        result_dict["objective"]
+        out = Lirion.solve(
+            file;
+            model = _model_from_type(model_type),
+            algorithm = Lirion.centralized(),
+            optimizer = optimizer,
+            outputs = false,
+            plots = false,
+        )
+        _objective_lirion(out)
     catch e
         @warn "Lirion failed on $case_name: $e"
         track_failure(label, "Lirion", case_name)
@@ -141,28 +202,7 @@ function compare_with_powermodels(
 
     # --- PowerModels ---
     pm_obj = try
-        pm_data = PowerModels.parse_file(file)
-        if haskey(pm_data, "storage") && !isempty(pm_data["storage"])
-            if model_type == Lirion.DC
-                PowerModels._solve_opf_strg(pm_data, DCPPowerModel, optimizer)["objective"]
-            elseif model_type == Lirion.AC
-                PowerModels._solve_opf_strg(pm_data, ACPPowerModel, optimizer)["objective"]
-            elseif model_type == Lirion.SOCP
-                PowerModels._solve_opf_strg(pm_data, SOCWRPowerModel, optimizer)["objective"]
-            else
-                error("Model type not recognized.")
-            end
-        else
-            if model_type == Lirion.DC
-                PowerModels.solve_opf(pm_data, DCPPowerModel, optimizer)["objective"]
-            elseif model_type == Lirion.AC
-                PowerModels.solve_ac_opf(pm_data, optimizer)["objective"]
-            elseif model_type == Lirion.SOCP
-                PowerModels.solve_opf(pm_data, SOCWRConicPowerModel, optimizer)["objective"]
-            else
-                error("Model type not recognized.")
-            end
-        end
+        _pm_objective(file, model_type, optimizer)
     catch e
         @warn "PowerModels failed on $case_name: $e"
         track_failure(label, "PowerModels", case_name)
@@ -201,7 +241,7 @@ function run_model_tests(
     n = length(selected_files)
     for (i, file) in enumerate(selected_files)
         case_name = basename(file)
-        @info "[$label] Rodando caso $i de $n: $case_name"
+        @info "[$label] Rodando caso $i/$n: $case_name"
         @testset "$(label) - $(case_name)" begin
             compare_with_powermodels(
                 file,
@@ -218,6 +258,7 @@ end
 
 function run_test_objective()
     @testset "Lirion vs PowerModels Unified Comparison" begin
+        # DC: às vezes Gurobi pode não estar disponível/licença
         dc_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer)
         run_model_tests(
             Lirion.DC,
@@ -226,6 +267,7 @@ function run_test_objective()
             case_list = reduced_list,
         )
 
+        # AC: Ipopt
         run_model_tests(
             Lirion.AC,
             "AC";
@@ -233,6 +275,7 @@ function run_test_objective()
             case_list = reduced_testlist_ac,
         )
 
+        # SOCP: Gurobi se tiver; senão SCS (ou COSMO se preferir)
         socp_optimizer = get_available_optimizer(Gurobi.Optimizer, SCS.Optimizer)
         run_model_tests(
             Lirion.SOCP,
@@ -241,6 +284,7 @@ function run_test_objective()
             case_list = reduced_list,
         )
 
+        # Batteries
         run_model_tests(
             Lirion.DC,
             "DC com baterias";

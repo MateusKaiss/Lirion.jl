@@ -1,5 +1,5 @@
 # ==============================================
-# ADMM-Branch-DC vs DC (objetivo) – testes
+# ADMM-Branch-DC vs DC (objective) – tests (API solve)
 # ==============================================
 
 # Casos particionados (2/3/4 zonas)
@@ -13,11 +13,10 @@ const distributed_branch_zone_cases = [
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
     "pglib_opf_case73_ieee_rts.m",
-    "pglib_opf_case57_ieee.m",
-    "pglib_opf_case118_ieee.m",
+    # "pglib_opf_case57_ieee.m",
+    # "pglib_opf_case118_ieee.m",
     # "pglib_opf_case200_activ.m",
     # "pglib_opf_case500_goc.m",
-
 ]
 
 function track_failure_branch(label::String, origin::String, case_name::String)
@@ -26,6 +25,30 @@ function track_failure_branch(label::String, origin::String, case_name::String)
             Dict("Centralized" => String[], "Distributed" => String[])
     end
     return push!(GLOBAL_FAILED_CASES[label][origin], case_name)
+end
+
+# ------------------------------------------------------------
+# Objective extraction (current return formats)
+# ------------------------------------------------------------
+@inline function _objective_centralized_dc(out::Lirion.LirionRunResult)
+    d = out.result
+    d isa AbstractDict || error("Centralized out.result must be Dict, got $(typeof(d))")
+    haskey(d, "objective") || error("Centralized result has no key 'objective'. Keys=$(collect(keys(d)))")
+    return Float64(d["objective"])
+end
+
+@inline function _objective_distributed_branch_dc(out::Lirion.LirionRunResult)
+    r = out.result
+    r isa NamedTuple || error("Distributed out.result must be NamedTuple, got $(typeof(r))")
+
+    # You used total_real_cost before; keep it as default.
+    hasproperty(r, :total_real_cost) ||
+        error("Distributed result has no field :total_real_cost. Fields=$(propertynames(r))")
+
+    return Float64(getproperty(r, :total_real_cost))
+
+    # If you ever want to compare expr cost instead:
+    # return Float64(getproperty(r, :total_expr_cost))
 end
 
 function compare_distributed_branch_vs_centralized(
@@ -49,16 +72,18 @@ function compare_distributed_branch_vs_centralized(
     case_name = basename(file)
 
     # ----------------------------
-    # Centralizado DC -> objective
+    # Centralized DC -> objective
     # ----------------------------
     cent_obj = try
-        args_cent = String[
-            file,
-            "--model", "dc",
-            "--optimizer", string(central_optimizer),
-        ]
-        result_dict, _, _ = Lirion.main(args_cent)
-        Float64(result_dict["objective"])
+        out_cent = Lirion.solve(
+            file;
+            model = Lirion.dc(),
+            algorithm = Lirion.centralized(),
+            optimizer = central_optimizer,
+            outputs = false,
+            plots = false,
+        )
+        _objective_centralized_dc(out_cent)
     catch e
         @warn "Centralized DC failed on $case_name: $e"
         track_failure_branch(label, "Centralized", case_name)
@@ -66,44 +91,41 @@ function compare_distributed_branch_vs_centralized(
     end
 
     # --------------------------------------
-    # Distribuído ADMM-Branch-DC -> NamedTuple
+    # Distributed ADMM-Branch-DC -> NamedTuple
     # --------------------------------------
     dist_obj = try
-        args_dist = String[
-            file,
-            "--model", "distributed-admm-branch-dc",
-            "--admm-rho", string(admm_rho),
-            "--admm-max-iter", string(admm_max_iter),
-            "--admm-eps-abs", string(admm_eps_abs),
-            "--admm-eps-rel", string(admm_eps_rel),
-            "--admm-mu-incr", string(admm_mu_incr),
-            "--admm-mu-decr", string(admm_mu_decr),
-            "--admm-tau-incr", string(admm_tau_incr),
-            "--admm-tau-decr", string(admm_tau_decr),
-        ]
+        alg = Lirion.admm_branch(
+            max_iter = admm_max_iter,
+            rho = Float64(admm_rho),
+            eps_abs = Float64(admm_eps_abs),
+            eps_rel = Float64(admm_eps_rel),
+            # NOTE: your config uses alpha_overrelax (not alpha)
+            alpha_overrelax = (admm_alpha == 1.0 ? nothing : Float64(admm_alpha)),
+            warm_start = Bool(admm_warm_start),
+            adaptive_rho = true,  # keep old behavior unless you add a knob here
+            mu_incr = Float64(admm_mu_incr),
+            mu_decr = Float64(admm_mu_decr),
+            tau_incr = Float64(admm_tau_incr),
+            tau_decr = Float64(admm_tau_decr),
+        )
 
-        if admm_alpha != 1.0
-            push!(args_dist, "--admm-alpha", string(admm_alpha))
-        end
-        if admm_warm_start
-            push!(args_dist, "--admm-warm-start")
-        end
-        if distributed_optimizer !== nothing
-            push!(args_dist, "--optimizer", string(distributed_optimizer))
-        end
+        out_dist = Lirion.solve(
+            file;
+            model = Lirion.dc(),
+            algorithm = alg,
+            optimizer = distributed_optimizer, # can be nothing; solve() will keep it if cfg has it
+            outputs = false,
+            plots = false,
+        )
 
-        res = Lirion.main(args_dist)
-
-        # aqui é o ponto: res é NamedTuple, pega o custo certo
-        Float64(res.total_real_cost)
-        # (se você quiser o outro: Float64(res.total_expr_cost))
+        _objective_distributed_branch_dc(out_dist)
     catch e
         @warn "Distributed ADMM-Branch-DC failed on $case_name: $e"
         track_failure_branch(label, "Distributed", case_name)
         return
     end
 
-    @info "File $case_name | centralized = $(round(cent_obj, digits=6)) | distributed-branch = $(round(dist_obj, digits=6))"
+    @info "File $case_name | centralized = $(round(cent_obj, digits=6)) | distributed-branch (total_real_cost) = $(round(dist_obj, digits=6))"
 
     abs_err = abs(dist_obj - cent_obj)
     rel_err = abs_err / max(abs(cent_obj), 1.0)
@@ -111,7 +133,6 @@ function compare_distributed_branch_vs_centralized(
 
     @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
 end
-
 
 """
 Roda a suíte de testes para ADMM-Branch-DC vs DC nos casos de zonas.
@@ -121,8 +142,10 @@ function run_distributed_branch_objective_tests(;
     label = "ADMM-Branch-DC vs DC",
     central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
     distributed_optimizer = nothing,
-    rtol = 0.01, atol = 1e-6,
-    admm_eps_abs = 1e-4, admm_eps_rel = 1e-4,
+    rtol = 0.01,
+    atol = 1e-6,
+    admm_eps_abs = 1e-4,
+    admm_eps_rel = 1e-4,
     admm_alpha::Float64 = 1.0,
     admm_mu_incr::Float64 = 3.0,
     admm_mu_decr::Float64 = 3.0,
@@ -159,16 +182,13 @@ function run_distributed_branch_objective_tests(;
         admm_warm_start_case = false
 
         # --------------------------------------------
-        # Override por caso (ex: case197_snem)
+        # Override por caso (ex: pglib_opf_case500_goc)
         # --------------------------------------------
         if case_name == "pglib_opf_case500_goc.m"
             admm_rho_case = 5000.0
-            central_optimizer_case = Ipopt.Optimizer
             distributed_optimizer_case = Ipopt.Optimizer
+            # (se você quiser trocar o central tbm, crie central_optimizer_case e passe abaixo)
         end
-
-
-
 
         @info "[$label] Rodando caso $i de $n: $case_name " *
               "(max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), " *

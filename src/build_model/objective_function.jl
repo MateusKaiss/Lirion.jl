@@ -46,7 +46,6 @@ function objective!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{DC},
-    ::Type{SubproblemBuild},
 )
     obj = sys.objective
     compute_generation_cost(model, obj)
@@ -60,7 +59,6 @@ function objective!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{AC},
-    ::Type{SubproblemBuild},
 )
     obj = sys.objective
     compute_generation_cost(model, obj)
@@ -74,7 +72,6 @@ function objective!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{SOCP},
-    ::Type{SubproblemBuild},
 )
     obj = sys.objective
     compute_generation_cost(model, obj)

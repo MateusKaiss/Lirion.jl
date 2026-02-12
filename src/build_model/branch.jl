@@ -349,7 +349,6 @@ function branches!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{DC},
-    ::Type{SubproblemBuild},
 )
     br = sys.branch
     create_dc_branch_expressions!(model, br)
@@ -361,7 +360,6 @@ function branches!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{AC},
-    ::Type{SubproblemBuild},
 )
     br = sys.branch
     create_ac_branch_expressions!(model, br)
@@ -373,7 +371,6 @@ function branches!(
     model::JuMP.Model,
     sys::SystemData,
     ::Type{SOCP},
-    ::Type{SubproblemBuild},
 )
     bus = sys.bus
     br = sys.branch

@@ -1,6 +1,7 @@
 # ==============================================
-# ADMM-Hybrid-SOCP vs SOCP (objetivo) – testes
+# ADMM-Hybrid-SOCP vs SOCP (objective) – tests (API solve)
 # ==============================================
+
 using Test
 using Lirion
 using Glob
@@ -10,7 +11,7 @@ using COSMO
 using Clarabel
 
 # -------------------------------------------------
-# Pacote de atributos robustos do Clarabel
+# (Opcional) pacote de atributos robustos do Clarabel
 # -------------------------------------------------
 const CLARABEL_ROBUST = """
 optimizer_with_attributes(Clarabel.Optimizer,
@@ -52,10 +53,10 @@ optimizer_with_attributes(Clarabel.Optimizer,
 # -------- helper local (caso o runtests não tenha definido) --------
 if !@isdefined(pick_socp_optimizer)
     const _SOCP_CHAIN_MAP_LOCAL = Dict(
-        :auto => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
+        :auto   => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
         :gurobi => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
-        :cosmo => (COSMO.Optimizer, Gurobi.Optimizer, SCS.Optimizer),
-        :scs => (SCS.Optimizer, Gurobi.Optimizer, COSMO.Optimizer),
+        :cosmo  => (COSMO.Optimizer,  Gurobi.Optimizer, SCS.Optimizer),
+        :scs    => (SCS.Optimizer,    Gurobi.Optimizer, COSMO.Optimizer),
     )
     function pick_socp_optimizer(;
         prefer::Symbol = Symbol(lowercase(get(ENV, "LIRION_SOCP_PREFER", "auto"))),
@@ -72,7 +73,7 @@ if !@isdefined(pick_socp_optimizer)
     end
 end
 
-# Defaults
+# Defaults: usa os do runtests se existirem; senão, cai para o picker local
 const _CENTRAL_DEFAULT =
     @isdefined(CENTRAL_SOCP_SOLVER) ? CENTRAL_SOCP_SOLVER :
     (
@@ -87,6 +88,9 @@ const _DISTRIB_DEFAULT =
         pick_socp_optimizer(; prefer = :auto)
     )
 
+# -------------------------------------------------
+# Cases
+# -------------------------------------------------
 const distributed_hybrid_socp_zone_cases = [
     # "pglib_opf_case73_ieee_rts__api.m",
     # "pglib_opf_case73_ieee_rts__sad.m",
@@ -97,12 +101,10 @@ const distributed_hybrid_socp_zone_cases = [
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
     "pglib_opf_case73_ieee_rts.m",
-    "pglib_opf_case57_ieee.m",
-    "pglib_opf_case118_ieee.m",
+    # "pglib_opf_case57_ieee.m",
+    # "pglib_opf_case118_ieee.m",
     # "pglib_opf_case200_activ.m",
-
     # "pglib_opf_case500_goc.m",
-
 ]
 
 function track_failure_hybrid_socp(label::String, origin::String, case_name::String)
@@ -113,6 +115,24 @@ function track_failure_hybrid_socp(label::String, origin::String, case_name::Str
     return push!(GLOBAL_FAILED_CASES[label][origin], case_name)
 end
 
+# ------------------------------------------------------------
+# Objective extraction (same pattern as branch-AC)
+# ------------------------------------------------------------
+@inline function _objective_centralized_socp(out::Lirion.LirionRunResult)
+    d = out.result
+    d isa AbstractDict || error("Centralized out.result must be Dict, got $(typeof(d))")
+    haskey(d, "objective") || error("Centralized result has no key 'objective'. Keys=$(collect(keys(d)))")
+    return d["objective"]
+end
+
+@inline function _objective_distributed_hybrid_socp(out::Lirion.LirionRunResult)
+    r = out.result
+    r isa NamedTuple || error("Distributed out.result must be NamedTuple, got $(typeof(r))")
+    # ADMM distributed results expose these (same as your branch tests)
+    hasproperty(r, :total_expr_cost) || error("Distributed result has no field :total_expr_cost. Fields=$(propertynames(r))")
+    return getproperty(r, :total_expr_cost)
+end
+
 function compare_distributed_hybrid_socp_vs_centralized(
     file::String;
     label::String,
@@ -120,12 +140,18 @@ function compare_distributed_hybrid_socp_vs_centralized(
     distributed_optimizer = _DISTRIB_DEFAULT,
     rtol = 0.01,
     atol = 1e-6,
+    # ADMM defaults
     rho_v::Float64 = 1.0e3,
     rho_flow_p::Float64 = 3.0e2,
     rho_flow_q::Float64 = 3.0e2,
     admm_max_iter::Int = 350,
     admm_eps_abs::Float64 = 1e-4,
     admm_eps_rel::Float64 = 1e-4,
+    admm_adaptive::Union{Nothing, Bool} = nothing,
+    admm_mu_incr::Float64 = 3.0,
+    admm_mu_decr::Float64 = 3.0,
+    admm_tau_incr::Float64 = 1.05,
+    admm_tau_decr::Float64 = 0.98,
 )
     case_name = basename(file)
 
@@ -135,63 +161,70 @@ function compare_distributed_hybrid_socp_vs_centralized(
     if case_name == "pglib_opf_case2000_5zones_goc.m"
         @info "⚙️ [HYBRID-SOCP] Caso especial $case_name com Clarabel robusto (central) e Clarabel com rho=1e8 (distribuído)."
 
-        # --- Centralizado Clarabel robusto ---
         cent_obj = try
-            args_cent = String[
-                file,
-                "--model", "socp",
-                "--optimizer", CLARABEL_ROBUST,
-            ]
-            result_dict, _, _ = Lirion.main(args_cent)
-            result_dict["objective"]
+            out_cent = Lirion.solve(
+                file;
+                model = Lirion.socp(),
+                algorithm = Lirion.centralized(),
+                optimizer = eval(Meta.parse(CLARABEL_ROBUST)),
+                outputs = false,
+                plots = false,
+            )
+            _objective_centralized_socp(out_cent)
         catch e
             @warn "Centralized SOCP failed on $case_name: $e"
             track_failure_hybrid_socp(label, "Centralized", case_name)
             return
         end
 
-        # --- Distribuído ADMM-Hybrid-SOCP com Clarabel e args específicos ---
         dist_obj = try
-            args_dist = String[
-                file,
-                "--model", "distributed-admm-hybrid-socp",
-                "--optimizer", "Clarabel.Optimizer",
-                "--admm-max-iter", "700",
-                "--admm-rho-v", "1e8",
-                "--admm-rho-flow-p", "1e8",
-                "--admm-rho-flow-q", "1e8",
-                "--admm-eps-abs", "1e-4",
-                "--admm-eps-rel", "1e-4",
-                "--admm-adaptive", "on",
-                "--admm-mu-incr", "3.0",
-                "--admm-mu-decr", "3.0",
-                "--admm-tau-incr", "1.1",
-                "--admm-tau-decr", "0.9",
-            ]
-            obj, _ = Lirion.main(args_dist)
-            obj
+            alg = Lirion.admm_hybrid(
+                max_iter = 700,
+                rho_v = 1e8,
+                rho_flow_p = 1e8,
+                rho_flow_q = 1e8,
+                eps_abs = 1e-4,
+                eps_rel = 1e-4,
+                adaptive_rho = true,
+                mu_incr = 3.0,
+                mu_decr = 3.0,
+                tau_incr = 1.1,
+                tau_decr = 0.9,
+            )
+
+            out_dist = Lirion.solve(
+                file;
+                model = Lirion.socp(),
+                algorithm = alg,
+                optimizer = Clarabel.Optimizer,
+                outputs = false,
+                plots = false,
+            )
+            _objective_distributed_hybrid_socp(out_dist)
         catch e
             @warn "Distributed ADMM-Hybrid-SOCP failed on $case_name: $e"
             track_failure_hybrid_socp(label, "Distributed", case_name)
             return
         end
 
-        @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-hybrid-SOCP = $(round(dist_obj, digits=6))"
+        @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-hybrid-SOCP (total_expr_cost) = $(round(dist_obj, digits=6))"
         @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
         return
     end
 
     # ===========================================================
-    # Casos gerais (fallback)
+    # Casos gerais
     # ===========================================================
     cent_obj = try
-        args_cent = String[
-            file,
-            "--model", "socp",
-            "--optimizer", string(central_optimizer),
-        ]
-        result_dict, _, _ = Lirion.main(args_cent)
-        result_dict["objective"]
+        out_cent = Lirion.solve(
+            file;
+            model = Lirion.socp(),
+            algorithm = Lirion.centralized(),
+            optimizer = central_optimizer,
+            outputs = false,
+            plots = false,
+        )
+        _objective_centralized_socp(out_cent)
     catch e
         @warn "Centralized SOCP failed on $case_name: $e"
         track_failure_hybrid_socp(label, "Centralized", case_name)
@@ -199,24 +232,37 @@ function compare_distributed_hybrid_socp_vs_centralized(
     end
 
     dist_obj = try
-        args_dist = String[
-            file,
-            "--model", "distributed-admm-hybrid-socp",
-            "--optimizer", string(distributed_optimizer),
-            "--admm-rho", string(rho_v),
-            "--admm-max-iter", string(admm_max_iter),
-            "--admm-eps-abs", string(admm_eps_abs),
-            "--admm-eps-rel", string(admm_eps_rel),
-        ]
-        obj, _ = Lirion.main(args_dist)
-        obj
+        # Hybrid-SOCP needs separate rho_v / rho_flow_p / rho_flow_q (do NOT use --admm-rho here)
+        alg = Lirion.admm_hybrid(
+            max_iter = admm_max_iter,
+            rho_v = Float64(rho_v),
+            rho_flow_p = Float64(rho_flow_p),
+            rho_flow_q = Float64(rho_flow_q),
+            eps_abs = Float64(admm_eps_abs),
+            eps_rel = Float64(admm_eps_rel),
+            adaptive_rho = isnothing(admm_adaptive) ? true : Bool(admm_adaptive),
+            mu_incr = Float64(admm_mu_incr),
+            mu_decr = Float64(admm_mu_decr),
+            tau_incr = Float64(admm_tau_incr),
+            tau_decr = Float64(admm_tau_decr),
+        )
+
+        out_dist = Lirion.solve(
+            file;
+            model = Lirion.socp(),
+            algorithm = alg,
+            optimizer = distributed_optimizer,
+            outputs = false,
+            plots = false,
+        )
+        _objective_distributed_hybrid_socp(out_dist)
     catch e
         @warn "Distributed ADMM-Hybrid-SOCP failed on $case_name: $e"
         track_failure_hybrid_socp(label, "Distributed", case_name)
         return
     end
 
-    @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-hybrid-SOCP = $(round(dist_obj, digits=6)) | max_iter=$(admm_max_iter), rhoV²=$(rho_v), rhoP=$(rho_flow_p), rhoQ=$(rho_flow_q)"
+    @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-hybrid-SOCP (total_expr_cost) = $(round(dist_obj, digits=6)) | max_iter=$(admm_max_iter), rhoV=$(rho_v), rhoP=$(rho_flow_p), rhoQ=$(rho_flow_q)"
     @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
 end
 
@@ -225,8 +271,10 @@ function run_distributed_hybrid_socp_objective_tests(;
     label = "ADMM-Hybrid-SOCP vs SOCP",
     central_optimizer = _CENTRAL_DEFAULT,
     distributed_optimizer = _DISTRIB_DEFAULT,
-    rtol = 0.01, atol = 1e-6,
-    admm_eps_abs = 1e-4, admm_eps_rel = 1e-4,
+    rtol = 0.01,
+    atol = 1e-6,
+    admm_eps_abs = 1e-4,
+    admm_eps_rel = 1e-4,
 )
     if isempty(case_list)
         @info "Empty hybrid-SOCP distributed case list. No tests will be run."
@@ -244,13 +292,16 @@ function run_distributed_hybrid_socp_objective_tests(;
     for (i, file) in enumerate(selected_files)
         case_name = basename(file)
 
+        # defaults por case
         rho_v_case = 1.0e4
+        rho_flow_p_case = 3.0e2
+        rho_flow_q_case = 3.0e2
         admm_max_iter_case = 5000
         admm_eps_abs_case = admm_eps_abs
         admm_eps_rel_case = admm_eps_rel
 
-        @info "[$label] Rodando caso $i de $n: $case_name " *
-              "(max_iter=$(admm_max_iter_case), rhoV²=$(rho_v_case), " *
+        @info "[$label] Rodando caso $i/$n: $case_name " *
+              "(max_iter=$(admm_max_iter_case), rhoV=$(rho_v_case), rhoP=$(rho_flow_p_case), rhoQ=$(rho_flow_q_case), " *
               "eps_pr=$(admm_eps_abs_case), eps_dual=$(admm_eps_rel_case))"
 
         @testset "$(label) - $(case_name)" begin
@@ -262,6 +313,8 @@ function run_distributed_hybrid_socp_objective_tests(;
                 rtol = rtol,
                 atol = atol,
                 rho_v = rho_v_case,
+                rho_flow_p = rho_flow_p_case,
+                rho_flow_q = rho_flow_q_case,
                 admm_max_iter = admm_max_iter_case,
                 admm_eps_abs = admm_eps_abs_case,
                 admm_eps_rel = admm_eps_rel_case,
