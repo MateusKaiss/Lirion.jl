@@ -53,10 +53,14 @@ function compare_distributed_branch_ac_vs_centralized(
     distributed_optimizer = Ipopt.Optimizer,
     rtol = 0.01,
     atol = 1e-6,
-    admm_rho_flow = 1.0e5,
-    admm_rho_flow_p = nothing,
-    admm_rho_flow_q = nothing,
-    admm_max_iter = 5000,
+
+    # ---- ADMM params ----
+    # Preferred:
+    # - use admm_rho (generic) to fill required rhos for AC+admm_branch => rho_p, rho_q
+    # - OR pass both admm_rho_p and admm_rho_q explicitly
+    admm_rho = 1.0e5,
+    admm_rho_p = nothing,
+    admm_rho_q = nothing, admm_max_iter = 5000,
     admm_eps_abs = 1e-4,
     admm_eps_rel = 1e-4,
     admm_mu_incr = 2.0,
@@ -64,6 +68,7 @@ function compare_distributed_branch_ac_vs_centralized(
     admm_tau_incr = 1.05,
     admm_tau_decr = 0.98,
     admm_adaptive::Union{Nothing, Bool} = nothing,
+
     # legacy placeholder (was CLI flags). Kept for callsites; ignored here.
     additional_flags::Vector{String} = String[],
 )
@@ -88,10 +93,11 @@ function compare_distributed_branch_ac_vs_centralized(
 
     # --- Distributed ADMM-Branch-AC ---
     dist_obj = try
-        alg = if admm_rho_flow_p === nothing && admm_rho_flow_q === nothing
+        alg = if admm_rho_p === nothing && admm_rho_q === nothing
+            # generic rho (fills REQUIRED rho_p/rho_q for AC+admm_branch)
             Lirion.admm_branch(;
-                max_iter = admm_max_iter,
-                rho_flow = Float64(admm_rho_flow),
+                max_iter = Int(admm_max_iter),
+                rho = Float64(admm_rho),
                 eps_abs = Float64(admm_eps_abs),
                 eps_rel = Float64(admm_eps_rel),
                 mu_incr = Float64(admm_mu_incr),
@@ -101,16 +107,14 @@ function compare_distributed_branch_ac_vs_centralized(
                 adaptive_rho = isnothing(admm_adaptive) ? true : Bool(admm_adaptive),
             )
         else
-            # IMPORTANT: don't pass 0.0; your constructor requires > 0
-            (admm_rho_flow_p === nothing || admm_rho_flow_q === nothing) &&
-                error(
-                    "If you set rho_flow_p or rho_flow_q, you must provide BOTH (non-nothing).",
-                )
+            # explicit rho_p / rho_q
+            (admm_rho_p === nothing || admm_rho_q === nothing) &&
+                error("If you set rho_p or rho_q, you must provide BOTH (non-nothing).")
 
             Lirion.admm_branch(;
-                max_iter = admm_max_iter,
-                rho_flow_p = Float64(admm_rho_flow_p),
-                rho_flow_q = Float64(admm_rho_flow_q),
+                max_iter = Int(admm_max_iter),
+                rho_p = Float64(admm_rho_p),
+                rho_q = Float64(admm_rho_q),
                 eps_abs = Float64(admm_eps_abs),
                 eps_rel = Float64(admm_eps_rel),
                 mu_incr = Float64(admm_mu_incr),
@@ -167,7 +171,11 @@ function run_distributed_branch_ac_objective_tests(;
     for (i, file) in enumerate(selected_files)
         case_name = basename(file)
 
-        admm_max_iter_case, admm_rho_case = (5000, 10000.0)
+        admm_max_iter_case = 5000
+        admm_rho_case = 10000.0   # generic rho (fills rho_p/rho_q)
+        # If you ever want explicit:
+        admm_rho_p_case = nothing
+        admm_rho_q_case = nothing
 
         admm_eps_abs_case = admm_eps_abs
         admm_eps_rel_case = admm_eps_rel
@@ -179,8 +187,8 @@ function run_distributed_branch_ac_objective_tests(;
         extra_flags = String[]  # legacy placeholder (ignored)
 
         @info "[$label] Rodando caso $i de $n: $case_name " *
-              "(max_iter=$(admm_max_iter_case), rho_flow=$(admm_rho_case), " *
-              "eps_pr=$(admm_eps_abs_case), eps_dual=$(admm_eps_rel_case), " *
+              "(max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), " *
+              "eps_abs=$(admm_eps_abs_case), eps_rel=$(admm_eps_rel_case), " *
               "mu=(incr=$(mu_incr_case),decr=$(mu_decr_case)), " *
               "tau=(incr=$(tau_incr_case),decr=$(tau_decr_case)), " *
               "adaptive=$(adaptive_case))"
@@ -193,7 +201,9 @@ function run_distributed_branch_ac_objective_tests(;
                 distributed_optimizer = distributed_optimizer,
                 rtol = rtol,
                 atol = atol,
-                admm_rho_flow = admm_rho_case,
+                admm_rho = admm_rho_case,
+                admm_rho_p = admm_rho_p_case,
+                admm_rho_q = admm_rho_q_case,
                 admm_max_iter = admm_max_iter_case,
                 admm_eps_abs = admm_eps_abs_case,
                 admm_eps_rel = admm_eps_rel_case,

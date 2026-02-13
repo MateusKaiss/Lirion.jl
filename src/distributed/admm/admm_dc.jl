@@ -345,7 +345,7 @@ function run_admm(
     interzonal_branches = sys.interzonal_branches
     max_iter = config.max_iter
 
-    rho = Ref(config.rho_flow_p)
+    rho = Ref(config.rho_p)
     prev_rho = Ref(rho[])
     eps_abs = config.eps_abs
     eps_rel = config.eps_rel
@@ -466,7 +466,7 @@ function run_admm(
     _print_admm_summary!(
         "[ADMM-branch/DC]",
         result;
-        rho_lines = ("rho_flow inicial: $(config.rho_flow_p) | rho_flow final: $(rho[])",),
+        rho_lines = ("rho_flow inicial: $(config.rho_p) | rho_flow final: $(rho[])",),
     )
 
     return LirionRunResult(; result, model = nothing, system = sys, diagnostics = hist)
@@ -490,7 +490,7 @@ function run_admm(
     max_iter = config.max_iter
 
     rho_theta = Ref(config.rho_theta)
-    rho_flow = Ref(config.rho_flow_p)
+    rho_flow = Ref(config.rho_p)
 
     prev_rho_theta = Ref(rho_theta[])
     prev_rho_flow = Ref(rho_flow[])
@@ -696,7 +696,7 @@ function run_admm(
         result;
         rho_lines = (
             "rho_theta inicial: $(config.rho_theta) | rho_theta final: $(rho_theta[])",
-            "rho_flow  inicial: $(config.rho_flow_p) | rho_flow  final: $(rho_flow[])",
+            "rho_flow  inicial: $(config.rho_p) | rho_flow  final: $(rho_flow[])",
         ),
     )
 

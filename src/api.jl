@@ -15,7 +15,7 @@ socp() = SOCP
 centralized() = :centralized
 
 @inline function _admm_cfg(method::Symbol; max_iter::Int = 350, kwargs...)
-    return DistributedOPFModel(DC, method, max_iter; kwargs...)
+    return ADMMAlgorithmSpec(method, max_iter, (; kwargs...))
 end
 
 admm_bus(; kwargs...) = _admm_cfg(:admm; kwargs...)

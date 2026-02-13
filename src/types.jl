@@ -31,6 +31,195 @@ struct SOCPTag <: OPFTag end
 
 struct ADMM{V <: ADMMVariant, B <: OPFTag} end
 
+struct ADMMAlgorithmSpec
+    method::Symbol
+    max_iter::Int
+    kwargs::NamedTuple
+end
+
+# ============================================================
+# RHO RULES
+# ============================================================
+
+const _RHO_RULES = Dict{Tuple{DataType, Symbol}, NamedTuple}(
+    # ----------------------------
+    # DC
+    # ----------------------------
+    (DC, :admm) => (
+        allowed = Set([:rho_theta]),
+        required = Set([:rho_theta]),
+    ),
+    (DC, :admm_branch) => (
+        allowed = Set([:rho_p]),
+        required = Set([:rho_p]),
+    ),
+    (DC, :admm_hybrid) => (
+        allowed = Set([:rho_theta, :rho_p]),
+        required = Set([:rho_theta, :rho_p]),
+    ),
+
+    # ----------------------------
+    # AC
+    # ----------------------------
+    (AC, :admm) => (
+        allowed = Set([:rho_theta, :rho_v]),
+        required = Set([:rho_theta, :rho_v]),
+    ),
+    (AC, :admm_branch) => (
+        allowed = Set([:rho_p, :rho_q]),
+        required = Set([:rho_p, :rho_q]),
+    ),
+    (AC, :admm_hybrid) => (
+        allowed = Set([:rho_theta, :rho_v, :rho_p, :rho_q]),
+        required = Set([:rho_theta, :rho_v, :rho_p, :rho_q]),
+    ),
+
+    # ----------------------------
+    # SOCP (SEM rho_theta; usa rho_v2 e exige rho_r/rho_t no bus)
+    # ----------------------------
+    (SOCP, :admm) => (
+        allowed = Set([:rho_v2, :rho_r, :rho_t]),
+        required = Set([:rho_v2, :rho_r, :rho_t]),
+    ),
+    (SOCP, :admm_branch) => (
+        allowed = Set([:rho_p, :rho_q]),
+        required = Set([:rho_p, :rho_q]),
+    ),
+    (SOCP, :admm_hybrid) => (
+        allowed = Set([:rho_v2, :rho_p, :rho_q, :rho_r, :rho_t]),
+        required = Set([:rho_v2, :rho_p, :rho_q, :rho_r, :rho_t]),
+    ),
+)
+
+@inline function _rules_for(base_model::Type{<:OPFModel}, method::Symbol)
+    key = (base_model, method)
+    haskey(_RHO_RULES, key) ||
+        error("No rho rules for base_model=$(base_model), method=$(method)")
+    return _RHO_RULES[key]
+end
+
+@inline function _asfloat(x, name::Symbol)
+    x isa Real || throw(ArgumentError("$name must be Real, got $(typeof(x))"))
+    xf = Float64(x)
+    xf > 0 || throw(ArgumentError("$name must be > 0, got $xf"))
+    return xf
+end
+
+function _normalize_rhos_strict(
+    base_model::Type{<:OPFModel},
+    method::Symbol;
+    # generic
+    rho::Union{Nothing, Real} = nothing, rho_theta::Union{Nothing, Real} = nothing,
+    rho_v::Union{Nothing, Real} = nothing,      # AC only (forbidden in SOCP)
+    rho_v2::Union{Nothing, Real} = nothing,     # SOCP only (stored in field rho_v)
+    rho_p::Union{Nothing, Real} = nothing,
+    rho_q::Union{Nothing, Real} = nothing,
+    rho_r::Union{Nothing, Real} = nothing,
+    rho_t::Union{Nothing, Real} = nothing,
+)
+    rules = _rules_for(base_model, method)
+    allowed = rules.allowed
+    required = rules.required
+
+    # ----------------------------
+    # Hard SOCP bans
+    # ----------------------------
+    if base_model === SOCP
+        rho_theta === nothing ||
+            error(
+                "SOCP does not accept rho_theta. Use rho_v2, rho_r, rho_t (or generic rho).",
+            )
+        rho_v === nothing ||
+            error("SOCP does not accept rho_v. Use rho_v2 (or generic rho).")
+    end
+
+    provided = Set{Symbol}()
+    rho_theta !== nothing && push!(provided, :rho_theta)
+    rho_v !== nothing && push!(provided, :rho_v)
+    rho_v2 !== nothing && push!(provided, :rho_v2)
+    rho_p !== nothing && push!(provided, :rho_p)
+    rho_q !== nothing && push!(provided, :rho_q)
+    rho_r !== nothing && push!(provided, :rho_r)
+    rho_t !== nothing && push!(provided, :rho_t)
+
+    for sym in provided
+        sym in allowed || error(
+            "Invalid rho parameter $sym for base_model=$(base_model), method=$(method). " *
+            "Allowed: $(sort!(collect(allowed))). (You can also pass generic rho=...)",
+        )
+    end
+
+    if rho === nothing
+        missing = setdiff(required, provided)
+        isempty(missing) || error(
+            "Missing required rho parameters for base_model=$(base_model), method=$(method): " *
+            "$(sort!(collect(missing))). Either provide them explicitly, or pass generic rho=... to fill required.",
+        )
+    end
+
+    ρ_generic = rho === nothing ? nothing : _asfloat(rho, :rho)
+
+    if ρ_generic !== nothing
+        if :rho_theta in required
+            rho_theta = something(rho_theta, ρ_generic)
+        end
+        if :rho_v in required
+            rho_v = something(rho_v, ρ_generic)
+        end
+        if :rho_v2 in required
+            rho_v2 = something(rho_v2, ρ_generic)
+        end
+        if :rho_p in required
+            rho_p = something(rho_p, ρ_generic)
+        end
+        if :rho_q in required
+            rho_q = something(rho_q, ρ_generic)
+        end
+        if :rho_r in required
+            rho_r = something(rho_r, ρ_generic)
+        end
+        if :rho_t in required
+            rho_t = something(rho_t, ρ_generic)
+        end
+    end
+
+    function _get_required_value(sym::Symbol)
+        sym === :rho_theta && return _asfloat(rho_theta, :rho_theta)
+        sym === :rho_v && return _asfloat(rho_v, :rho_v)
+        sym === :rho_v2 && return _asfloat(rho_v2, :rho_v2)
+        sym === :rho_p && return _asfloat(rho_p, :rho_p)
+        sym === :rho_q && return _asfloat(rho_q, :rho_q)
+        sym === :rho_r && return _asfloat(rho_r, :rho_r)
+        sym === :rho_t && return _asfloat(rho_t, :rho_t)
+        return error("unexpected required sym: $sym")
+    end
+
+    req_sorted = sort!(collect(required))
+    anchor_sym = req_sorted[1]
+    anchor_val = _get_required_value(anchor_sym)
+
+    ρθ = if base_model === SOCP
+        anchor_val
+    else
+        (:rho_theta in required) ? _asfloat(rho_theta, :rho_theta) : anchor_val
+    end
+
+    ρv = if base_model === AC
+        (:rho_v in required) ? _asfloat(rho_v, :rho_v) : anchor_val
+    elseif base_model === SOCP
+        (:rho_v2 in required) ? _asfloat(rho_v2, :rho_v2) : anchor_val  # stored in rho_v field
+    else
+        anchor_val
+    end
+
+    ρp = (:rho_p in required) ? _asfloat(rho_p, :rho_p) : anchor_val
+    ρq = (:rho_q in required) ? _asfloat(rho_q, :rho_q) : anchor_val
+    ρr = (:rho_r in required) ? _asfloat(rho_r, :rho_r) : anchor_val
+    ρt = (:rho_t in required) ? _asfloat(rho_t, :rho_t) : anchor_val
+
+    return (rho_theta = ρθ, rho_v = ρv, rho_p = ρp, rho_q = ρq, rho_r = ρr, rho_t = ρt)
+end
+
 # ============================================================
 # DISTRIBUTED OPF MODEL CONFIGURATION
 # ============================================================
@@ -42,9 +231,9 @@ mutable struct DistributedOPFModel
 
     # bus/state rhos
     rho_theta::Float64
-    rho_v::Float64           # (SOCP) você pode enxergar como rho(V²)
+    rho_v::Float64
 
-    # branch/flow rhos (separa semanticamente)
+    # branch/flow rhos
     rho_p::Float64
     rho_q::Float64
     rho_r::Float64
@@ -62,12 +251,14 @@ mutable struct DistributedOPFModel
     function DistributedOPFModel(
         base_model::Type{<:OPFModel},
         method::Symbol,
-        max_iter::Integer, rho_theta::Real,
+        max_iter::Integer,
+        rho_theta::Real,
         rho_v::Real,
         rho_p::Real,
         rho_q::Real,
         rho_r::Real,
-        rho_t::Real, eps_abs::Real,
+        rho_t::Real,
+        eps_abs::Real,
         eps_rel::Real;
         adaptive_rho::Bool = true,
         mu_incr::Real = 3.0,
@@ -90,12 +281,18 @@ mutable struct DistributedOPFModel
         tau_decr > 0 || throw(ArgumentError("tau_decr must be > 0"))
 
         return new(
-            base_model, method, Int(max_iter), Float64(rho_theta),
-            Float64(rho_v), Float64(rho_p),
+            base_model,
+            method,
+            Int(max_iter),
+            Float64(rho_theta),
+            Float64(rho_v),
+            Float64(rho_p),
             Float64(rho_q),
             Float64(rho_r),
-            Float64(rho_t), Float64(eps_abs),
-            Float64(eps_rel), adaptive_rho,
+            Float64(rho_t),
+            Float64(eps_abs),
+            Float64(eps_rel),
+            adaptive_rho,
             Float64(mu_incr),
             Float64(mu_decr),
             Float64(tau_incr),
@@ -108,73 +305,76 @@ end
 # DISTRIBUTED OPF MODEL CONVENIENCE CONSTRUCTORS
 # ============================================================
 
-# (A) Posicional (seta tudo igual)
 DistributedOPFModel(
     base_model::Type{<:OPFModel},
     method::Symbol,
     max_iter::Int,
-    rho::Float64,
-    eps_abs::Float64,
-    eps_rel::Float64;
+    rho::Real,
+    eps_abs::Real,
+    eps_rel::Real;
     adaptive_rho::Bool = true,
-    mu_incr::Float64 = 3.0,
-    mu_decr::Float64 = 3.0,
-    tau_incr::Float64 = 1.05,
-    tau_decr::Float64 = 0.98,
-) = DistributedOPFModel(
-    base_model, method, max_iter,
-    rho, rho, rho, rho, rho, rho,
-    eps_abs, eps_rel;
-    adaptive_rho = adaptive_rho,
-    mu_incr = mu_incr,
-    mu_decr = mu_decr,
-    tau_incr = tau_incr,
-    tau_decr = tau_decr,
-)
+    mu_incr::Real = 3.0,
+    mu_decr::Real = 3.0,
+    tau_incr::Real = 1.05,
+    tau_decr::Real = 0.98,
+) = begin
+    rhos = _normalize_rhos_strict(base_model, method; rho = rho)
+    DistributedOPFModel(
+        base_model, method, max_iter,
+        rhos.rho_theta, rhos.rho_v, rhos.rho_p, rhos.rho_q, rhos.rho_r, rhos.rho_t,
+        eps_abs, eps_rel;
+        adaptive_rho = adaptive_rho,
+        mu_incr = mu_incr,
+        mu_decr = mu_decr,
+        tau_incr = tau_incr,
+        tau_decr = tau_decr,
+    )
+end
 
-# (B) kwargs flexível (rho + overrides)
-# Precedência:
-#   rho_theta/rho_v/rho_p/rho_q/rho_r/rho_t > rho_flow_pq / rho_flow_rt / rho_flow > rho
+# (B) Kwargs strict
 DistributedOPFModel(
     base_model::Type{<:OPFModel},
     method::Symbol,
     max_iter::Int;
-    rho::Float64 = 1_000.0, rho_theta::Union{Nothing, Float64} = nothing,
-    rho_v::Union{Nothing, Float64} = nothing, rho_flow::Union{Nothing, Float64} = nothing,      # fallback para p,q,r,t
-    rho_flow_pq::Union{Nothing, Float64} = nothing,   # fallback para p,q
-    rho_flow_rt::Union{Nothing, Float64} = nothing,   # fallback para r,t
+    rho::Union{Nothing, Real} = nothing,
+    rho_theta::Union{Nothing, Real} = nothing,
+    rho_v::Union{Nothing, Real} = nothing,
+    rho_v2::Union{Nothing, Real} = nothing,
+    rho_p::Union{Nothing, Real} = nothing,
+    rho_q::Union{Nothing, Real} = nothing,
+    rho_r::Union{Nothing, Real} = nothing,
+    rho_t::Union{Nothing, Real} = nothing,
+    eps_abs::Real = 1e-7,
+    eps_rel::Real = 1e-7,
+    adaptive_rho::Bool = true,
+    mu_incr::Real = 3.0,
+    mu_decr::Real = 3.0,
+    tau_incr::Real = 1.05,
+    tau_decr::Real = 0.98,
+) = begin
+    rhos = _normalize_rhos_strict(
+        base_model, method;
+        rho = rho,
+        rho_theta = rho_theta,
+        rho_v = rho_v,
+        rho_v2 = rho_v2,
+        rho_p = rho_p,
+        rho_q = rho_q,
+        rho_r = rho_r,
+        rho_t = rho_t,
+    )
 
-    rho_p::Union{Nothing, Float64} = nothing,
-    rho_q::Union{Nothing, Float64} = nothing,
-    rho_r::Union{Nothing, Float64} = nothing,
-    rho_t::Union{Nothing, Float64} = nothing,
-
-    rho_flow_p::Union{Nothing, Float64} = nothing,    # alias -> rho_p
-    rho_flow_q::Union{Nothing, Float64} = nothing,    # alias -> rho_q
-    rho_flow_r::Union{Nothing, Float64} = nothing,    # alias -> rho_r
-    rho_flow_t::Union{Nothing, Float64} = nothing,    # alias -> rho_t
-    eps_abs::Float64 = 1e-7,
-    eps_rel::Float64 = 1e-7, adaptive_rho::Bool = true,
-    mu_incr::Float64 = 3.0,
-    mu_decr::Float64 = 3.0,
-    tau_incr::Float64 = 1.05,
-    tau_decr::Float64 = 0.98,
-) = DistributedOPFModel(
-    base_model, method, max_iter, something(rho_theta, rho), something(rho_v, rho),
-
-    # p/q (aceita rho_p ou rho_flow_p; e fallback em rho_flow_pq/rho_flow/rho)
-    something(rho_p, rho_flow_p, rho_flow_pq, rho_flow, rho),
-    something(rho_q, rho_flow_q, rho_flow_pq, rho_flow, rho),
-
-    # r/t (aceita rho_r ou rho_flow_r; e fallback em rho_flow_rt/rho_flow/rho)
-    something(rho_r, rho_flow_r, rho_flow_rt, rho_flow, rho),
-    something(rho_t, rho_flow_t, rho_flow_rt, rho_flow, rho), eps_abs, eps_rel;
-    adaptive_rho = adaptive_rho,
-    mu_incr = mu_incr,
-    mu_decr = mu_decr,
-    tau_incr = tau_incr,
-    tau_decr = tau_decr,
-)
+    DistributedOPFModel(
+        base_model, method, max_iter,
+        rhos.rho_theta, rhos.rho_v, rhos.rho_p, rhos.rho_q, rhos.rho_r, rhos.rho_t,
+        eps_abs, eps_rel;
+        adaptive_rho = adaptive_rho,
+        mu_incr = mu_incr,
+        mu_decr = mu_decr,
+        tau_incr = tau_incr,
+        tau_decr = tau_decr,
+    )
+end
 
 # ============================================================
 # MODEL TYPE CHECKS
@@ -185,50 +385,63 @@ DistributedOPFModel(
 @inline is_centralized_model(x) = !is_distributed_model(x)
 
 # ============================================================
-# RHO SHIMS (compat + rho_v2)
+# shims
 # ============================================================
 
-# rho() continua sendo rho_theta por padrão (como você tinha)
 rho(c::DistributedOPFModel) = c.rho_theta
 const rho = rho
 
-# getproperty: mantém nomes antigos E adiciona rho_v2
 Base.getproperty(c::DistributedOPFModel, s::Symbol) =
     s === :rho ? c.rho_theta :
-    s === :rho_flow ? c.rho_p :          # "flow genérico" -> p (e set vai setar p,q,r,t)
-    s === :rho_flow_p ? c.rho_p :
-    s === :rho_flow_q ? c.rho_q :
-    s === :rho_flow_r ? c.rho_r :
-    s === :rho_flow_t ? c.rho_t :
-    s === :rho_v2 ? c.rho_v :          # <-- pedido: alias pra V²
+    s === :rho_v2 ? c.rho_v :
     getfield(c, s)
 
-# setproperty: mantém nomes antigos E adiciona set de rho_v2
-Base.setproperty!(c::DistributedOPFModel, s::Symbol, v) =
-    s === :rho ? (c.rho_theta = v;
-    c.rho_v = v;
-    c.rho_p = v;
-    c.rho_q = v;
-    c.rho_r = v;
-    c.rho_t = v) :
-    s === :rho_flow ? (c.rho_p = v;
-    c.rho_q = v;
-    c.rho_r = v;
-    c.rho_t = v) :
-    s === :rho_flow_p ? (c.rho_p = v) :
-    s === :rho_flow_q ? (c.rho_q = v) :
-    s === :rho_flow_r ? (c.rho_r = v) :
-    s === :rho_flow_t ? (c.rho_t = v) :
-    s === :rho_v2 ? (c.rho_v = v) :
-    Base.setfield!(c, s, v)
+function Base.setproperty!(c::DistributedOPFModel, s::Symbol, v)
+    if s === :rho
+        v isa Real || throw(ArgumentError("rho must be Real, got $(typeof(v))"))
+        vf = Float64(v)
+        vf > 0 || throw(ArgumentError("rho must be > 0, got $vf"))
+
+        rules = _rules_for(c.base_model, c.method)
+        req = rules.required
+
+        if :rho_theta in req
+            c.rho_theta = vf
+        end
+        if :rho_v in req
+            c.rho_v = vf
+        end
+        if :rho_v2 in req
+            c.rho_v = vf
+        end
+        if :rho_p in req
+            c.rho_p = vf
+        end
+        if :rho_q in req
+            c.rho_q = vf
+        end
+        if :rho_r in req
+            c.rho_r = vf
+        end
+        if :rho_t in req
+            c.rho_t = vf
+        end
+
+        return vf
+    elseif s === :rho_v2
+        c.rho_v = Float64(v)
+        return c.rho_v
+    else
+        Base.setfield!(c, s, v)
+        return v
+    end
+end
 
 Base.propertynames(c::DistributedOPFModel, private::Bool = false) =
-    (propertynames(typeof(c), private)...,
-        :rho, :rho_flow, :rho_flow_p, :rho_flow_q, :rho_flow_r, :rho_flow_t,
-        :rho_v2)
+    (propertynames(typeof(c), private)..., :rho, :rho_v2)
 
 # ============================================================
-# RUN DIAGNOSTICS
+# Diagnostics
 # ============================================================
 
 abstract type AbstractRunDiagnostics end
@@ -243,10 +456,6 @@ Base.@kwdef struct ADMMHistory <: AbstractRunDiagnostics
     heatmaps::Dict{Symbol, Any} = Dict{Symbol, Any}()
     meta::Dict{Symbol, Any} = Dict{Symbol, Any}()
 end
-
-# ============================================================
-# RUN RESULT
-# ============================================================
 
 Base.@kwdef struct LirionRunResult
     result::Any = nothing

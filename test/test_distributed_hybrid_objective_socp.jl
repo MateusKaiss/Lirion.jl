@@ -84,19 +84,10 @@ const _DISTRIB_DEFAULT =
 # Cases
 # -------------------------------------------------
 const distributed_hybrid_socp_zone_cases = [
-    # "pglib_opf_case73_ieee_rts__api.m",
-    # "pglib_opf_case73_ieee_rts__sad.m",
-    ## "pglib_opf_case57_ieee__api.m",
-    # "pglib_opf_case57_ieee__sad.m",
-
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
     "pglib_opf_case73_ieee_rts.m",
-    # "pglib_opf_case57_ieee.m",
-    # "pglib_opf_case118_ieee.m",
-    # "pglib_opf_case200_activ.m",
-    # "pglib_opf_case500_goc.m",
 ]
 
 function track_failure_hybrid_socp(label::String, origin::String, case_name::String)
@@ -121,7 +112,6 @@ end
 @inline function _objective_distributed_hybrid_socp(out::Lirion.LirionRunResult)
     r = out.result
     r isa NamedTuple || error("Distributed out.result must be NamedTuple, got $(typeof(r))")
-    # ADMM distributed results expose these (same as your branch tests)
     hasproperty(r, :total_expr_cost) || error(
         "Distributed result has no field :total_expr_cost. Fields=$(propertynames(r))",
     )
@@ -135,10 +125,12 @@ function compare_distributed_hybrid_socp_vs_centralized(
     distributed_optimizer = _DISTRIB_DEFAULT,
     rtol = 0.01,
     atol = 1e-6,
-    # ADMM defaults
-    rho_v::Float64 = 1.0e3,
-    rho_flow_p::Float64 = 3.0e2,
-    rho_flow_q::Float64 = 3.0e2,
+    # ADMM defaults (SOCP hybrid requires rho_v2, rho_p, rho_q, rho_r, rho_t)
+    rho_v2::Float64 = 1.0e3,
+    rho_p::Float64 = 3.0e2,
+    rho_q::Float64 = 3.0e2,
+    rho_r::Float64 = 1.0e3,
+    rho_t::Float64 = 1.0e3,
     admm_max_iter::Int = 350,
     admm_eps_abs::Float64 = 1e-4,
     admm_eps_rel::Float64 = 1e-4,
@@ -175,9 +167,11 @@ function compare_distributed_hybrid_socp_vs_centralized(
         dist_obj = try
             alg = Lirion.admm_hybrid(;
                 max_iter = 700,
-                rho_v = 1e8,
-                rho_flow_p = 1e8,
-                rho_flow_q = 1e8,
+                rho_v2 = 1e8,
+                rho_p = 1e8,
+                rho_q = 1e8,
+                rho_r = 1e8,
+                rho_t = 1e8,
                 eps_abs = 1e-4,
                 eps_rel = 1e-4,
                 adaptive_rho = true,
@@ -227,12 +221,13 @@ function compare_distributed_hybrid_socp_vs_centralized(
     end
 
     dist_obj = try
-        # Hybrid-SOCP needs separate rho_v / rho_flow_p / rho_flow_q (do NOT use --admm-rho here)
         alg = Lirion.admm_hybrid(;
             max_iter = admm_max_iter,
-            rho_v = Float64(rho_v),
-            rho_flow_p = Float64(rho_flow_p),
-            rho_flow_q = Float64(rho_flow_q),
+            rho_v2 = Float64(rho_v2),
+            rho_p = Float64(rho_p),
+            rho_q = Float64(rho_q),
+            rho_r = Float64(rho_r),
+            rho_t = Float64(rho_t),
             eps_abs = Float64(admm_eps_abs),
             eps_rel = Float64(admm_eps_rel),
             adaptive_rho = isnothing(admm_adaptive) ? true : Bool(admm_adaptive),
@@ -257,7 +252,8 @@ function compare_distributed_hybrid_socp_vs_centralized(
         return
     end
 
-    @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-hybrid-SOCP (total_expr_cost) = $(round(dist_obj, digits=6)) | max_iter=$(admm_max_iter), rhoV=$(rho_v), rhoP=$(rho_flow_p), rhoQ=$(rho_flow_q)"
+    @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-hybrid-SOCP (total_expr_cost) = $(round(dist_obj, digits=6)) | " *
+          "max_iter=$(admm_max_iter), rhoV2=$(rho_v2), rhoP=$(rho_p), rhoQ=$(rho_q), rhoR=$(rho_r), rhoT=$(rho_t)"
     @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
 end
 
@@ -288,15 +284,18 @@ function run_distributed_hybrid_socp_objective_tests(;
         case_name = basename(file)
 
         # defaults por case
-        rho_v_case = 1.0e4
-        rho_flow_p_case = 3.0e2
-        rho_flow_q_case = 3.0e2
+        rho_v2_case = 1.0e4
+        rho_p_case = 3.0e2
+        rho_q_case = 3.0e2
+        rho_r_case = 1.0e4
+        rho_t_case = 1.0e4
+
         admm_max_iter_case = 5000
         admm_eps_abs_case = admm_eps_abs
         admm_eps_rel_case = admm_eps_rel
 
         @info "[$label] Rodando caso $i/$n: $case_name " *
-              "(max_iter=$(admm_max_iter_case), rhoV=$(rho_v_case), rhoP=$(rho_flow_p_case), rhoQ=$(rho_flow_q_case), " *
+              "(max_iter=$(admm_max_iter_case), rhoV2=$(rho_v2_case), rhoP=$(rho_p_case), rhoQ=$(rho_q_case), rhoR=$(rho_r_case), rhoT=$(rho_t_case), " *
               "eps_pr=$(admm_eps_abs_case), eps_dual=$(admm_eps_rel_case))"
 
         @testset "$(label) - $(case_name)" begin
@@ -307,9 +306,11 @@ function run_distributed_hybrid_socp_objective_tests(;
                 distributed_optimizer = distributed_optimizer,
                 rtol = rtol,
                 atol = atol,
-                rho_v = rho_v_case,
-                rho_flow_p = rho_flow_p_case,
-                rho_flow_q = rho_flow_q_case,
+                rho_v2 = rho_v2_case,
+                rho_p = rho_p_case,
+                rho_q = rho_q_case,
+                rho_r = rho_r_case,
+                rho_t = rho_t_case,
                 admm_max_iter = admm_max_iter_case,
                 admm_eps_abs = admm_eps_abs_case,
                 admm_eps_rel = admm_eps_rel_case,

@@ -443,8 +443,8 @@ function run_admm(
     interzonal_branches = sys.interzonal_branches
     max_iter = config.max_iter
 
-    rho_p = Ref(config.rho_flow_p)
-    rho_q = Ref(config.rho_flow_q)
+    rho_p = Ref(config.rho_p)
+    rho_q = Ref(config.rho_q)
     prev_rho_p = Ref(rho_p[])
     prev_rho_q = Ref(rho_q[])
 
@@ -607,8 +607,8 @@ function run_admm(
         "[ADMM-branch/AC]",
         result;
         rho_lines = (
-            "rhoP inicial: $(config.rho_flow_p) | rhoP final: $(rho_p[])",
-            "rhoQ inicial: $(config.rho_flow_q) | rhoQ final: $(rho_q[])",
+            "rhoP inicial: $(config.rho_p) | rhoP final: $(rho_p[])",
+            "rhoQ inicial: $(config.rho_q) | rhoQ final: $(rho_q[])",
         ),
     )
 
@@ -630,8 +630,8 @@ function run_admm(
 
     rho_theta = Ref(config.rho_theta)
     rho_v = Ref(config.rho_v)
-    rho_p = Ref(config.rho_flow_p)
-    rho_q = Ref(config.rho_flow_q)
+    rho_p = Ref(config.rho_p)
+    rho_q = Ref(config.rho_q)
 
     prev_rho_theta = Ref(rho_theta[])
     prev_rho_v = Ref(rho_v[])
@@ -925,8 +925,8 @@ function run_admm(
         rho_lines = (
             "rho_theta inicial: $(config.rho_theta) | rho_theta final: $(rho_theta[])",
             "rho_v     inicial: $(config.rho_v)     | rho_v     final: $(rho_v[])",
-            "rhoP      inicial: $(config.rho_flow_p)| rhoP      final: $(rho_p[])",
-            "rhoQ      inicial: $(config.rho_flow_q)| rhoQ      final: $(rho_q[])",
+            "rhoP      inicial: $(config.rho_p)| rhoP      final: $(rho_p[])",
+            "rhoQ      inicial: $(config.rho_q)| rhoQ      final: $(rho_q[])",
         ),
     )
 

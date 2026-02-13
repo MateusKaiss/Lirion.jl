@@ -169,8 +169,8 @@ function compare_distributed_socp_vs_centralized(
     rtol = 0.05,
     atol = 1e-6,
     rho_v::Float64 = 1.0e6,
-    rho_flow_p::Float64 = 1.0e6,
-    rho_flow_q::Float64 = 1.0e6,
+    rho_p::Float64 = 1.0e6,
+    rho_q::Float64 = 1.0e6,
     admm_max_iter::Int = ADMM_MAX_IT,
     admm_eps_abs::Float64 = 1e-4,
     admm_eps_rel::Float64 = 1e-4,
@@ -266,15 +266,15 @@ function run_distributed_socp_objective_tests(;
         case_name = basename(file)
 
         rho_v_case = 1.0e6
-        rho_flow_p_case = 1.0e6
-        rho_flow_q_case = 1.0e6
+        rho_p_case = 1.0e6
+        rho_q_case = 1.0e6
 
         admm_max_iter_case = 10_000
         admm_eps_abs_case = admm_eps_abs
         admm_eps_rel_case = admm_eps_rel
 
         @info "[$label] Rodando caso $i/$n: $case_name " *
-              "(max_iter=$(admm_max_iter_case), rhoV=$(rho_v_case), rhoP=$(rho_flow_p_case), rhoQ=$(rho_flow_q_case), " *
+              "(max_iter=$(admm_max_iter_case), rhoV=$(rho_v_case), rhoP=$(rho_p_case), rhoQ=$(rho_q_case), " *
               "eps_abs=$(admm_eps_abs_case), eps_rel=$(admm_eps_rel_case), mu=10, tau_incr=1.05, tau_decr=0.98, optimizer=nothing)"
 
         @testset "$(label) - $(case_name)" begin
@@ -286,8 +286,8 @@ function run_distributed_socp_objective_tests(;
                 rtol = rtol,
                 atol = atol,
                 rho_v = rho_v_case,
-                rho_flow_p = rho_flow_p_case,
-                rho_flow_q = rho_flow_q_case,
+                rho_p = rho_p_case,
+                rho_q = rho_q_case,
                 admm_max_iter = admm_max_iter_case,
                 admm_eps_abs = admm_eps_abs_case,
                 admm_eps_rel = admm_eps_rel_case,
