@@ -84,10 +84,20 @@ const _DISTRIB_DEFAULT =
 # Cases
 # -------------------------------------------------
 const distributed_hybrid_socp_zone_cases = [
+    # "pglib_opf_case73_ieee_rts__api.m",
+    # "pglib_opf_case73_ieee_rts__sad.m",
+    ## "pglib_opf_case57_ieee__api.m",
+    # "pglib_opf_case57_ieee__sad.m",
+
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
     "pglib_opf_case73_ieee_rts.m",
+    "pglib_opf_case57_ieee.m",
+    "pglib_opf_case118_ieee.m",
+
+    # "pglib_opf_case200_activ.m",
+    # "pglib_opf_case500_goc.m",
 ]
 
 function track_failure_hybrid_socp(label::String, origin::String, case_name::String)
@@ -99,7 +109,7 @@ function track_failure_hybrid_socp(label::String, origin::String, case_name::Str
 end
 
 # ------------------------------------------------------------
-# Objective extraction (same pattern as branch-AC)
+# Objective extraction
 # ------------------------------------------------------------
 @inline function _objective_centralized_socp(out::Lirion.LirionRunResult)
     d = out.result
@@ -125,13 +135,13 @@ function compare_distributed_hybrid_socp_vs_centralized(
     distributed_optimizer = _DISTRIB_DEFAULT,
     rtol = 0.01,
     atol = 1e-6,
-    # ADMM defaults (SOCP hybrid requires rho_v2, rho_p, rho_q, rho_r, rho_t)
+
+    # ADMM defaults (SOCP hybrid requires: rho_v2, rho_p, rho_q, rho_r, rho_t)
     rho_v2::Float64 = 1.0e3,
     rho_p::Float64 = 3.0e2,
     rho_q::Float64 = 3.0e2,
     rho_r::Float64 = 1.0e3,
-    rho_t::Float64 = 1.0e3,
-    admm_max_iter::Int = 350,
+    rho_t::Float64 = 1.0e3, admm_max_iter::Int = 350,
     admm_eps_abs::Float64 = 1e-4,
     admm_eps_rel::Float64 = 1e-4,
     admm_adaptive::Union{Nothing, Bool} = nothing,
@@ -165,14 +175,17 @@ function compare_distributed_hybrid_socp_vs_centralized(
         end
 
         dist_obj = try
-            alg = Lirion.admm_hybrid(;
+            alg = Lirion.admm(;
+                coupling = :hybrid,
+                sectioning = :tie_line,
                 max_iter = 700,
+
+                # SOCP usa rho_v2 (não rho_v, não rho_theta)
                 rho_v2 = 1e8,
                 rho_p = 1e8,
                 rho_q = 1e8,
                 rho_r = 1e8,
-                rho_t = 1e8,
-                eps_abs = 1e-4,
+                rho_t = 1e8, eps_abs = 1e-4,
                 eps_rel = 1e-4,
                 adaptive_rho = true,
                 mu_incr = 3.0,
@@ -221,14 +234,15 @@ function compare_distributed_hybrid_socp_vs_centralized(
     end
 
     dist_obj = try
-        alg = Lirion.admm_hybrid(;
-            max_iter = admm_max_iter,
-            rho_v2 = Float64(rho_v2),
+        # NEW API: admm(coupling=:hybrid, ...)
+        alg = Lirion.admm(;
+            coupling = :hybrid,
+            sectioning = :tie_line,
+            max_iter = Int(admm_max_iter), rho_v2 = Float64(rho_v2),
             rho_p = Float64(rho_p),
             rho_q = Float64(rho_q),
             rho_r = Float64(rho_r),
-            rho_t = Float64(rho_t),
-            eps_abs = Float64(admm_eps_abs),
+            rho_t = Float64(rho_t), eps_abs = Float64(admm_eps_abs),
             eps_rel = Float64(admm_eps_rel),
             adaptive_rho = isnothing(admm_adaptive) ? true : Bool(admm_adaptive),
             mu_incr = Float64(admm_mu_incr),

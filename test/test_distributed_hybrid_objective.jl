@@ -1,16 +1,23 @@
 # ==============================================
 # ADMM-Hybrid-DC vs DC (objective) – tests (API solve)
+# Corrigido p/ NOVA API: admm(coupling=:hybrid, sectioning=:tie_line, ...)
 # ==============================================
 
 # Casos particionados (2/3/4 zonas) — iguais aos do branch
 const distributed_hybrid_zone_cases = [
+    # "pglib_opf_case73_ieee_rts__api.m",
+    # "pglib_opf_case73_ieee_rts__sad.m",
+    ## "pglib_opf_case57_ieee__api.m",
+    # "pglib_opf_case57_ieee__sad.m",
+
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
     "pglib_opf_case73_ieee_rts.m",
     "pglib_opf_case57_ieee.m",
+    "pglib_opf_case200_activ.m",
+
     # "pglib_opf_case118_ieee.m",
-    # "pglib_opf_case200_activ.m",
     # "pglib_opf_case500_goc.m",
 ]
 
@@ -112,11 +119,17 @@ function compare_distributed_hybrid_dc_vs_centralized(
 
     # --- Distribuído ADMM-Hybrid-DC ---
     dist_obj = try
-        alg = Lirion.admm_hybrid(;
-            max_iter = admm_max_iter,
+        # NEW API: admm(coupling=:hybrid, ...)
+        alg = Lirion.admm(;
+            coupling = :hybrid,
+            sectioning = :tie_line,
+            max_iter = Int(admm_max_iter),
             rho = Float64(admm_rho),
             eps_abs = Float64(admm_eps_abs),
             eps_rel = Float64(admm_eps_rel),
+            # (se quiser expor knobs aqui depois)
+            # adaptive_rho = true,
+            # mu_incr = 3.0, mu_decr = 3.0, tau_incr = 1.05, tau_decr = 0.98,
         )
 
         out_dist = _solve_maybe_optimizer(

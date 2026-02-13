@@ -6,7 +6,7 @@
 # Partition initialization
 # ------------------------------------------------------------
 
-# ---------- socp bus [V² + (R,T)] partition ----------
+# ---------- socp state [V² + (R,T)] partition ----------
 
 function init_socp_v2rt_partition!(
     part::PartitionSOCP,
@@ -66,7 +66,7 @@ function init_socp_v2rt_partition!(
     return nothing
 end
 
-# ---------- socp branch partition (P/Q) ----------
+# ---------- socp power partition (P/Q) ----------
 
 function init_socp_pq_partition!(
     part::PartitionSOCP,
@@ -203,17 +203,18 @@ end
 # ============================================================
 
 # ------------------------------------------------------------
-# Runner: ADMM SOCP (V² + R/T)
+# Runner: ADMM SOCP state (V² + R/T)
 # ------------------------------------------------------------
 
 function run_admm(
     sys::ADMMSystem,
     config::DistributedOPFModel,
-    ::ADMM{Bus, SOCPTag};
+    ::ADMM{State, SOCPTag};
     optimizer_factory = nothing,
 )::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == SOCP "ADMM-SOCP: base_model deve ser SOCP."
+    @assert config.coupling == :state "Dispatch State/SOCP requer coupling=:state."
 
     if optimizer_factory === nothing
         optimizer_factory = resolve_optimizer(config)
@@ -257,16 +258,12 @@ function run_admm(
     r_consensus_prev = Dict{Int, Float64}()
     t_consensus_prev = Dict{Int, Float64}()
 
-    duals_r = Dict{Int, Dict{Int, Float64}}(
-        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
-    )
-    duals_t = Dict{Int, Dict{Int, Float64}}(
-        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
-    )
+    duals_r = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
+    duals_t = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
 
     hist = ADMMHistory()
-    hist.meta[:kind] = :socp_v2rt
-    hist.meta[:tag] = "admm_socp_v2rt"
+    hist.meta[:kind] = :socp_state_v2rt
+    hist.meta[:tag] = "admm_socp_state_v2rt"
     v2_avg_history = Dict{Int, Vector{Float64}}()
 
     results = Vector{NamedTuple{(:gen_cost_expr, :real_cost), Tuple{Float64, Float64}}}(
@@ -281,7 +278,7 @@ function run_admm(
     iter_done = 0
     for iter in 1:max_iter
         iter_done = iter
-        _FAST_USE_LOGS && println("\n[ADMM-SOCP (V²+R,T)] Iteração $iter")
+        _FAST_USE_LOGS && println("\n[ADMM-SOCP-state (V²+R,T)] Iteração $iter")
 
         refresh_rho_v2_socp!(partitions, rho_v2, prev_rho_v2)
         refresh_rho_rt_socp!(partitions, rho_r, prev_rho_r, rho_t, prev_rho_t)
@@ -458,7 +455,7 @@ function run_admm(
 
     result = _finalize_admm_result(partitions, t0_ns, iter_done)
     _print_admm_summary!(
-        "[ADMM-SOCP (V²+R,T)]",
+        "[ADMM-SOCP-state (V²+R,T)]",
         result;
         rho_lines = (
             "rho(V²) inicial: $(config.rho_v2) | rho(V²) final: $(rho_v2[])",
@@ -467,26 +464,22 @@ function run_admm(
         ),
     )
 
-    return LirionRunResult(;
-        result = result,
-        model = nothing,
-        system = sys,
-        diagnostics = hist,
-    )
+    return LirionRunResult(; result, model = nothing, system = sys, diagnostics = hist)
 end
 
 # ------------------------------------------------------------
-# Runner: ADMM SOCP (branch P/Q)
+# Runner: ADMM SOCP power (branch P/Q)
 # ------------------------------------------------------------
 
 function run_admm(
     sys::ADMMSystem,
     config::DistributedOPFModel,
-    ::ADMM{Branch, SOCPTag};
+    ::ADMM{Power, SOCPTag};
     optimizer_factory = nothing,
 )::LirionRunResult
     t0_ns = time_ns()
-    @assert config.base_model == SOCP "ADMM-SOCP-branch: base_model deve ser SOCP."
+    @assert config.base_model == SOCP "ADMM-SOCP-power: base_model deve ser SOCP."
+    @assert config.coupling == :power "Dispatch Power/SOCP requer coupling=:power."
 
     if optimizer_factory === nothing
         optimizer_factory = resolve_optimizer(config)
@@ -513,16 +506,12 @@ function run_admm(
     p_flow_consensus_prev = Dict{Int, Float64}()
     q_flow_consensus_prev = Dict{Int, Float64}()
 
-    dualsP = Dict{Int, Dict{Int, Float64}}(
-        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
-    )
-    dualsQ = Dict{Int, Dict{Int, Float64}}(
-        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
-    )
+    dualsP = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
+    dualsQ = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
 
     hist = ADMMHistory()
-    hist.meta[:kind] = :socp_pq
-    hist.meta[:tag] = "admm_socp_pq"
+    hist.meta[:kind] = :socp_power_pq
+    hist.meta[:tag] = "admm_socp_power_pq"
 
     init_socp_pq_partition!(
         partitions,
@@ -536,7 +525,7 @@ function run_admm(
     iter_done = 0
     for iter in 1:max_iter
         iter_done = iter
-        _FAST_USE_LOGS && println("\n[ADMM-SOCP-branch (P,Q)] Iteração $iter")
+        _FAST_USE_LOGS && println("\n[ADMM-SOCP-power (P,Q)] Iteração $iter")
 
         refresh_rho_pq_socp!(partitions, rho_p, prev_rho_p, rho_q, prev_rho_q)
 
@@ -641,7 +630,7 @@ function run_admm(
 
     result = _finalize_admm_result(partitions, t0_ns, iter_done)
     _print_admm_summary!(
-        "[ADMM-SOCP-branch (P,Q)]",
+        "[ADMM-SOCP-power (P,Q)]",
         result;
         rho_lines = (
             "rho_p inicial: $(config.rho_p) | rho_p final: $(rho_p[])",
@@ -649,12 +638,7 @@ function run_admm(
         ),
     )
 
-    return LirionRunResult(;
-        result = result,
-        model = nothing,
-        system = sys,
-        diagnostics = hist,
-    )
+    return LirionRunResult(; result, model = nothing, system = sys, diagnostics = hist)
 end
 
 # ------------------------------------------------------------
@@ -669,6 +653,7 @@ function run_admm(
 )::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == SOCP "ADMM-SOCP-hybrid: base_model deve ser SOCP."
+    @assert config.coupling == :hybrid "Dispatch Hybrid/SOCP requer coupling=:hybrid."
 
     if optimizer_factory === nothing
         optimizer_factory = resolve_optimizer(config)
@@ -704,12 +689,10 @@ function run_admm(
     v2_consensus = ones(Float64, n_shared_buses)
     v2_consensus_prev = similar(v2_consensus)
 
-    duals_v2 = Dict{Int, Vector{Float64}}(
-        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-    )
-    dual_v2_buf = Dict{Int, Vector{Float64}}(
-        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-    )
+    duals_v2 =
+        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+    dual_v2_buf =
+        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
 
     p_flow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
     q_flow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
@@ -721,18 +704,10 @@ function run_admm(
     r_consensus_prev = Dict{Int, Float64}()
     t_consensus_prev = Dict{Int, Float64}()
 
-    dualsP = Dict{Int, Dict{Int, Float64}}(
-        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
-    )
-    dualsQ = Dict{Int, Dict{Int, Float64}}(
-        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
-    )
-    duals_r = Dict{Int, Dict{Int, Float64}}(
-        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
-    )
-    duals_t = Dict{Int, Dict{Int, Float64}}(
-        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
-    )
+    dualsP = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
+    dualsQ = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
+    duals_r = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
+    duals_t = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
 
     hist = ADMMHistory()
     hist.meta[:kind] = :socp_hybrid
@@ -1001,10 +976,5 @@ function run_admm(
         ),
     )
 
-    return LirionRunResult(;
-        result = result,
-        model = nothing,
-        system = sys,
-        diagnostics = hist,
-    )
+    return LirionRunResult(; result, model = nothing, system = sys, diagnostics = hist)
 end

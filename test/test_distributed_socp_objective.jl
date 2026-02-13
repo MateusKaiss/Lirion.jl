@@ -1,5 +1,6 @@
 # ============================================
 # ADMM-SOCP vs SOCP (objective) — tests (API solve)
+# Corrigido p/ NOVA API: admm(coupling=:state, sectioning=:tie_line, ...)
 # ============================================
 
 const ADMM_MAX_IT = 5000
@@ -94,9 +95,9 @@ const distributed_socp_zone_cases = [
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
     "pglib_opf_case73_ieee_rts.m",
-    # "pglib_opf_case118_ieee.m",
-    # "pglib_opf_case200_activ.m",
+    "pglib_opf_case200_activ.m",
 
+    # "pglib_opf_case118_ieee.m",
     # "pglib_opf_case57_ieee.m",
     # "pglib_opf_case500_goc.m",
 ]
@@ -161,6 +162,24 @@ end
     end
 end
 
+# ------------------------------------------------------------
+# Small helper: parse "on/off/nothing" into Bool (default=true)
+# ------------------------------------------------------------
+@inline function _parse_adaptive(admm_adaptive::Union{Nothing, String, Bool})
+    admm_adaptive === nothing && return true
+    admm_adaptive isa Bool && return admm_adaptive
+    s = lowercase(String(admm_adaptive))
+    if s == "on"
+        return true
+    elseif s == "off"
+        return false
+    else
+        error(
+            "admm_adaptive must be \"on\", \"off\", Bool, or nothing; got: $admm_adaptive",
+        )
+    end
+end
+
 function compare_distributed_socp_vs_centralized(
     file::String;
     label::String,
@@ -168,20 +187,20 @@ function compare_distributed_socp_vs_centralized(
     distributed_optimizer = _DISTRIB_DEFAULT,
     rtol = 0.05,
     atol = 1e-6,
+
+    # (mantidos por compat / log) — na NOVA API vamos usar um rho “base”
     rho_v::Float64 = 1.0e6,
     rho_p::Float64 = 1.0e6,
-    rho_q::Float64 = 1.0e6,
-    admm_max_iter::Int = ADMM_MAX_IT,
+    rho_q::Float64 = 1.0e6, admm_max_iter::Int = ADMM_MAX_IT,
     admm_eps_abs::Float64 = 1e-4,
     admm_eps_rel::Float64 = 1e-4,
-    admm_adaptive::Union{Nothing, Bool} = true,
-    # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    # MATCH do seu run “bom” (API solve):
+    admm_adaptive::Union{Nothing, Bool, String} = true,
+
+    # MATCH do seu run “bom”:
     admm_mu_incr::Float64 = 10.0,
     admm_mu_decr::Float64 = 10.0,
     admm_tau_incr::Float64 = 1.05,
     admm_tau_decr::Float64 = 0.98,
-    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 )
     case_name = basename(file)
 
@@ -205,25 +224,32 @@ function compare_distributed_socp_vs_centralized(
     end
 
     # -----------------------------------------------------------
-    # Distributed ADMM-SOCP (com os mesmos params do run “bom”)
+    # Distributed ADMM-SOCP (NOVA API)
     # -----------------------------------------------------------
     dist_obj = try
-        alg = admm_bus(;
-            max_iter = 10000,
-            rho = 1e6,
-            eps_abs = 1e-4,
-            eps_rel = 1e-4,
-            adaptive_rho = true,
-            mu_incr = 10.0,
-            mu_decr = 10.0,
-            tau_incr = 1.05,
-            tau_decr = 0.98,
+        # Para SOCP (bus/state), usamos rho “base”.
+        # Mantemos a intenção antiga (rho_v/p/q) como “sugestão” pro rho:
+        rho_base = max(rho_v, rho_p, rho_q)
+
+        alg = Lirion.admm(;
+            coupling = :state,          # substitui admm_bus
+            sectioning = :tie_line,
+            max_iter = Int(admm_max_iter),
+            rho = Float64(rho_base),
+            eps_abs = Float64(admm_eps_abs),
+            eps_rel = Float64(admm_eps_rel),
+            adaptive_rho = _parse_adaptive(admm_adaptive),
+            mu_incr = Float64(admm_mu_incr),
+            mu_decr = Float64(admm_mu_decr),
+            tau_incr = Float64(admm_tau_incr),
+            tau_decr = Float64(admm_tau_decr),
         )
 
-        out_dist = solve(
+        out_dist = _solve_maybe_optimizer(
             file;
-            model = socp(),
+            model = Lirion.socp(),
             algorithm = alg,
+            optimizer = distributed_optimizer,
             outputs = false,
             plots = false,
         )
@@ -235,7 +261,7 @@ function compare_distributed_socp_vs_centralized(
         return
     end
 
-    @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-ADMM-SOCP (total_expr_cost) = $(round(dist_obj, digits=6)) | max_iter=$(admm_max_iter) | (mu=$(admm_mu_incr), tau_incr=$(admm_tau_incr), tau_decr=$(admm_tau_decr))"
+    @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-ADMM-SOCP (total_expr_cost) = $(round(dist_obj, digits=6)) | max_iter=$(admm_max_iter) | rho=$(max(rho_v,rho_p,rho_q)) | mu=$(admm_mu_incr) | tau_incr=$(admm_tau_incr) | tau_decr=$(admm_tau_decr)"
     @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
 end
 
@@ -275,7 +301,7 @@ function run_distributed_socp_objective_tests(;
 
         @info "[$label] Rodando caso $i/$n: $case_name " *
               "(max_iter=$(admm_max_iter_case), rhoV=$(rho_v_case), rhoP=$(rho_p_case), rhoQ=$(rho_q_case), " *
-              "eps_abs=$(admm_eps_abs_case), eps_rel=$(admm_eps_rel_case), mu=10, tau_incr=1.05, tau_decr=0.98, optimizer=nothing)"
+              "eps_abs=$(admm_eps_abs_case), eps_rel=$(admm_eps_rel_case), mu=10, tau_incr=1.05, tau_decr=0.98, optimizer=$(distributed_optimizer === nothing ? "nothing(default)" : string(distributed_optimizer)))"
 
         @testset "$(label) - $(case_name)" begin
             compare_distributed_socp_vs_centralized(

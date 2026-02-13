@@ -1,5 +1,5 @@
 # ==============================================
-# ADMM-Branch-SOCP vs SOCP (objective) – tests (API solve)
+# ADMM-(Power coupling)-SOCP vs SOCP (objective) – tests (API solve)
 # ==============================================
 
 # -------------------------------------------------
@@ -74,10 +74,20 @@ const _DISTRIB_DEFAULT =
 
 # --- case list ---
 const distributed_branch_socp_zone_cases = [
+    # "pglib_opf_case73_ieee_rts__api.m",
+    # "pglib_opf_case73_ieee_rts__sad.m",
+    ## "pglib_opf_case57_ieee__api.m",
+    # "pglib_opf_case57_ieee__sad.m",
+
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
     "pglib_opf_case73_ieee_rts.m",
+    "pglib_opf_case57_ieee.m",
+    "pglib_opf_case118_ieee.m",
+
+    # "pglib_opf_case200_activ.m",
+    # "pglib_opf_case500_goc.m",
 ]
 
 function track_failure_branch_socp(label::String, origin::String, case_name::String)
@@ -99,7 +109,7 @@ end
     return d["objective"]
 end
 
-@inline function _objective_distributed_branch_socp(out::Lirion.LirionRunResult)
+@inline function _objective_distributed_power_socp(out::Lirion.LirionRunResult)
     r = out.result
     r isa NamedTuple || error("Distributed out.result must be NamedTuple, got $(typeof(r))")
     hasproperty(r, :total_expr_cost) || error(
@@ -116,7 +126,7 @@ function compare_distributed_branch_socp_vs_centralized(
     rtol = 0.05,
     atol = 1e-6,
 
-    # ADMM defaults (SOCP + admm_branch requires ONLY rho_p and rho_q)
+    # ADMM defaults (SOCP + coupling=:power requires ONLY rho_p and rho_q)
     rho_p::Float64 = 1.0e3,
     rho_q::Float64 = 1.0e3,
     admm_max_iter::Int = 350,
@@ -134,7 +144,7 @@ function compare_distributed_branch_socp_vs_centralized(
     # Special case: 2000-bus / 5 zones
     # ================================================================
     if case_name == "pglib_opf_case2000_5zones_goc.m"
-        @info "⚙️ [BRANCH-SOCP] Special case $case_name with Clarabel robust (central) and Clarabel rho=1e8 (distributed)."
+        @info "⚙️ [SOCP/:power] Special case $case_name with Clarabel robust (central) and Clarabel rho=1e8 (distributed)."
 
         cent_obj = try
             opt_cent =
@@ -155,7 +165,9 @@ function compare_distributed_branch_socp_vs_centralized(
         end
 
         dist_obj = try
-            alg = Lirion.admm_branch(;
+            alg = Lirion.admm(;
+                coupling = :power,
+                sectioning = :tie_line,
                 max_iter = 700,
                 rho_p = 1e8,
                 rho_q = 1e8,
@@ -175,14 +187,14 @@ function compare_distributed_branch_socp_vs_centralized(
                 outputs = false,
                 plots = false,
             )
-            _objective_distributed_branch_socp(out_dist)
+            _objective_distributed_power_socp(out_dist)
         catch e
-            @warn "Distributed ADMM-Branch-SOCP failed on $case_name: $e"
+            @warn "Distributed ADMM-(power)-SOCP failed on $case_name: $e"
             track_failure_branch_socp(label, "Distributed", case_name)
             return
         end
 
-        @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-branch-SOCP (total_expr_cost) = $(round(dist_obj, digits=6))"
+        @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-(power)-SOCP (total_expr_cost) = $(round(dist_obj, digits=6))"
         @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
         return
     end
@@ -207,7 +219,9 @@ function compare_distributed_branch_socp_vs_centralized(
     end
 
     dist_obj = try
-        alg = Lirion.admm_branch(;
+        alg = Lirion.admm(;
+            coupling = :power,
+            sectioning = :tie_line,
             max_iter = admm_max_iter,
             rho_p = Float64(rho_p),
             rho_q = Float64(rho_q),
@@ -227,21 +241,21 @@ function compare_distributed_branch_socp_vs_centralized(
             outputs = false,
             plots = false,
         )
-        _objective_distributed_branch_socp(out_dist)
+        _objective_distributed_power_socp(out_dist)
     catch e
-        @warn "Distributed ADMM-Branch-SOCP failed on $case_name: $e"
+        @warn "Distributed ADMM-(power)-SOCP failed on $case_name: $e"
         track_failure_branch_socp(label, "Distributed", case_name)
         return
     end
 
-    @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-branch-SOCP (total_expr_cost) = $(round(dist_obj, digits=6)) | " *
+    @info "File $case_name | centralized SOCP = $(round(cent_obj, digits=6)) | distributed-(power)-SOCP (total_expr_cost) = $(round(dist_obj, digits=6)) | " *
           "max_iter=$(admm_max_iter), rhoP=$(rho_p), rhoQ=$(rho_q)"
     @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
 end
 
 function run_distributed_branch_socp_objective_tests(;
     case_list = distributed_branch_socp_zone_cases,
-    label = "ADMM-Branch-SOCP vs SOCP",
+    label = "ADMM-(power)-SOCP vs SOCP",
     central_optimizer = _CENTRAL_DEFAULT,
     distributed_optimizer = _DISTRIB_DEFAULT,
     rtol = 0.05,
@@ -250,7 +264,7 @@ function run_distributed_branch_socp_objective_tests(;
     admm_eps_rel = 1e-4,
 )
     if isempty(case_list)
-        @info "Empty distributed (branch-SOCP) case list. No tests will be run."
+        @info "Empty distributed (power-SOCP) case list. No tests will be run."
         return true
     end
 
@@ -274,7 +288,7 @@ function run_distributed_branch_socp_objective_tests(;
 
         @info "[$label] Rodando caso $i/$n: $case_name " *
               "(max_iter=$(admm_max_iter_case), rhoP=$(rho_p_case), rhoQ=$(rho_q_case), " *
-              "eps_pr=$(admm_eps_abs_case), eps_dual=$(admm_eps_rel_case))"
+              "eps_abs=$(admm_eps_abs_case), eps_rel=$(admm_eps_rel_case))"
 
         @testset "$(label) - $(case_name)" begin
             compare_distributed_branch_socp_vs_centralized(

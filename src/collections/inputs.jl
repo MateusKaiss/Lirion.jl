@@ -78,11 +78,18 @@ function _build_inputs(
         )
     end
 
+    # DISTRIBUTED (ADMM)
     spec = algorithm
     spec isa ADMMAlgorithmSpec ||
-        error("Invalid algorithm: expected centralized() or an ADMM spec from admm_*().")
+        error("Invalid algorithm: expected centralized() or an ADMM spec from admm().")
 
-    cfg = DistributedOPFModel(model, spec.method, spec.max_iter; spec.kwargs...)
+    cfg = DistributedOPFModel(
+        model,
+        spec.coupling,
+        spec.sectioning,
+        spec.max_iter;
+        spec.kwargs...,
+    )
 
     parts_dict, shared_buses = prepare_admm_partitions(data)
     interzonal_branches = _find_interzonal_branches(data)

@@ -6,9 +6,9 @@
 # Partition initialization
 # ------------------------------------------------------------
 
-# ---------- ac bus partition ----------
+# ---------- ac state coupling partition ----------
 
-function init_ac_bus_partition!(
+function init_ac_state_partition!(
     part::PartitionAC,
     sys_zone::SystemData,
     optimizer_factory,
@@ -38,7 +38,7 @@ function init_ac_bus_partition!(
     return nothing
 end
 
-function init_ac_bus_partition!(
+function init_ac_state_partition!(
     partitions::Partitions{PartitionAC},
     sys::ADMMSystem,
     optimizer_factory,
@@ -49,7 +49,7 @@ function init_ac_bus_partition!(
     @assert n_zones == length(sys.parts) == length(sys.zones)
 
     @inbounds for i in 1:n_zones
-        init_ac_bus_partition!(
+        init_ac_state_partition!(
             partitions.parts[i],
             sys.parts[i],
             optimizer_factory,
@@ -60,9 +60,9 @@ function init_ac_bus_partition!(
     return nothing
 end
 
-# ---------- ac branch partition ----------
+# ---------- ac power coupling partition  ----------
 
-function init_ac_branch_partition!(
+function init_ac_power_partition!(
     part::PartitionAC,
     sys_zone::SystemData,
     optimizer_factory,
@@ -94,7 +94,7 @@ function init_ac_branch_partition!(
     return nothing
 end
 
-function init_ac_branch_partition!(
+function init_ac_power_partition!(
     partitions::Partitions{PartitionAC},
     sys::ADMMSystem,
     optimizer_factory,
@@ -106,7 +106,7 @@ function init_ac_branch_partition!(
     @assert n_zones == length(sys.parts) == length(sys.zones)
 
     @inbounds for i in 1:n_zones
-        init_ac_branch_partition!(
+        init_ac_power_partition!(
             partitions.parts[i],
             sys.parts[i],
             optimizer_factory,
@@ -118,7 +118,7 @@ function init_ac_branch_partition!(
     return nothing
 end
 
-# ---------- ac hybrid partition ----------
+# ---------- ac hybrid coupling partition ----------
 
 function init_ac_hybrid_partition!(
     part::PartitionAC,
@@ -193,16 +193,17 @@ end
 # ============================================================
 
 # ------------------------------------------------------------
-# Runner: ADMM bus/AC  (with debug)
+# Runner: ADMM state/AC  (ex-bus)
 # ------------------------------------------------------------
 function run_admm(
     sys::ADMMSystem,
     config::DistributedOPFModel,
-    ::ADMM{Bus, ACTag};
+    ::ADMM{State, ACTag};
     optimizer_factory = nothing,
 )::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == AC "ADMM-AC: base_model deve ser AC."
+    @assert config.coupling == :state "Dispatch State/AC requer coupling=:state."
 
     shared_buses = sys.shared_buses
     max_iter = config.max_iter
@@ -236,8 +237,8 @@ function run_admm(
     v_mag_consensus_prev = similar(v_mag_consensus)
 
     hist = ADMMHistory()
-    hist.meta[:kind] = :ac_bus
-    hist.meta[:tag] = "admm_ac_bus"
+    hist.meta[:kind] = :ac_state
+    hist.meta[:tag] = "admm_ac_state"
 
     theta_avg_hist = Dict{Int, Vector{Float64}}()
     v_mag_avg_hist = Dict{Int, Vector{Float64}}()
@@ -247,19 +248,15 @@ function run_admm(
         n_zones,
     )
 
-    init_ac_bus_partition!(partitions, sys, optimizer_factory, rho_theta[], rho_v[])
+    init_ac_state_partition!(partitions, sys, optimizer_factory, rho_theta[], rho_v[])
 
     iter_done = 0
     for iter in 1:max_iter
         iter_done = iter
-        _FAST_USE_LOGS && println("\n[ADMM-AC] Iteração $iter")
+        _FAST_USE_LOGS && println("\n[ADMM-AC-state] Iteração $iter")
 
-        # rho refresh (rebuild cached quads if rho changed)
         refresh_rho_bus_ac!(partitions, rho_theta, prev_rho_theta, rho_v, prev_rho_v)
 
-        # ------------------------------
-        # 1) solve subproblems (parallel)
-        # ------------------------------
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
             part = get_partition(partitions, zone_id)
@@ -299,9 +296,6 @@ function run_admm(
             part.real_generation_cost = out.real_cost
         end
 
-        # ------------------------------
-        # 2) consensus
-        # ------------------------------
         theta_consensus_prev .= theta_consensus
         v_mag_consensus_prev .= v_mag_consensus
 
@@ -319,9 +313,6 @@ function run_admm(
             push!(get!(v_mag_avg_hist, b, Float64[]), v_mag_consensus[j])
         end
 
-        # ------------------------------
-        # 3) dual updates
-        # ------------------------------
         update_duals_bus_ac_all!(
             duals_theta,
             duals_v_mag,
@@ -337,9 +328,6 @@ function run_admm(
             v_mag_consensus_prev = v_mag_consensus_prev,
         )
 
-        # ------------------------------
-        # 4) residuals + tolerances
-        # ------------------------------
         r = primal_residual_bus_ac_vec(
             partitions,
             theta_consensus,
@@ -348,7 +336,6 @@ function run_admm(
             shared_buses_to_pos,
         )
 
-        # dual residual escalado: || [rhoθ*Δθ ; rhoV*ΔV] ||
         s = dual_residual_bus_ac_vec(
             theta_consensus,
             v_mag_consensus,
@@ -386,20 +373,15 @@ function run_admm(
             eps_s;
             rhos = Dict(:rho_theta => rho_theta[], :rho_v => rho_v[]),
         )
+
         _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_r")
         _FAST_USE_LOGS && println("‖s‖ = $s | eps_du  = $eps_s")
 
-        # ------------------------------
-        # stopping
-        # ------------------------------
         if stop_if_converged!(r, s, eps_r, eps_s)
             _FAST_USE_LOGS && println("Stopping criterion met.")
             break
         end
 
-        # ------------------------------
-        # rho adaptation
-        # ------------------------------
         maybe_adapt_rho!(
             adaptive,
             rho_theta,
@@ -420,7 +402,7 @@ function run_admm(
 
     result = _finalize_admm_result(partitions, t0_ns, iter_done)
     _print_admm_summary!(
-        "[ADMM-bus/AC]",
+        "[ADMM-state/AC]",
         result;
         rho_lines = (
             "rho_theta inicial: $(config.rho_theta) | rho_theta final: $(rho_theta[])",
@@ -431,14 +413,18 @@ function run_admm(
     return LirionRunResult(; result, model = nothing, system = sys, diagnostics = hist)
 end
 
+# ------------------------------------------------------------
+# Runner: ADMM power/AC
+# ------------------------------------------------------------
 function run_admm(
     sys::ADMMSystem,
     config::DistributedOPFModel,
-    ::ADMM{Branch, ACTag};
+    ::ADMM{Power, ACTag};
     optimizer_factory = nothing,
 )::LirionRunResult
     t0_ns = time_ns()
-    @assert config.base_model == AC "ADMM-AC-branch: base_model deve ser AC."
+    @assert config.base_model == AC "ADMM-AC-power: base_model deve ser AC."
+    @assert config.coupling == :power "Dispatch Power/AC requer coupling=:power."
 
     interzonal_branches = sys.interzonal_branches
     max_iter = config.max_iter
@@ -467,14 +453,15 @@ function run_admm(
     q_flow_consensus_prev = Dict{Int, Float64}()
 
     hist = ADMMHistory()
-    hist.meta[:kind] = :ac_branch
-    hist.meta[:tag] = "admm_ac_branch"
+    hist.meta[:kind] = :ac_power
+    hist.meta[:tag] = "admm_ac_power"
 
     results = Vector{NamedTuple{(:expr_cost, :real_cost), Tuple{Float64, Float64}}}(
-        undef, n_zones,
+        undef,
+        n_zones,
     )
 
-    init_ac_branch_partition!(
+    init_ac_power_partition!(
         partitions,
         sys,
         optimizer_factory,
@@ -486,7 +473,7 @@ function run_admm(
     iter_done = 0
     for iter in 1:max_iter
         iter_done = iter
-        _FAST_USE_LOGS && println("\n[ADMM-AC-branch] Iteração $iter")
+        _FAST_USE_LOGS && println("\n[ADMM-AC-power] Iteração $iter")
 
         refresh_rho_branch_ac!(partitions, rho_p, prev_rho_p, rho_q, prev_rho_q)
 
@@ -553,7 +540,6 @@ function run_admm(
             interzonal_branches,
         )
 
-        # dual residual escalado: || [rhoP*ΔP ; rhoQ*ΔQ] ||
         s = dual_residual_branch_ac(
             p_flow_consensus,
             q_flow_consensus,
@@ -573,7 +559,6 @@ function run_admm(
             eps_rel,
         )
 
-        # eps_dual baseado no dual "não escalado" y
         eps_s = eps_dual_branch_ac_unscaled(
             duals_p_flow,
             duals_q_flow,
@@ -591,6 +576,7 @@ function run_admm(
             eps_s;
             rhos = Dict(:rho_p => rho_p[], :rho_q => rho_q[]),
         )
+
         _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_r")
         _FAST_USE_LOGS && println("‖s‖ = $s | eps_du  = $eps_s")
 
@@ -604,7 +590,7 @@ function run_admm(
 
     result = _finalize_admm_result(partitions, t0_ns, iter_done)
     _print_admm_summary!(
-        "[ADMM-branch/AC]",
+        "[ADMM-power/AC]",
         result;
         rho_lines = (
             "rhoP inicial: $(config.rho_p) | rhoP final: $(rho_p[])",
@@ -615,6 +601,9 @@ function run_admm(
     return LirionRunResult(; result, model = nothing, system = sys, diagnostics = hist)
 end
 
+# ------------------------------------------------------------
+# Runner: ADMM hybrid/AC
+# ------------------------------------------------------------
 function run_admm(
     sys::ADMMSystem,
     config::DistributedOPFModel,
@@ -623,6 +612,7 @@ function run_admm(
 )::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == AC "Hybrid AC: base_model deve ser AC."
+    @assert config.coupling == :hybrid "Dispatch Hybrid/AC requer coupling=:hybrid."
 
     shared_buses = sys.shared_buses
     interzonal_branches = sys.interzonal_branches
@@ -680,7 +670,8 @@ function run_admm(
     v_mag_avg_hist = Dict{Int, Vector{Float64}}()
 
     results = Vector{NamedTuple{(:expr_cost, :real_cost), Tuple{Float64, Float64}}}(
-        undef, n_zones,
+        undef,
+        n_zones,
     )
 
     init_ac_hybrid_partition!(
@@ -825,7 +816,6 @@ function run_admm(
         )
         r_tot = hypot(r_bus, r_br)
 
-        # dual residuals escalados
         s_bus = dual_residual_bus_ac_vec(
             theta_consensus, v_mag_consensus,
             theta_consensus_prev, v_mag_consensus_prev,
@@ -858,7 +848,6 @@ function run_admm(
         )
         eps_r_tot = hypot(eps_bus_r, eps_br_r)
 
-        # eps_dual baseado no dual "não escalado" y
         eps_bus_s = eps_dual_bus_ac_unscaled(
             duals_theta,
             duals_v_mag,
@@ -925,8 +914,8 @@ function run_admm(
         rho_lines = (
             "rho_theta inicial: $(config.rho_theta) | rho_theta final: $(rho_theta[])",
             "rho_v     inicial: $(config.rho_v)     | rho_v     final: $(rho_v[])",
-            "rhoP      inicial: $(config.rho_p)| rhoP      final: $(rho_p[])",
-            "rhoQ      inicial: $(config.rho_q)| rhoQ      final: $(rho_q[])",
+            "rhoP      inicial: $(config.rho_p)     | rhoP      final: $(rho_p[])",
+            "rhoQ      inicial: $(config.rho_q)     | rhoQ      final: $(rho_q[])",
         ),
     )
 

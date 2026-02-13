@@ -6,9 +6,9 @@
 # Partition initialization
 # ------------------------------------------------------------
 
-# ---------- dc bus partition ----------
+# ---------- dc state coupling partition (ex-bus) ----------
 
-function init_dc_bus_partition!(
+function init_dc_state_partition!(
     part::PartitionDC,
     sys_zone::SystemData,
     optimizer_factory,
@@ -32,7 +32,7 @@ function init_dc_bus_partition!(
     return nothing
 end
 
-function init_dc_bus_partition!(
+function init_dc_state_partition!(
     partitions::Partitions{PartitionDC},
     sys::ADMMSystem,
     optimizer_factory,
@@ -42,7 +42,7 @@ function init_dc_bus_partition!(
     @assert length(sys.parts) == n_zones "ADMMSystem.parts must be aligned with partitions.parts"
 
     @inbounds for i in 1:n_zones
-        init_dc_bus_partition!(
+        init_dc_state_partition!(
             partitions.parts[i],
             sys.parts[i],
             optimizer_factory,
@@ -52,9 +52,9 @@ function init_dc_bus_partition!(
     return nothing
 end
 
-# ---------- dc branch partition ----------
+# ---------- dc power coupling partition (ex-branch) ----------
 
-function init_dc_branch_partition!(
+function init_dc_power_partition!(
     part::PartitionDC,
     sys_zone::SystemData,
     optimizer_factory,
@@ -81,7 +81,7 @@ function init_dc_branch_partition!(
     return nothing
 end
 
-function init_dc_branch_partition!(
+function init_dc_power_partition!(
     partitions::Partitions{PartitionDC},
     sys::ADMMSystem,
     optimizer_factory,
@@ -92,7 +92,7 @@ function init_dc_branch_partition!(
     @assert length(sys.parts) == n_zones "ADMMSystem.parts must be aligned with partitions.parts"
 
     @inbounds for i in 1:n_zones
-        init_dc_branch_partition!(
+        init_dc_power_partition!(
             partitions.parts[i],
             sys.parts[i],
             optimizer_factory,
@@ -103,7 +103,7 @@ function init_dc_branch_partition!(
     return nothing
 end
 
-# ---------- dc hybrid partition ----------
+# ---------- dc hybrid coupling partition ----------
 
 function init_dc_hybrid_partition!(
     part::PartitionDC,
@@ -163,18 +163,18 @@ end
 # RUNNERS (ADMM-DC)
 # ============================================================
 
-# # ------------------------------------------------------------
-# # Runner: ADMM bus/DC
-# # ------------------------------------------------------------
-
+# ------------------------------------------------------------
+# Runner: ADMM state/DC
+# ------------------------------------------------------------
 function run_admm(
     sys::ADMMSystem,
     config::DistributedOPFModel,
-    ::ADMM{Bus, DCTag};
+    ::ADMM{State, DCTag};
     optimizer_factory = nothing,
 )::LirionRunResult
     t0_ns = time_ns()
-    @assert config.base_model == DC "ADMM bus/DC requer base_model == DC."
+    @assert config.base_model == DC "ADMM state/DC requer base_model == DC."
+    @assert config.coupling == :state "Dispatch State/DC requer coupling=:state."
 
     shared_buses = sys.shared_buses
     max_iter = config.max_iter
@@ -192,32 +192,31 @@ function run_admm(
     shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(shared_buses)
     n_shared_buses = length(shared_buses_sorted)
 
-    dual_theta = Dict{Int, Vector{Float64}}(
-        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-    )
-    dual_theta_buf = Dict{Int, Vector{Float64}}(
-        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-    )
+    dual_theta =
+        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+    dual_theta_buf =
+        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
 
     theta_consensus = zeros(Float64, n_shared_buses)
     theta_consensus_prev = similar(theta_consensus)
 
     hist = ADMMHistory()
-    hist.meta[:kind] = :dc_bus
-    hist.meta[:tag] = "admm_dc_bus"
+    hist.meta[:kind] = :dc_state
+    hist.meta[:tag] = "admm_dc_state"
 
     theta_avg_history = Dict{Int, Vector{Float64}}()
 
     results = Vector{NamedTuple{(:gen_cost_expr, :real_cost), Tuple{Float64, Float64}}}(
-        undef, n_zones,
+        undef,
+        n_zones,
     )
 
-    init_dc_bus_partition!(partitions, sys, optimizer_factory, rho[])
+    init_dc_state_partition!(partitions, sys, optimizer_factory, rho[])
 
     iter_done = 0
     for iter in 1:max_iter
         iter_done = iter
-        _FAST_USE_LOGS && println("\nIteração $iter (bus/DC)")
+        _FAST_USE_LOGS && println("\nIteração $iter (state/DC)")
 
         refresh_rho_bus_dc!(partitions, rho, prev_rho)
 
@@ -301,9 +300,6 @@ function run_admm(
             dual_theta, partitions, zone_ids, shared_buses_to_pos, eps_abs, eps_rel,
         )
 
-        # eps_r = 1e-4
-
-        # eps_s = 1e-4
         _record_iter!(hist, r, s, eps_r, eps_s; rhos = Dict(:rho_theta => rho[]))
 
         _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_r")
@@ -321,7 +317,7 @@ function run_admm(
 
     result = _finalize_admm_result(partitions, t0_ns, iter_done)
     _print_admm_summary!(
-        "[ADMM-bus/DC]",
+        "[ADMM-state/DC]",
         result;
         rho_lines = ("rho_theta inicial: $(config.rho_theta) | rho_theta final: $(rho[])",),
     )
@@ -330,17 +326,17 @@ function run_admm(
 end
 
 # ------------------------------------------------------------
-# Runner: ADMM branch/DC
+# Runner: ADMM power/DC
 # ------------------------------------------------------------
-
 function run_admm(
     sys::ADMMSystem,
     config::DistributedOPFModel,
-    ::ADMM{Branch, DCTag};
+    ::ADMM{Power, DCTag};
     optimizer_factory = nothing,
 )::LirionRunResult
     t0_ns = time_ns()
-    @assert config.base_model == DC "ADMM-branch/DC requer base_model == DC."
+    @assert config.base_model == DC "ADMM-power/DC requer base_model == DC."
+    @assert config.coupling == :power "Dispatch Power/DC requer coupling=:power."
 
     interzonal_branches = sys.interzonal_branches
     max_iter = config.max_iter
@@ -358,19 +354,18 @@ function run_admm(
     flow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
     flow_consensus_prev = Dict{Int, Float64}()
 
-    duals_flow = Dict{Int, Dict{Int, Float64}}(
-        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
-    )
+    duals_flow = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
 
     hist = ADMMHistory()
-    hist.meta[:kind] = :dc_branch
-    hist.meta[:tag] = "admm_dc_branch"
+    hist.meta[:kind] = :dc_power
+    hist.meta[:tag] = "admm_dc_power"
 
     results = Vector{NamedTuple{(:gen_cost_expr, :real_cost), Tuple{Float64, Float64}}}(
-        undef, n_zones,
+        undef,
+        n_zones,
     )
 
-    init_dc_branch_partition!(
+    init_dc_power_partition!(
         partitions,
         sys,
         optimizer_factory,
@@ -381,7 +376,7 @@ function run_admm(
     iter_done = 0
     for iter in 1:max_iter
         iter_done = iter
-        _FAST_USE_LOGS && println("\n[ADMM-branch/DC] Iteração $iter")
+        _FAST_USE_LOGS && println("\n[ADMM-power/DC] Iteração $iter")
 
         refresh_rho_branch_dc!(partitions, rho, prev_rho)
 
@@ -400,7 +395,7 @@ function run_admm(
 
             @objective(model, Min, part.obj_base + part.quad_branch_expr + lin)
             optimize!(model)
-            _require_optimal!(model; iter = iter, zone_id = zone_id, tag = "ADMM-branch/DC")
+            _require_optimal!(model; iter = iter, zone_id = zone_id, tag = "ADMM-power/DC")
 
             results[i] = (
                 gen_cost_expr = value(model[:generation_cost]),
@@ -429,7 +424,6 @@ function run_admm(
         )
 
         r = primal_residual_branch_dc(partitions, flow_consensus, interzonal_branches)
-
         s = dual_residual_branch_dc(flow_consensus, flow_consensus_prev, rho[])
 
         eps_r = eps_primal_branch_dc(
@@ -449,7 +443,7 @@ function run_admm(
             eps_rel,
         )
 
-        _record_iter!(hist, r, s, eps_r, eps_s; rhos = Dict(:rho_flow => rho[]))
+        _record_iter!(hist, r, s, eps_r, eps_s; rhos = Dict(:rho_p => rho[]))
 
         _FAST_USE_LOGS && println("‖r‖ = $r | eps_pri = $eps_r")
         _FAST_USE_LOGS && println("‖s‖ = $s | eps_du  = $eps_s")
@@ -464,9 +458,9 @@ function run_admm(
 
     result = _finalize_admm_result(partitions, t0_ns, iter_done)
     _print_admm_summary!(
-        "[ADMM-branch/DC]",
+        "[ADMM-power/DC]",
         result;
-        rho_lines = ("rho_flow inicial: $(config.rho_p) | rho_flow final: $(rho[])",),
+        rho_lines = ("rho_p inicial: $(config.rho_p) | rho_p final: $(rho[])",),
     )
 
     return LirionRunResult(; result, model = nothing, system = sys, diagnostics = hist)
@@ -475,7 +469,6 @@ end
 # ------------------------------------------------------------
 # Runner: ADMM hybrid/DC
 # ------------------------------------------------------------
-
 function run_admm(
     sys::ADMMSystem,
     config::DistributedOPFModel,
@@ -484,16 +477,17 @@ function run_admm(
 )::LirionRunResult
     t0_ns = time_ns()
     @assert config.base_model == DC "Hybrid ADMM/DC requer DC."
+    @assert config.coupling == :hybrid "Dispatch Hybrid/DC requer coupling=:hybrid."
 
     shared_buses = sys.shared_buses
     interzonal_branches = sys.interzonal_branches
     max_iter = config.max_iter
 
     rho_theta = Ref(config.rho_theta)
-    rho_flow = Ref(config.rho_p)
+    rho_p = Ref(config.rho_p)
 
     prev_rho_theta = Ref(rho_theta[])
-    prev_rho_flow = Ref(rho_flow[])
+    prev_rho_p = Ref(rho_p[])
 
     eps_abs = config.eps_abs
     eps_rel = config.eps_rel
@@ -512,15 +506,12 @@ function run_admm(
     flow_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
     flow_consensus_prev = Dict{Int, Float64}()
 
-    duals_theta = Dict{Int, Vector{Float64}}(
-        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-    )
-    dual_theta_buf = Dict{Int, Vector{Float64}}(
-        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
-    )
-    duals_flow = Dict{Int, Dict{Int, Float64}}(
-        zone_id => Dict{Int, Float64}() for zone_id in zone_ids
-    )
+    duals_theta =
+        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+    dual_theta_buf =
+        Dict{Int, Vector{Float64}}(z => zeros(Float64, n_shared_buses) for z in zone_ids)
+
+    duals_flow = Dict{Int, Dict{Int, Float64}}(z => Dict{Int, Float64}() for z in zone_ids)
 
     hist = ADMMHistory()
     hist.meta[:kind] = :dc_hybrid
@@ -529,7 +520,8 @@ function run_admm(
     theta_avg_history = Dict{Int, Vector{Float64}}()
 
     results = Vector{NamedTuple{(:gen_cost_expr, :real_cost), Tuple{Float64, Float64}}}(
-        undef, n_zones,
+        undef,
+        n_zones,
     )
 
     init_dc_hybrid_partition!(
@@ -537,7 +529,7 @@ function run_admm(
         sys,
         optimizer_factory,
         rho_theta[],
-        rho_flow[],
+        rho_p[],
         interzonal_branches,
     )
 
@@ -547,7 +539,7 @@ function run_admm(
         _FAST_USE_LOGS && println("\n[ADMM-hybrid/DC] Iteração $iter")
 
         refresh_rho_bus_dc!(partitions, rho_theta, prev_rho_theta)
-        refresh_rho_branch_dc!(partitions, rho_flow, prev_rho_flow)
+        refresh_rho_branch_dc!(partitions, rho_p, prev_rho_p)
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
@@ -570,7 +562,7 @@ function run_admm(
                 part.zone_edges,
                 flow_consensus,
                 duals_flow[zone_id],
-                rho_flow[],
+                rho_p[],
             )
 
             @objective(
@@ -626,7 +618,7 @@ function run_admm(
             partitions,
             flow_consensus,
             interzonal_branches,
-            rho_flow[],
+            rho_p[],
         )
 
         r_bus = primal_residual_bus_dc(
@@ -639,7 +631,7 @@ function run_admm(
         r_tot = hypot(r_bus, r_br)
 
         s_bus = dual_residual_bus_dc(theta_consensus, theta_consensus_prev, rho_theta[])
-        s_br = dual_residual_branch_dc(flow_consensus, flow_consensus_prev, rho_flow[])
+        s_br = dual_residual_branch_dc(flow_consensus, flow_consensus_prev, rho_p[])
         s_tot = hypot(s_bus, s_br)
 
         eps_bus_r = eps_primal_bus_dc(
@@ -669,7 +661,7 @@ function run_admm(
 
         _record_iter!(
             hist, r_tot, s_tot, eps_r_tot, eps_s_tot;
-            rhos = Dict(:rho_theta => rho_theta[], :rho_flow => rho_flow[]),
+            rhos = Dict(:rho_theta => rho_theta[], :rho_p => rho_p[]),
         )
 
         _FAST_USE_LOGS && println("‖r‖ = $r_tot | eps_pri = $eps_r_tot")
@@ -683,7 +675,7 @@ function run_admm(
         maybe_adapt_rho!(
             adaptive,
             rho_theta, r_bus, s_bus,
-            rho_flow, r_br, s_br,
+            rho_p, r_br, s_br,
             config,
         )
     end
@@ -696,7 +688,7 @@ function run_admm(
         result;
         rho_lines = (
             "rho_theta inicial: $(config.rho_theta) | rho_theta final: $(rho_theta[])",
-            "rho_flow  inicial: $(config.rho_p) | rho_flow  final: $(rho_flow[])",
+            "rho_p     inicial: $(config.rho_p)     | rho_p     final: $(rho_p[])",
         ),
     )
 

@@ -1,5 +1,6 @@
 # ==============================================
 # ADMM-AC vs AC (objective) – tests (API solve) (compat mu/tau)
+# Corrigido p/ NOVA API: admm(coupling=:state, sectioning=:tie_line, ...)
 # ==============================================
 
 # Casos particionados (2/3/4 zonas)
@@ -13,10 +14,10 @@ const distributed_ac_zone_cases = [
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
     "pglib_opf_case73_ieee_rts.m",
-    # "pglib_opf_case118_ieee.m",
-    # "pglib_opf_case200_activ.m",
+    "pglib_opf_case118_ieee.m",
 
-    # "pglib_opf_case57_ieee.m",
+    # "pglib_opf_case57_ieee.m", problem
+    # "pglib_opf_case200_activ.m",
     # "pglib_opf_case500_goc.m",
 ]
 
@@ -86,7 +87,8 @@ function compare_distributed_ac_vs_centralized(
     central_optimizer = Ipopt.Optimizer,
     distributed_optimizer = Ipopt.Optimizer,   # pode ser nothing também
     rtol = 0.02,
-    atol = 1e-6, admm_rho = 100.0,
+    atol = 1e-6,
+    admm_rho = 100.0,
     admm_max_iter = 5000,
     admm_eps_abs = 1e-4,
     admm_eps_rel = 1e-4,
@@ -117,32 +119,41 @@ function compare_distributed_ac_vs_centralized(
         return
     end
 
-    # --- Distribuído ADMM-AC (bus) ---
+    # --- Distribuído ADMM-AC (STATE coupling) ---
     dist_obj = try
+        adaptive_bool =
+            (admm_adaptive === nothing) ? true :
+            (lowercase(admm_adaptive) == "on") ? true :
+            false
+
         # Se passar rho_theta/rho_v explicitamente, use-os; senão use rho (base)
         alg = if (admm_rho_theta !== nothing) || (admm_rho_v !== nothing)
             (admm_rho_theta === nothing || admm_rho_v === nothing) &&
                 error("If you set rho_theta or rho_v, you must provide BOTH (non-nothing).")
 
-            Lirion.admm_bus(;
+            Lirion.admm(;
+                coupling = :state,
+                sectioning = :tie_line,
                 max_iter = Int(admm_max_iter),
                 rho_theta = Float64(admm_rho_theta),
                 rho_v = Float64(admm_rho_v),
                 eps_abs = Float64(admm_eps_abs),
                 eps_rel = Float64(admm_eps_rel),
-                adaptive_rho = (admm_adaptive === nothing ? true : (admm_adaptive == "on")),
+                adaptive_rho = adaptive_bool,
                 mu_incr = Float64(admm_mu_incr),
                 mu_decr = Float64(admm_mu_decr),
                 tau_incr = Float64(admm_tau_incr),
                 tau_decr = Float64(admm_tau_decr),
             )
         else
-            Lirion.admm_bus(;
+            Lirion.admm(;
+                coupling = :state,
+                sectioning = :tie_line,
                 max_iter = Int(admm_max_iter),
                 rho = Float64(admm_rho),
                 eps_abs = Float64(admm_eps_abs),
                 eps_rel = Float64(admm_eps_rel),
-                adaptive_rho = (admm_adaptive === nothing ? true : (admm_adaptive == "on")),
+                adaptive_rho = adaptive_bool,
                 mu_incr = Float64(admm_mu_incr),
                 mu_decr = Float64(admm_mu_decr),
                 tau_incr = Float64(admm_tau_incr),
@@ -154,7 +165,7 @@ function compare_distributed_ac_vs_centralized(
             file;
             model = Lirion.ac(),
             algorithm = alg,
-            optimizer = distributed_optimizer,   # <- se nada, deixa o default do Lirion
+            optimizer = distributed_optimizer,
             outputs = false,
             plots = false,
         )
@@ -174,7 +185,7 @@ function run_distributed_ac_objective_tests(;
     case_list = distributed_ac_zone_cases,
     label = "ADMM-AC vs AC",
     central_optimizer = Ipopt.Optimizer,
-    distributed_optimizer = Ipopt.Optimizer,   # pode virar nothing se quiser
+    distributed_optimizer = Ipopt.Optimizer,
     rtol = 0.01,
     atol = 1e-6,
     admm_eps_abs = 1e-4,
@@ -273,13 +284,16 @@ function run_distributed_ac_objective_tests(;
                 central_optimizer = central_optimizer_case,
                 distributed_optimizer = distributed_optimizer_case,
                 rtol = rtol,
-                atol = atol, admm_rho = admm_rho_case,
+                atol = atol,
+                admm_rho = admm_rho_case,
                 admm_max_iter = admm_max_iter_case,
                 admm_eps_abs = admm_eps_abs_case,
-                admm_eps_rel = admm_eps_rel_case, admm_mu_incr = admm_mu_incr_case,
+                admm_eps_rel = admm_eps_rel_case,
+                admm_mu_incr = admm_mu_incr_case,
                 admm_mu_decr = admm_mu_decr_case,
                 admm_tau_incr = admm_tau_incr_case,
-                admm_tau_decr = admm_tau_decr_case, admm_rho_theta = admm_rho_theta_case,
+                admm_tau_decr = admm_tau_decr_case,
+                admm_rho_theta = admm_rho_theta_case,
                 admm_rho_v = admm_rho_v_case,
                 admm_adaptive = admm_adaptive_case,
             )

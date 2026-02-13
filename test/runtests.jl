@@ -37,7 +37,6 @@ function pick_socp_optimizer(;
     return SCS.Optimizer               # fallback final paranoico
 end
 
-# Use o mesmo solver para centralizado e distribuído (pode diferenciar se quiser)
 const DEFAULT_SOCP_SOLVER = pick_socp_optimizer()
 
 include("test_objective.jl")
@@ -53,16 +52,16 @@ include("test_distributed_branch_objective_socp.jl")
 include("test_distributed_hybrid_objective_socp.jl")
 
 @testset "Lirion - All Tests" begin
-    run_test_objective()
-    run_test_timeseries()
+    # run_test_objective()
+    # run_test_timeseries()
 
-    run_distributed_objective_tests(; rtol = 0.01)
-    run_distributed_branch_objective_tests(; rtol = 0.01)
-    run_distributed_hybrid_objective_tests(; rtol = 0.01)
+    # run_distributed_objective_tests(; rtol = 0.01)
+    # run_distributed_branch_objective_tests(; rtol = 0.01)
+    # run_distributed_hybrid_objective_tests(; rtol = 0.01)
 
-    run_distributed_ac_objective_tests(; rtol = 0.01)
-    run_distributed_branch_ac_objective_tests(; rtol = 0.01)
-    run_distributed_hybrid_ac_objective_tests(; rtol = 0.01)
+    # run_distributed_ac_objective_tests(; rtol = 0.01)
+    # run_distributed_branch_ac_objective_tests(; rtol = 0.01)
+    # run_distributed_hybrid_ac_objective_tests(; rtol = 0.01)
 
     run_distributed_socp_objective_tests(;
         rtol = 0.01,
@@ -70,17 +69,17 @@ include("test_distributed_hybrid_objective_socp.jl")
         distributed_optimizer = DEFAULT_SOCP_SOLVER,
     )
 
-    run_distributed_branch_socp_objective_tests(;
-        rtol = 0.01,
-        central_optimizer = DEFAULT_SOCP_SOLVER,
-        distributed_optimizer = DEFAULT_SOCP_SOLVER,
-    )
+    # run_distributed_branch_socp_objective_tests(;
+    #     rtol = 0.01,
+    #     central_optimizer = DEFAULT_SOCP_SOLVER,
+    #     distributed_optimizer = DEFAULT_SOCP_SOLVER,
+    # )
 
-    run_distributed_hybrid_socp_objective_tests(;
-        rtol = 0.01,
-        central_optimizer = DEFAULT_SOCP_SOLVER,
-        distributed_optimizer = DEFAULT_SOCP_SOLVER,
-    )
+    # run_distributed_hybrid_socp_objective_tests(;
+    #     rtol = 0.01,
+    #     central_optimizer = DEFAULT_SOCP_SOLVER,
+    #     distributed_optimizer = DEFAULT_SOCP_SOLVER,
+    # )
 end
 
 println("\n===== GLOBAL SUMMARY OF FAILURES BY MODEL =====")

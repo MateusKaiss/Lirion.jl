@@ -12,15 +12,12 @@ const distributed_zone_cases = [
     # "pglib_opf_case57_ieee__sad.m",
 
     "pglib_opf_case3_lmbd.m",
-    # "pglib_opf_case3_lmbd__api.m",
-    # "pglib_opf_case3_lmbd__sad.m",
-
-    # "pglib_opf_case57_ieee.m",
-    # "pglib_opf_case73_ieee_rts.m",
-    # "pglib_opf_case118_ieee.m",
-
-    # "pglib_opf_case500_goc.m",
+    "pglib_opf_case3_lmbd__api.m",
+    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case73_ieee_rts.m",
+    "pglib_opf_case118_ieee.m", "pglib_opf_case57_ieee.m",
     # "pglib_opf_case200_activ.m",
+    # "pglib_opf_case500_goc.m",
 ]
 
 function track_failure_dist(label::String, origin::String, case_name::String)
@@ -103,7 +100,7 @@ function compare_distributed_vs_centralized(
     file::String;
     label::String,
     central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
-    distributed_optimizer::Union{Nothing, Type, Function} = nothing,  # <- FIX AQUI
+    distributed_optimizer = nothing,
     rtol = 0.05,
     atol = 1e-6,
     admm_rho = 1_000.0,
@@ -115,7 +112,7 @@ function compare_distributed_vs_centralized(
     admm_mu_decr::Float64 = 3.0,
     admm_tau_incr::Float64 = 1.05,
     admm_tau_decr::Float64 = 0.98,
-    admm_accel::Bool = false,                         # Nesterov
+    admm_accel::Bool = false,                         # placeholder (ignorado na nova API)
     admm_adaptive::Union{Nothing, String} = nothing,   # "on" | "off" | nothing
 )
     case_name = basename(file)
@@ -137,9 +134,11 @@ function compare_distributed_vs_centralized(
         return
     end
 
-    # --- Distribuído ADMM-DC (bus) ---
+    # --- Distribuído ADMM-DC (bus/state) ---
     dist_obj = try
-        alg = Lirion.admm_bus(;
+        alg = Lirion.admm(;
+            coupling = :state,          # substitui admm_bus
+            sectioning = :tie_line,     # mantém padrão; pode ajustar depois
             max_iter = Int(admm_max_iter),
             rho = Float64(admm_rho),
             eps_abs = Float64(admm_eps_abs),
@@ -155,7 +154,7 @@ function compare_distributed_vs_centralized(
             file;
             model = Lirion.dc(),
             algorithm = alg,
-            optimizer = distributed_optimizer,  # now accepts Ipopt.Optimizer
+            optimizer = distributed_optimizer,
             outputs = false,
             plots = false,
         )
@@ -178,13 +177,13 @@ function run_distributed_objective_tests(;
     case_list = distributed_zone_cases,
     label = "ADMM-DC (bus) vs DC",
     central_optimizer = get_available_optimizer(OSQP.Optimizer, Ipopt.Optimizer),
-    distributed_optimizer::Union{Nothing, Type, Function} = nothing,  # <- FIX AQUI
+    distributed_optimizer = nothing,
     rtol = 0.05,
     atol = 1e-6,
     admm_eps_abs = 1e-4,
     admm_eps_rel = 1e-4,
-    admm_alpha::Float64 = 1.0,
-    admm_accel::Bool = false,
+    admm_alpha::Float64 = 1.0,                    # placeholder (ignorado na nova API)
+    admm_accel::Bool = false,                     # placeholder (ignorado na nova API)
     admm_adaptive::Union{Nothing, String} = nothing,
 )
     if isempty(case_list)
@@ -211,17 +210,15 @@ function run_distributed_objective_tests(;
 
         admm_eps_abs_case = admm_eps_abs
         admm_eps_rel_case = admm_eps_rel
-        admm_alpha_case = admm_alpha
 
         # parâmetros adaptativos: defaults gerais
         admm_mu_incr_case = 3.0
         admm_mu_decr_case = 3.0
         admm_tau_incr_case = 1.05
         admm_tau_decr_case = 0.98
-        admm_accel_case = admm_accel
         admm_adaptive_case = admm_adaptive  # nothing | "on" | "off"
 
-        # solvers por caso (não pisa nos globais)
+        # solvers por case (não pisa nos globais)
         central_optimizer_case = central_optimizer
         distributed_optimizer_case = distributed_optimizer
 
@@ -245,9 +242,9 @@ function run_distributed_objective_tests(;
         @info "[$label] Rodando caso $i/$n: $case_name " *
               "(max_iter=$(admm_max_iter_case), rho=$(admm_rho_case), " *
               "eps_pr=$(admm_eps_abs_case), eps_dual=$(admm_eps_rel_case), " *
-              "alpha=$(admm_alpha_case), mu_incr=$(admm_mu_incr_case), mu_decr=$(admm_mu_decr_case), " *
+              "mu_incr=$(admm_mu_incr_case), mu_decr=$(admm_mu_decr_case), " *
               "tau_incr=$(admm_tau_incr_case), tau_decr=$(admm_tau_decr_case), " *
-              "accel=$(admm_accel_case), adaptive=$(admm_adaptive_case), " *
+              "adaptive=$(admm_adaptive_case), " *
               "central=$(string(central_optimizer_case)), dist=$(distributed_optimizer_case === nothing ? "default" : string(distributed_optimizer_case)))"
 
         @testset "$(label) - $(case_name)" begin
@@ -255,19 +252,17 @@ function run_distributed_objective_tests(;
                 file;
                 label = label,
                 central_optimizer = central_optimizer_case,
-                distributed_optimizer = distributed_optimizer_case,  # <- FIX: passa o case, não o global
+                distributed_optimizer = distributed_optimizer_case,
                 rtol = rtol,
                 atol = atol,
                 admm_rho = admm_rho_case,
                 admm_max_iter = admm_max_iter_case,
                 admm_eps_abs = admm_eps_abs_case,
                 admm_eps_rel = admm_eps_rel_case,
-                admm_alpha = admm_alpha_case,
                 admm_mu_incr = admm_mu_incr_case,
                 admm_mu_decr = admm_mu_decr_case,
                 admm_tau_incr = admm_tau_incr_case,
                 admm_tau_decr = admm_tau_decr_case,
-                admm_accel = admm_accel_case,
                 admm_adaptive = admm_adaptive_case,
             )
         end

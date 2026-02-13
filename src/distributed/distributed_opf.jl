@@ -1,12 +1,16 @@
-@inline function _variant_type(::Val{m}) where {m}
-    m === :admm && return Bus
-    m === :admm_branch && return Branch
-    m === :admm_hybrid && return Hybrid
-    return error(
-        "Unknown ADMM method: $(m). Expected :admm, :admm_branch, or :admm_hybrid.",
-    )
+# ------------------------------------------------------------
+# Coupling -> Variant type
+# ------------------------------------------------------------
+@inline function _variant_type(::Val{c}) where {c}
+    c === :state && return State
+    c === :power && return Power
+    c === :hybrid && return Hybrid
+    return error("Unknown ADMM coupling: $(c). Expected :state, :power, or :hybrid.")
 end
 
+# ------------------------------------------------------------
+# Base model -> Tag type
+# ------------------------------------------------------------
 @inline function _base_tag_type(::Type{B}) where {B <: OPFModel}
     B === DC && return DCTag
     B === AC && return ACTag
@@ -14,12 +18,18 @@ end
     return error("Unknown base_model: $(B). Expected DC, AC, or SOCP.")
 end
 
+# ------------------------------------------------------------
+# ADMM tag (type-level) used by run_admm dispatch
+# ------------------------------------------------------------
 @inline function admm_tag(cfg::DistributedOPFModel)
-    V = _variant_type(Val(cfg.method))
+    V = _variant_type(Val(cfg.coupling))
     B = _base_tag_type(cfg.base_model)
     return ADMM{V, B}()
 end
 
+# ------------------------------------------------------------
+# Distributed runner
+# ------------------------------------------------------------
 function run_distributed(inputs::LirionInputs)::LirionRunResult
     @assert inputs.model_type isa DistributedOPFModel
     @assert inputs.admm_system !== nothing "Distributed run requires inputs.admm_system"
@@ -28,7 +38,8 @@ function run_distributed(inputs::LirionInputs)::LirionRunResult
     sys = inputs.admm_system::ADMMSystem
 
     @info "Running distributed OPF"
-    @info "  method     = $(cfg.method)"
+    @info "  coupling   = $(cfg.coupling)"
+    @info "  sectioning = $(cfg.sectioning)"
     @info "  base_model = $(cfg.base_model)"
     @info "  optimizer  = $(inputs.optimizer)"
 

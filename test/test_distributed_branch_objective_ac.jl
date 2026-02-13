@@ -1,5 +1,5 @@
 # ==============================================
-# ADMM-Branch-AC vs AC (objective) – tests (API solve)
+# ADMM-(Power coupling)-AC vs AC (objective) – tests (API solve)
 # ==============================================
 
 const distributed_branch_ac_zone_cases = [
@@ -12,8 +12,9 @@ const distributed_branch_ac_zone_cases = [
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
     "pglib_opf_case73_ieee_rts.m",
-    # "pglib_opf_case57_ieee.m",
-    # "pglib_opf_case118_ieee.m",
+    "pglib_opf_case57_ieee.m",
+    "pglib_opf_case118_ieee.m",
+
     # "pglib_opf_case200_activ.m",
     # "pglib_opf_case500_goc.m",
 ]
@@ -37,7 +38,7 @@ end
     return d["objective"]
 end
 
-@inline function _objective_distributed_branch_ac(out::Lirion.LirionRunResult)
+@inline function _objective_distributed_power_ac(out::Lirion.LirionRunResult)
     r = out.result
     r isa NamedTuple || error("Distributed out.result must be NamedTuple, got $(typeof(r))")
     hasproperty(r, :total_expr_cost) || error(
@@ -55,12 +56,16 @@ function compare_distributed_branch_ac_vs_centralized(
     atol = 1e-6,
 
     # ---- ADMM params ----
+    # New API:
+    # - coupling = :power  (replaces old admm_branch for AC)
+    # - sectioning = :tie_line (current only)
     # Preferred:
-    # - use admm_rho (generic) to fill required rhos for AC+admm_branch => rho_p, rho_q
-    # - OR pass both admm_rho_p and admm_rho_q explicitly
+    # - use rho (generic) to fill required rhos for AC+:power => rho_p, rho_q
+    # - OR pass both rho_p and rho_q explicitly
     admm_rho = 1.0e5,
     admm_rho_p = nothing,
-    admm_rho_q = nothing, admm_max_iter = 5000,
+    admm_rho_q = nothing,
+    admm_max_iter = 5000,
     admm_eps_abs = 1e-4,
     admm_eps_rel = 1e-4,
     admm_mu_incr = 2.0,
@@ -91,11 +96,13 @@ function compare_distributed_branch_ac_vs_centralized(
         return
     end
 
-    # --- Distributed ADMM-Branch-AC ---
+    # --- Distributed ADMM-(power)/AC ---
     dist_obj = try
         alg = if admm_rho_p === nothing && admm_rho_q === nothing
-            # generic rho (fills REQUIRED rho_p/rho_q for AC+admm_branch)
-            Lirion.admm_branch(;
+            # generic rho (fills REQUIRED rho_p/rho_q for AC+coupling=:power)
+            Lirion.admm(;
+                coupling = :power,
+                sectioning = :tie_line,
                 max_iter = Int(admm_max_iter),
                 rho = Float64(admm_rho),
                 eps_abs = Float64(admm_eps_abs),
@@ -111,7 +118,9 @@ function compare_distributed_branch_ac_vs_centralized(
             (admm_rho_p === nothing || admm_rho_q === nothing) &&
                 error("If you set rho_p or rho_q, you must provide BOTH (non-nothing).")
 
-            Lirion.admm_branch(;
+            Lirion.admm(;
+                coupling = :power,
+                sectioning = :tie_line,
                 max_iter = Int(admm_max_iter),
                 rho_p = Float64(admm_rho_p),
                 rho_q = Float64(admm_rho_q),
@@ -133,20 +142,20 @@ function compare_distributed_branch_ac_vs_centralized(
             outputs = false,
             plots = false,
         )
-        _objective_distributed_branch_ac(out_dist)
+        _objective_distributed_power_ac(out_dist)
     catch e
-        @warn "Distributed ADMM-Branch-AC failed on $case_name: $e"
+        @warn "Distributed ADMM-(power)-AC failed on $case_name: $e"
         track_failure_branch_ac(label, "Distributed", case_name)
         return
     end
 
-    @info "File $case_name | centralized AC = $(round(cent_obj, digits=6)) | distributed-branch-AC (total_expr_cost) = $(round(dist_obj, digits=6))"
+    @info "File $case_name | centralized AC = $(round(cent_obj, digits=6)) | distributed-(power)-AC (total_expr_cost) = $(round(dist_obj, digits=6))"
     @test isapprox(dist_obj, cent_obj; rtol = rtol, atol = atol)
 end
 
 function run_distributed_branch_ac_objective_tests(;
     case_list = distributed_branch_ac_zone_cases,
-    label = "ADMM-Branch-AC vs AC",
+    label = "ADMM-(power)-AC vs AC",
     central_optimizer = Ipopt.Optimizer,
     distributed_optimizer = Ipopt.Optimizer,
     rtol = 0.01,
@@ -159,7 +168,7 @@ function run_distributed_branch_ac_objective_tests(;
     admm_tau_decr = 0.98,
 )
     if isempty(case_list)
-        @info "Empty distributed (branch-AC) case list. No tests will be run."
+        @info "Empty distributed (power-AC) case list. No tests will be run."
         return true
     end
 

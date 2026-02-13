@@ -1,5 +1,6 @@
 # ==============================================
 # ADMM-Hybrid-AC vs AC (objective) – tests (API solve)
+# Corrigido p/ NOVA API: admm(coupling=:hybrid, sectioning=:tie_line, ...)
 # ==============================================
 
 const distributed_hybrid_ac_zone_cases = [
@@ -11,9 +12,9 @@ const distributed_hybrid_ac_zone_cases = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
-    "pglib_opf_case73_ieee_rts.m",
-    # "pglib_opf_case57_ieee.m",
-    # "pglib_opf_case118_ieee.m",
+    "pglib_opf_case73_ieee_rts.m", "pglib_opf_case57_ieee.m",
+    "pglib_opf_case118_ieee.m",
+
     # "pglib_opf_case200_activ.m",
     # "pglib_opf_case500_goc.m",
 ]
@@ -53,19 +54,20 @@ function compare_distributed_hybrid_ac_vs_centralized(
     distributed_optimizer = Ipopt.Optimizer,
     rtol = 0.01,
     atol = 1e-6,
+
+    # rhos (AC + hybrid => rho_theta, rho_v, rho_p, rho_q)
     rho_base::Union{Nothing, Float64} = 1.0e3,
     rho_theta::Union{Nothing, Float64} = nothing,
     rho_v::Union{Nothing, Float64} = nothing,
     rho_p::Union{Nothing, Float64} = 1.0e5,
-    rho_q::Union{Nothing, Float64} = 1.0e5,
-    admm_max_iter::Int = 500,
+    rho_q::Union{Nothing, Float64} = 1.0e5, admm_max_iter::Int = 500,
     admm_eps_abs::Float64 = 1e-7,
     admm_eps_rel::Float64 = 1e-7,
     admm_mu_incr::Float64 = 2.0,
     admm_mu_decr::Float64 = 2.0,
     admm_tau_incr::Float64 = 1.05,
     admm_tau_decr::Float64 = 0.98,
-    admm_adaptive::Union{Nothing, Bool} = nothing, # nothing => default true (in builder below)
+    admm_adaptive::Union{Nothing, Bool} = nothing, # nothing => default true no builder
 )
     case_name = basename(file)
 
@@ -86,25 +88,47 @@ function compare_distributed_hybrid_ac_vs_centralized(
         return
     end
 
-    # --- Distributed ADMM-Hybrid-AC ---
+    # --- Distributed ADMM-Hybrid-AC (NEW API) ---
     dist_obj = try
-        # NOTE: DistributedOPFModel constructor enforces > 0.
-        # So: if you pass a rho_* kwarg, it MUST be non-nothing and > 0.
-        alg = Lirion.admm_hybrid(;
-            max_iter = admm_max_iter,
-            rho = (rho_base === nothing ? 1_000.0 : Float64(rho_base)),
-            rho_theta = (rho_theta === nothing ? nothing : Float64(rho_theta)),
-            rho_v = (rho_v === nothing ? nothing : Float64(rho_v)),
-            rho_p = (rho_p === nothing ? nothing : Float64(rho_p)),
-            rho_q = (rho_q === nothing ? nothing : Float64(rho_q)),
-            eps_abs = Float64(admm_eps_abs),
-            eps_rel = Float64(admm_eps_rel),
-            adaptive_rho = isnothing(admm_adaptive) ? true : Bool(admm_adaptive),
-            mu_incr = Float64(admm_mu_incr),
-            mu_decr = Float64(admm_mu_decr),
-            tau_incr = Float64(admm_tau_incr),
-            tau_decr = Float64(admm_tau_decr),
-        )
+        # Regra:
+        # - Se você passar rho_* explícitos, NÃO passe rho=...
+        # - Se quiser preencher tudo com um único valor, passe só rho=...
+        use_explicit_rhos =
+            (rho_theta !== nothing) || (rho_v !== nothing) ||
+            (rho_p !== nothing) || (rho_q !== nothing)
+
+        alg = if use_explicit_rhos
+            Lirion.admm(;
+                coupling = :hybrid,
+                sectioning = :tie_line,
+                max_iter = Int(admm_max_iter),
+                rho_theta = (rho_theta === nothing ? nothing : Float64(rho_theta)),
+                rho_v = (rho_v === nothing ? nothing : Float64(rho_v)),
+                rho_p = (rho_p === nothing ? nothing : Float64(rho_p)),
+                rho_q = (rho_q === nothing ? nothing : Float64(rho_q)),
+                eps_abs = Float64(admm_eps_abs),
+                eps_rel = Float64(admm_eps_rel),
+                adaptive_rho = isnothing(admm_adaptive) ? true : Bool(admm_adaptive),
+                mu_incr = Float64(admm_mu_incr),
+                mu_decr = Float64(admm_mu_decr),
+                tau_incr = Float64(admm_tau_incr),
+                tau_decr = Float64(admm_tau_decr),
+            )
+        else
+            Lirion.admm(;
+                coupling = :hybrid,
+                sectioning = :tie_line,
+                max_iter = Int(admm_max_iter),
+                rho = Float64(rho_base === nothing ? 1.0e3 : rho_base),
+                eps_abs = Float64(admm_eps_abs),
+                eps_rel = Float64(admm_eps_rel),
+                adaptive_rho = isnothing(admm_adaptive) ? true : Bool(admm_adaptive),
+                mu_incr = Float64(admm_mu_incr),
+                mu_decr = Float64(admm_mu_decr),
+                tau_incr = Float64(admm_tau_incr),
+                tau_decr = Float64(admm_tau_decr),
+            )
+        end
 
         out_dist = Lirion.solve(
             file;
@@ -177,7 +201,7 @@ function run_distributed_hybrid_ac_objective_tests(;
         admm_tau_decr_case = admm_tau_decr
         admm_adaptive_case::Union{Nothing, Bool} = nothing
 
-        # ---- overrides (mantendo exatamente tua lógica, só convertendo "on" -> true) ----
+        # ---- overrides (mantendo tua lógica) ----
         if case_name == "pglib_opf_case118_2zones_ieee.m" ||
            case_name == "pglib_opf_case118_3zones_ieee.m" ||
            case_name == "pglib_opf_case118_5zones_ieee.m"
@@ -255,10 +279,7 @@ function run_distributed_hybrid_ac_objective_tests(;
                 central_optimizer = central_optimizer,
                 distributed_optimizer = distributed_optimizer,
                 rtol = rtol,
-                atol = atol,
-
-                # usar rhos separados
-                rho_base = nothing,
+                atol = atol, rho_base = nothing,
                 rho_theta = rho_bus_base,
                 rho_v = rho_bus_base,
                 rho_p = rho_flow_base,

@@ -1,9 +1,5 @@
-# ============================================================
-# src/solve.jl
-# ============================================================
-
 # -----------------------------
-# Model builders
+# Model builders (mantém Type)
 # -----------------------------
 dc() = DC
 ac() = AC
@@ -14,13 +10,22 @@ socp() = SOCP
 # -----------------------------
 centralized() = :centralized
 
-@inline function _admm_cfg(method::Symbol; max_iter::Int = 350, kwargs...)
-    return ADMMAlgorithmSpec(method, max_iter, (; kwargs...))
-end
+@inline function admm(;
+    coupling::Symbol = :hybrid,         # :state | :power | :hybrid
+    sectioning::Symbol = :tie_line,     # por enquanto só :tie_line
+    max_iter::Int = 350,
+    kwargs...,
+)
+    coupling in (:state, :power, :hybrid) ||
+        throw(ArgumentError("Invalid coupling=$coupling. Allowed: :state, :power, :hybrid"))
 
-admm_bus(; kwargs...) = _admm_cfg(:admm; kwargs...)
-admm_branch(; kwargs...) = _admm_cfg(:admm_branch; kwargs...)
-admm_hybrid(; kwargs...) = _admm_cfg(:admm_hybrid; kwargs...)
+    sectioning === :tie_line ||
+        throw(
+            ArgumentError("Invalid sectioning=$sectioning. Currently supported: :tie_line"),
+        )
+
+    return ADMMAlgorithmSpec(coupling, sectioning, max_iter, (; kwargs...))
+end
 
 # -----------------------------
 # Plot helpers
@@ -36,7 +41,11 @@ end
 
 @inline function _plots_stem(model_type)::String
     if model_type isa DistributedOPFModel
-        return "admm_" * string(model_type.base_model) * "_" * string(model_type.method)
+        # Ex: admm_ac_hybrid_tie_line
+        return "admm_" *
+               lowercase(string(model_type.base_model)) * "_" *
+               string(model_type.coupling) * "_" *
+               string(model_type.sectioning)
     else
         return "opf_" * lowercase(string(model_type))
     end
@@ -62,10 +71,9 @@ end
     return nothing
 end
 
-function _assert_valid_path(path::AbstractString)
+@inline function _assert_valid_path(path::AbstractString)::String
     p = abspath(String(path))
     (isfile(p) || isdir(p)) ||
         throw(ArgumentError("Invalid path: $p is not a file or directory."))
     return p
 end
-
