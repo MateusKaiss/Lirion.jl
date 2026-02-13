@@ -61,3 +61,11 @@ end
     end
     return nothing
 end
+
+function _assert_valid_path(path::AbstractString)
+    p = abspath(String(path))
+    (isfile(p) || isdir(p)) ||
+        throw(ArgumentError("Invalid path: $p is not a file or directory."))
+    return p
+end
+

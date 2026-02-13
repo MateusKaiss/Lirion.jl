@@ -28,16 +28,13 @@ end
 
 function solve(
     path::AbstractString;
-    model,
+    model::Type{<:OPFModel},
     algorithm = centralized(),
     optimizer = nothing,
     outputs::Bool = false,
     plots::Bool = false,
 )::LirionRunResult
-    path_str = abspath(String(path))
-    if !(isfile(path_str) || isdir(path_str))
-        error("Invalid path: $path_str is not a file or directory.")
-    end
+    path_str = _assert_valid_path(path)
 
     inputs = _build_inputs(
         path_str;
@@ -53,15 +50,3 @@ function solve(
 
     return out
 end
-
-# centralized 
-
-# out = Lirion.solve(
-#     file;
-#     model = Lirion.ac(),              # ou dc(), socp()
-#     algorithm = Lirion.centralized(), # opcional (padrão)
-#     optimizer = Ipopt.Optimizer,
-#     outputs = true,
-#     plots = false,
-# )
-# obj = out.result["objective"]
