@@ -8,6 +8,7 @@ Documenter.makedocs(
         mathengine = Documenter.MathJax(),
         prettyurls = false,
         sidebar_sitename = false,
+        assets = ["assets/custom.css"], # se você criou o custom.css
     ),
     modules = [Lirion],
     checkdocs = :none,
@@ -17,5 +18,5 @@ Documenter.makedocs(
 )
 
 Documenter.deploydocs(
-    repo = "github.com/SEU_USUARIO/Lirion.jl.git",
+    repo = "github.com/MateusKaiss/Lirion.jl.git",
 )
