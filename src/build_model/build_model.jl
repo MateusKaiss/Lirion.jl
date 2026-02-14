@@ -1,124 +1,140 @@
 # =========================
 # BUILD ENTRYPOINT
 # =========================
-function _select_default_optimizer(model_type::Type{<:OPFModel}, opt)
-    if opt !== nothing
-        return opt
-    end
-    if model_type == DC
-        return OSQP.Optimizer
-    elseif model_type == SOCP
-        return SCS.Optimizer
+@inline _select_default_optimizer(::Type{DC}) = OSQP.Optimizer
+@inline _select_default_optimizer(::Type{SOCP}) = SCS.Optimizer
+@inline _select_default_optimizer(::Type{<:OPFModel}) = Ipopt.Optimizer
+
+function build_model(
+    sys::SystemData,
+    model_type::Type{<:OPFModel};
+    optimizer = nothing,
+)
+    opt = optimizer === nothing ? _select_default_optimizer(model_type) : optimizer
+    times = get_model_times(sys)
+
+    if length(times) == 1
+        return _build_singleperiod_model(sys, model_type, opt)
     else
-        return Ipopt.Optimizer
+        return _build_multiperiod_model(sys, model_type, opt, times)
     end
 end
 
-function build_model(data, model_type; optimizer = nothing, build_only::Bool = false)
-    return build_and_optimize_model(
-        data,
-        model_type;
-        optimizer,
-        build_only = build_only,
-    )
+function build_model(inputs::LirionInputs; optimizer = nothing)
+    sys = inputs.system
+    model_type = inputs.model_type::Type{<:OPFModel}
+
+    opt =
+        optimizer !== nothing ? optimizer :
+        inputs.optimizer !== nothing ? inputs.optimizer :
+        _select_default_optimizer(model_type)
+
+    return build_model(sys, model_type; optimizer = opt)
 end
 
 # =========================
 # CENTRALIZED (DC/AC/SOCP)
 # =========================
-function build_and_optimize_model(
-    matpower_data::Dict{String, Any},
-    model_type::Type{<:OPFModel};
-    optimizer = nothing,
-    build_only::Bool = false,
-)
-    # define optimizer default por tipo, se não veio de Args
-    optimizer === nothing && (optimizer = _select_default_optimizer(model_type, optimizer))
+function get_model_times(sys::SystemData)
+    time_vecs = Vector{Vector{Int}}()
 
-    # timeseries? single x multi
-    times = get_model_times(matpower_data)
-    if length(unique(times)) > 1
-        return build_and_optimize_multiperiod_model(
-            matpower_data, model_type; optimizer, times = times, build_only = build_only,
-        )
-    else
-        return build_and_optimize_singleperiod_model(
-            matpower_data, model_type; optimizer, build_only = build_only,
-        )
+    if !isempty(sys.bus_ts.time)
+        push!(time_vecs, sys.bus_ts.time)
     end
+    if !isempty(sys.prosumer_ts.time)
+        push!(time_vecs, sys.prosumer_ts.time)
+    end
+    if !isempty(sys.consumer_ts.time)
+        push!(time_vecs, sys.consumer_ts.time)
+    end
+    if !isempty(sys.gencost_ts.time)
+        push!(time_vecs, sys.gencost_ts.time)
+    end
+
+    if isempty(time_vecs)
+        return collect(1:sys.T)
+    end
+
+    times = unique(vcat(time_vecs...))
+    sort!(times)
+    return times
 end
 
 # ============================================
-# SINGLE-PERIOD
+# SINGLE-PERIOD (build only)
 # ============================================
-function build_and_optimize_singleperiod_model(
-    matpower_data::Dict{String, Any},
-    model_type::Type{<:OPFModel};
-    optimizer = nothing,
-    build_only::Bool = false,
+function _build_singleperiod_model(
+    sys::SystemData,
+    model_type::Type{<:OPFModel},
+    optimizer,
 )
-    optimizer === nothing && (optimizer = _select_default_optimizer(model_type, optimizer))
     model = JuMP.Model(optimizer)
+
     model.ext[:time_periods] = 1
     model.ext[:times] = [1]
 
-    process_subproblem(model, matpower_data, model_type, SubproblemBuild)
-
-    if !build_only
-        JuMP.optimize!(model)
-        status = JuMP.termination_status(model)
-        if status == MOI.OPTIMAL || status == MOI.LOCALLY_SOLVED
-            @info "Objective value = $(JuMP.objective_value(model)) | status=$status"
-        else
-            @warn "Modelo não resolveu com sucesso. Status: $status"
-            # compute_conflict!(model)  # habilite se quiser depurar
-        end
-    end
+    process_subproblem(model, sys, model_type)
 
     return model
 end
 
 # ============================================
-# MULTI-PERIOD
+# MULTI-PERIOD (build only)
 # ============================================
-function build_and_optimize_multiperiod_model(
-    matpower_data::Dict{String, Any},
-    model_type::Type{<:OPFModel};
-    optimizer = nothing,
+
+function _build_multiperiod_model(
+    sys::SystemData,
+    model_type::Type{<:OPFModel},
+    optimizer,
     times::AbstractVector,
-    build_only::Bool = false,
 )
-    optimizer === nothing && (optimizer = _select_default_optimizer(model_type, optimizer))
     model = JuMP.Model(optimizer)
+
     model.ext[:time_periods] = length(times)
-    model.ext[:times] = times
+    model.ext[:times] = collect(times)
 
-    process_subproblem(model, matpower_data, model_type, SubproblemBuild)
+    process_subproblem(model, sys, model_type)
 
-    if !build_only
-        JuMP.optimize!(model)
-        status = JuMP.termination_status(model)
-        if status == MOI.OPTIMAL || status == MOI.LOCALLY_SOLVED
-            @info "Objective value (multi) = $(JuMP.objective_value(model)) | status=$status"
-        else
-            @warn "Modelo multi-período não resolveu com sucesso. Status: $status"
-        end
+    return model
+end
+
+# ============================================
+# OPTIMIZATION HELPER
+# ============================================
+function optimize_model!(model::JuMP.Model; label::AbstractString = "centralized OPF")
+    JuMP.optimize!(model)
+    status = JuMP.termination_status(model)
+
+    if status == MOI.OPTIMAL || status == MOI.LOCALLY_SOLVED
+        @info "Objective value ($label) = $(JuMP.objective_value(model)) | status=$status"
+    else
+        @warn "Model did not solve successfully ($label). Status: $status"
     end
 
+    return model
+end
+
+function solve_model(args...; kwargs...)
+    model = build_model(args...; kwargs...)
+    optimize_model!(model)
     return model
 end
 
 # ============================================
 # SUBPROBLEM PIPELINE
 # ============================================
-function process_subproblem(args...)
-    buses!(args...)
-    branches!(args...)
-    generators!(args...)
-    batteries!(args...)
-    prosumer(args...)
-    active_power_balance!(args...)
-    reactive_power_balance!(args...)
-    objective!(args...)
+@inline function process_subproblem(
+    model::JuMP.Model,
+    sys::SystemData,
+    model_type::Type{<:OPFModel},
+)
+    buses!(model, sys, model_type)
+    branches!(model, sys, model_type)
+    generators!(model, sys, model_type)
+    batteries!(model, sys, model_type)
+    prosumer!(model, sys, model_type)
+    active_power_balance!(model, sys, model_type)
+    reactive_power_balance!(model, sys, model_type)
+    objective!(model, sys, model_type)
     return nothing
 end

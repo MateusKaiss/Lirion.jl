@@ -1,5 +1,9 @@
-function get_model_times(data)
-    time_vecs = []
+# ===============================================================
+# Timeseries helpers for Lirion.jl
+# ===============================================================
+
+function get_model_times(data::Dict{String, Any})
+    time_vecs = Vector{Vector{Int}}()
 
     if haskey(data, "bus_timeseries") && !isempty(data["bus_timeseries"])
         push!(time_vecs, data["bus_timeseries"]["time"])
@@ -23,8 +27,8 @@ function get_model_times(data)
     return all_times
 end
 
-function check_time_alignment(data)
-    time_sets = Dict()
+function check_time_alignment(data::Dict{String, Any})
+    time_sets = Dict{String, Set{Int}}()
 
     for key in (
         "bus_timeseries",
@@ -58,7 +62,7 @@ function ensure_bus_timeseries!(data::Dict{String, Any}, T::Int)
     b = data["bus"]
     nb = length(b["bus_i"])
 
-    return data["bus_timeseries"] = Dict(
+    data["bus_timeseries"] = Dict(
         "time" => ones(Int, nb),
         "bus" => copy(b["bus_i"]),
         "pd" => copy(b["pd"]),
@@ -66,6 +70,7 @@ function ensure_bus_timeseries!(data::Dict{String, Any}, T::Int)
         "gs" => copy(b["gs"]),
         "bs" => copy(b["bs"]),
     )
+    return
 end
 
 function ensure_gencost_timeseries!(data::Dict{String, Any}, T::Int)
@@ -107,7 +112,8 @@ function ensure_gencost_timeseries!(data::Dict{String, Any}, T::Int)
         push!(ts["feed_in_tariff"], 0.0)
     end
 
-    return data["gencost_timeseries"] = ts
+    data["gencost_timeseries"] = ts
+    return
 end
 
 function ensure_prosumer_timeseries!(data::Dict{String, Any}, T::Int)
@@ -121,13 +127,14 @@ function ensure_prosumer_timeseries!(data::Dict{String, Any}, T::Int)
     s = data["prosumer"]
     nb = length(s["bus"])
 
-    return data["prosumer_timeseries"] = Dict(
+    data["prosumer_timeseries"] = Dict(
         "time" => ones(Int, nb),
         "bus" => copy(s["bus"]),
         "p_pv" => copy(s["generation"]),
         "p_load" => copy(s["demand"]),
         "p_curtail" => fill(0.0, nb),
     )
+    return
 end
 
 function ensure_consumer_timeseries!(data::Dict{String, Any}, T::Int)
@@ -159,6 +166,11 @@ function extend_bus_timeseries!(data::Dict{String, Any}, T::Int)
     ts = data["bus_timeseries"]
     times = ts["time"]
     buses = ts["bus"]
+
+    if isempty(times)
+        return
+    end
+
     last_time = maximum(times)
     bus_ids = unique(buses)
 
@@ -166,7 +178,7 @@ function extend_bus_timeseries!(data::Dict{String, Any}, T::Int)
         return
     end
 
-    @warn "bus_timeseries has data only up to t=$last_time. Repeating values ​​for t=$(last_time+1):$T automatically."
+    @warn "bus_timeseries has data only up to t=$last_time. Repeating values for t=$(last_time+1):$T automatically."
 
     for bus in bus_ids
         indices = [
@@ -193,6 +205,11 @@ function extend_gencost_timeseries!(data::Dict{String, Any}, T::Int)
     ts = data["gencost_timeseries"]
     times = ts["time"]
     gens = ts["gen_id"]
+
+    if isempty(times)
+        return
+    end
+
     last_time = maximum(times)
     gen_ids = unique(gens)
 
@@ -203,8 +220,9 @@ function extend_gencost_timeseries!(data::Dict{String, Any}, T::Int)
     @warn "gencost_timeseries has data only up to t=$last_time. Repeating values for t=$(last_time+1):$T automatically."
 
     for gen in gen_ids
-        indices =
-            [i for (i, (g, t)) in enumerate(zip(gens, times)) if g == gen && t == last_time]
+        indices = [
+            i for (i, (g, t)) in enumerate(zip(gens, times)) if g == gen && t == last_time
+        ]
         if isempty(indices)
             continue
         end
@@ -230,6 +248,7 @@ function extend_prosumer_timeseries!(data::Dict{String, Any}, T::Int)
     if isempty(times)
         return
     end
+
     last_time = maximum(times)
     prosumer_ids = unique(prosumers)
 
@@ -237,7 +256,7 @@ function extend_prosumer_timeseries!(data::Dict{String, Any}, T::Int)
         return
     end
 
-    @warn "prosumer_timeseries has data only up to t=$last_time. Repeating values ​​for t=$(last_time+1):$T automatically."
+    @warn "prosumer_timeseries has data only up to t=$last_time. Repeating values for t=$(last_time+1):$T automatically."
 
     for p in prosumer_ids
         indices = [
@@ -264,11 +283,12 @@ function extend_consumer_timeseries!(data::Dict{String, Any}, T::Int)
 
     ts = data["consumer_timeseries"]
     times = ts["time"]
+    consumers = ts["bus"]
 
     if isempty(times)
         return
     end
-    consumers = ts["bus"]
+
     last_time = maximum(times)
     consumer_ids = unique(consumers)
 
@@ -276,7 +296,7 @@ function extend_consumer_timeseries!(data::Dict{String, Any}, T::Int)
         return
     end
 
-    @warn "consumer_timeseries has data only up to t=$last_time. Repeating values ​​for t=$(last_time+1):$T automatically."
+    @warn "consumer_timeseries has data only up to t=$last_time. Repeating values for t=$(last_time+1):$T automatically."
 
     for c in consumer_ids
         indices = [

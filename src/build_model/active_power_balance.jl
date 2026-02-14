@@ -1,72 +1,107 @@
-function compute_power_balance(model, matpower_data, params, bus_index, t)
+function compute_power_balance(
+    model::JuMP.Model,
+    sys::SystemData,
+    bus_id::Int,
+    t::Int,
+)
+    pf = sys.powerflow
+    gen = sys.gen
+    bus = sys.bus
+    bus_ts = sys.bus_ts
+    consumer_ts = sys.consumer_ts
+    bus_idx = pf.bus_idx_map[bus_id]
+
+    # --------------------------------------------------------------
+    # Geração Ativa
+    # --------------------------------------------------------------
     p_gen = sum(
         model[:p_generation][g, t]
-        for g in get(params.bus_to_generators, bus_index, Int[])
-        if params.existing[g] == 1;
-        init = 0.0,
-    )
-    p_bat = sum(
-        model[:p_battery_injected][b, t] for
-        b in get(params.bus_to_batteries, bus_index, Int[]);
+        for g in pf.bus_to_generators[bus_idx]
+        if gen.existing[g];
         init = 0.0,
     )
 
-    p_pros = sum(
-        model[:p_prosumer_injected][p, t] for
-        p in get(params.bus_to_prosumers, bus_index, Int[]);
-        init = 0.0,
-    )
-    p_out = sum(
-        model[:p_flow_branches][l, t] for
-        l in get(params.bus_to_branches_from, bus_index, Int[])
-        if params.branch_status[l] == 1;
-        init = 0.0,
-    )
-    p_in = sum(
-        model[:p_reverse_flow_branches][l, t] for
-        l in get(params.bus_to_branches_to, bus_index, Int[])
-        if params.branch_status[l] == 1;
-        init = 0.0,
-    )
-
-    pd = if params.has_timeseries
-        ts = matpower_data["bus_timeseries"]
+    # --------------------------------------------------------------
+    # Baterias
+    # --------------------------------------------------------------
+    p_bat = if haskey(model, :p_battery_injected)
         sum(
-            ts["pd"][i]
-            for i in eachindex(ts["bus"])
-            if ts["bus"][i] == bus_index && ts["time"][i] == t;
-            init = 0.0,
-        )
-    else
-        bus_list = matpower_data["bus"]["bus_i"]
-        pd_list = matpower_data["bus"]["pd"]
-        @inbounds sum(
-            pd_list[i] for i in eachindex(bus_list) if bus_list[i] == bus_index;
-            init = 0.0,
-        )
-    end
-
-    p_cons = if params.has_timeseries && haskey(matpower_data, "consumer_timeseries")
-        tsc = matpower_data["consumer_timeseries"]
-        sum(
-            tsc["demand"][i]
-            for i in eachindex(tsc["bus"])
-            if tsc["bus"][i] == bus_index && tsc["time"][i] == t;
-            init = 0.0,
-        )
-    elseif haskey(matpower_data, "consumer")
-        c = matpower_data["consumer"]
-        sum(
-            c["demand"][i]
-            for i in eachindex(c["bus"])
-            if c["bus"][i] == bus_index;
+            model[:p_battery_injected][b, t] for
+            b in pf.bus_to_batteries[bus_idx];
             init = 0.0,
         )
     else
         0.0
     end
-    if haskey(model.ext, :p_virtual) && bus_index in axes(model.ext[:p_virtual], 1)
-        p_virt = model.ext[:p_virtual][bus_index, t]
+
+    # --------------------------------------------------------------
+    # Prosumers
+    # --------------------------------------------------------------
+    p_pros = if haskey(model, :p_prosumer_injected)
+        sum(
+            model[:p_prosumer_injected][p, t] for
+            p in pf.bus_to_prosumers[bus_idx];
+            init = 0.0,
+        )
+    else
+        0.0
+    end
+
+    # --------------------------------------------------------------
+    # Fluxos de ramo
+    # --------------------------------------------------------------
+    p_out = if haskey(model, :p_flow_branches)
+        sum(
+            model[:p_flow_branches][l, t] for
+            l in pf.bus_to_branches_from[bus_idx]
+            if pf.branch_status[l] == 1;
+            init = 0.0,
+        )
+    else
+        0.0
+    end
+
+    p_in = if haskey(model, :p_reverse_flow_branches)
+        sum(
+            model[:p_reverse_flow_branches][l, t] for
+            l in pf.bus_to_branches_to[bus_idx]
+            if pf.branch_status[l] == 1;
+            init = 0.0,
+        )
+    else
+        0.0
+    end
+
+    # --------------------------------------------------------------
+    # Carga de barra (pd): timeseries OU estática
+    # --------------------------------------------------------------
+    pd = 0.0
+    if bus_ts.has_timeseries && !isempty(bus_ts.time)
+        @inbounds for i in eachindex(bus_ts.bus)
+            if bus_ts.bus[i] == bus_id && bus_ts.time[i] == t
+                pd += bus_ts.pd[i]
+            end
+        end
+    else
+        pd = bus.pd[bus_idx]
+    end
+
+    # --------------------------------------------------------------
+    # Carga adicional de "consumer" (ConsumerTimeseriesData)
+    # --------------------------------------------------------------
+    p_cons = 0.0
+    if consumer_ts.has_timeseries && !isempty(consumer_ts.time)
+        @inbounds for i in eachindex(consumer_ts.bus)
+            if consumer_ts.bus[i] == bus_id && consumer_ts.time[i] == t
+                p_cons += consumer_ts.demand[i]
+            end
+        end
+    end
+
+    if haskey(model.ext, :p_virtual) &&
+       bus_id in axes(model.ext[:p_virtual], 1) &&
+       t in axes(model.ext[:p_virtual], 2)
+        p_virt = model.ext[:p_virtual][bus_id, t]
     else
         p_virt = 0.0
     end
@@ -74,41 +109,67 @@ function compute_power_balance(model, matpower_data, params, bus_index, t)
     return p_gen - p_bat - p_pros - pd - p_cons - p_out - p_in
 end
 
-# ---------------------------------------------------------------------
-# Dispatching Active Power Balance Variables by Model Type
-# ---------------------------------------------------------------------
-function active_power_balance!(model, matpower_data, ::Type{DC}, ::Type{SubproblemBuild})
-    params = matpower_data["power_balance_params"]
+# =======================================================================
+# Dispatch by model type (DC / AC / SOCP)
+# =======================================================================
+function active_power_balance!(
+    model::JuMP.Model,
+    sys::SystemData,
+    ::Type{DC},
+)
+    pf = sys.powerflow
     T = get(model.ext, :time_periods, 1)
 
-    valid_bus_ids = filter(b -> !params.is_virtual[params.bus_idx_map[b]], params.bus_ids)
+    valid_bus_ids = [
+        b for b in pf.bus_ids if !pf.is_virtual[pf.bus_idx_map[b]]
+    ]
 
     @constraint(model, [b in valid_bus_ids, t in 1:T],
-        compute_power_balance(model, matpower_data, params, b, t) -
-        params.shunt_conductance[params.bus_idx_map[b]] == 0
+        compute_power_balance(model, sys, b, t) -
+        pf.shunt_conductance[pf.bus_idx_map[b]] == 0
     )
+
+    return nothing
 end
 
-function active_power_balance!(model, matpower_data, ::Type{AC}, ::Type{SubproblemBuild})
-    params = matpower_data["power_balance_params"]
+function active_power_balance!(
+    model::JuMP.Model,
+    sys::SystemData,
+    ::Type{AC},
+)
+    pf = sys.powerflow
     T = get(model.ext, :time_periods, 1)
 
-    valid_bus_ids = filter(b -> !params.is_virtual[params.bus_idx_map[b]], params.bus_ids)
+    valid_bus_ids = [
+        b for b in pf.bus_ids if !pf.is_virtual[pf.bus_idx_map[b]]
+    ]
 
     @constraint(model, [b in valid_bus_ids, t in 1:T],
-        compute_power_balance(model, matpower_data, params, b, t) -
-        params.shunt_conductance[params.bus_idx_map[b]] * model[:v_magnitude][b, t]^2 == 0
+        compute_power_balance(model, sys, b, t) -
+        pf.shunt_conductance[pf.bus_idx_map[b]] *
+        model[:v_magnitude][b, t]^2 == 0
     )
+
+    return nothing
 end
 
-function active_power_balance!(model, matpower_data, ::Type{SOCP}, ::Type{SubproblemBuild})
-    params = matpower_data["power_balance_params"]
+function active_power_balance!(
+    model::JuMP.Model,
+    sys::SystemData,
+    ::Type{SOCP},
+)
+    pf = sys.powerflow
     T = get(model.ext, :time_periods, 1)
 
-    valid_bus_ids = filter(b -> !params.is_virtual[params.bus_idx_map[b]], params.bus_ids)
+    valid_bus_ids = [
+        b for b in pf.bus_ids if !pf.is_virtual[pf.bus_idx_map[b]]
+    ]
 
     @constraint(model, [b in valid_bus_ids, t in 1:T],
-        compute_power_balance(model, matpower_data, params, b, t) -
-        params.shunt_conductance[params.bus_idx_map[b]] * model[:v_magnitude_sq][b, t] == 0
+        compute_power_balance(model, sys, b, t) -
+        pf.shunt_conductance[pf.bus_idx_map[b]] *
+        model[:v_magnitude_sq][b, t] == 0
     )
+
+    return nothing
 end

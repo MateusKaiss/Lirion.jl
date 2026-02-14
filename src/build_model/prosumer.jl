@@ -1,57 +1,95 @@
-function create_prosumer_variables!(model::JuMP.Model, params)
-    T = get(model.ext, :time_periods, 1)
+# =====================================================================
+# Prosumers (usa ProsumerData em SystemData)
+# =====================================================================
 
-    @variable(model, p_prosumer_injected[1:params.number_of_prosumers, 1:T])
-    @variable(model, q_prosumer_injected[1:params.number_of_prosumers, 1:T])
-    @variable(model, pv_generation_used[1:params.number_of_prosumers, 1:T] >= 0)
-    @variable(model, pv_curtailment[1:params.number_of_prosumers, 1:T] >= 0)
+function create_prosumer_variables!(model::JuMP.Model, pros::ProsumerData)
+    T = get(model.ext, :time_periods, 1)
+    np = pros.number_of_prosumers
+
+    @variable(
+        model,
+        p_prosumer_injected[p in 1:np, t in 1:T],
+    )
+
+    @variable(
+        model,
+        q_prosumer_injected[p in 1:np, t in 1:T],
+    )
+
+    @variable(
+        model,
+        pv_generation_used[p in 1:np, t in 1:T],
+        lower_bound = 0.0,
+    )
+
+    @variable(
+        model,
+        pv_curtailment[p in 1:np, t in 1:T],
+        lower_bound = 0.0,
+    )
+
+    # JuMP já registra por nome, mas se quiser explitar:
+    model[:p_prosumer_injected] = p_prosumer_injected
+    model[:q_prosumer_injected] = q_prosumer_injected
+    model[:pv_generation_used] = pv_generation_used
+    model[:pv_curtailment] = pv_curtailment
+
+    return nothing
 end
 
-function create_prosumer_constraints!(model::JuMP.Model, params)
+function create_prosumer_constraints!(model::JuMP.Model, pros::ProsumerData)
     T = get(model.ext, :time_periods, 1)
+    np = pros.number_of_prosumers
 
-    @constraint(
-        model,
-        [p = 1:params.number_of_prosumers, t = 1:T],
+    # Pré-computa capacidade² para não elevar ao quadrado dentro do macro
+    inverter_cap_squared = pros.inverter_capacity .^ 2
+
+    # Ativo: p_inj = p_used - demanda
+    @constraint(model, [p in 1:np, t in 1:T],
         model[:p_prosumer_injected][p, t] ==
-        model[:pv_generation_used][p, t] - params.demand[p]
+        model[:pv_generation_used][p, t] - pros.demand[p]
     )
 
-    @constraint(
-        model,
-        [p = 1:params.number_of_prosumers, t = 1:T],
-        model[:q_prosumer_injected][p, t] == params.q_generation[p] - params.q_demand[p]
+    # Reativo: q_inj = q_gen - q_dem
+    @constraint(model, [p in 1:np, t in 1:T],
+        model[:q_prosumer_injected][p, t] ==
+        pros.q_generation[p] - pros.q_demand[p]
     )
 
-    @constraint(
-        model,
-        [p = 1:params.number_of_prosumers, t = 1:T],
-        model[:pv_generation_used][p, t] + model[:pv_curtailment][p, t] ==
-        params.generation[p]
+    # Balanço da geração FV: usada + corte = geração disponível
+    @constraint(model, [p in 1:np, t in 1:T],
+        model[:pv_generation_used][p, t] +
+        model[:pv_curtailment][p, t] ==
+        pros.generation[p]
     )
 
-    @constraint(
-        model,
-        [p = 1:params.number_of_prosumers, t = 1:T],
-        model[:p_prosumer_injected][p, t]^2 + model[:q_prosumer_injected][p, t]^2 <=
-        params.inverter_capacity[p]^2
+    # Limite de capacidade do inversor
+    @constraint(model, [p in 1:np, t in 1:T],
+        model[:p_prosumer_injected][p, t]^2 +
+        model[:q_prosumer_injected][p, t]^2 <=
+        inverter_cap_squared[p]
     )
+
+    return nothing
 end
 
-function prosumer(
+# =======================================================================
+# Dispatch by model type (DC / AC / SOCP)
+# =======================================================================
+function prosumer!(
     model::JuMP.Model,
-    data,
+    sys::SystemData,
     ::Type{T},
-    ::Type{SubproblemBuild},
 ) where {T <: OPFModel}
-    if !haskey(data, "prosumer") || isempty(data["prosumer"])
+    pros = sys.prosumer
+
+    if pros.number_of_prosumers == 0
         @info "No prosumers found. Skipping prosumer modeling."
-        return
+        return nothing
     end
 
-    params = get_prosumer_parameters(data)
-    create_prosumer_variables!(model, params)
-    create_prosumer_constraints!(model, params)
+    create_prosumer_variables!(model, pros)
+    create_prosumer_constraints!(model, pros)
 
     return nothing
 end
