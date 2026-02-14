@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/src/assets/lirion_logo.png" alt="Lirion.jl" 
+  <img src="docs/src/assets/logo.png" alt="Lirion.jl" 
   width="600"/>
 </p>
 
