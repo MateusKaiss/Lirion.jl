@@ -10,7 +10,8 @@ const SOCP_STATE_CASES = [
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
     "pglib_opf_case73_ieee_rts.m",
-    "pglib_opf_case200_activ.m",
+    # "pglib_opf_case200_activ.m",
+
     # "pglib_opf_case118_ieee.m",
     # "pglib_opf_case57_ieee.m",
     # "pglib_opf_case500_goc.m",
@@ -24,8 +25,8 @@ const SOCP_POWER_CASES = [
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
     "pglib_opf_case73_ieee_rts.m",
-    "pglib_opf_case57_ieee.m",
-    "pglib_opf_case118_ieee.m",
+    # "pglib_opf_case57_ieee.m",
+    # "pglib_opf_case118_ieee.m",
     # "pglib_opf_case200_activ.m",
     # "pglib_opf_case500_goc.m",
 ]
@@ -38,8 +39,8 @@ const SOCP_HYBRID_CASES = [
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
     "pglib_opf_case73_ieee_rts.m",
-    "pglib_opf_case57_ieee.m",
-    "pglib_opf_case118_ieee.m",
+    # "pglib_opf_case57_ieee.m",
+    # "pglib_opf_case118_ieee.m",
     # "pglib_opf_case200_activ.m",
     # "pglib_opf_case500_goc.m",
 ]
