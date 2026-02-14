@@ -1,3 +1,13 @@
+```@raw html
+<img src="assets/logo.png" alt="Lirion.jl logo"
+     style="max-width: 720px; width: 100%; margin: 0 auto 1.25rem; display: block;" />
+
+```
+
+```@meta
+# This prevents certain rendering issues in Documenter
+```
+
 # Introduction
 
 Lirion is a Julia framework for modeling and solving Optimal Power Flow (OPF) problems under both **centralized** and **distributed** optimization paradigms, providing a practical environment for implementing established formulations and investigating novel decomposition and consensus strategies.
@@ -9,7 +19,7 @@ At present, Lirion unifies DC, AC, and SOCP OPF formulations within a modular ar
 
     The site consolidates mathematical formulations, derivations, and structural studies developed throughout his academic training and research activities, covering both fundamental optimization concepts and advanced theoretical developments that underpin Lirion’s design.
 
-    
+    Researchers, students, and practitioners interested in optimization and Optimal Power Flow — as well as anyone passionate about mathematical modeling — are encouraged to explore this resource.
 
     [Visit the Lirion Mathematical Foundations Website](https://your-link-here.com)
 
