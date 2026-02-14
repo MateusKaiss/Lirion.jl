@@ -5,7 +5,7 @@ const AC_STATE_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
-    "pglib_opf_case73_ieee_rts.m", 
+    "pglib_opf_case73_ieee_rts.m",
     # "pglib_opf_case57_ieee.m",
     # "pglib_opf_case118_ieee.m",
 
@@ -35,7 +35,7 @@ const AC_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
-    "pglib_opf_case73_ieee_rts.m", 
+    "pglib_opf_case73_ieee_rts.m",
 
     # "pglib_opf_case118_ieee.m",
     # "pglib_opf_case57_ieee.m",
@@ -88,7 +88,6 @@ function run_admm_ac_state_tests(;
         tau_incr = 1.05,
         tau_decr = 0.98,
     )
-
 
     # ------------------------
     # Overrides por caso
