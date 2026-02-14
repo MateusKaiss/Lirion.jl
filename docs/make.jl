@@ -8,7 +8,6 @@ Documenter.makedocs(
         mathengine = Documenter.MathJax(),
         prettyurls = false,
         sidebar_sitename = false,
-        assets = ["assets/custom.css"], # se você criou o custom.css
     ),
     modules = [Lirion],
     checkdocs = :none,
