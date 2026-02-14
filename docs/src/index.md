@@ -9,7 +9,7 @@ At present, Lirion unifies DC, AC, and SOCP OPF formulations within a modular ar
 
     The site consolidates mathematical formulations, derivations, and structural studies developed throughout his academic training and research activities, covering both fundamental optimization concepts and advanced theoretical developments that underpin Lirion’s design.
 
-    Researchers, students, and practitioners interested in optimization and Optimal Power Flow, as well as anyone passionate about mathematical modeling, are encouraged to explore this resource.
+    
 
     [Visit the Lirion Mathematical Foundations Website](https://your-link-here.com)
 
