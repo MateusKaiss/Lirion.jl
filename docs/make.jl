@@ -4,15 +4,18 @@ using Lirion
 Documenter.makedocs(
     sitename = "Lirion.jl",
     authors = "Mateus Kaiss and contributors.",
-    format = Documenter.HTML(
+    format = Documenter.HTML(;
         mathengine = Documenter.MathJax(),
         prettyurls = false,
         sidebar_sitename = false,
+        collapselevel = 1,
     ),
     modules = [Lirion],
     checkdocs = :none,
     pages = [
-        "Home" => "index.md",
+        "Introduction" => [
+            "Introduction" => "index.md","installation.md"
+        ],
     ],
 )
 
