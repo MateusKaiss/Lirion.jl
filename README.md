@@ -78,7 +78,7 @@ https://your-docs-link-here.com/installation
 
 Below are two examples, one **centralized** and one **distributed (ADMM)**, to get started with Lirion: 
 
-The example cases below are based on the well-known PGLib-OPF benchmark library and are included in the repository for convenience.
+The example cases below are based on the well-known **PGLib-OPF** benchmark library and are included in the repository for convenience.
 
 If no solver is specified, Lirion automatically selects its default solver:
 
