@@ -12,13 +12,13 @@
 # Public API
 # ------------------------------------------------------------------------------
 
-function parse_matlab_string(data_string::String; extended::Bool=false)
+function parse_matlab_string(data_string::String; extended::Bool = false)
     data_lines = split(data_string, '\n')
 
-    matlab_dict = Dict{String,Any}()
+    matlab_dict = Dict{String, Any}()
     struct_name = nothing
     function_name = nothing
-    column_names = Dict{String,Any}()
+    column_names = Dict{String, Any}()
 
     last_index = length(data_lines)
     index = 1
@@ -113,19 +113,22 @@ function _type_value(value_string::AbstractString)
     end
 end
 
-function _type_array(string_array::Vector{T}) where {T<:AbstractString}
+function _type_array(string_array::Vector{T}) where {T <: AbstractString}
     ss = [strip(s) for s in string_array]
 
     if any(occursin("'", s) for s in ss)
         return [strip(s, '\'') for s in ss]
-    elseif any(occursin(".", s) || occursin("e", lowercase(s)) || occursin("Inf", s) || occursin("NaN", s) for s in ss)
+    elseif any(
+        occursin(".", s) || occursin("e", lowercase(s)) || occursin("Inf", s) ||
+        occursin("NaN", s) for s in ss
+    )
         return [check_type(Float64, s) for s in ss]
     else
         return [check_type(Int, s) for s in ss]
     end
 end
 
-_parse_matlab_cells(lines, index)  = _parse_matlab_data(lines, index, '{', '}')
+_parse_matlab_cells(lines, index) = _parse_matlab_data(lines, index, '{', '}')
 _parse_matlab_matrix(lines, index) = _parse_matlab_data(lines, index, '[', ']')
 
 function _parse_matlab_data(lines, index, start_char, end_char)
@@ -133,8 +136,8 @@ function _parse_matlab_data(lines, index, start_char, end_char)
     line_count = 0
     columns = -1
 
-    @assert occursin("=", lines[index + line_count])
-    matrix_assignment = split(lines[index + line_count], '%')[1] |> strip
+    @assert occursin("=", lines[index+line_count])
+    matrix_assignment = split(lines[index+line_count], '%')[1] |> strip
 
     @assert occursin(".", matrix_assignment) # expects mpc.bus, mpc.gen, etc.
     matrix_assignment_parts = split(matrix_assignment, '=')
@@ -150,7 +153,7 @@ function _parse_matlab_data(lines, index, start_char, end_char)
     found_close = occursin(string(end_char), matrix_assignment_rhs)
 
     while index + line_count < last_index && !found_close
-        line = strip(replace(lines[index + line_count], "\r" => ""))
+        line = strip(replace(lines[index+line_count], "\r" => ""))
         if isempty(line) || startswith(line, "%")
             line_count += 1
             continue
@@ -162,9 +165,11 @@ function _parse_matlab_data(lines, index, start_char, end_char)
         line_count += 1
     end
 
-    matrix_body_lines = [_add_line_delimiter(line, start_char, end_char) for line in matrix_body_lines]
+    matrix_body_lines =
+        [_add_line_delimiter(line, start_char, end_char) for line in matrix_body_lines]
     matrix_body = join(matrix_body_lines, ' ')
-    matrix_body = strip(replace(strip(strip(matrix_body), start_char), "$(end_char);" => ""))
+    matrix_body =
+        strip(replace(strip(strip(matrix_body), start_char), "$(end_char);" => ""))
     matrix_body_rows = split(matrix_body, ';')
     matrix_body_rows = matrix_body_rows[1:(length(matrix_body_rows)-1)]
 
@@ -229,7 +234,8 @@ function split_line(mp_line::AbstractString)
             if mp_line[curr_pos] == curr_token[1]
                 if mp_line[prevind(mp_line, curr_pos)] == '\\'
                     _push_curr_char()
-                elseif curr_pos < lastindex(mp_line) && mp_line[nextind(mp_line, curr_pos)] == curr_token[1]
+                elseif curr_pos < lastindex(mp_line) &&
+                       mp_line[nextind(mp_line, curr_pos)] == curr_token[1]
                     curr_token *= mp_line[curr_pos]
                     curr_pos = nextind(mp_line, nextind(mp_line, curr_pos))
                 else
@@ -239,7 +245,8 @@ function split_line(mp_line::AbstractString)
                 _push_curr_char()
             end
         else
-            if isspace(mp_line[curr_pos]) && curr_pos < lastindex(mp_line) && !isspace(mp_line[nextind(mp_line, curr_pos)])
+            if isspace(mp_line[curr_pos]) && curr_pos < lastindex(mp_line) &&
+               !isspace(mp_line[nextind(mp_line, curr_pos)])
                 _push_curr_token()
             elseif isquote(mp_line[curr_pos])
                 curr_token = strip(curr_token * mp_line[curr_pos])
