@@ -9,6 +9,53 @@
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
+# Small helpers
+# ------------------------------------------------------------------------------
+
+function _strip_comment_matlab(s::AbstractString)
+    in_quote = false
+    quote_char = '\0'
+    i = firstindex(s)
+
+    while i <= lastindex(s)
+        c = s[i]
+
+        if in_quote
+            if c == quote_char
+                j = nextind(s, i)
+                if j <= lastindex(s) && s[j] == quote_char
+                    i = nextind(s, j)
+                    continue
+                end
+                in_quote = false
+            end
+        else
+            if c == '\'' || c == '"'
+                in_quote = true
+                quote_char = c
+            elseif c == '%'
+                return s[firstindex(s):prevind(s, i)]
+            end
+        end
+
+        i = nextind(s, i)
+    end
+
+    return s
+end
+
+function _clean_line(raw::AbstractString)
+    line = strip(replace(raw, "\r" => ""))
+    isempty(line) && return nothing
+    startswith(line, "%") && return nothing
+
+    line = strip(_strip_comment_matlab(line))
+    isempty(line) && return nothing
+
+    return line
+end
+
+# ------------------------------------------------------------------------------
 # Public API
 # ------------------------------------------------------------------------------
 
@@ -23,45 +70,42 @@ function parse_matlab_string(data_string::String; extended::Bool = false)
     last_index = length(data_lines)
     index = 1
     while index <= last_index
-        line = strip(replace(data_lines[index], "\r" => ""))
-        isempty(line) && (index += 1; continue)
-        startswith(line, "%") && (index += 1; continue)
+        line = _clean_line(data_lines[index])
+        line === nothing && (index += 1; continue)
 
-        # strip inline comment
-        line_nocom = strip(split(line, "%")[1])
-        isempty(line_nocom) && (index += 1; continue)
-
-        if occursin("function", line_nocom)
-            func, value = _extract_matlab_assignment(line_nocom)
+        if startswith(line, "function")
+            func, value = _extract_matlab_assignment(line)
             struct_name = strip(replace(func, "function" => ""))
             function_name = value
-        elseif occursin("=", line_nocom)
-            if struct_name !== nothing && !occursin("$(struct_name).", line_nocom)
-                @warn "Assignments expected to be made to \"$(struct_name)\" but got: $(line_nocom)"
+
+        elseif occursin("=", line)
+            if struct_name !== nothing && !occursin("$(struct_name).", line)
+                @warn "Assignments expected to be made to \"$(struct_name)\" but got: $(line)"
             end
 
-            if occursin("[", line_nocom)
+            if occursin("[", line)
                 matrix_dict = _parse_matlab_matrix(data_lines, index)
                 matlab_dict[matrix_dict["name"]] = matrix_dict["data"]
                 if haskey(matrix_dict, "column_names")
                     column_names[matrix_dict["name"]] = matrix_dict["column_names"]
                 end
-                index = index + matrix_dict["line_count"] - 1
+                index += matrix_dict["line_count"] - 1
 
-            elseif occursin("{", line_nocom)
+            elseif occursin("{", line)
                 cell_dict = _parse_matlab_cells(data_lines, index)
                 matlab_dict[cell_dict["name"]] = cell_dict["data"]
                 if haskey(cell_dict, "column_names")
                     column_names[cell_dict["name"]] = cell_dict["column_names"]
                 end
-                index = index + cell_dict["line_count"] - 1
+                index += cell_dict["line_count"] - 1
 
             else
-                name, value = _extract_matlab_assignment(line_nocom)
+                name, value = _extract_matlab_assignment(line)
                 matlab_dict[name] = _type_value(value)
             end
+
         else
-            @warn "Matlab parser skipping line: $(line_nocom)"
+            @warn "Matlab parser skipping line: $(line)"
         end
 
         index += 1
@@ -90,38 +134,39 @@ function _extract_matlab_assignment(string::AbstractString)
 end
 
 function _type_value(value_string::AbstractString)
-    value_string = strip(value_string)
+    s = strip(value_string)
 
-    if occursin("'", value_string) # string
-        return strip(value_string, '\'')
+    # string literal
+    if occursin("'", s)
+        return strip(s, '\'')
     end
 
-    # handle Inf/-Inf/NaN (Matlab tokens)
-    if value_string == "Inf"
+    if s == "Inf" || s == "+Inf"
         return Inf
-    elseif value_string == "-Inf"
+    elseif s == "-Inf"
         return -Inf
-    elseif value_string == "NaN"
+    elseif s == "NaN"
         return NaN
     end
 
-    # float or int
-    if occursin(".", value_string) || occursin("e", lowercase(value_string))
-        return check_type(Float64, value_string)
+    if occursin(".", s) || occursin("e", lowercase(s))
+        return check_type(Float64, s)
     else
-        return check_type(Int, value_string)
+        return check_type(Int, s)
     end
 end
 
 function _type_array(string_array::Vector{T}) where {T <: AbstractString}
-    ss = [strip(s) for s in string_array]
+    ss = strip.(string_array)
 
-    if any(occursin("'", s) for s in ss)
+    if any(s -> occursin("'", s), ss)
         return [strip(s, '\'') for s in ss]
     elseif any(
-        occursin(".", s) || occursin("e", lowercase(s)) || occursin("Inf", s) ||
-        occursin("NaN", s) for s in ss
-    )
+        s ->
+            occursin(".", s) ||
+                occursin("e", lowercase(s)) ||
+                occursin("Inf", s) ||
+                occursin("NaN", s), ss)
         return [check_type(Float64, s) for s in ss]
     else
         return [check_type(Int, s) for s in ss]
@@ -137,7 +182,10 @@ function _parse_matlab_data(lines, index, start_char, end_char)
     columns = -1
 
     @assert occursin("=", lines[index+line_count])
-    matrix_assignment = split(lines[index+line_count], '%')[1] |> strip
+    first_line = _clean_line(lines[index+line_count])
+    @assert first_line !== nothing
+
+    matrix_assignment = strip(first_line)
 
     @assert occursin(".", matrix_assignment) # expects mpc.bus, mpc.gen, etc.
     matrix_assignment_parts = split(matrix_assignment, '=')
@@ -152,14 +200,13 @@ function _parse_matlab_data(lines, index, start_char, end_char)
     matrix_body_lines = String[matrix_assignment_rhs]
     found_close = occursin(string(end_char), matrix_assignment_rhs)
 
-    while index + line_count < last_index && !found_close
-        line = strip(replace(lines[index+line_count], "\r" => ""))
-        if isempty(line) || startswith(line, "%")
+    while index + line_count <= last_index && !found_close
+        line = _clean_line(lines[index+line_count])
+        if line === nothing
             line_count += 1
             continue
         end
 
-        line = strip(split(line, "%")[1])
         occursin(string(end_char), line) && (found_close = true)
         push!(matrix_body_lines, line)
         line_count += 1
@@ -167,21 +214,45 @@ function _parse_matlab_data(lines, index, start_char, end_char)
 
     matrix_body_lines =
         [_add_line_delimiter(line, start_char, end_char) for line in matrix_body_lines]
+
     matrix_body = join(matrix_body_lines, ' ')
-    matrix_body =
-        strip(replace(strip(strip(matrix_body), start_char), "$(end_char);" => ""))
+    matrix_body = strip(matrix_body)
+    matrix_body = strip(strip(matrix_body), start_char)
+    matrix_body = replace(matrix_body, "$(end_char);" => "")
+    matrix_body = strip(matrix_body)
+
     matrix_body_rows = split(matrix_body, ';')
-    matrix_body_rows = matrix_body_rows[1:(length(matrix_body_rows)-1)]
+
+    while !isempty(matrix_body_rows) && isempty(strip(matrix_body_rows[end]))
+        pop!(matrix_body_rows)
+    end
+
+    if !isempty(matrix_body_rows)
+        lastrow = matrix_body_rows[end]
+        if occursin(string(end_char), lastrow)
+            matrix_body_rows[end] = strip(replace(lastrow, string(end_char) => ""))
+            isempty(strip(matrix_body_rows[end])) && pop!(matrix_body_rows)
+        end
+    end
 
     matrix = Vector{Vector{Any}}()
     for row in matrix_body_rows
-        row_items = split_line(strip(row))
+        row_s = strip(row)
+        isempty(row_s) && continue
+        row_items = split_line(row_s)
         push!(matrix, row_items)
         if columns < 0
             columns = length(row_items)
         elseif columns != length(row_items)
-            @error "Matrix parsing error: inconsistent number of items in each row\n$(row)"
+            @error "Matrix parsing error: inconsistent number of items in each row\n$(row_s)"
         end
+    end
+    if isempty(matrix)
+        return Dict(
+            "name" => matrix_name,
+            "data" => Vector{Vector{Any}}(),
+            "line_count" => line_count,
+        )
     end
 
     rows = length(matrix)
@@ -194,11 +265,14 @@ function _parse_matlab_data(lines, index, start_char, end_char)
 
     # optional column names line: "%column_names% ..."
     if index > 1 && occursin("%column_names%", lines[index-1])
-        column_names_string = replace(lines[index-1], "%column_names%" => "")
-        colnames = split(column_names_string)
-        if length(matrix[1]) != length(colnames)
+        col_line = replace(lines[index-1], "%column_names%" => "")
+        col_line = strip(col_line)
+        colnames = split(col_line)
+
+        if !isempty(matrix) && length(matrix[1]) != length(colnames)
             @error "Column name parsing error: data cols $(length(matrix[1])) vs column names $(length(colnames))"
         end
+
         matrix_dict["column_names"] = colnames
     end
 
@@ -228,7 +302,7 @@ function split_line(mp_line::AbstractString)
         return nothing
     end
 
-    curr_pos = 1
+    curr_pos = firstindex(mp_line)
     while curr_pos <= lastindex(mp_line)
         if is_curr_token_quote
             if mp_line[curr_pos] == curr_token[1]
@@ -245,7 +319,8 @@ function split_line(mp_line::AbstractString)
                 _push_curr_char()
             end
         else
-            if isspace(mp_line[curr_pos]) && curr_pos < lastindex(mp_line) &&
+            if isspace(mp_line[curr_pos]) &&
+               curr_pos < lastindex(mp_line) &&
                !isspace(mp_line[nextind(mp_line, curr_pos)])
                 _push_curr_token()
             elseif isquote(mp_line[curr_pos])
