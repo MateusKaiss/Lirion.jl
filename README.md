@@ -27,8 +27,6 @@ It provides:
 
 ---
 
----
-
 ## Installation
 
 Lirion is written in [Julia](https://julialang.org).
