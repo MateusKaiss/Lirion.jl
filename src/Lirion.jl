@@ -32,7 +32,6 @@ using SCS
 using OSQP
 using Base.Threads
 using MathOptInterface
-using COSMO
 using Clarabel
 
 const MOI = MathOptInterface

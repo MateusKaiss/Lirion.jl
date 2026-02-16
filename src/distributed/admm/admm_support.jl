@@ -68,8 +68,6 @@ end
         )
     elseif isdefined(Main, :GLPK) && opt === GLPK.Optimizer
         return optimizer_with_attributes(GLPK.Optimizer, "msg_lev" => 0)
-    elseif opt === COSMO.Optimizer
-        return optimizer_with_attributes(COSMO.Optimizer, "verbose" => false)
     else
         return opt
     end
@@ -84,16 +82,6 @@ function resolve_optimizer(::Val{:dc}, config, inputs_optimizer)
         _getopt(config, :optimizer, nothing)
 
     if opt !== nothing
-        if opt == COSMO.Optimizer
-            return optimizer_with_attributes(
-                COSMO.Optimizer,
-                "eps_abs" => 1e-6,
-                "eps_rel" => 1e-6,
-                "max_iter" => 50_000,
-                "verbose" => false,
-                "decompose" => true,
-            )
-        end
         return _silent_factory(opt)
     end
 

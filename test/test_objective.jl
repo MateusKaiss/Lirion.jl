@@ -286,7 +286,6 @@ function run_test_objective()
             case_list = reduced_testlist_ac,
         )
 
-        # SOCP: Gurobi se tiver; senão SCS (ou COSMO se preferir)
         socp_optimizer = get_available_optimizer(Gurobi.Optimizer, SCS.Optimizer)
         run_model_tests(
             Lirion.SOCP,

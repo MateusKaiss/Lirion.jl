@@ -67,10 +67,9 @@ end
 # ============================================================
 
 const _SOCP_CHAIN_MAP = Dict(
-    :auto => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
-    :gurobi => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
-    :cosmo => (COSMO.Optimizer, Gurobi.Optimizer, SCS.Optimizer),
-    :scs => (SCS.Optimizer, Gurobi.Optimizer, COSMO.Optimizer),
+    :auto => (Gurobi.Optimizer, SCS.Optimizer),
+    :gurobi => (Gurobi.Optimizer, SCS.Optimizer),
+    :scs => (SCS.Optimizer, Gurobi.Optimizer),
 )
 
 function pick_socp_optimizer(;

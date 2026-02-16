@@ -5,7 +5,6 @@ using Glob
 using Ipopt
 using SCS
 using OSQP
-using COSMO
 using Gurobi
 
 include("common.jl")
