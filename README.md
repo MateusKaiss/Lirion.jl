@@ -56,24 +56,6 @@ using Lirion
 
 ---
 
-### Solver Requirements
-
-Lirion relies on external optimization solvers to solve OPF models.
-
-If no solver is explicitly specified, Lirion automatically selects a default solver depending on the formulation:
-
-- **DC OPF → OSQP**
-- **AC OPF → Ipopt**
-- **SOCP OPF → Clarabel**
-
-These solvers are installed automatically as dependencies.
-
-For detailed installation instructions, solver selection guidance, and a complete list of supported solvers, see the documentation:
-
-**Installation Guide**  
-https://your-docs-link-here.com/installation
-
-
 ## Quick Examples
 
 Below are two examples, one **centralized** and one **distributed (ADMM)**, to get started with Lirion: 
@@ -85,6 +67,11 @@ If no solver is specified, Lirion automatically selects its default solver:
 - **DC → OSQP**
 - **AC → Ipopt**
 - **SOCP → Clarabel**
+
+For detailed installation instructions, solver selection guidance, and a complete list of supported solvers, see the documentation:
+
+**Installation Guide**  
+https://your-docs-link-here.com/installation
 
 ---
 
