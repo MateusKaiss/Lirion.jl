@@ -26,7 +26,6 @@ using DataFrames
 using CSV
 using Dates
 using Statistics
-using InfrastructureModels
 using Logging
 using SCS
 using OSQP
@@ -79,6 +78,7 @@ include("collections/admm_structs.jl")
 # ------------------------------------------------------------------
 # Case parsing (.m / .csv)
 # ------------------------------------------------------------------
+include("parsing/utils.jl")
 include("parsing/parser.jl")
 include("parsing/csv_parser.jl")
 
