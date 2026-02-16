@@ -103,8 +103,8 @@ out.result
 You may also switch the formulation:
 
 ```julia
-model = dc()     # DC OPF  → typically OSQP.Optimizer
-model = socp()   # SOCP OPF → typically Clarabel.Optimizer
+model = dc()     # DC OPF  → typically uses OSQP.Optimizer
+model = socp()   # SOCP OPF → typically uses Clarabel.Optimizer
 ```
 
 ### 🔹 Distributed Example ( ADMM AC / ADMM DC / ADMM SOCP)
