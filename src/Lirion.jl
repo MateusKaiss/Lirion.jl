@@ -74,7 +74,7 @@ include("collections/preprocess.jl")
 # ------------------------------------------------------------------
 # Inputs structs (legacy CLI + shared input pipeline)
 # ------------------------------------------------------------------
-include("collections/inputs.jl")
+include("collections/build_inputs.jl")
 include("collections/admm_structs.jl")
 
 # ------------------------------------------------------------------
