@@ -14,7 +14,7 @@ Documenter.makedocs(
     checkdocs = :none,
     pages = [
         "Introduction" => [
-            "Introduction" => "index.md","installation.md"
+            "Introduction" => "index.md","installation.md","quick_start.md"
         ],
     ],
 )
