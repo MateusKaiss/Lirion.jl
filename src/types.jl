@@ -12,7 +12,6 @@ struct SOCP <: OPFModel end
 # ============================================================
 
 abstract type ADMMVariant end
-
 struct State <: ADMMVariant end
 struct Power <: ADMMVariant end
 struct Hybrid <: ADMMVariant end
@@ -33,10 +32,14 @@ struct SOCPTag <: OPFTag end
 struct ADMM{V <: ADMMVariant, B <: OPFTag} end
 
 # ============================================================
-# Algorithm spec
+# Algorithm spec (TIPADO via dispatch)
+#   ATENÇÃO: aqui NÃO definimos centralized() nem admm()
 # ============================================================
 
-struct ADMMAlgorithmSpec
+abstract type AbstractAlgorithm end
+struct CentralizedAlgorithm <: AbstractAlgorithm end
+
+struct ADMMAlgorithmSpec <: AbstractAlgorithm
     coupling::Symbol        # :state | :power | :hybrid
     sectioning::Symbol      # :tie_line
     max_iter::Int
@@ -114,7 +117,6 @@ end
 function _normalize_rhos_strict(
     base_model::Type{<:OPFModel},
     coupling::Symbol;
-    # generic
     rho::Union{Nothing, Real} = nothing,
     rho_theta::Union{Nothing, Real} = nothing,
     rho_v::Union{Nothing, Real} = nothing,      # AC only (forbidden in SOCP)
@@ -128,9 +130,6 @@ function _normalize_rhos_strict(
     allowed = rules.allowed
     required = rules.required
 
-    # ----------------------------
-    # Hard SOCP bans
-    # ----------------------------
     if base_model === SOCP
         rho_theta === nothing ||
             error("SOCP does not accept rho_theta. Use rho_v2, rho_r, rho_t (or rho=...).")
@@ -165,27 +164,13 @@ function _normalize_rhos_strict(
     ρ_generic = rho === nothing ? nothing : _asfloat(rho, :rho)
 
     if ρ_generic !== nothing
-        if :rho_theta in required
-            rho_theta = something(rho_theta, ρ_generic)
-        end
-        if :rho_v in required
-            rho_v = something(rho_v, ρ_generic)
-        end
-        if :rho_v2 in required
-            rho_v2 = something(rho_v2, ρ_generic)
-        end
-        if :rho_p in required
-            rho_p = something(rho_p, ρ_generic)
-        end
-        if :rho_q in required
-            rho_q = something(rho_q, ρ_generic)
-        end
-        if :rho_r in required
-            rho_r = something(rho_r, ρ_generic)
-        end
-        if :rho_t in required
-            rho_t = something(rho_t, ρ_generic)
-        end
+        (:rho_theta in required) && (rho_theta = something(rho_theta, ρ_generic))
+        (:rho_v in required) && (rho_v = something(rho_v, ρ_generic))
+        (:rho_v2 in required) && (rho_v2 = something(rho_v2, ρ_generic))
+        (:rho_p in required) && (rho_p = something(rho_p, ρ_generic))
+        (:rho_q in required) && (rho_q = something(rho_q, ρ_generic))
+        (:rho_r in required) && (rho_r = something(rho_r, ρ_generic))
+        (:rho_t in required) && (rho_t = something(rho_t, ρ_generic))
     end
 
     function _get_required_value(sym::Symbol)
@@ -200,8 +185,7 @@ function _normalize_rhos_strict(
     end
 
     req_sorted = sort!(collect(required))
-    anchor_sym = req_sorted[1]
-    anchor_val = _get_required_value(anchor_sym)
+    anchor_val = _get_required_value(req_sorted[1])
 
     ρθ =
         (base_model === SOCP) ? anchor_val :
@@ -233,11 +217,9 @@ mutable struct DistributedOPFModel
     sectioning::Symbol
     max_iter::Int
 
-    # state rhos
     rho_theta::Float64
     rho_v::Float64
 
-    # power/flow rhos
     rho_p::Float64
     rho_q::Float64
     rho_r::Float64
@@ -277,6 +259,7 @@ mutable struct DistributedOPFModel
                     "Invalid coupling=$coupling. Allowed: :state, :power, :hybrid",
                 ),
             )
+
         sectioning === :tie_line ||
             throw(
                 ArgumentError(
@@ -293,8 +276,8 @@ mutable struct DistributedOPFModel
         rho_r > 0 || throw(ArgumentError("rho_r must be > 0"))
         rho_t > 0 || throw(ArgumentError("rho_t must be > 0"))
 
-        eps_abs ≥ 0 || throw(ArgumentError("eps_abs must be ≥ 0"))
-        eps_rel ≥ 0 || throw(ArgumentError("eps_rel must be ≥ 0"))
+        eps_abs >= 0 || throw(ArgumentError("eps_abs must be ≥ 0"))
+        eps_rel >= 0 || throw(ArgumentError("eps_rel must be ≥ 0"))
 
         mu_incr > 0 || throw(ArgumentError("mu_incr must be > 0"))
         mu_decr > 0 || throw(ArgumentError("mu_decr must be > 0"))
@@ -427,27 +410,13 @@ function Base.setproperty!(c::DistributedOPFModel, s::Symbol, v)
         rules = _rules_for(c.base_model, c.coupling)
         req = rules.required
 
-        if :rho_theta in req
-            c.rho_theta = vf
-        end
-        if :rho_v in req
-            c.rho_v = vf
-        end
-        if :rho_v2 in req
-            c.rho_v = vf
-        end
-        if :rho_p in req
-            c.rho_p = vf
-        end
-        if :rho_q in req
-            c.rho_q = vf
-        end
-        if :rho_r in req
-            c.rho_r = vf
-        end
-        if :rho_t in req
-            c.rho_t = vf
-        end
+        (:rho_theta in req) && (c.rho_theta = vf)
+        (:rho_v in req) && (c.rho_v = vf)
+        (:rho_v2 in req) && (c.rho_v = vf)
+        (:rho_p in req) && (c.rho_p = vf)
+        (:rho_q in req) && (c.rho_q = vf)
+        (:rho_r in req) && (c.rho_r = vf)
+        (:rho_t in req) && (c.rho_t = vf)
 
         return vf
     elseif s === :rho_v2

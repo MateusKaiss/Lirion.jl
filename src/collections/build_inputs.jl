@@ -56,39 +56,35 @@ end
 # ============================================================
 
 function _build_inputs(
-    path::String;
+    path::String,
+    algorithm::CentralizedAlgorithm;
     model::Type{<:OPFModel},
-    algorithm,
     optimizer::Any,
     outputs::Bool,
 )::LirionInputs
     data = load_input_data(path)
     preprocess_case_data!(data, OPFModel)
 
-    # CENTRALIZED
-    if algorithm === :centralized
-        full_sys = build_system_data(data)
-        return LirionInputs(
-            path,
-            model,
-            optimizer,
-            outputs,
-            full_sys,
-            nothing,
-        )
-    end
+    full_sys = build_system_data(data)
+    return LirionInputs(path, model, optimizer, outputs, full_sys, nothing)
+end
 
-    # DISTRIBUTED (ADMM)
-    spec = algorithm
-    spec isa ADMMAlgorithmSpec ||
-        error("Invalid algorithm: expected centralized() or an ADMM spec from admm().")
+function _build_inputs(
+    path::String,
+    algorithm::ADMMAlgorithmSpec;
+    model::Type{<:OPFModel},
+    optimizer::Any,
+    outputs::Bool,
+)::LirionInputs
+    data = load_input_data(path)
+    preprocess_case_data!(data, OPFModel)
 
     cfg = DistributedOPFModel(
         model,
-        spec.coupling,
-        spec.sectioning,
-        spec.max_iter;
-        spec.kwargs...,
+        algorithm.coupling,
+        algorithm.sectioning,
+        algorithm.max_iter;
+        algorithm.kwargs...,
     )
 
     parts_dict, shared_buses = prepare_admm_partitions(data)
@@ -111,13 +107,5 @@ function _build_inputs(
     end
 
     admm_sys = ADMMSystem(zones, zone_to_idx, parts, shared_buses, interzonal_branches)
-
-    return LirionInputs(
-        path,
-        cfg,
-        optimizer,
-        outputs,
-        nothing,
-        admm_sys,
-    )
+    return LirionInputs(path, cfg, optimizer, outputs, nothing, admm_sys)
 end

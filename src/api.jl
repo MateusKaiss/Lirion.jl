@@ -1,6 +1,7 @@
 # -----------------------------
-# Model builders (mantém Type)
+# Model builders
 # -----------------------------
+
 dc() = DC
 ac() = AC
 socp() = SOCP
@@ -8,11 +9,12 @@ socp() = SOCP
 # -----------------------------
 # Algorithm builders
 # -----------------------------
-centralized() = :centralized
+
+centralized() = CentralizedAlgorithm()
 
 @inline function admm(;
     coupling::Symbol = :hybrid,         # :state | :power | :hybrid
-    sectioning::Symbol = :tie_line,     # por enquanto só :tie_line
+    sectioning::Symbol = :tie_line,     # :tie_line
     max_iter::Int = 350,
     kwargs...,
 )
@@ -28,8 +30,20 @@ centralized() = :centralized
 end
 
 # -----------------------------
+# Helpers
+# -----------------------------
+
+@inline function _assert_valid_path(path::AbstractString)::String
+    p = abspath(String(path))
+    (isfile(p) || isdir(p)) ||
+        throw(ArgumentError("Invalid path: $p is not a file or directory."))
+    return p
+end
+
+# -----------------------------
 # Plot helpers
 # -----------------------------
+
 @inline function _input_basedir(path::AbstractString)::String
     p = abspath(String(path))
     return isdir(p) ? p : dirname(p)
@@ -41,7 +55,6 @@ end
 
 @inline function _plots_stem(model_type)::String
     if model_type isa DistributedOPFModel
-        # Ex: admm_ac_hybrid_tie_line
         return "admm_" *
                lowercase(string(model_type.base_model)) * "_" *
                string(model_type.coupling) * "_" *
@@ -69,11 +82,4 @@ end
         @warn "Plots requested, but there is no ADMMHistory in this run (no plots generated)."
     end
     return nothing
-end
-
-@inline function _assert_valid_path(path::AbstractString)::String
-    p = abspath(String(path))
-    (isfile(p) || isdir(p)) ||
-        throw(ArgumentError("Invalid path: $p is not a file or directory."))
-    return p
 end

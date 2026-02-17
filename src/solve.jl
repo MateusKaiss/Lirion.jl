@@ -1,3 +1,7 @@
+# ============================================================
+# Run + Solve
+# ============================================================
+
 function run_lirion(inputs::LirionInputs)::LirionRunResult
     @info "Case: $(inputs.database_path)"
     @info "Model: $(inputs.model_type)"
@@ -29,7 +33,7 @@ end
 function solve(
     path::AbstractString;
     model::Type{<:OPFModel},
-    algorithm = centralized(),
+    algorithm::AbstractAlgorithm = centralized(),
     optimizer = nothing,
     outputs::Bool = false,
     plots::Bool = false,
@@ -37,16 +41,14 @@ function solve(
     path_str = _assert_valid_path(path)
 
     inputs = _build_inputs(
-        path_str;
+        path_str,
+        algorithm;
         model = model,
-        algorithm = algorithm,
         optimizer = optimizer,
         outputs = outputs,
     )
 
     out = run_lirion(inputs)
-
     _maybe_build_plots!(plots, path_str, inputs.model_type, out)
-
     return out
 end
