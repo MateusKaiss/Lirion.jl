@@ -62,6 +62,8 @@ end
         if bus.is_virtual[i]
             bus.pd[i] = 0.0
             bus.qd[i] = 0.0
+            bus.gs[i] = 0.0
+            bus.bs[i] = 0.0
             bus.bus_type[i] = 1
         end
     end
