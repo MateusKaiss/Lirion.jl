@@ -137,8 +137,8 @@ include("modeling/solve_model.jl")
 # ------------------------------------------------------------------
 # Post-processing / results
 # ------------------------------------------------------------------
-include("results/build_results.jl")
-include("results/build_plots.jl")
+include("postprocessing/build_results.jl")
+include("postprocessing/build_plots.jl")
 
 # ------------------------------------------------------------------
 # Distributed methods
