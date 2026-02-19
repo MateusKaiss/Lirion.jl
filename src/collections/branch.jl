@@ -1,3 +1,7 @@
+# ============================================================
+# Branch data
+# ============================================================
+
 struct BranchData{T <: Real}
     n::Int
     s_base::T
@@ -5,8 +9,8 @@ struct BranchData{T <: Real}
     from::Vector{Int}
     to::Vector{Int}
     status::Vector{Int}
-    global_index::Vector{Int}
-    active::Vector{Int}
+    global_index::Vector{Int}   # global branch ids (full case) for this local vector
+    active::Vector{Int}         # local indices i where status[i] == 1
 
     r::Vector{T}
     x::Vector{T}
@@ -17,12 +21,12 @@ struct BranchData{T <: Real}
     rate_c::Vector{T}
 
     tap::Vector{T}
-    shift::Vector{T}
+    shift::Vector{T}            # radians (keep consistent with raw)
     angmin::Vector{T}
     angmax::Vector{T}
 
     tap_position::Vector{T}
-    tap_angle::Vector{T}
+    tap_angle::Vector{T}        # radians
     inv_tap::Vector{T}
     g::Vector{T}
     b::Vector{T}
@@ -37,33 +41,58 @@ struct BranchData{T <: Real}
     zone::Vector{Int}
 end
 
-function get_branch_parameters(matpower_data::Dict{String, Any})
-    branch_data = matpower_data["branch"]
+# ------------------------------------------------------------------------------
+# Tap + phase-shift helpers
+# ------------------------------------------------------------------------------
 
-    f_bus = branch_data["f_bus"]
-    t_bus = branch_data["t_bus"]
+@inline function _tap_params(tap_raw::T, shift_rad::T) where {T <: Real}
+    if isnan(tap_raw) || tap_raw == zero(T)
+        tap_pos = one(T)
+        tap_ang = zero(T)
+        inv_tap = one(T)
+    else
+        tap_pos = tap_raw
+        tap_ang = shift_rad
+        inv_tap = one(T) / tap_raw
+    end
 
-    r = Float64.(branch_data["br_r"])
-    x = Float64.(branch_data["br_x"])
-    b_sh = Float64.(branch_data["br_b"])
+    tr = tap_pos * cos(tap_ang)
+    ti = tap_pos * sin(tap_ang)
+    return tap_pos, tap_ang, inv_tap, tr, ti
+end
 
-    tap_raw = Float64.(branch_data["tap"])
-    shift_deg = Float64.(branch_data["shift"])
+# ------------------------------------------------------------------------------
+# Parameter extraction
+# ------------------------------------------------------------------------------
 
-    rate_a = Float64.(branch_data["rate_a"])
-    rate_b = Float64.(branch_data["rate_b"])
-    rate_c = Float64.(branch_data["rate_c"])
+function get_branch_parameters(raw::CaseRaw)
+    @assert raw.branch !== nothing && raw.bus !== nothing "CaseRaw.branch/bus is nothing"
+    br = raw.branch::BranchRaw{Float64}
+    bus = raw.bus::BusRaw{Float64}
 
-    angmin = Float64.(branch_data["angmin"])
-    angmax = Float64.(branch_data["angmax"])
+    from = br.f_bus
+    to = br.t_bus
 
-    status = branch_data["br_status"]
+    r = br.br_r
+    x = br.br_x
+    b_sh = br.br_b
 
-    n = length(f_bus)
+    tap_raw = br.tap
+    shift_rad = br.shift
 
-    local_indices = get(matpower_data, "branch_local_indices", nothing)
-    global_index =
-        local_indices === nothing ? collect(1:n) : Vector{Int}(local_indices)
+    rate_a = br.rate_a
+    rate_b = br.rate_b
+    rate_c = br.rate_c
+
+    angmin = br.angmin
+    angmax = br.angmax
+
+    status = br.br_status
+    n = length(from)
+
+    # global_index: ADMM subproblem uses raw.admm.branch_local_indices (global IDs)
+    local_indices = raw.admm.branch_local_indices
+    global_index = isempty(local_indices) ? collect(1:n) : Vector{Int}(local_indices)
 
     tap_position = ones(Float64, n)
     tap_angle = zeros(Float64, n)
@@ -72,31 +101,18 @@ function get_branch_parameters(matpower_data::Dict{String, Any})
     ti = zeros(Float64, n)
 
     @inbounds for i in 1:n
-        t = tap_raw[i]
-        adeg = shift_deg[i]
-
-        if isnan(t) || t == 0.0
-            tap_position[i] = 1.0
-            tap_angle[i] = 0.0
-            inv_tap[i] = 1.0
-        else
-            tap_position[i] = t
-            tap_angle[i] = deg2rad(adeg)
-            inv_tap[i] = 1.0 / t
-        end
-        tr[i] = tap_position[i] * cos(tap_angle[i])
-        ti[i] = tap_position[i] * sin(tap_angle[i])
+        tap_position[i], tap_angle[i], inv_tap[i], tr[i], ti[i] =
+            _tap_params(tap_raw[i], shift_rad[i])
     end
 
     active = Int[]
-    @inbounds for i in eachindex(f_bus)
-        if status[i] == 1
-            push!(active, i)
-        end
+    sizehint!(active, n)
+    @inbounds for i in 1:n
+        status[i] == 1 && push!(active, i)
     end
 
-    bus_ids = matpower_data["bus"]["bus_i"]
-    bus_idx_map = get_bus_index_map(bus_ids)
+    bus_ids = bus.bus_i
+    bus_idx_map = raw.maps.bus_idx_map
 
     den = r .^ 2 .+ x .^ 2
     g = r ./ den
@@ -104,17 +120,16 @@ function get_branch_parameters(matpower_data::Dict{String, Any})
 
     return (
         n = n,
-        from = f_bus,
-        to = t_bus,
+        from = from,
+        to = to,
         status = status,
         global_index = global_index,
         active = active, r = r,
         x = x,
-        b_sh = b_sh,
-        rate_a = rate_a,
+        b_sh = b_sh, rate_a = rate_a,
         rate_b = rate_b,
         rate_c = rate_c, tap = tap_raw,
-        shift = shift_deg,
+        shift = shift_rad,
         angmin = angmin,
         angmax = angmax, tap_position = tap_position,
         tap_angle = tap_angle,
@@ -122,45 +137,42 @@ function get_branch_parameters(matpower_data::Dict{String, Any})
         g = g,
         b = b,
         tr = tr,
-        ti = ti, s_base = Float64(matpower_data["baseMVA"]),
-        initial_voltage_magnitude = Float64.(matpower_data["bus"]["vm"]),
-        initial_voltage_angle = Float64.(matpower_data["bus"]["va"]), bus_ids = bus_ids,
+        ti = ti, s_base = Float64(raw.baseMVA),
+        initial_voltage_magnitude = Float64.(bus.vm),
+        initial_voltage_angle = Float64.(bus.va), bus_ids = bus_ids,
         bus_idx_map = bus_idx_map,
-        zone = matpower_data["bus"]["zone"],
+        zone = bus.zone,
     )
 end
 
-function build_branch_data(data::Dict{String, Any})::BranchData{Float64}
-    p = get_branch_parameters(data)
+# ------------------------------------------------------------------------------
+# Builder
+# ------------------------------------------------------------------------------
+
+function build_branch_data(raw::CaseRaw)::BranchData{Float64}
+    p = get_branch_parameters(raw)
 
     return BranchData{Float64}(
         p.n,
-        p.s_base,
-        p.from,
+        p.s_base, p.from,
         p.to,
         p.status,
         p.global_index,
-        p.active,
-        p.r,
+        p.active, p.r,
         p.x,
-        p.b_sh,
-        p.rate_a,
+        p.b_sh, p.rate_a,
         p.rate_b,
-        p.rate_c,
-        p.tap,
+        p.rate_c, p.tap,
         p.shift,
         p.angmin,
-        p.angmax,
-        p.tap_position,
+        p.angmax, p.tap_position,
         p.tap_angle,
         p.inv_tap,
         p.g,
         p.b,
         p.tr,
-        p.ti,
-        p.initial_voltage_magnitude,
-        p.initial_voltage_angle,
-        p.bus_ids,
+        p.ti, p.initial_voltage_magnitude,
+        p.initial_voltage_angle, p.bus_ids,
         p.bus_idx_map,
         p.zone,
     )

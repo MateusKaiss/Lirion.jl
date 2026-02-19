@@ -2,6 +2,17 @@
 # Run + Solve
 # ============================================================
 
+# -----------------------------
+# Helpers
+# -----------------------------
+
+@inline function _assert_valid_path(path::AbstractString)::String
+    p = abspath(String(path))
+    (isfile(p) || isdir(p)) ||
+        throw(ArgumentError("Invalid path: $p is not a file or directory."))
+    return p
+end
+
 function run_lirion(inputs::LirionInputs)::LirionRunResult
     @info "Case: $(inputs.database_path)"
     @info "Model: $(inputs.model_type)"
@@ -13,9 +24,11 @@ function run_lirion(inputs::LirionInputs)::LirionRunResult
         result_model = solve_model(inputs)
 
         sys = inputs.system
+        @assert sys !== nothing
+
         data = sys.raw
 
-        result_dict = build_result_dict(result_model, data)
+        result_dict = build_result_dict(result_model, sys)
 
         if inputs.write_outputs
             save_result_to_csv(result_dict, data, inputs.database_path)

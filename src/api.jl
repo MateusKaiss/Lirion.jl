@@ -30,17 +30,6 @@ centralized() = CentralizedAlgorithm()
 end
 
 # -----------------------------
-# Helpers
-# -----------------------------
-
-@inline function _assert_valid_path(path::AbstractString)::String
-    p = abspath(String(path))
-    (isfile(p) || isdir(p)) ||
-        throw(ArgumentError("Invalid path: $p is not a file or directory."))
-    return p
-end
-
-# -----------------------------
 # Plot helpers
 # -----------------------------
 

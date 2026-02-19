@@ -48,58 +48,68 @@ function run_test_timeseries()
         end
     end
 
-    @testset "Test preprocessing extension for timeseries (Dict-style)" begin
+    # ---------------------------------------------------------------------
+    # CaseRaw-style preprocessing test (updated from old Dict-style)
+    # ---------------------------------------------------------------------
+    @testset "Test preprocessing extension for timeseries (CaseRaw-style)" begin
         case_path = joinpath(@__DIR__, "matpower_cases", "case3_timeseries_mismatch.m")
 
-        data = Lirion.load_input_data(case_path)
-        Lirion.preprocess_case_data!(data)
+        raw = Lirion.load_input_data(case_path)   # now returns CaseRaw
+        Lirion.preprocess_case_data!(raw)
 
         expected_times = [1, 2, 3]
 
         @testset "bus_timeseries" begin
-            ts = data["bus_timeseries"]
-            @test sort(unique(ts["time"])) == expected_times
-            for bus in unique(ts["bus"])
-                idxs = findall(x -> x == bus, ts["bus"])
+            ts = raw.bus_timeseries
+            @test ts !== nothing
+            @test sort(unique(ts.time)) == expected_times
+
+            for bus in unique(ts.bus)
+                idxs = findall(==(bus), ts.bus)
                 @test length(idxs) == 3
-                @test ts["pd"][idxs[3]] == ts["pd"][idxs[2]]
-                @test ts["qd"][idxs[3]] == ts["qd"][idxs[2]]
+                @test ts.pd[idxs[3]] == ts.pd[idxs[2]]
+                @test ts.qd[idxs[3]] == ts.qd[idxs[2]]
             end
         end
 
         @testset "prosumer_timeseries" begin
-            ts = data["prosumer_timeseries"]
-            @test sort(unique(ts["time"])) == expected_times
-            for bus in unique(ts["bus"])
-                idxs = findall(x -> x == bus, ts["bus"])
+            ts = raw.prosumer_timeseries
+            @test ts !== nothing
+            @test sort(unique(ts.time)) == expected_times
+
+            for bus in unique(ts.bus)
+                idxs = findall(==(bus), ts.bus)
                 @test length(idxs) == 3
-                for field in ["generation", "demand", "q_generation", "q_demand"]
-                    @test ts[field][idxs[3]] == ts[field][idxs[2]]
-                end
+
+                # CaseRaw fields (match your ProsumerTimeseriesRaw)
+                @test ts.p_pv[idxs[3]] == ts.p_pv[idxs[2]]
+                @test ts.p_load[idxs[3]] == ts.p_load[idxs[2]]
+                @test ts.p_curtail[idxs[3]] == ts.p_curtail[idxs[2]]
             end
         end
 
         @testset "consumer_timeseries" begin
-            ts = data["consumer_timeseries"]
-            @test sort(unique(ts["time"])) == expected_times
-            for bus in unique(ts["bus"])
-                idxs = findall(x -> x == bus, ts["bus"])
+            ts = raw.consumer_timeseries
+            @test ts !== nothing
+            @test sort(unique(ts.time)) == expected_times
+
+            for bus in unique(ts.bus)
+                idxs = findall(==(bus), ts.bus)
                 @test length(idxs) == 3
-                for field in ["demand", "q_demand"]
-                    @test ts[field][idxs[3]] == ts[field][idxs[2]]
-                end
+                @test ts.demand[idxs[3]] == ts.demand[idxs[2]]
+                @test ts.q_demand[idxs[3]] == ts.q_demand[idxs[2]]
             end
         end
 
         @testset "gencost_timeseries" begin
-            ts = data["gencost_timeseries"]
-            @test sort(unique(ts["time"])) == expected_times
-            for gen in unique(ts["gen_id"])
-                idxs = findall(x -> x == gen, ts["gen_id"])
+            ts = raw.gencost_timeseries
+            @test ts !== nothing
+            @test sort(unique(ts.time)) == expected_times
+
+            for gen in unique(ts.gen_id)
+                idxs = findall(==(gen), ts.gen_id)
                 @test length(idxs) == 3
-                for field in ["cost_coefficients"]
-                    @test ts[field][idxs[3]] == ts[field][idxs[2]]
-                end
+                @test ts.cost_coefficients[idxs[3]] == ts.cost_coefficients[idxs[2]]
             end
         end
     end

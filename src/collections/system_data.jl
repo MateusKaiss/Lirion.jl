@@ -1,16 +1,24 @@
+# ============================================================
+# ADMM zone meta (unchanged shape)
+# ============================================================
+
 struct ADMMZoneMeta
-    branch_local_indices::Vector{Int}
-    branch_global_to_local::Dict{Int, Int}
-    shared_buses_zone::Vector{Int}
+    branch_local_indices::Vector{Int}         # global branch indices in full case
+    branch_global_to_local::Dict{Int, Int}    # global -> local index inside this zone
+    shared_buses_zone::Vector{Int}            # bus IDs shared with other zones
 end
+
+# ============================================================
+# SystemData
+# ============================================================
 
 struct SystemData
     baseMVA::Float64
     T::Int
 
-    bus::BusData
+    bus::BusData{Float64}
     branch::BranchData
-    gen::GenData
+    gen::GenData{Float64}
     battery::BatteryData
     prosumer::ProsumerData
 
@@ -22,32 +30,40 @@ struct SystemData
     powerflow::PowerFlowData
     objective::ObjectiveData
 
-    admm::Union{Nothing, ADMMZoneMeta}
-
     raw::Dict{String, Any}
 end
 
-function build_system_data(
-    data::Dict{String, Any};
-    admm_meta::Union{Nothing, ADMMZoneMeta} = nothing,
-)::SystemData
-    bus_data = build_bus_data(data)
-    branch_data = build_branch_data(data)
-    gen_data = build_gen_data(data)
-    battery_data = build_battery_data(data)
-    prosumer_data = build_prosumer_data(data)
+function _raw_snapshot(raw::CaseRaw)
+    d = Dict{String, Any}()
+    d["name"] = raw.name
+    d["baseMVA"] = raw.baseMVA
+    d["T"] = raw.T
+    d["maps"] = raw.maps
+    return d
+end
 
-    bus_ts_data = build_bus_timeseries_data(data)
-    prosumer_ts_data = build_prosumer_timeseries_data(data)
-    consumer_ts_data = build_consumer_timeseries_data(data)
-    gencost_ts_data = build_gencost_timeseries_data(data)
+# ============================================================
+# Builder: CaseRaw -> SystemData
+# ============================================================
 
-    powerflow_data = build_power_flow_data(data)
-    objective_data = build_objective_data(data)
+function build_system_data(raw::CaseRaw)::SystemData
+    bus_data = build_bus_data(raw)
+    branch_data = build_branch_data(raw)
+    gen_data = build_gen_data(raw)
+    battery_data = build_battery_data(raw)
+    prosumer_data = build_prosumer_data(raw)
+
+    bus_ts_data = build_bus_timeseries_data(raw)
+    prosumer_ts_data = build_prosumer_timeseries_data(raw)
+    consumer_ts_data = build_consumer_timeseries_data(raw)
+    gencost_ts_data = build_gencost_timeseries_data(raw)
+
+    powerflow_data = build_power_flow_data(raw)
+    objective_data = build_objective_data(raw)
 
     return SystemData(
-        data["baseMVA"],
-        data["T"],
+        raw.baseMVA,
+        raw.T,
         bus_data,
         branch_data,
         gen_data,
@@ -59,7 +75,6 @@ function build_system_data(
         gencost_ts_data,
         powerflow_data,
         objective_data,
-        admm_meta,
-        data,
+        _raw_snapshot(raw),
     )
 end

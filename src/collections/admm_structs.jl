@@ -1,3 +1,4 @@
+
 struct Partitions{P}
     parts::Vector{P}
     zones::Vector{Int}
@@ -140,18 +141,7 @@ Base.@kwdef mutable struct PartitionSOCP
 end
 
 # =======================================================================
-# Utils
-# =======================================================================
-
-@inline function _require_admm_meta(s::SystemData, zone::Int)
-    m = s.admm
-    m === nothing &&
-        error("Missing ADMM metadata for zone=$zone (SystemData.admm === nothing).")
-    return m::ADMMZoneMeta
-end
-
-# =======================================================================
-# ADMM Partitions Builders
+# ADMM Partitions Builders (meta vem do sys direto)
 # =======================================================================
 
 function build_dc_partitions(sys::ADMMSystem)::Partitions{PartitionDC}
@@ -163,15 +153,14 @@ function build_dc_partitions(sys::ADMMSystem)::Partitions{PartitionDC}
     @inbounds for i in 1:n_zones
         zone = zones[i]
         s = sys.parts[i]
-        meta = _require_admm_meta(s, zone)
 
         parts[i] = PartitionDC(;
             id = zone,
             bus = s.bus,
             branch = s.branch,
-            branch_local_indices = meta.branch_local_indices,
-            branch_global_to_local = meta.branch_global_to_local,
-            shared_buses_zone = meta.shared_buses_zone,
+            branch_local_indices = sys.branch_local_indices[i],
+            branch_global_to_local = sys.branch_global_to_local[i],
+            shared_buses_zone = sys.shared_buses_zone[i],
             objective_params = s.objective,
         )
     end
@@ -188,15 +177,14 @@ function build_ac_partitions(sys::ADMMSystem)::Partitions{PartitionAC}
     @inbounds for i in 1:n_zones
         zone = zones[i]
         s = sys.parts[i]
-        meta = _require_admm_meta(s, zone)
 
         parts[i] = PartitionAC(;
             id = zone,
             bus = s.bus,
             branch = s.branch,
-            branch_local_indices = meta.branch_local_indices,
-            branch_global_to_local = meta.branch_global_to_local,
-            shared_buses_zone = meta.shared_buses_zone,
+            branch_local_indices = sys.branch_local_indices[i],
+            branch_global_to_local = sys.branch_global_to_local[i],
+            shared_buses_zone = sys.shared_buses_zone[i],
             objective_params = s.objective,
         )
     end
@@ -213,15 +201,14 @@ function build_socp_partitions(sys::ADMMSystem)::Partitions{PartitionSOCP}
     @inbounds for i in 1:n_zones
         zone = zones[i]
         s = sys.parts[i]
-        meta = _require_admm_meta(s, zone)
 
         parts[i] = PartitionSOCP(;
             id = zone,
             bus = s.bus,
             branch = s.branch,
-            branch_local_indices = meta.branch_local_indices,
-            branch_global_to_local = meta.branch_global_to_local,
-            shared_buses_zone = meta.shared_buses_zone,
+            branch_local_indices = sys.branch_local_indices[i],
+            branch_global_to_local = sys.branch_global_to_local[i],
+            shared_buses_zone = sys.shared_buses_zone[i],
             objective_params = s.objective,
         )
     end

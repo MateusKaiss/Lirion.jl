@@ -2,8 +2,6 @@
 # Helpers para variáveis de geração / curtailment
 # =====================================================================
 
-"Retorna se o gerador g é curtível (renovável) e está existente.
-   Mesma lógica antiga: existing[g] == true && plant_type[g] == \"R\"."
 function has_curtailment(gen::GenData, g::Int)
     return gen.existing[g] && gen.plant_type[g] == "R"
 end
@@ -72,74 +70,5 @@ function create_curtailment_variables!(model::JuMP.Model, gen::GenData)
     @variable(model, curtailment[g in curtailable, t in 1:T] >= 0.0)
 
     model[:curtailment] = curtailment
-    return nothing
-end
-
-function create_curtailment_constraints!(model::JuMP.Model, gen::GenData)
-    T = get(model.ext, :time_periods, 1)
-    G = gen.n
-
-    curtailable = [g for g in 1:G if has_curtailment(gen, g)]
-
-    @constraint(model, [g in curtailable, t in 1:T],
-        model[:p_generation][g, t] + model[:curtailment][g, t] == gen.pmax[g]
-    )
-
-    return nothing
-end
-
-# =======================================================================
-# Dispatch by model type (DC / AC / SOCP)
-# =======================================================================
-function generators!(
-    model::JuMP.Model,
-    sys::SystemData,
-    ::Type{DC},
-)
-    gen = sys.gen
-    if gen.n == 0
-        @info "No generators in SystemData (DC). Skipping generator modeling."
-        return nothing
-    end
-
-    create_active_generation_variables!(model, gen)
-    create_curtailment_variables!(model, gen)
-    create_curtailment_constraints!(model, gen)
-    return nothing
-end
-
-function generators!(
-    model::JuMP.Model,
-    sys::SystemData,
-    ::Type{AC},
-)
-    gen = sys.gen
-    if gen.n == 0
-        @info "No generators in SystemData (AC). Skipping generator modeling."
-        return nothing
-    end
-
-    create_active_generation_variables!(model, gen)
-    create_reactive_generation_variables!(model, gen)
-    create_curtailment_variables!(model, gen)
-    create_curtailment_constraints!(model, gen)
-    return nothing
-end
-
-function generators!(
-    model::JuMP.Model,
-    sys::SystemData,
-    ::Type{SOCP},
-)
-    gen = sys.gen
-    if gen.n == 0
-        @info "No generators in SystemData (SOCP). Skipping generator modeling."
-        return nothing
-    end
-
-    create_active_generation_variables!(model, gen)
-    create_reactive_generation_variables!(model, gen)
-    create_curtailment_variables!(model, gen)
-    create_curtailment_constraints!(model, gen)
     return nothing
 end

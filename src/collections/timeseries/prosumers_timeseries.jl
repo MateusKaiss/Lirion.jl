@@ -9,10 +9,9 @@ struct ProsumerTimeseriesData
     p_curtail::Vector{Float64}
 end
 
-function build_prosumer_timeseries_data(data::Dict{String, Any})::ProsumerTimeseriesData
-    if !haskey(data, "prosumer_timeseries") ||
-       !haskey(data["prosumer_timeseries"], "time") ||
-       isempty(data["prosumer_timeseries"]["time"])
+function build_prosumer_timeseries_data(raw::CaseRaw)::ProsumerTimeseriesData
+    ts = raw.prosumer_timeseries
+    if ts === nothing || isempty(ts.time)
         return ProsumerTimeseriesData(
             false,
             Int[],
@@ -24,17 +23,15 @@ function build_prosumer_timeseries_data(data::Dict{String, Any})::ProsumerTimese
             Float64[],
         )
     end
-
-    ts = data["prosumer_timeseries"]
-
+    ts = ts::ProsumerTimeseriesRaw{Float64}
     return ProsumerTimeseriesData(
         true,
-        ts["time"],
-        ts["bus"],
-        get(ts, "p_pv", zeros(Float64, length(ts["bus"]))),
-        get(ts, "p_load", zeros(Float64, length(ts["bus"]))),
-        get(ts, "q_generation", zeros(Float64, length(ts["bus"]))),
-        get(ts, "q_demand", zeros(Float64, length(ts["bus"]))),
-        get(ts, "p_curtail", zeros(Float64, length(ts["bus"]))),
+        ts.time,
+        ts.bus,
+        ts.p_pv,
+        ts.p_load,
+        fill(0.0, length(ts.bus)),  # q_generation (não existe no raw atual)
+        fill(0.0, length(ts.bus)),  # q_demand
+        ts.p_curtail,
     )
 end

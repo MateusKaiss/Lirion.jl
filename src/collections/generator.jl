@@ -19,52 +19,53 @@ struct GenData{T <: Real}
     curtailment_cost::Vector{T}
 end
 
-# ---------------------------------------------------------------------
-# Generator Parameters
-# ---------------------------------------------------------------------
-function get_generator_parameters(matpower_data::Dict{String, Any})
-    gen_data = matpower_data["gen"]
+function get_generator_parameters(raw::CaseRaw)
+    if raw.gen === nothing
+        return (
+            n = 0,
+            bus = Int[],
+            pg = Float64[], qg = Float64[],
+            pmin = Float64[], pmax = Float64[],
+            qmin = Float64[], qmax = Float64[],
+            status = Int[],
+            existing = Bool[],
+            initial_pg = Union{Nothing, Float64}[],
+            initial_qg = Union{Nothing, Float64}[],
+            plant_type = String[],
+            curtailment_cost = Float64[],
+        )
+    end
 
-    n = length(gen_data["gen_bus"])
-    pg = Float64.(gen_data["pg"])
-    qg = Float64.(gen_data["qg"])
-    pmin = Float64.(gen_data["pmin"])
-    pmax = Float64.(gen_data["pmax"])
-    qmin = Float64.(gen_data["qmin"])
-    qmax = Float64.(gen_data["qmax"])
+    gen = raw.gen::GenRaw{Float64}
+    n = length(gen.gen_bus)
 
-    gen_status_vec = Int.(gen_data["gen_status"])
-    existing = gen_status_vec .== 1
+    pg = gen.pg
+    qg = gen.qg
+    pmin = gen.pmin
+    pmax = gen.pmax
+    qmin = gen.qmin
+    qmax = gen.qmax
+
+    status = gen.gen_status
+    existing = status .== 1
 
     initial_pg = Vector{Union{Nothing, Float64}}(undef, n)
     initial_qg = Vector{Union{Nothing, Float64}}(undef, n)
-
     @inbounds for g in 1:n
-        pg_val = pg[g]
-        qg_val = qg[g]
-        initial_pg[g] = isnan(pg_val) ? nothing : pg_val
-        initial_qg[g] = isnan(qg_val) ? nothing : qg_val
+        initial_pg[g] = isnan(pg[g]) ? nothing : pg[g]
+        initial_qg[g] = isnan(qg[g]) ? nothing : qg[g]
     end
 
-    raw_pt = gen_data["plant_type"]
-    plant_type = String.(raw_pt)
-
-    curtailment_cost = if haskey(gen_data, "curtailment_cost")
-        Float64.(gen_data["curtailment_cost"])
-    else
-        zeros(Float64, n)
-    end
+    plant_type = gen.plant_type
+    curtailment_cost = gen.curtailment_cost
 
     return (
         n = n,
-        bus = Int.(gen_data["gen_bus"]),
-        pg = pg,
-        qg = qg,
-        pmin = pmin,
-        pmax = pmax,
-        qmin = qmin,
-        qmax = qmax,
-        status = gen_status_vec,
+        bus = gen.gen_bus,
+        pg = pg, qg = qg,
+        pmin = pmin, pmax = pmax,
+        qmin = qmin, qmax = qmax,
+        status = status,
         existing = existing,
         initial_pg = initial_pg,
         initial_qg = initial_qg,
@@ -73,26 +74,22 @@ function get_generator_parameters(matpower_data::Dict{String, Any})
     )
 end
 
-# =====================================================================
-# Builder
-# =====================================================================
-function build_gen_data(data::Dict{String, Any})::GenData{Float64}
-    params = get_generator_parameters(data)
-
+function build_gen_data(raw::CaseRaw)::GenData{Float64}
+    p = get_generator_parameters(raw)
     return GenData{Float64}(
-        params.n,
-        params.bus,
-        params.pg,
-        params.qg,
-        params.pmin,
-        params.pmax,
-        params.qmin,
-        params.qmax,
-        params.status,
-        params.existing,
-        params.initial_pg,
-        params.initial_qg,
-        params.plant_type,
-        params.curtailment_cost,
+        p.n,
+        p.bus,
+        p.pg,
+        p.qg,
+        p.pmin,
+        p.pmax,
+        p.qmin,
+        p.qmax,
+        p.status,
+        p.existing,
+        p.initial_pg,
+        p.initial_qg,
+        p.plant_type,
+        p.curtailment_cost,
     )
 end

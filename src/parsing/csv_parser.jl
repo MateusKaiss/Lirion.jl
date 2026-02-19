@@ -1,327 +1,439 @@
-# ---------------------------------------------------------------------
-# Expected columns from CSV files (same as Matpower)
-# ---------------------------------------------------------------------
-const _mp_data_names_csv = [
-    "mpc.version", "mpc.baseMVA", "mpc.bus", "mpc.gen",
-    "mpc.branch", "mpc.dcline", "mpc.gencost", "mpc.dclinecost",
-    "mpc.bus_name", "mpc.storage", "mpc.switch", "mpc.prosumer",
-    "mpc.bus_timeseries", "mpc.prosumer_timeseries",
-    "mpc.consumer",
-]
+# -------------------------
+# helpers
+# -------------------------
 
-const _mp_bus_columns_csv = [
-    ("bus_i", Int),
-    ("bus_type", Int),
-    ("pd", Float64), ("qd", Float64),
-    ("gs", Float64), ("bs", Float64),
-    ("area", Int),
-    ("vm", Float64), ("va", Float64),
-    ("base_kv", Float64),
-    ("zone", Int),
-    ("vmax", Float64), ("vmin", Float64),
-    ("lam_p", Float64), ("lam_q", Float64),
-    ("mu_vmax", Float64), ("mu_vmin", Float64),
-]
+@inline _sym(s::AbstractString) = Symbol(String(s))
 
-const _mp_bus_name_columns_csv = [
-    ("name", Union{String, SubString{String}})
-]
+function _read_csv(path::String)::DataFrame
+    return CSV.read(path, DataFrame; normalizenames = false, silencewarnings = true)
+end
 
-const _mp_gen_columns_csv = [
-    ("gen_bus", Int),
-    ("pg", Float64), ("qg", Float64),
-    ("qmax", Float64), ("qmin", Float64),
-    ("vg", Float64),
-    ("mbase", Float64),
-    ("gen_status", Int),
-    ("pmax", Float64), ("pmin", Float64),
-    ("pc1", Float64),
-    ("pc2", Float64),
-    ("qc1min", Float64), ("qc1max", Float64),
-    ("qc2min", Float64), ("qc2max", Float64),
-    ("ramp_agc", Float64),
-    ("ramp_10", Float64),
-    ("ramp_30", Float64),
-    ("ramp_q", Float64),
-    ("apf", Float64),
-    ("mu_pmax", Float64), ("mu_pmin", Float64),
-    ("mu_qmax", Float64), ("mu_qmin", Float64),
-    ("plant_type", Float64),
-    ("curtailment_cost", Float64),
-]
+@inline function _hascol(df::DataFrame, col::AbstractString)::Bool
+    return _sym(col) in propertynames(df)
+end
 
-const _mp_branch_columns_csv = [
-    ("f_bus", Int),
-    ("t_bus", Int),
-    ("br_r", Float64), ("br_x", Float64),
-    ("br_b", Float64),
-    ("rate_a", Float64),
-    ("rate_b", Float64),
-    ("rate_c", Float64),
-    ("tap", Float64), ("shift", Float64),
-    ("br_status", Int),
-    ("angmin", Float64), ("angmax", Float64),
-    ("pf", Float64), ("qf", Float64),
-    ("pt", Float64), ("qt", Float64),
-    ("mu_sf", Float64), ("mu_st", Float64),
-    ("mu_angmin", Float64), ("mu_angmax", Float64),
-]
+@inline function _nrows_df(df::DataFrame)::Int
+    return nrow(df)
+end
 
-const _mp_dcline_columns_csv = [
-    ("f_bus", Int),
-    ("t_bus", Int),
-    ("br_status", Int),
-    ("pf", Float64), ("pt", Float64),
-    ("qf", Float64), ("qt", Float64),
-    ("vf", Float64), ("vt", Float64),
-    ("pmin", Float64), ("pmax", Float64),
-    ("qminf", Float64), ("qmaxf", Float64),
-    ("qmint", Float64), ("qmaxt", Float64),
-    ("loss0", Float64),
-    ("loss1", Float64),
-    ("mu_pmin", Float64), ("mu_pmax", Float64),
-    ("mu_qminf", Float64), ("mu_qmaxf", Float64),
-    ("mu_qmint", Float64), ("mu_qmaxt", Float64),
-]
+@inline function _getcol(df::DataFrame, col::AbstractString)
+    s = _sym(col)
+    return (s in propertynames(df)) ? df[!, s] : nothing
+end
 
-const _mp_storage_columns_csv = [
-    ("storage_bus", Int),
-    ("ps", Float64), ("qs", Float64),
-    ("energy", Float64), ("energy_rating", Float64),
-    ("charge_rating", Float64), ("discharge_rating", Float64),
-    ("charge_efficiency", Float64), ("discharge_efficiency", Float64),
-    ("thermal_rating", Float64),
-    ("qmin", Float64), ("qmax", Float64),
-    ("r", Float64), ("x", Float64),
-    ("p_loss", Float64), ("q_loss", Float64),
-    ("status", Int),
-]
+function _col_or_default(df::DataFrame, col::AbstractString, ::Type{Int}, default::Int)
+    v = _getcol(df, col)
+    n = _nrows_df(df)
+    out = Vector{Int}(undef, n)
 
-const _mp_switch_columns_csv = [
-    ("f_bus", Int), ("t_bus", Int),
-    ("psw", Float64), ("qsw", Float64), ("state", Int),
-    ("thermal_rating", Float64),
-    ("status", Int),
-]
+    if v === nothing
+        fill!(out, default)
+        return out
+    end
 
-const _mp_gencost_columns_csv = [
-    ("model", Int),
-    ("startup", Float64),
-    ("shutdown", Float64),
-    ("ncost", Int),
-    ("cost_coefficients", Vector{Float64}),
-]
+    @inbounds for i in 1:n
+        x = v[i]
+        out[i] = (x === missing) ? default : Int(x)
+    end
+    return out
+end
 
-const _mp_prosumer_columns_csv = [
-    ("bus", Int),
-    ("generation", Float64),
-    ("demand", Float64),
-    ("q_generation", Float64),
-    ("q_demand", Float64),
-    ("cost_injection", Float64),
-    ("inverter_capacity", Float64),
-]
+function _col_or_default(
+    df::DataFrame,
+    col::AbstractString,
+    ::Type{Float64},
+    default::Float64,
+)
+    v = _getcol(df, col)
+    n = _nrows_df(df)
+    out = Vector{Float64}(undef, n)
 
-const _mp_consumer_columns_csv = [
-    ("bus", Int),
-    ("demand", Float64),
-    ("q_demand", Float64),
-]
+    if v === nothing
+        fill!(out, default)
+        return out
+    end
 
-const _mp_consumer_timeseries_columns_csv = [
-    ("time", Int),
-    ("bus", Int),
-    ("demand", Float64),
-    ("q_demand", Float64),
-]
+    @inbounds for i in 1:n
+        x = v[i]
+        out[i] = (x === missing) ? default : Float64(x)
+    end
+    return out
+end
 
-const _mp_prosumer_timeseries_columns_csv = [
-    ("time", Int),
-    ("bus", Int),
-    ("generation", Float64),
-    ("demand", Float64),
-    ("q_generation", Float64),
-    ("q_demand", Float64),
-]
+function _col_or_default(
+    df::DataFrame,
+    col::AbstractString,
+    ::Type{String},
+    default::String,
+)
+    v = _getcol(df, col)
+    n = _nrows_df(df)
+    out = Vector{String}(undef, n)
 
-const _mp_gencost_timeseries_columns_csv = [
-    ("time", Int),
-    ("gen_id", Int),
-    ("model", Int),
-    ("startup", Float64),
-    ("shutdown", Float64),
-    ("ncost", Int),
-    ("cost_coefficients", Vector{Float64}),
-    ("tou", Float64),
-    ("feed_in_tariff", Float64),
-]
+    if v === nothing
+        fill!(out, default)
+        return out
+    end
 
-const _mp_bus_timeseries_columns_csv = [
-    ("time", Int),
-    ("bus", Int),
-    ("pd", Float64),
-    ("qd", Float64),
-]
+    @inbounds for i in 1:n
+        x = v[i]
+        out[i] = (x === missing) ? default : String(x)
+    end
+    return out
+end
 
-function parse_csv_table(path::String, columns::Vector{Tuple{String, DataType}})
-    df = CSV.read(path, DataFrame)
-    table = Dict{String, Union{Vector, Nothing}}()
+function _col_or_default(
+    df::DataFrame,
+    col::AbstractString,
+    ::Type{Union{String, SubString{String}}},
+    default::String,
+)
+    return _col_or_default(df, col, String, default)
+end
 
-    for (col_name, col_type) in columns
-        if hasproperty(df, col_name)
-            table[col_name] = convert(Vector{col_type}, df[!, col_name])
+function _parse_csv_table_dict(path::String, columns::Vector{Tuple{String, Type}})
+    df = _read_csv(path)
+    tbl = Dict{String, Any}()
+    for (name, typ) in columns
+        if typ == Int
+            tbl[name] = _col_or_default(df, name, Int, 0)
+        elseif typ == Float64
+            tbl[name] = _col_or_default(df, name, Float64, 0.0)
+        elseif typ == String || typ == Union{String, SubString{String}}
+            tbl[name] = _col_or_default(df, name, String, "")
         else
-            @warn "Missing column '$col_name' in file $path. Setting as `nothing`."
-            table[col_name] = Any[]
+            tbl[name] = _col_or_default(df, name, String, "")
         end
     end
-
-    return table
+    return tbl
 end
 
-# ---------------------------------------------------------------------
-# Specific function for gencost.csv
-# ---------------------------------------------------------------------
-function parse_gencost_table(path::String)
-    df = CSV.read(path, DataFrame)
-    table = Dict{String, Vector}()
+# -------------------------
+# gencost + gencost_timeseries (colunas c1,c2,...)
+# -------------------------
 
-    table["model"] = Vector{Int}()
-    table["startup"] = Vector{Float64}()
-    table["shutdown"] = Vector{Float64}()
-    table["ncost"] = Vector{Int}()
-    table["cost_coefficients"] = Vector{Vector{Float64}}()
+@inline function _safe_int(x, default::Int = 0)::Int
+    return (x === missing || x === nothing) ? default : Int(x)
+end
 
-    for row in eachrow(df)
-        push!(table["model"], row.model)
-        push!(table["startup"], row.startup)
-        push!(table["shutdown"], row.shutdown)
-        push!(table["ncost"], row.ncost)
-        coeffs = []
-        for i in 1:row.ncost
-            push!(coeffs, row[Symbol("c$(i)")])
+@inline function _safe_f64(x, default::Float64 = 0.0)::Float64
+    return (x === missing || x === nothing) ? default : Float64(x)
+end
+
+function _parse_gencost_csv(path::String)::GencostRaw{Float64}
+    df = _read_csv(path)
+    n = nrow(df)
+
+    model = Vector{Int}(undef, n)
+    startup = Vector{Float64}(undef, n)
+    shutdown = Vector{Float64}(undef, n)
+    ncost = Vector{Int}(undef, n)
+    coeffs = Vector{Vector{Float64}}(undef, n)
+
+    smodel = _sym("model")
+    sstartup = _sym("startup")
+    sshutdown = _sym("shutdown")
+    sncost = _sym("ncost")
+
+    @inbounds for i in 1:n
+        model[i] = _safe_int(df[i, smodel], 0)
+        startup[i] = _safe_f64(df[i, sstartup], 0.0)
+        shutdown[i] = _safe_f64(df[i, sshutdown], 0.0)
+        ncost[i] = _safe_int(df[i, sncost], 0)
+
+        k = ncost[i]
+        if k <= 0
+            coeffs[i] = Float64[]
+            continue
         end
-        push!(table["cost_coefficients"], coeffs)
+
+        c = Vector{Float64}(undef, k)
+        @inbounds for j in 1:k
+            sj = _sym("c$(j)")
+            if sj in propertynames(df)
+                c[j] = _safe_f64(df[i, sj], 0.0)
+            else
+                c[j] = 0.0
+            end
+        end
+        coeffs[i] = c
     end
-    return table
+
+    return GencostRaw{Float64}(model, startup, shutdown, ncost, coeffs)
 end
 
-# ---------------------------------------------------------------------
-# Parse Gencost Timeseries CSV
-# ---------------------------------------------------------------------
-function parse_gencost_timeseries_csv(path::String)
-    df = CSV.read(path, DataFrame)
-    table = Dict{String, Vector}()
+function _parse_gencost_timeseries_csv(path::String)::GencostTimeseriesRaw{Float64}
+    df = _read_csv(path)
+    n = nrow(df)
 
-    table["time"] = Int[]
-    table["gen_id"] = Int[]
-    table["model"] = Int[]
-    table["startup"] = Float64[]
-    table["shutdown"] = Float64[]
-    table["ncost"] = Int[]
-    table["cost_coefficients"] = Vector{Vector{Float64}}()
-    table["tou"] = Float64[]
-    table["feed_in_tariff"] = Float64[]
+    time = Vector{Int}(undef, n)
+    gen_id = Vector{Int}(undef, n)
+    model = Vector{Int}(undef, n)
+    startup = Vector{Float64}(undef, n)
+    shutdown = Vector{Float64}(undef, n)
+    ncost = Vector{Int}(undef, n)
+    coeffs = Vector{Vector{Float64}}(undef, n)
+    tou = Vector{Float64}(undef, n)
+    fit = Vector{Float64}(undef, n)
 
-    for row in eachrow(df)
-        n = row.ncost
-        coeffs = [row[Symbol("c$(i)")] for i in 1:n]
-        push!(table["time"], row.time)
-        push!(table["gen_id"], row.gen_id)
-        push!(table["model"], row.model)
-        push!(table["startup"], row.startup)
-        push!(table["shutdown"], row.shutdown)
-        push!(table["ncost"], n)
-        push!(table["cost_coefficients"], coeffs)
-        push!(table["tou"], row.tou)
-        push!(table["feed_in_tariff"], row.feed_in_tariff)
+    stime = _sym("time")
+    sgen_id = _sym("gen_id")
+    smodel = _sym("model")
+    sstartup = _sym("startup")
+    sshutdown = _sym("shutdown")
+    sncost = _sym("ncost")
+
+    stou = _sym("tou")
+    sfit = _sym("feed_in_tariff")
+    has_tou = stou in propertynames(df)
+    has_fit = sfit in propertynames(df)
+
+    @inbounds for i in 1:n
+        time[i] = _safe_int(df[i, stime], 1)
+        gen_id[i] = _safe_int(df[i, sgen_id], 0)
+        model[i] = _safe_int(df[i, smodel], 0)
+        startup[i] = _safe_f64(df[i, sstartup], 0.0)
+        shutdown[i] = _safe_f64(df[i, sshutdown], 0.0)
+        ncost[i] = _safe_int(df[i, sncost], 0)
+
+        k = ncost[i]
+        if k <= 0
+            coeffs[i] = Float64[]
+        else
+            c = Vector{Float64}(undef, k)
+            @inbounds for j in 1:k
+                sj = _sym("c$(j)")
+                if sj in propertynames(df)
+                    c[j] = _safe_f64(df[i, sj], 0.0)
+                else
+                    c[j] = 0.0
+                end
+            end
+            coeffs[i] = c
+        end
+
+        tou[i] = has_tou ? _safe_f64(df[i, stou], 0.0) : 0.0
+        fit[i] = has_fit ? _safe_f64(df[i, sfit], 0.0) : 0.0
     end
-    return table
+
+    return GencostTimeseriesRaw{Float64}(
+        time, gen_id, model, startup, shutdown, ncost, coeffs, tou, fit,
+    )
 end
 
-# ---------------------------------------------------------------------
-# Main CSV Parser Function
-# ---------------------------------------------------------------------
-function parse_case_from_csv(dir::String)
-    case = Dict{String, Any}()
-    case["source_type"] = "csv"
-    case["source_version"] = "2"
-    case["name"] = splitdir(dir)[end]
+# -------------------------
+# Prosumer timeseries: compat (p_pv/p_load/p_curtail) ou (generation/demand)
+# -------------------------
 
-    base_path = joinpath(dir, "baseMVA.csv")
+function _prosumer_ts_from_tbl_csv(tbl::Dict{String, Any})
+    n = length(tbl["time"])
+
+    if haskey(tbl, "p_pv") && haskey(tbl, "p_load") && haskey(tbl, "p_curtail")
+        return ProsumerTimeseriesRaw{Float64}(
+            tbl["time"]::Vector{Int},
+            tbl["bus"]::Vector{Int},
+            tbl["p_pv"]::Vector{Float64},
+            tbl["p_load"]::Vector{Float64},
+            tbl["p_curtail"]::Vector{Float64},
+        )
+    end
+
+    if haskey(tbl, "generation") && haskey(tbl, "demand")
+        return ProsumerTimeseriesRaw{Float64}(
+            tbl["time"]::Vector{Int},
+            tbl["bus"]::Vector{Int},
+            tbl["generation"]::Vector{Float64},
+            tbl["demand"]::Vector{Float64},
+            fill(0.0, n),
+        )
+    end
+
+    @warn "prosumer_timeseries: missing expected columns. Filling zeros."
+    return ProsumerTimeseriesRaw{Float64}(
+        tbl["time"]::Vector{Int},
+        tbl["bus"]::Vector{Int},
+        fill(0.0, n),
+        fill(0.0, n),
+        fill(0.0, n),
+    )
+end
+
+function _parse_case(dir::String, ::CsvFolder)::CaseRaw
+    d = abspath(String(dir))
+
+    case = CaseRaw(;
+        name = splitdir(d)[end],
+        source_type = "csv",
+        source_version = "2",
+        baseMVA = 100.0,
+        T = 1,
+    )
+
+    base_path = joinpath(d, "baseMVA.csv")
     if isfile(base_path)
-        base = CSV.read(base_path, DataFrame)
-        if nrow(base) > 0 && hasproperty(base, :baseMVA)
-            case["baseMVA"] = base[1, :baseMVA]
+        df = _read_csv(base_path)
+        if nrow(df) > 0 && _hascol(df, "baseMVA")
+            x = df[1, _sym("baseMVA")]
+            case.baseMVA = (x === missing) ? 100.0 : Float64(x)
         else
-            @warn "baseMVA.csv is empty or missing 'baseMVA'. Using 100.0"
-            case["baseMVA"] = 100.0
+            @warn "baseMVA.csv empty or missing baseMVA. Using 100.0"
         end
     else
-        @warn "baseMVA.csv not found. Using default value 100.0"
-        case["baseMVA"] = 100.0
+        @warn "baseMVA.csv not found. Using 100.0"
     end
 
-    for (name, cols) in [
-        ("bus", _mp_bus_columns_csv),
-        ("gen", _mp_gen_columns_csv),
-        ("branch", _mp_branch_columns_csv),
-        ("dcline", _mp_dcline_columns_csv),
-        ("storage", _mp_storage_columns_csv),
-        ("switch", _mp_switch_columns_csv),
-        ("prosumer", _mp_prosumer_columns_csv),
-        ("consumer", _mp_consumer_columns_csv),
-        ("bus_name", _mp_bus_name_columns_csv),
-    ]
-        path = joinpath(dir, "$name.csv")
-        if isfile(path)
-            case[name] = parse_csv_table(path, cols)
+    # -------------------------
+    # core tables
+    # -------------------------
+
+    let p = joinpath(d, "bus.csv")
+        if isfile(p)
+            tbl = _parse_csv_table_dict(p, _mp_bus_columns_csv)
+            case.bus = _bus_from_tbl(tbl)
         end
     end
 
-    if haskey(case, "branch")
-        if haskey(case["branch"], "angmin")
-            case["branch"]["angmin"] = [deg2rad(x) for x in case["branch"]["angmin"]]
-        end
-        if haskey(case["branch"], "angmax")
-            case["branch"]["angmax"] = [deg2rad(x) for x in case["branch"]["angmax"]]
-        end
-    end
+    let p = joinpath(d, "gen.csv")
+        if isfile(p)
+            tbl = _parse_csv_table_dict(p, _mp_gen_columns_csv)
+            n = length(tbl["gen_bus"])
 
-    if isfile(joinpath(dir, "gencost.csv"))
-        case["gencost"] = parse_gencost_table(joinpath(dir, "gencost.csv"))
-    end
-
-    if haskey(case, "gen")
-        ngens = length(case["gen"]["gen_bus"])
-        if !haskey(case["gen"], "plant_type") || isempty(case["gen"]["plant_type"])
-            @warn "plant_type missing in gen.csv. Assuming 'T'."
-            case["gen"]["plant_type"] = fill("T", ngens)
-        end
-        if !haskey(case["gen"], "curtailment_cost") ||
-           isempty(case["gen"]["curtailment_cost"])
-            @warn "curtailment_cost missing in gen.csv. Assuming 0.0."
-            case["gen"]["curtailment_cost"] = fill(0.0, ngens)
-        end
-    end
-
-    profile_dir = joinpath(dir, "time")
-    if isdir(profile_dir)
-        for file in readdir(profile_dir)
-            fullpath = joinpath(profile_dir, file)
-            key = splitext(file)[1]
-
-            if key == "gencost_timeseries"
-                case[key] = parse_gencost_timeseries_csv(fullpath)
-            elseif key == "bus_timeseries"
-                case[key] = parse_csv_table(fullpath, _mp_bus_timeseries_columns_csv)
-            elseif key == "prosumer_timeseries"
-                case[key] = parse_csv_table(fullpath, _mp_prosumer_timeseries_columns_csv)
-            elseif key == "consumer_timeseries"
-                case[key] = parse_csv_table(fullpath, _mp_consumer_timeseries_columns_csv)
+            if !haskey(tbl, "plant_type")
+                tbl["plant_type"] = fill("T", n)
             else
-                @warn "Unknown timeseries file: $file. Reading as raw DataFrame."
-                case[key] = CSV.read(fullpath, DataFrame)
+                pt = tbl["plant_type"]
+                if !(pt isa Vector{String})
+                    tbl["plant_type"] = String.(pt)
+                end
+                @inbounds for i in 1:n
+                    if isempty(tbl["plant_type"][i])
+                        tbl["plant_type"][i] = "T"
+                    end
+                end
+            end
+
+            if !haskey(tbl, "curtailment_cost")
+                tbl["curtailment_cost"] = fill(0.0, n)
+            end
+
+            case.gen = _gen_from_tbl(tbl)
+        end
+    end
+
+    let p = joinpath(d, "branch.csv")
+        if isfile(p)
+            tbl = _parse_csv_table_dict(p, _mp_branch_columns_csv)
+            # NÃO converte angmin/angmax aqui.
+            case.branch = _branch_from_tbl(tbl)
+        end
+    end
+
+    let p = joinpath(d, "dcline.csv")
+        if isfile(p)
+            tbl = _parse_csv_table_dict(p, _mp_dcline_columns_csv)
+            case.dcline = _dcline_from_tbl(tbl)
+        end
+    end
+
+    let p = joinpath(d, "storage.csv")
+        if isfile(p)
+            tbl = _parse_csv_table_dict(p, _mp_storage_columns_csv)
+            case.storage = _storage_from_tbl(tbl)
+        end
+    end
+
+    let p = joinpath(d, "switch.csv")
+        if isfile(p)
+            tbl = _parse_csv_table_dict(p, _mp_switch_columns_csv)
+            case.switch = _switch_from_tbl(tbl)
+        end
+    end
+
+    let p = joinpath(d, "prosumer.csv")
+        if isfile(p)
+            tbl = _parse_csv_table_dict(p, _mp_prosumer_columns_csv)
+            case.prosumer = _prosumer_from_tbl(tbl)
+        end
+    end
+
+    let p = joinpath(d, "consumer.csv")
+        if isfile(p)
+            tbl = _parse_csv_table_dict(p, _mp_consumer_columns_csv)
+            case.consumer = _consumer_from_tbl(tbl)
+        end
+    end
+
+    let p = joinpath(d, "bus_name.csv")
+        if isfile(p)
+            tbl = _parse_csv_table_dict(p, _mp_bus_name_columns_csv)
+            case.bus_name = _busname_from_tbl(tbl)
+            if case.bus !== nothing && length(case.bus_name.name) != length(case.bus.bus_i)
+                @error "Incorrect CSV case: number of bus names != number of buses."
+            end
+        end
+    end
+
+    let p = joinpath(d, "gencost.csv")
+        if isfile(p)
+            case.gencost = _parse_gencost_csv(p)
+        end
+    end
+
+    # -------------------------
+    # timeseries folder
+    # -------------------------
+    tdir = joinpath(d, "time")
+    if isdir(tdir)
+        let p = joinpath(tdir, "bus_timeseries.csv")
+            if isfile(p)
+                tbl = _parse_csv_table_dict(p, _mp_bus_timeseries_columns_csv)
+                case.bus_timeseries = _bus_ts_from_tbl(tbl)
+                if !isempty(case.bus_timeseries.time)
+                    case.T = maximum(case.bus_timeseries.time)
+                end
+            end
+        end
+
+        let p = joinpath(tdir, "consumer_timeseries.csv")
+            if isfile(p)
+                tbl = _parse_csv_table_dict(p, _mp_consumer_timeseries_columns_csv)
+                case.consumer_timeseries = _consumer_ts_from_tbl(tbl)
+                if !isempty(case.consumer_timeseries.time)
+                    case.T = max(case.T, maximum(case.consumer_timeseries.time))
+                end
+            end
+        end
+
+        let p = joinpath(tdir, "prosumer_timeseries.csv")
+            if isfile(p)
+                df = _read_csv(p)
+                tbl = Dict{String, Any}()
+
+                tbl["time"] = _col_or_default(df, "time", Int, 1)
+                tbl["bus"] = _col_or_default(df, "bus", Int, 1)
+
+                if _hascol(df, "p_pv") || _hascol(df, "p_load") || _hascol(df, "p_curtail")
+                    tbl["p_pv"] = _col_or_default(df, "p_pv", Float64, 0.0)
+                    tbl["p_load"] = _col_or_default(df, "p_load", Float64, 0.0)
+                    tbl["p_curtail"] = _col_or_default(df, "p_curtail", Float64, 0.0)
+                else
+                    tbl["generation"] = _col_or_default(df, "generation", Float64, 0.0)
+                    tbl["demand"] = _col_or_default(df, "demand", Float64, 0.0)
+                end
+
+                case.prosumer_timeseries = _prosumer_ts_from_tbl_csv(tbl)
+                if !isempty(case.prosumer_timeseries.time)
+                    case.T = max(case.T, maximum(case.prosumer_timeseries.time))
+                end
+            end
+        end
+
+        let p = joinpath(tdir, "gencost_timeseries.csv")
+            if isfile(p)
+                case.gencost_timeseries = _parse_gencost_timeseries_csv(p)
+                if !isempty(case.gencost_timeseries.time)
+                    case.T = max(case.T, maximum(case.gencost_timeseries.time))
+                end
             end
         end
     end

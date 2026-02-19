@@ -11,36 +11,17 @@ struct GencostTimeseriesData
     feed_in_tariff::Vector{Float64}
 end
 
-function build_gencost_timeseries_data(data::Dict{String, Any})::GencostTimeseriesData
-    if !haskey(data, "gencost_timeseries") ||
-       !haskey(data["gencost_timeseries"], "time") ||
-       isempty(data["gencost_timeseries"]["time"])
+function build_gencost_timeseries_data(raw::CaseRaw)::GencostTimeseriesData
+    ts = raw.gencost_timeseries
+    if ts === nothing || isempty(ts.time)
         return GencostTimeseriesData(
-            false,
-            Int[],
-            Int[],
-            Int[],
-            Float64[],
-            Float64[],
-            Int[],
-            Vector{Vector{Float64}}(),
-            Float64[],
-            Float64[],
+            false, Int[], Int[], Int[], Float64[], Float64[], Int[],
+            Vector{Vector{Float64}}(), Float64[], Float64[],
         )
     end
-
-    ts = data["gencost_timeseries"]
-
+    ts = ts::GencostTimeseriesRaw{Float64}
     return GencostTimeseriesData(
-        true,
-        ts["time"],
-        ts["gen_id"],
-        ts["model"],
-        ts["startup"],
-        ts["shutdown"],
-        ts["ncost"],
-        ts["cost_coefficients"],
-        get(ts, "tou", ones(Float64, length(ts["time"]))),
-        get(ts, "feed_in_tariff", zeros(Float64, length(ts["time"]))),
+        true, ts.time, ts.gen_id, ts.model, ts.startup, ts.shutdown,
+        ts.ncost, ts.cost_coefficients, ts.tou, ts.feed_in_tariff,
     )
 end

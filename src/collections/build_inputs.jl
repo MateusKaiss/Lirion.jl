@@ -1,16 +1,37 @@
 # ============================================================
 # Core structs
+#   - ADMM meta vai TODO no ADMMSystem (sem ADMMZoneMeta)
+#   - SystemData fica 100% limpo (sem nada de ADMM)
 # ============================================================
 
 struct ADMMSystem
     zones::Vector{Int}
     zone_to_idx::Dict{Int, Int}
-    parts::Vector{SystemData}
-    shared_buses::Vector{Int}
-    interzonal_branches::Vector{Int}
+
+    parts::Vector{SystemData}   # SystemData puro por zona
+
+    branch_local_indices::Vector{Vector{Int}}          # global branch indices (full case) usados pela zona
+    branch_global_to_local::Vector{Dict{Int, Int}}     # global -> local (na branch slice da zona)
+    shared_buses_zone::Vector{Vector{Int}}             # bus IDs compartilhados (subconjunto local)
+
+    shared_buses::Vector{Int}                          # global list
+    interzonal_branches::Vector{Int}                   # global list
 end
 
-@inline get_zone(sys::ADMMSystem, zone::Int) = @inbounds sys.parts[sys.zone_to_idx[zone]]
+@inline get_zone(sys::ADMMSystem, zone::Int) =
+    (@inbounds sys.parts[sys.zone_to_idx[zone]])
+
+@inline get_zone_idx(sys::ADMMSystem, zone::Int) =
+    (@inbounds sys.zone_to_idx[zone])
+
+@inline get_branch_local_indices(sys::ADMMSystem, zone::Int) =
+    (@inbounds sys.branch_local_indices[sys.zone_to_idx[zone]])
+
+@inline get_branch_global_to_local(sys::ADMMSystem, zone::Int) =
+    (@inbounds sys.branch_global_to_local[sys.zone_to_idx[zone]])
+
+@inline get_shared_buses_zone(sys::ADMMSystem, zone::Int) =
+    (@inbounds sys.shared_buses_zone[sys.zone_to_idx[zone]])
 
 struct LirionInputs
     database_path::String
@@ -25,30 +46,26 @@ end
 # IO helpers
 # ============================================================
 
-function parse_case_from_csv_silent(dir::String)
-    with_logger(NullLogger()) do
-        return parse_case_from_csv(dir)
-    end
-end
+@inline detect_input(path::AbstractString)::InputFormat =
+    endswith(lowercase(path), ".m") ? MatpowerM() :
+    isdir(path) ? CsvFolder() :
+    throw(
+        ArgumentError(
+            "Unrecognized input format for path=$(abspath(String(path))). Use .m or a folder with .csv files.",
+        ),
+    )
 
-function parse_matpower_string_silent(data_string::String)
-    with_logger(NullLogger()) do
-        return _parse_matpower_string(data_string)
+@inline _load(path::AbstractString, matpower::MatpowerM)::CaseRaw =
+    open(String(path)) do io
+        return _parse_case(read(io, String), matpower)
     end
-end
 
-function load_input_data(path::String)
-    result = if endswith(lowercase(path), ".m")
-        open(path) do io
-            return parse_matpower_string_silent(read(io, String))
-        end
-    elseif isdir(path)
-        parse_case_from_csv_silent(path)
-    else
-        error("Unrecognized input format. Use .m or folder with .csv files.")
-    end
-    global_logger(ConsoleLogger(stderr, Logging.Info))
-    return result
+@inline _load(path::AbstractString, csv::CsvFolder)::CaseRaw =
+    _parse_case(String(path), csv)
+
+function load_input_data(path::AbstractString)::CaseRaw
+    p = abspath(String(path))
+    return _load(p, detect_input(p))
 end
 
 # ============================================================
@@ -62,10 +79,10 @@ function _build_inputs(
     optimizer::Any,
     outputs::Bool,
 )::LirionInputs
-    data = load_input_data(path)
-    preprocess_case_data!(data, OPFModel)
+    raw = load_input_data(path)
+    preprocess_case_data!(raw, OPFModel)
 
-    full_sys = build_system_data(data)
+    full_sys = build_system_data(raw)
     return LirionInputs(path, model, optimizer, outputs, full_sys, nothing)
 end
 
@@ -76,8 +93,8 @@ function _build_inputs(
     optimizer::Any,
     outputs::Bool,
 )::LirionInputs
-    data = load_input_data(path)
-    preprocess_case_data!(data, OPFModel)
+    raw = load_input_data(path)
+    preprocess_case_data!(raw, OPFModel)
 
     cfg = DistributedOPFModel(
         model,
@@ -87,25 +104,41 @@ function _build_inputs(
         algorithm.kwargs...,
     )
 
-    parts_dict, shared_buses = prepare_admm_partitions(data)
-    interzonal_branches = _find_interzonal_branches(data)
+    parts_dict, shared_buses = prepare_admm_partitions(raw)
+    interzonal_branches = _find_interzonal_branches(raw)
 
     zones = sort!(collect(keys(parts_dict)))
     zone_to_idx = Dict{Int, Int}(z => i for (i, z) in pairs(zones))
 
-    parts = Vector{SystemData}(undef, length(zones))
-    @inbounds for (i, z) in pairs(zones)
-        zone_data = parts_dict[z]::Dict{String, Any}
+    n_zones = length(zones)
 
-        admm_meta = ADMMZoneMeta(
-            zone_data["branch_local_indices"]::Vector{Int},
-            zone_data["branch_global_to_local"]::Dict{Int, Int},
-            zone_data["shared_buses_zone"]::Vector{Int},
-        )
+    parts = Vector{SystemData}(undef, n_zones)
 
-        parts[i] = build_system_data(zone_data; admm_meta = admm_meta)
+    branch_local_indices = Vector{Vector{Int}}(undef, n_zones)
+    branch_global_to_local = Vector{Dict{Int, Int}}(undef, n_zones)
+    shared_buses_zone = Vector{Vector{Int}}(undef, n_zones)
+
+    @inbounds for i in 1:n_zones
+        z = zones[i]
+        zone_raw = parts_dict[z]::CaseRaw
+
+        parts[i] = build_system_data(zone_raw)
+
+        branch_local_indices[i] = zone_raw.admm.branch_local_indices
+        branch_global_to_local[i] = zone_raw.admm.branch_global_to_local
+        shared_buses_zone[i] = zone_raw.admm.shared_buses_zone
     end
 
-    admm_sys = ADMMSystem(zones, zone_to_idx, parts, shared_buses, interzonal_branches)
+    admm_sys = ADMMSystem(
+        zones,
+        zone_to_idx,
+        parts,
+        branch_local_indices,
+        branch_global_to_local,
+        shared_buses_zone,
+        shared_buses,
+        interzonal_branches,
+    )
+
     return LirionInputs(path, cfg, optimizer, outputs, nothing, admm_sys)
 end

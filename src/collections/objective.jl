@@ -1,87 +1,80 @@
 struct ObjectiveData
     number_of_generators::Int
     number_of_batteries::Int
-    generator_costs::Dict{Int, Dict{Int, Vector{Float64}}}
-    num_polynomial_coefs::Vector
-    curtailment_cost::Vector
-    plant_type::Vector
-    generator_status::Vector
+    generator_costs::Dict{Int, Dict{Int, Vector{Float64}}}   # t -> gen_id -> coeffs
+    num_polynomial_coefs::Vector{Int}
+    curtailment_cost::Vector{Float64}
+    plant_type::Vector{String}
+    generator_status::Vector{Int}
     number_of_prosumers::Int
-    prosumer_costs::Vector
+    prosumer_costs::Vector{Float64}
     has_timeseries::Bool
     sbase::Float64
 end
 
 function get_objective_parameters(
-    data::Dict{String, Any},
-    gen_data,
-    battery_data,
-    gencost_data,
-    prosumer_data = Dict(),
-    gencost_timeseries = nothing,
+    raw::CaseRaw;
+    gencost_timeseries::Union{Nothing, GencostTimeseriesRaw{Float64}} = raw.gencost_timeseries,
 )
-    T = data["T"]
+    T = raw.T
     has_timeseries = T > 1
+
+    ng = raw.gen === nothing ? 0 : length(raw.gen.gen_bus)
+    nbatt = raw.storage === nothing ? 0 : length(raw.storage.storage_bus)
+    npros = raw.prosumer === nothing ? 0 : length(raw.prosumer.bus)
 
     generator_costs = Dict{Int, Dict{Int, Vector{Float64}}}()
 
-    if has_timeseries && gencost_timeseries !== nothing
-        gen_ids = gencost_timeseries["gen_id"]
-        times = gencost_timeseries["time"]
-        cost_coeffs = gencost_timeseries["cost_coefficients"]
-
-        for i in eachindex(gen_ids)
-            t = times[i]
-            g = gen_ids[i]
-            c = cost_coeffs[i]
-
-            if !haskey(generator_costs, t)
-                generator_costs[t] = Dict{Int, Vector{Float64}}()
-            end
-            generator_costs[t][g] = c
+    if has_timeseries && gencost_timeseries !== nothing && !isempty(gencost_timeseries.time)
+        ts = gencost_timeseries
+        @inbounds for i in eachindex(ts.time)
+            t = ts.time[i]
+            g = ts.gen_id[i]                 # MUST be global gen index
+            c = ts.cost_coefficients[i]
+            get!(generator_costs, t, Dict{Int, Vector{Float64}}())[g] = c
         end
     else
         generator_costs[1] = Dict{Int, Vector{Float64}}()
-        for (g, coefs) in enumerate(getfieldsafe(gencost_data, "cost_coefficients", []))
-            generator_costs[1][g] = coefs
+        if raw.gencost !== nothing
+            @inbounds for g in 1:length(raw.gencost.cost_coefficients)
+                generator_costs[1][g] = raw.gencost.cost_coefficients[g]
+            end
         end
     end
 
+    num_poly = raw.gencost === nothing ? Int[] : raw.gencost.ncost
+    curt = raw.gen === nothing ? Float64[] : raw.gen.curtailment_cost
+    ptype = raw.gen === nothing ? String[] : raw.gen.plant_type
+    gstat = raw.gen === nothing ? Int[] : raw.gen.gen_status
+    pcost = raw.prosumer === nothing ? Float64[] : raw.prosumer.cost_injection
+
     return (
-        number_of_generators = getfieldsafe(gen_data, "gen_bus", []) |> length,
-        number_of_batteries = getfieldsafe(battery_data, "storage_bus", []) |> length,
+        number_of_generators = ng,
+        number_of_batteries = nbatt,
         generator_costs = generator_costs,
-        num_polynomial_coefs = getfieldsafe(gencost_data, "ncost", []),
-        curtailment_cost = getfieldsafe(gen_data, "curtailment_cost", []),
-        plant_type = getfieldsafe(gen_data, "plant_type", []),
-        generator_status = getfieldsafe(gen_data, "gen_status", []),
-        number_of_prosumers = getfieldsafe(prosumer_data, "bus", []) |> length,
-        prosumer_costs = getfieldsafe(prosumer_data, "cost_injection", []),
+        num_polynomial_coefs = num_poly,
+        curtailment_cost = curt,
+        plant_type = ptype,
+        generator_status = gstat,
+        number_of_prosumers = npros,
+        prosumer_costs = pcost,
         has_timeseries = has_timeseries,
     )
 end
 
-function build_objective_data(data::Dict{String, Any})::ObjectiveData
-    params = get_objective_parameters(
-        data,
-        data["gen"],
-        get(data, "storage", Dict()),
-        data["gencost"],
-        get(data, "prosumer", Dict()),
-        get(data, "gencost_timeseries", nothing),
-    )
-
+function build_objective_data(raw::CaseRaw)::ObjectiveData
+    p = get_objective_parameters(raw)
     return ObjectiveData(
-        params.number_of_generators,
-        params.number_of_batteries,
-        params.generator_costs,
-        params.num_polynomial_coefs,
-        params.curtailment_cost,
-        params.plant_type,
-        params.generator_status,
-        params.number_of_prosumers,
-        params.prosumer_costs,
-        params.has_timeseries,
-        data["baseMVA"],
+        p.number_of_generators,
+        p.number_of_batteries,
+        p.generator_costs,
+        p.num_polynomial_coefs,
+        p.curtailment_cost,
+        p.plant_type,
+        p.generator_status,
+        p.number_of_prosumers,
+        p.prosumer_costs,
+        p.has_timeseries,
+        raw.baseMVA,
     )
 end

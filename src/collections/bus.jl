@@ -20,25 +20,20 @@ struct BusData{T <: Real}
     vastart::Vector{Union{Nothing, T}}
 end
 
-function get_bus_parameters(bus_data)
-    bus_ids = bus_data["bus_i"]
-    bus_type = bus_data["bus_type"]
-    vm = bus_data["vm"]
-    va = bus_data["va"]
-    vmin = bus_data["vmin"]
-    vmax = bus_data["vmax"]
+function get_bus_parameters(bus::BusRaw{T}) where {T <: Real}
+    bus_ids = bus.bus_i
+    btype = bus.bus_type
+    vm = bus.vm
+    va = bus.va
+    vmin = bus.vmin
+    vmax = bus.vmax
 
-    reference_bus_idx = findfirst(==(3), bus_type)
-    reference_bus = nothing
-    if reference_bus_idx !== nothing
-        reference_bus = bus_ids[reference_bus_idx]
-    else
-        @info "No reference bus (type 3) found in this zone. Skipping theta_ref constraint."
-    end
+    reference_bus_idx = findfirst(==(3), btype)
+    reference_bus = reference_bus_idx === nothing ? nothing : bus_ids[reference_bus_idx]
 
     n = length(bus_ids)
-    vstart = Vector{Union{Nothing, Float64}}(undef, n)
-    vastart = Vector{Union{Nothing, Float64}}(undef, n)
+    vstart = Vector{Union{Nothing, T}}(undef, n)
+    vastart = Vector{Union{Nothing, T}}(undef, n)
 
     @inbounds for i in 1:n
         v = vm[i]
@@ -57,31 +52,35 @@ function get_bus_parameters(bus_data)
     )
 end
 
-function build_bus_data(data::Dict{String, Any})::BusData{Float64}
-    bus = data["bus"]
+function build_bus_data(raw::CaseRaw)::BusData{Float64}
+    @assert raw.bus !== nothing "CaseRaw.bus is nothing"
+    bus = raw.bus::BusRaw{Float64}
+
     params = get_bus_parameters(bus)
     bus_ids = params.bus_ids
     n = length(bus_ids)
+
     id_to_idx = Dict{Int, Int}()
     @inbounds for (i, b) in pairs(bus_ids)
-        id_to_idx[b] = i
+        id_to_idx[Int(b)] = i
     end
 
     return BusData{Float64}(
         n,
         bus_ids,
-        bus["bus_type"],
-        bus["pd"],
-        bus["qd"],
-        bus["gs"],
-        bus["bs"],
-        bus["area"],
-        bus["vm"],
-        bus["va"],
-        bus["base_kv"],
-        bus["zone"],
-        bus["vmax"],
-        bus["vmin"], params.reference_bus,
+        bus.bus_type,
+        bus.pd,
+        bus.qd,
+        bus.gs,
+        bus.bs,
+        bus.area,
+        bus.vm,
+        bus.va,
+        bus.base_kv,
+        bus.zone,
+        bus.vmax,
+        bus.vmin,
+        params.reference_bus,
         id_to_idx,
         params.vstart,
         params.initial_voltage_angle,

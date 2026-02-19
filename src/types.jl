@@ -454,3 +454,11 @@ Base.@kwdef struct LirionRunResult
     system::Any = nothing
     diagnostics::AbstractRunDiagnostics = NoDiagnostics()
 end
+
+# ============================================================
+# Inputs Format
+# ============================================================
+
+abstract type InputFormat end
+struct MatpowerM <: InputFormat end
+struct CsvFolder <: InputFormat end

@@ -8,10 +8,9 @@ struct BusTimeseriesData
     bs::Vector{Float64}
 end
 
-function build_bus_timeseries_data(data::Dict{String, Any})::BusTimeseriesData
-    if !haskey(data, "bus_timeseries") ||
-       !haskey(data["bus_timeseries"], "time") ||
-       isempty(data["bus_timeseries"]["time"])
+function build_bus_timeseries_data(raw::CaseRaw)::BusTimeseriesData
+    ts = raw.bus_timeseries
+    if ts === nothing || isempty(ts.time)
         return BusTimeseriesData(
             false,
             Int[],
@@ -22,16 +21,6 @@ function build_bus_timeseries_data(data::Dict{String, Any})::BusTimeseriesData
             Float64[],
         )
     end
-
-    ts = data["bus_timeseries"]
-
-    return BusTimeseriesData(
-        true,
-        ts["time"],
-        ts["bus"],
-        get(ts, "pd", zeros(Float64, length(ts["bus"]))),
-        get(ts, "qd", zeros(Float64, length(ts["bus"]))),
-        get(ts, "gs", zeros(Float64, length(ts["bus"]))),
-        get(ts, "bs", zeros(Float64, length(ts["bus"]))),
-    )
+    ts = ts::BusTimeseriesRaw{Float64}
+    return BusTimeseriesData(true, ts.time, ts.bus, ts.pd, ts.qd, ts.gs, ts.bs)
 end
