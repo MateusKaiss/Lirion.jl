@@ -43,6 +43,8 @@ snoop_compile
 *.bin
 *.hdr
 **/results/
+!src/results/
+!src/results/**
 test/*/*.toml
 *.zip
 *.csv
