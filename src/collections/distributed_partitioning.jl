@@ -202,10 +202,10 @@ end
 end
 
 # ============================================================
-# Prepare ADMM partitions
+# Distributed partitioning (tie-line sectioning)
 # ============================================================
 
-function prepare_admm_partitions(full::CaseRaw)
+function prepare_distributed_partitions(full::CaseRaw)
     @assert full.bus !== nothing && full.branch !== nothing
 
     bus_ids = Int.(full.bus.bus_i)

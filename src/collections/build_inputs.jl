@@ -98,7 +98,7 @@ function _build_inputs(
         algorithm.kwargs...,
     )
 
-    parts_dict, shared_buses = prepare_admm_partitions(raw)
+    parts_dict, shared_buses = prepare_distributed_partitions(raw)
     interzonal_branches = _find_interzonal_branches(raw)
 
     zones = sort!(collect(keys(parts_dict)))

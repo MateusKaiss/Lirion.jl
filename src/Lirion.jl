@@ -69,7 +69,7 @@ include("collections/objective.jl")
 include("collections/power_balance.jl")
 include("collections/system_data.jl")
 include("collections/preprocess_case.jl")
-include("collections/admm_partitioning.jl")
+include("collections/distributed_partitioning.jl")
 
 # ------------------------------------------------------------------
 # Inputs structs (legacy CLI + shared input pipeline)
