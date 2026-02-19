@@ -4,12 +4,12 @@ struct DistributedSystem
 
     parts::Vector{SystemData}
 
-    branch_local_indices::Vector{Vector{Int}}          # global branch indices (full case) usados pela zona
-    branch_global_to_local::Vector{Dict{Int, Int}}     # global -> local (na branch slice da zona)
-    shared_buses_zone::Vector{Vector{Int}}             # bus IDs compartilhados (subconjunto local)
+    branch_local_indices::Vector{Vector{Int}}
+    branch_global_to_local::Vector{Dict{Int, Int}}
+    shared_buses_zone::Vector{Vector{Int}}
 
-    shared_buses::Vector{Int}                          # global list
-    interzonal_branches::Vector{Int}                   # global list
+    shared_buses::Vector{Int}
+    interzonal_branches::Vector{Int}
 end
 
 @inline get_zone(sys::DistributedSystem, zone::Int) =
@@ -98,8 +98,8 @@ function _build_inputs(
         algorithm.kwargs...,
     )
 
-    parts_dict, shared_buses = prepare_distributed_partitions(raw)
-    interzonal_branches = _find_interzonal_branches(raw)
+    parts_dict, shared_buses = prepare_distributed_partitions(raw, algorithm.sectioning)
+    interzonal_branches = _find_interzonal_branches(raw, algorithm.sectioning)
 
     zones = sort!(collect(keys(parts_dict)))
     zone_to_idx = Dict{Int, Int}(z => i for (i, z) in pairs(zones))

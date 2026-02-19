@@ -1,8 +1,4 @@
-# ============================================================
-# ADMM preprocessing
-# ============================================================
-
-function _find_interzonal_branches(full::CaseRaw)
+function _find_interzonal_branches(full::CaseRaw, ::TieLine)
     @assert full.bus !== nothing && full.branch !== nothing
 
     zones = full.bus.zone
@@ -14,7 +10,7 @@ function _find_interzonal_branches(full::CaseRaw)
     br_status = full.branch.br_status
 
     interzonal_branches = Int[]
-    for i in eachindex(f_bus)
+    @inbounds for i in eachindex(f_bus)
         if br_status[i] == 1 && bus_to_zone[f_bus[i]] != bus_to_zone[t_bus[i]]
             push!(interzonal_branches, i)
         end
@@ -138,7 +134,7 @@ end
 @inline function _filter_timeseries!(sub::CaseRaw, full::CaseRaw, zone_bus_set::Set{Int})
     if full.bus_timeseries !== nothing
         ts = full.bus_timeseries
-        keep = _filter_by_zone_bus(ts.bus, zone_bus_set)
+        keep = _filter_by_zone_bus(Int.(ts.bus), zone_bus_set)
         sub.bus_timeseries = BusTimeseriesRaw{Float64}(
             ts.time[keep], ts.bus[keep],
             ts.pd[keep], ts.qd[keep], ts.gs[keep], ts.bs[keep],
@@ -146,7 +142,7 @@ end
     end
     if full.prosumer_timeseries !== nothing
         ts = full.prosumer_timeseries
-        keep = _filter_by_zone_bus(ts.bus, zone_bus_set)
+        keep = _filter_by_zone_bus(Int.(ts.bus), zone_bus_set)
         sub.prosumer_timeseries = ProsumerTimeseriesRaw{Float64}(
             ts.time[keep], ts.bus[keep],
             ts.p_pv[keep], ts.p_load[keep], ts.p_curtail[keep],
@@ -154,7 +150,7 @@ end
     end
     if full.consumer_timeseries !== nothing
         ts = full.consumer_timeseries
-        keep = _filter_by_zone_bus(ts.bus, zone_bus_set)
+        keep = _filter_by_zone_bus(Int.(ts.bus), zone_bus_set)
         sub.consumer_timeseries = ConsumerTimeseriesRaw{Float64}(
             ts.time[keep], ts.bus[keep],
             ts.demand[keep], ts.q_demand[keep],
@@ -171,7 +167,7 @@ end
         return nothing
     end
 
-    gen_keep = _filter_by_zone_bus(full.gen.gen_bus, zone_bus_set)
+    gen_keep = _filter_by_zone_bus(Int.(full.gen.gen_bus), zone_bus_set)
     sub.gen =
         isempty(gen_keep) ? _slice_gen(full.gen, Int[]) : _slice_gen(full.gen, gen_keep)
 

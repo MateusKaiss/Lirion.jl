@@ -17,7 +17,7 @@ struct Power <: ADMMVariant end
 struct Hybrid <: ADMMVariant end
 
 # ============================================================
-# OPF TAGS FOR DISTRIBUTED VARIANTS (mantém como estava)
+# OPF TAGS FOR DISTRIBUTED VARIANTS
 # ============================================================
 
 abstract type OPFTag end
@@ -26,22 +26,30 @@ struct ACTag <: OPFTag end
 struct SOCPTag <: OPFTag end
 
 # ============================================================
-# ADMM TYPE COMBINATOR (mantém)
+# ADMM TYPE COMBINATOR
 # ============================================================
 
 struct ADMM{V <: ADMMVariant, B <: OPFTag} end
 
 # ============================================================
+# SECTIONING / DECOMPOSITION STRATEGIES
+# ============================================================
+
+abstract type Sectioning end
+struct TieLine <: Sectioning end
+struct DummyBus <: Sectioning end
+struct Metis <: Sectioning end
+
+# ============================================================
 # Algorithm spec (TIPADO via dispatch)
-#   ATENÇÃO: aqui NÃO definimos centralized() nem admm()
 # ============================================================
 
 abstract type AbstractAlgorithm end
 struct CentralizedAlgorithm <: AbstractAlgorithm end
 
 struct ADMMAlgorithmSpec <: AbstractAlgorithm
-    coupling::Symbol        # :state | :power | :hybrid
-    sectioning::Symbol      # :tie_line
+    coupling::Symbol            # :state | :power | :hybrid
+    sectioning::Sectioning      # TieLine(), DummyBus(), Metis(), ...
     max_iter::Int
     kwargs::NamedTuple
 end
@@ -51,6 +59,7 @@ end
 # ============================================================
 
 const _RHO_RULES = Dict{Tuple{DataType, Symbol}, NamedTuple}(
+
     # ----------------------------
     # DC
     # ----------------------------
@@ -214,7 +223,7 @@ end
 mutable struct DistributedOPFModel
     base_model::Type{<:OPFModel}
     coupling::Symbol
-    sectioning::Symbol
+    sectioning::Sectioning
     max_iter::Int
 
     rho_theta::Float64
@@ -237,7 +246,7 @@ mutable struct DistributedOPFModel
     function DistributedOPFModel(
         base_model::Type{<:OPFModel},
         coupling::Symbol,
-        sectioning::Symbol,
+        sectioning::Sectioning,
         max_iter::Integer,
         rho_theta::Real,
         rho_v::Real,
@@ -257,13 +266,6 @@ mutable struct DistributedOPFModel
             throw(
                 ArgumentError(
                     "Invalid coupling=$coupling. Allowed: :state, :power, :hybrid",
-                ),
-            )
-
-        sectioning === :tie_line ||
-            throw(
-                ArgumentError(
-                    "Invalid sectioning=$sectioning. Currently supported: :tie_line",
                 ),
             )
 
@@ -313,7 +315,7 @@ end
 DistributedOPFModel(
     base_model::Type{<:OPFModel},
     coupling::Symbol,
-    sectioning::Symbol,
+    sectioning::Union{Sectioning, Symbol},
     max_iter::Int,
     rho::Real,
     eps_abs::Real,
@@ -324,9 +326,10 @@ DistributedOPFModel(
     tau_incr::Real = 1.05,
     tau_decr::Real = 0.98,
 ) = begin
+    sec = _sectioning(sectioning)
     rhos = _normalize_rhos_strict(base_model, coupling; rho = rho)
     DistributedOPFModel(
-        base_model, coupling, sectioning, max_iter,
+        base_model, coupling, sec, max_iter,
         rhos.rho_theta, rhos.rho_v, rhos.rho_p, rhos.rho_q, rhos.rho_r, rhos.rho_t,
         eps_abs, eps_rel;
         adaptive_rho = adaptive_rho,
@@ -340,7 +343,7 @@ end
 DistributedOPFModel(
     base_model::Type{<:OPFModel},
     coupling::Symbol,
-    sectioning::Symbol,
+    sectioning::Union{Sectioning, Symbol},
     max_iter::Int;
     rho::Union{Nothing, Real} = nothing,
     rho_theta::Union{Nothing, Real} = nothing,
@@ -358,6 +361,7 @@ DistributedOPFModel(
     tau_incr::Real = 1.05,
     tau_decr::Real = 0.98,
 ) = begin
+    sec = _sectioning(sectioning)
     rhos = _normalize_rhos_strict(
         base_model, coupling;
         rho = rho,
@@ -371,7 +375,7 @@ DistributedOPFModel(
     )
 
     DistributedOPFModel(
-        base_model, coupling, sectioning, max_iter,
+        base_model, coupling, sec, max_iter,
         rhos.rho_theta, rhos.rho_v, rhos.rho_p, rhos.rho_q, rhos.rho_r, rhos.rho_t,
         eps_abs, eps_rel;
         adaptive_rho = adaptive_rho,

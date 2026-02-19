@@ -1,8 +1,13 @@
+
+# ==============================================================================
+# Sectioning dispatch: TieLine
+# ==============================================================================
+
 # ============================================================
 # Distributed partitioning (tie-line sectioning)
 # ============================================================
 
-function prepare_distributed_partitions(full::CaseRaw)
+function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
     @assert full.bus !== nothing && full.branch !== nothing
 
     bus_ids = Int.(full.bus.bus_i)
@@ -38,11 +43,12 @@ function prepare_distributed_partitions(full::CaseRaw)
         _mark_virtual_buses!(sub.bus, zone_bus_set)
 
         if full.gen !== nothing
-            keep = _filter_by_zone_bus(full.gen.gen_bus, zone_bus_set)
+            keep = _filter_by_zone_bus(Int.(full.gen.gen_bus), zone_bus_set)
             sub.gen = _slice_gen(full.gen, keep)
         end
+
         if full.prosumer !== nothing
-            keep = _filter_by_zone_bus(full.prosumer.bus, zone_bus_set)
+            keep = _filter_by_zone_bus(Int.(full.prosumer.bus), zone_bus_set)
             sub.prosumer = ProsumerRaw{Float64}(
                 full.prosumer.bus[keep],
                 full.prosumer.generation[keep],
@@ -53,16 +59,18 @@ function prepare_distributed_partitions(full::CaseRaw)
                 full.prosumer.inverter_capacity[keep],
             )
         end
+
         if full.consumer !== nothing
-            keep = _filter_by_zone_bus(full.consumer.bus, zone_bus_set)
+            keep = _filter_by_zone_bus(Int.(full.consumer.bus), zone_bus_set)
             sub.consumer = ConsumerRaw{Float64}(
                 full.consumer.bus[keep],
                 full.consumer.demand[keep],
                 full.consumer.q_demand[keep],
             )
         end
+
         if full.storage !== nothing
-            keep = _filter_by_zone_bus(full.storage.storage_bus, zone_bus_set)
+            keep = _filter_by_zone_bus(Int.(full.storage.storage_bus), zone_bus_set)
             sub.storage = StorageRaw{Float64}(
                 full.storage.storage_bus[keep],
                 full.storage.ps[keep], full.storage.qs[keep],
@@ -81,7 +89,10 @@ function prepare_distributed_partitions(full::CaseRaw)
         keep_all = findall(
             i ->
                 branch_status_mask[i] &&
-                    (in(f_bus_full[i], zone_bus_set) || in(t_bus_full[i], zone_bus_set)),
+                    (
+                        in(Int(f_bus_full[i]), zone_bus_set) ||
+                        in(Int(t_bus_full[i]), zone_bus_set)
+                    ),
             eachindex(f_bus_full),
         )
         sub.branch = _slice_branch(full.branch, keep_all)

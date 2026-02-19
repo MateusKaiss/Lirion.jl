@@ -12,21 +12,27 @@ socp() = SOCP
 
 centralized() = CentralizedAlgorithm()
 
+@inline _sectioning_name(s::Sectioning) = lowercase(string(nameof(typeof(s))))
+
+@inline function _sectioning(x)::Sectioning
+    x isa Sectioning && return x
+    x === :tie_line && return TieLine()
+    x === :dummy_bus && return DummyBus()
+    x === :metis && return Metis()
+    throw(ArgumentError("Invalid sectioning=$x. Allowed: :tie_line, :dummy_bus, :metis"))
+end
+
 @inline function admm(;
-    coupling::Symbol = :hybrid,         # :state | :power | :hybrid
-    sectioning::Symbol = :tie_line,     # :tie_line
+    coupling::Symbol = :hybrid,               # :state | :power | :hybrid
+    sectioning = :tie_line,
     max_iter::Int = 350,
     kwargs...,
 )
     coupling in (:state, :power, :hybrid) ||
         throw(ArgumentError("Invalid coupling=$coupling. Allowed: :state, :power, :hybrid"))
+    max_iter > 0 || throw(ArgumentError("max_iter must be > 0"))
 
-    sectioning === :tie_line ||
-        throw(
-            ArgumentError("Invalid sectioning=$sectioning. Currently supported: :tie_line"),
-        )
-
-    return ADMMAlgorithmSpec(coupling, sectioning, max_iter, (; kwargs...))
+    return ADMMAlgorithmSpec(coupling, _sectioning(sectioning), max_iter, (; kwargs...))
 end
 
 # -----------------------------
@@ -47,7 +53,7 @@ end
         return "admm_" *
                lowercase(string(model_type.base_model)) * "_" *
                string(model_type.coupling) * "_" *
-               string(model_type.sectioning)
+               _sectioning_name(model_type.sectioning)
     else
         return "opf_" * lowercase(string(model_type))
     end
