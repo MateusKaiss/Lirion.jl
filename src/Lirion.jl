@@ -52,30 +52,35 @@ include("types.jl")
 include("parsing/raw_structs.jl")
 
 # ------------------------------------------------------------------
-# Collections: static data + time series + SystemData
+# data: static data + time series + SystemData
 # ------------------------------------------------------------------
-include("collections/timeseries_utils.jl")
-include("collections/timeseries/bus_timeseries.jl")
-include("collections/timeseries/prosumers_timeseries.jl")
-include("collections/timeseries/consumer_timeseries.jl")
-include("collections/timeseries/gencost_timeseries.jl")
+include("data/timeseries_utils.jl")
+include("data/timeseries/bus_timeseries.jl")
+include("data/timeseries/prosumers_timeseries.jl")
+include("data/timeseries/consumer_timeseries.jl")
+include("data/timeseries/gencost_timeseries.jl")
 
-include("collections/bus.jl")
-include("collections/branch.jl")
-include("collections/generator.jl")
-include("collections/battery.jl")
-include("collections/prosumers.jl")
-include("collections/objective.jl")
-include("collections/power_balance.jl")
-include("collections/system_data.jl")
-include("collections/preprocess_case.jl")
-include("collections/distributed_partitioning.jl")
+include("data/bus.jl")
+include("data/branch.jl")
+include("data/generator.jl")
+include("data/battery.jl")
+include("data/prosumers.jl")
+include("data/objective.jl")
+include("data/power_balance.jl")
+include("data/system_data.jl")
+include("data/preprocess_case.jl")
+
+# ------------------------------------------------------------------
+# Partitioning / Sectioning
+# ------------------------------------------------------------------
+include("decomposition/decomposition_utils.jl")
+include("decomposition/tie_line.jl")
 
 # ------------------------------------------------------------------
 # Inputs structs (legacy CLI + shared input pipeline)
 # ------------------------------------------------------------------
-include("collections/build_inputs.jl")
-include("collections/admm_structs.jl")
+include("data/build_inputs.jl")
+include("data/admm_structs.jl")
 
 # ------------------------------------------------------------------
 # Case parsing (.m / .csv)
@@ -88,69 +93,69 @@ include("parsing/csv_parser.jl")
 # Model construction and centralized solution
 # ------------------------------------------------------------------
 # --- BUS
-include("build_model/bus/variables.jl")
-include("build_model/bus/dispatch.jl")
+include("modeling/bus/variables.jl")
+include("modeling/bus/dispatch.jl")
 
 # --- BRANCH
-include("build_model/branch/dc.jl")
-include("build_model/branch/ac.jl")
-include("build_model/branch/socp_rt.jl")
-include("build_model/branch/socp.jl")
-include("build_model/branch/dispatch.jl")
+include("modeling/branch/dc.jl")
+include("modeling/branch/ac.jl")
+include("modeling/branch/socp_rt.jl")
+include("modeling/branch/socp.jl")
+include("modeling/branch/dispatch.jl")
 
 # --- GENERATOR
-include("build_model/generator/variables.jl")
-include("build_model/generator/constraints.jl")
-include("build_model/generator/dispatch.jl")
+include("modeling/generator/variables.jl")
+include("modeling/generator/constraints.jl")
+include("modeling/generator/dispatch.jl")
 
 # --- BATTERY
-include("build_model/battery/variables.jl")
-include("build_model/battery/constraints_common.jl")
-include("build_model/battery/constraints_dc.jl")
-include("build_model/battery/constraints_ac.jl")
-include("build_model/battery/constraints_socp.jl")
-include("build_model/battery/dispatch.jl")
+include("modeling/battery/variables.jl")
+include("modeling/battery/constraints_common.jl")
+include("modeling/battery/constraints_dc.jl")
+include("modeling/battery/constraints_ac.jl")
+include("modeling/battery/constraints_socp.jl")
+include("modeling/battery/dispatch.jl")
 
 # --- PROSUMER
-include("build_model/prosumer/variables.jl")
-include("build_model/prosumer/constraints.jl")
-include("build_model/prosumer/dispatch.jl")
+include("modeling/prosumer/variables.jl")
+include("modeling/prosumer/constraints.jl")
+include("modeling/prosumer/dispatch.jl")
 
 # --- BALANCE
-include("build_model/power_balance/active.jl")
-include("build_model/power_balance/reactive.jl")
-include("build_model/power_balance/dispatch.jl")
+include("modeling/power_balance/active.jl")
+include("modeling/power_balance/reactive.jl")
+include("modeling/power_balance/dispatch.jl")
 
 # --- OBJECTIVE
-include("build_model/objective/generation_cost.jl")
-include("build_model/objective/dispatch.jl")
+include("modeling/objective/generation_cost.jl")
+include("modeling/objective/dispatch.jl")
 
 # --- builder/solver
-include("build_model/build_model.jl")
-include("build_model/solve_model.jl")
+include("modeling/build_model.jl")
+include("modeling/solve_model.jl")
 
 # ------------------------------------------------------------------
 # Post-processing / results
 # ------------------------------------------------------------------
-include("build_results/build_results.jl")
-include("build_results/build_plots.jl")
+include("results/build_results.jl")
+include("results/build_plots.jl")
 
 # ------------------------------------------------------------------
 # Distributed methods
 # ------------------------------------------------------------------
-include("distributed/distributed_opf.jl")
+include("distributed_algorithms/distributed_opf.jl")
 
-include("distributed/admm/admm_support.jl")
-include("distributed/admm/buffers.jl")
-include("distributed/admm/objective_terms.jl")
-include("distributed/admm/consensus.jl")
-include("distributed/admm/duals.jl")
-include("distributed/admm/residuals.jl")
-include("distributed/admm/rho.jl")
+include("distributed_algorithms/admm/admm_support.jl")
+include("distributed_algorithms/admm/buffers.jl")
+include("distributed_algorithms/admm/objective_terms.jl")
+include("distributed_algorithms/admm/consensus.jl")
+include("distributed_algorithms/admm/duals.jl")
+include("distributed_algorithms/admm/residuals.jl")
+include("distributed_algorithms/admm/rho.jl")
 
-include("distributed/admm/admm_dc.jl")
-include("distributed/admm/admm_ac.jl")
-include("distributed/admm/admm_socp.jl")
+include("distributed_algorithms/admm/admm_dc.jl")
+include("distributed_algorithms/admm/admm_ac.jl")
+include("distributed_algorithms/admm/admm_socp.jl")
 
 # ------------------------------------------------------------------
 # Legacy runner / CLI entrypoints
@@ -158,7 +163,7 @@ include("distributed/admm/admm_socp.jl")
 include("api.jl")
 
 # ------------------------------------------------------------------
-# New function-based 
+# New function-based
 # ------------------------------------------------------------------
 include("solve.jl")
 
