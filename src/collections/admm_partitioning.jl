@@ -210,7 +210,7 @@ function prepare_admm_partitions(full::CaseRaw)
 
     bus_ids = Int.(full.bus.bus_i)
     zones = Int.(full.bus.zone)
-    unique_zones = unique(zones)
+    unique_zones = sort!(unique(zones))
 
     partitions = Dict{Int, CaseRaw}()
 
