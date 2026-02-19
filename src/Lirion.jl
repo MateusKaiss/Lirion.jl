@@ -73,8 +73,8 @@ include("data/preprocess_case.jl")
 # ------------------------------------------------------------------
 # Partitioning / Sectioning
 # ------------------------------------------------------------------
-include("decomposition/decomposition_utils.jl")
-include("decomposition/tie_line.jl")
+include("partitioning/partitioning_utils.jl")
+include("partitioning/tie_line.jl")
 
 # ------------------------------------------------------------------
 # Inputs structs (legacy CLI + shared input pipeline)
