@@ -228,13 +228,13 @@ mutable struct CaseIndexMaps
     end
 end
 
-mutable struct ADMMRawMeta
+mutable struct DistributedRawMeta
     branch_full::Union{Nothing, BranchRaw{Float64}}
     branch_local_indices::Vector{Int}
     branch_global_to_local::Dict{Int, Int}
     shared_buses_zone::Vector{Int}
     bus_set::Set{Int}
-    function ADMMRawMeta()
+    function DistributedRawMeta()
         return new(nothing, Int[], Dict{Int, Int}(), Int[], Set{Int}())
     end
 end
@@ -272,7 +272,7 @@ mutable struct CaseRaw
 
     # maps/meta
     maps::CaseIndexMaps
-    admm::ADMMRawMeta
+    dist::DistributedRawMeta
 
     function CaseRaw(; name = "no_name_found", source_type = "matpower",
         source_version = "0.0.0+",
@@ -285,7 +285,7 @@ mutable struct CaseRaw
             Int(T), nothing, nothing, nothing, nothing, nothing,
             nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing,
             CaseIndexMaps(),
-            ADMMRawMeta(),
+            DistributedRawMeta(),
         )
     end
 end

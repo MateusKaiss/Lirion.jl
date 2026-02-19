@@ -1,14 +1,8 @@
-# ============================================================
-# Core structs
-#   - ADMM meta vai TODO no ADMMSystem (sem ADMMZoneMeta)
-#   - SystemData fica 100% limpo (sem nada de ADMM)
-# ============================================================
-
-struct ADMMSystem
+struct DistributedSystem
     zones::Vector{Int}
     zone_to_idx::Dict{Int, Int}
 
-    parts::Vector{SystemData}   # SystemData puro por zona
+    parts::Vector{SystemData}
 
     branch_local_indices::Vector{Vector{Int}}          # global branch indices (full case) usados pela zona
     branch_global_to_local::Vector{Dict{Int, Int}}     # global -> local (na branch slice da zona)
@@ -18,19 +12,19 @@ struct ADMMSystem
     interzonal_branches::Vector{Int}                   # global list
 end
 
-@inline get_zone(sys::ADMMSystem, zone::Int) =
+@inline get_zone(sys::DistributedSystem, zone::Int) =
     (@inbounds sys.parts[sys.zone_to_idx[zone]])
 
-@inline get_zone_idx(sys::ADMMSystem, zone::Int) =
+@inline get_zone_idx(sys::DistributedSystem, zone::Int) =
     (@inbounds sys.zone_to_idx[zone])
 
-@inline get_branch_local_indices(sys::ADMMSystem, zone::Int) =
+@inline get_branch_local_indices(sys::DistributedSystem, zone::Int) =
     (@inbounds sys.branch_local_indices[sys.zone_to_idx[zone]])
 
-@inline get_branch_global_to_local(sys::ADMMSystem, zone::Int) =
+@inline get_branch_global_to_local(sys::DistributedSystem, zone::Int) =
     (@inbounds sys.branch_global_to_local[sys.zone_to_idx[zone]])
 
-@inline get_shared_buses_zone(sys::ADMMSystem, zone::Int) =
+@inline get_shared_buses_zone(sys::DistributedSystem, zone::Int) =
     (@inbounds sys.shared_buses_zone[sys.zone_to_idx[zone]])
 
 struct LirionInputs
@@ -39,7 +33,7 @@ struct LirionInputs
     optimizer::Any
     write_outputs::Bool
     system::Union{Nothing, SystemData}
-    admm_system::Union{Nothing, ADMMSystem}
+    admm_system::Union{Nothing, DistributedSystem}
 end
 
 # ============================================================
@@ -124,12 +118,12 @@ function _build_inputs(
 
         parts[i] = build_system_data(zone_raw)
 
-        branch_local_indices[i] = zone_raw.admm.branch_local_indices
-        branch_global_to_local[i] = zone_raw.admm.branch_global_to_local
-        shared_buses_zone[i] = zone_raw.admm.shared_buses_zone
+        branch_local_indices[i] = zone_raw.dist.branch_local_indices
+        branch_global_to_local[i] = zone_raw.dist.branch_global_to_local
+        shared_buses_zone[i] = zone_raw.dist.shared_buses_zone
     end
 
-    admm_sys = ADMMSystem(
+    admm_sys = DistributedSystem(
         zones,
         zone_to_idx,
         parts,

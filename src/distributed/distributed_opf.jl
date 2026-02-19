@@ -35,7 +35,7 @@ function run_distributed(inputs::LirionInputs)::LirionRunResult
     @assert inputs.admm_system !== nothing "Distributed run requires inputs.admm_system"
 
     cfg = inputs.model_type::DistributedOPFModel
-    sys = inputs.admm_system::ADMMSystem
+    sys = inputs.admm_system::DistributedSystem
 
     @info "Running distributed OPF"
     @info "  coupling   = $(cfg.coupling)"

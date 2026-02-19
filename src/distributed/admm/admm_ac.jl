@@ -40,7 +40,7 @@ end
 
 function init_ac_state_partition!(
     partitions::Partitions{PartitionAC},
-    sys::ADMMSystem,
+    sys::DistributedSystem,
     optimizer_factory,
     rho_theta::Float64,
     rho_v_mag::Float64,
@@ -96,7 +96,7 @@ end
 
 function init_ac_power_partition!(
     partitions::Partitions{PartitionAC},
-    sys::ADMMSystem,
+    sys::DistributedSystem,
     optimizer_factory,
     rhoP::Float64,
     rhoQ::Float64,
@@ -162,7 +162,7 @@ end
 
 function init_ac_hybrid_partition!(
     partitions::Partitions{PartitionAC},
-    sys::ADMMSystem,
+    sys::DistributedSystem,
     optimizer_factory,
     rho_theta::Float64,
     rho_v_mag::Float64,
@@ -196,7 +196,7 @@ end
 # Runner: ADMM state/AC  (ex-bus)
 # ------------------------------------------------------------
 function run_admm(
-    sys::ADMMSystem,
+    sys::DistributedSystem,
     config::DistributedOPFModel,
     ::ADMM{State, ACTag};
     optimizer_factory = nothing,
@@ -417,7 +417,7 @@ end
 # Runner: ADMM power/AC
 # ------------------------------------------------------------
 function run_admm(
-    sys::ADMMSystem,
+    sys::DistributedSystem,
     config::DistributedOPFModel,
     ::ADMM{Power, ACTag};
     optimizer_factory = nothing,
@@ -605,7 +605,7 @@ end
 # Runner: ADMM hybrid/AC
 # ------------------------------------------------------------
 function run_admm(
-    sys::ADMMSystem,
+    sys::DistributedSystem,
     config::DistributedOPFModel,
     ::ADMM{Hybrid, ACTag};
     optimizer_factory = nothing,

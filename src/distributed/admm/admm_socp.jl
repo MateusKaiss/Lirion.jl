@@ -42,7 +42,7 @@ end
 
 function init_socp_v2rt_partition!(
     partitions::Partitions{PartitionSOCP},
-    sys::ADMMSystem,
+    sys::DistributedSystem,
     optimizer_factory,
     rho_v2::Float64,
     rho_r::Float64,
@@ -107,7 +107,7 @@ end
 
 function init_socp_pq_partition!(
     partitions::Partitions{PartitionSOCP},
-    sys::ADMMSystem,
+    sys::DistributedSystem,
     optimizer_factory,
     rho_p::Float64,
     rho_q::Float64,
@@ -170,7 +170,7 @@ end
 
 function init_socp_hybrid_partition!(
     partitions::Partitions{PartitionSOCP},
-    sys::ADMMSystem,
+    sys::DistributedSystem,
     optimizer_factory,
     rho_v2::Float64,
     rho_p::Float64,
@@ -207,7 +207,7 @@ end
 # ------------------------------------------------------------
 
 function run_admm(
-    sys::ADMMSystem,
+    sys::DistributedSystem,
     config::DistributedOPFModel,
     ::ADMM{State, SOCPTag};
     optimizer_factory = nothing,
@@ -472,7 +472,7 @@ end
 # ------------------------------------------------------------
 
 function run_admm(
-    sys::ADMMSystem,
+    sys::DistributedSystem,
     config::DistributedOPFModel,
     ::ADMM{Power, SOCPTag};
     optimizer_factory = nothing,
@@ -646,7 +646,7 @@ end
 # ------------------------------------------------------------
 
 function run_admm(
-    sys::ADMMSystem,
+    sys::DistributedSystem,
     config::DistributedOPFModel,
     ::ADMM{Hybrid, SOCPTag};
     optimizer_factory = nothing,

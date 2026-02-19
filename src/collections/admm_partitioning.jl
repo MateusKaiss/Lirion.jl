@@ -289,11 +289,11 @@ function prepare_admm_partitions(full::CaseRaw)
         )
         sub.branch = _slice_branch(full.branch, keep_all)
 
-        sub.admm.branch_full = full.branch
-        sub.admm.branch_local_indices = keep_all
-        empty!(sub.admm.branch_global_to_local)
+        sub.dist.branch_full = full.branch
+        sub.dist.branch_local_indices = keep_all
+        empty!(sub.dist.branch_global_to_local)
         @inbounds for (loc, glob) in enumerate(keep_all)
-            sub.admm.branch_global_to_local[glob] = loc
+            sub.dist.branch_global_to_local[glob] = loc
         end
 
         _filter_timeseries!(sub, full, zone_bus_set)
@@ -301,7 +301,7 @@ function prepare_admm_partitions(full::CaseRaw)
 
         add_case_index_maps!(sub)
 
-        sub.admm.bus_set = Set(Int.(sub.bus.bus_i))
+        sub.dist.bus_set = Set(Int.(sub.bus.bus_i))
         partitions[Int(zone)] = sub
     end
 
@@ -314,7 +314,7 @@ function prepare_admm_partitions(full::CaseRaw)
 
     for (_, sub) in partitions
         local_b = Int.(sub.bus.bus_i)
-        sub.admm.shared_buses_zone = [b for b in local_b if in(b, shared_set)]
+        sub.dist.shared_buses_zone = [b for b in local_b if in(b, shared_set)]
     end
 
     return partitions, shared_buses

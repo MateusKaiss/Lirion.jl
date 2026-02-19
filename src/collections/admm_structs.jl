@@ -144,7 +144,7 @@ end
 # ADMM Partitions Builders (meta vem do sys direto)
 # =======================================================================
 
-function build_dc_partitions(sys::ADMMSystem)::Partitions{PartitionDC}
+function build_dc_partitions(sys::DistributedSystem)::Partitions{PartitionDC}
     zones = sys.zones
     zone_to_idx = sys.zone_to_idx
     n_zones = length(zones)
@@ -168,7 +168,7 @@ function build_dc_partitions(sys::ADMMSystem)::Partitions{PartitionDC}
     return Partitions{PartitionDC}(parts, zones, zone_to_idx)
 end
 
-function build_ac_partitions(sys::ADMMSystem)::Partitions{PartitionAC}
+function build_ac_partitions(sys::DistributedSystem)::Partitions{PartitionAC}
     zones = sys.zones
     zone_to_idx = sys.zone_to_idx
     n_zones = length(zones)
@@ -192,7 +192,7 @@ function build_ac_partitions(sys::ADMMSystem)::Partitions{PartitionAC}
     return Partitions{PartitionAC}(parts, zones, zone_to_idx)
 end
 
-function build_socp_partitions(sys::ADMMSystem)::Partitions{PartitionSOCP}
+function build_socp_partitions(sys::DistributedSystem)::Partitions{PartitionSOCP}
     zones = sys.zones
     zone_to_idx = sys.zone_to_idx
     n_zones = length(zones)

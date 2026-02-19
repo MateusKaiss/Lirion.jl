@@ -34,12 +34,12 @@ end
 
 function init_dc_state_partition!(
     partitions::Partitions{PartitionDC},
-    sys::ADMMSystem,
+    sys::DistributedSystem,
     optimizer_factory,
     rho_theta::Float64,
 )
     n_zones = length(partitions.parts)
-    @assert length(sys.parts) == n_zones "ADMMSystem.parts must be aligned with partitions.parts"
+    @assert length(sys.parts) == n_zones "DistributedSystem.parts must be aligned with partitions.parts"
 
     @inbounds for i in 1:n_zones
         init_dc_state_partition!(
@@ -83,13 +83,13 @@ end
 
 function init_dc_power_partition!(
     partitions::Partitions{PartitionDC},
-    sys::ADMMSystem,
+    sys::DistributedSystem,
     optimizer_factory,
     rho::Float64,
     interzonal_branches::Vector{Int},
 )
     n_zones = length(partitions.parts)
-    @assert length(sys.parts) == n_zones "ADMMSystem.parts must be aligned with partitions.parts"
+    @assert length(sys.parts) == n_zones "DistributedSystem.parts must be aligned with partitions.parts"
 
     @inbounds for i in 1:n_zones
         init_dc_power_partition!(
@@ -137,14 +137,14 @@ end
 
 function init_dc_hybrid_partition!(
     partitions::Partitions{PartitionDC},
-    sys::ADMMSystem,
+    sys::DistributedSystem,
     optimizer_factory,
     rho_theta::Float64,
     rho::Float64,
     interzonal_branches::Vector{Int},
 )
     n_zones = length(partitions.parts)
-    @assert length(sys.parts) == n_zones "ADMMSystem.parts must be aligned with partitions.parts"
+    @assert length(sys.parts) == n_zones "DistributedSystem.parts must be aligned with partitions.parts"
 
     @inbounds for i in 1:n_zones
         init_dc_hybrid_partition!(
@@ -167,7 +167,7 @@ end
 # Runner: ADMM state/DC
 # ------------------------------------------------------------
 function run_admm(
-    sys::ADMMSystem,
+    sys::DistributedSystem,
     config::DistributedOPFModel,
     ::ADMM{State, DCTag};
     optimizer_factory = nothing,
@@ -329,7 +329,7 @@ end
 # Runner: ADMM power/DC
 # ------------------------------------------------------------
 function run_admm(
-    sys::ADMMSystem,
+    sys::DistributedSystem,
     config::DistributedOPFModel,
     ::ADMM{Power, DCTag};
     optimizer_factory = nothing,
@@ -470,7 +470,7 @@ end
 # Runner: ADMM hybrid/DC
 # ------------------------------------------------------------
 function run_admm(
-    sys::ADMMSystem,
+    sys::DistributedSystem,
     config::DistributedOPFModel,
     ::ADMM{Hybrid, DCTag};
     optimizer_factory = nothing,
