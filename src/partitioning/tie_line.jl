@@ -8,8 +8,6 @@
 # ============================================================
 
 function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
-    @assert full.bus !== nothing && full.branch !== nothing
-
     bus_ids = Int.(full.bus.bus_i)
     zones = Int.(full.bus.zone)
     unique_zones = sort!(unique(zones))

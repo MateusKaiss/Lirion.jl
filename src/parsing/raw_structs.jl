@@ -199,6 +199,55 @@ struct GencostTimeseriesRaw{T <: Real} <: AbstractRawTable
     feed_in_tariff::Vector{T}
 end
 
+@inline _empty_vec(::Type{T}) where {T} = T[]
+
+function empty_bus_raw(::Type{T} = Float64) where {T <: Real}
+    return BusRaw{T}(
+        Int[], Int[],
+        _empty_vec(T), _empty_vec(T), _empty_vec(T), _empty_vec(T),
+        Int[],
+        _empty_vec(T), _empty_vec(T), _empty_vec(T),
+        Int[],
+        _empty_vec(T), _empty_vec(T),
+        _empty_vec(T), _empty_vec(T),
+        _empty_vec(T), _empty_vec(T),
+        Bool[],
+    )
+end
+
+function empty_gen_raw(::Type{T} = Float64) where {T <: Real}
+    return GenRaw{T}(
+        Int[],
+        _empty_vec(T), _empty_vec(T), _empty_vec(T), _empty_vec(T),
+        _empty_vec(T), _empty_vec(T),
+        Int[],
+        _empty_vec(T), _empty_vec(T),
+        _empty_vec(T), _empty_vec(T),
+        _empty_vec(T), _empty_vec(T), _empty_vec(T), _empty_vec(T),
+        _empty_vec(T), _empty_vec(T), _empty_vec(T), _empty_vec(T), _empty_vec(T),
+        _empty_vec(T), _empty_vec(T), _empty_vec(T), _empty_vec(T),
+        String[],
+        _empty_vec(T),
+    )
+end
+
+function empty_branch_raw(::Type{T} = Float64) where {T <: Real}
+    return BranchRaw{T}(
+        Int[], Int[],
+        _empty_vec(T), _empty_vec(T), _empty_vec(T),
+        _empty_vec(T), _empty_vec(T), _empty_vec(T),
+        _empty_vec(T), _empty_vec(T),
+        Int[],
+        _empty_vec(T), _empty_vec(T),
+        _empty_vec(T), _empty_vec(T), _empty_vec(T), _empty_vec(T),
+        _empty_vec(T), _empty_vec(T), _empty_vec(T), _empty_vec(T),
+    )
+end
+
+function empty_gencost_raw(::Type{T} = Float64) where {T <: Real}
+    return GencostRaw{T}(Int[], _empty_vec(T), _empty_vec(T), Int[], Vector{Vector{T}}())
+end
+
 # -------------------------
 # Index maps container
 # -------------------------
@@ -251,13 +300,13 @@ mutable struct CaseRaw
     baseMVA::Float64
     T::Int
 
-    # tables
-    bus::Union{Nothing, BusRaw{Float64}}
-    gen::Union{Nothing, GenRaw{Float64}}
-    branch::Union{Nothing, BranchRaw{Float64}}
+    bus::BusRaw{Float64}
+    gen::GenRaw{Float64}
+    branch::BranchRaw{Float64}
+    gencost::GencostRaw{Float64}
 
+    # optional tables
     dcline::Union{Nothing, DCLineRaw{Float64}}
-    gencost::Union{Nothing, GencostRaw{Float64}}
     bus_name::Union{Nothing, BusNameRaw}
     storage::Union{Nothing, StorageRaw{Float64}}
     switch::Union{Nothing, SwitchRaw{Float64}}
@@ -282,9 +331,12 @@ mutable struct CaseRaw
             String(source_type),
             String(source_version),
             Float64(baseMVA),
-            Int(T), nothing, nothing, nothing, nothing, nothing,
-            nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing,
-            CaseIndexMaps(),
+            Int(T), empty_bus_raw(Float64),
+            empty_gen_raw(Float64),
+            empty_branch_raw(Float64),
+            empty_gencost_raw(Float64), nothing, nothing, nothing, nothing, nothing,
+            nothing,
+            nothing, nothing, nothing, nothing, CaseIndexMaps(),
             DistributedRawMeta(),
         )
     end
