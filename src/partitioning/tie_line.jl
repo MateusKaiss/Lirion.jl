@@ -1,4 +1,3 @@
-
 # ==============================================================================
 # Sectioning dispatch: Tie Line
 # ==============================================================================
@@ -8,36 +7,34 @@
 # ============================================================
 
 function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
-    bus_ids = Int.(full.bus.bus_i)
-    zones = Int.(full.bus.zone)
-    unique_zones = sort!(unique(zones))
+    full_bus_ids = Int.(full.bus.bus_i)
+    full_bus_zones = Int.(full.bus.zone)
+    zone_ids = sort!(unique(full_bus_zones))
+    full_f_bus = Int.(full.branch.f_bus)
+    full_t_bus = Int.(full.branch.t_bus)
+    full_branch_in_service_mask = branch_in_service_mask(full.branch)
 
     partitions = Dict{Int, CaseRaw}()
 
-    f_bus_full = Int.(full.branch.f_bus)
-    t_bus_full = Int.(full.branch.t_bus)
-    branch_status_mask = branch_in_service_mask(full.branch)
-
-    for zone in unique_zones
-        zone_mask = findall(==(zone), zones)
-
-        zone_bus_ids = @views bus_ids[zone_mask]
+    for zone_id in zone_ids
+        zone_bus_idx = findall(==(zone_id), full_bus_zones)
+        zone_bus_ids = @views full_bus_ids[zone_bus_idx]
         zone_bus_set = Set{Int}(zone_bus_ids)
+        
+        extra_bus_set = Set{Int}()
 
-        extra = Set{Int}()
-        _find_extra_neighbor_buses!(
-            extra,
+        _find_extra_bus_set_neighbor_buses!(
+            extra_bus_set,
             zone_bus_set,
-            f_bus_full,
-            t_bus_full,
-            branch_status_mask,
+            full_f_bus,
+            full_t_bus,
+            full_branch_in_service_mask,
         )
 
-        all_bus_set = union(zone_bus_set, extra)
-        bus_mask = findall(b -> in(b, all_bus_set), bus_ids)
-
-        sub = _build_sub_meta(full, zone)
-        sub.bus = _slice_bus(full.bus, bus_mask)
+        all_bus_set = union(zone_bus_set, extra_bus_set)
+        sub_bus_idx = findall(b -> in(b, all_bus_set), full_bus_ids)
+        sub = _build_sub_meta(full, zone_id)
+        sub.bus = _slice_bus(full.bus, sub_bus_idx)
         _mark_virtual_buses!(sub.bus, zone_bus_set)
 
         if full.gen !== nothing
@@ -84,21 +81,21 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
             )
         end
 
-        keep_all = findall(
+        zone_branch_idx = findall(
             i ->
-                branch_status_mask[i] &&
+                full_branch_in_service_mask[i] &&
                     (
-                        in(Int(f_bus_full[i]), zone_bus_set) ||
-                        in(Int(t_bus_full[i]), zone_bus_set)
+                        in(Int(full_f_bus[i]), zone_bus_set) ||
+                        in(Int(full_t_bus[i]), zone_bus_set)
                     ),
-            eachindex(f_bus_full),
+            eachindex(full_f_bus),
         )
-        sub.branch = _slice_branch(full.branch, keep_all)
+        sub.branch = _slice_branch(full.branch, zone_branch_idx)
 
         sub.dist.branch_full = full.branch
-        sub.dist.branch_local_indices = keep_all
+        sub.dist.branch_local_indices = zone_branch_idx
         empty!(sub.dist.branch_global_to_local)
-        @inbounds for (loc, glob) in enumerate(keep_all)
+        @inbounds for (loc, glob) in enumerate(zone_branch_idx)
             sub.dist.branch_global_to_local[glob] = loc
         end
 
@@ -108,9 +105,12 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
         add_case_index_maps!(sub)
 
         sub.dist.bus_set = Set(Int.(sub.bus.bus_i))
-        partitions[Int(zone)] = sub
+        partitions[Int(zone_id)] = sub
     end
 
+    # -------------------------
+    # compute shared buses across zones
+    # -------------------------
     bus_zone_appearance = Dict{Int, Set{Int}}()
     for (zone_id, sub) in partitions, b in Int.(sub.bus.bus_i)
         push!(get!(bus_zone_appearance, b, Set{Int}()), zone_id)
@@ -119,8 +119,8 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
     shared_set = Set(shared_buses)
 
     for (_, sub) in partitions
-        local_b = Int.(sub.bus.bus_i)
-        sub.dist.shared_buses_zone = [b for b in local_b if in(b, shared_set)]
+        sub_bus_ids = Int.(sub.bus.bus_i)
+        sub.dist.shared_buses_zone = [b for b in sub_bus_ids if in(b, shared_set)]
     end
 
     return partitions, shared_buses

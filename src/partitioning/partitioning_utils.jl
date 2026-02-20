@@ -33,7 +33,7 @@ end
     return sub
 end
 
-@inline function _find_extra_neighbor_buses!(
+@inline function _find_extra_bus_set_neighbor_buses!(
     extra::Set{Int},
     zone_bus_set::Set{Int},
     f_bus_full::AbstractVector{<:Integer},
