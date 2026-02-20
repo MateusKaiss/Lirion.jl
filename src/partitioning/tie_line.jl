@@ -10,8 +10,10 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
     full_bus_ids = Int.(full.bus.bus_i)
     full_bus_zones = Int.(full.bus.zone)
     zone_ids = sort!(unique(full_bus_zones))
+
     full_f_bus = Int.(full.branch.f_bus)
     full_t_bus = Int.(full.branch.t_bus)
+
     full_branch_in_service_mask = branch_in_service_mask(full.branch)
 
     partitions = Dict{Int, CaseRaw}()
@@ -20,27 +22,27 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
         zone_bus_idx = findall(==(zone_id), full_bus_zones)
         zone_bus_ids = @views full_bus_ids[zone_bus_idx]
         zone_bus_set = Set{Int}(zone_bus_ids)
-        
-        extra_bus_set = Set{Int}()
 
-        _find_extra_bus_set_neighbor_buses!(
-            extra_bus_set,
+        external_neighbor_bus_set = Set{Int}()
+
+        _collect_external_neighbor_buses!(
+            external_neighbor_bus_set,
             zone_bus_set,
             full_f_bus,
             full_t_bus,
             full_branch_in_service_mask,
         )
 
-        all_bus_set = union(zone_bus_set, extra_bus_set)
+        all_bus_set = union(zone_bus_set, external_neighbor_bus_set)
+
         sub_bus_idx = findall(b -> in(b, all_bus_set), full_bus_ids)
+
         sub = _build_sub_meta(full, zone_id)
         sub.bus = _slice_bus(full.bus, sub_bus_idx)
         _mark_virtual_buses!(sub.bus, zone_bus_set)
 
-        if full.gen !== nothing
-            keep = _filter_by_zone_bus(Int.(full.gen.gen_bus), zone_bus_set)
-            sub.gen = _slice_gen(full.gen, keep)
-        end
+        gen_keep = _filter_by_zone_bus(Int.(full.gen.gen_bus), zone_bus_set)
+        sub.gen = _slice_gen(full.gen, gen_keep)
 
         if full.prosumer !== nothing
             keep = _filter_by_zone_bus(Int.(full.prosumer.bus), zone_bus_set)
@@ -115,6 +117,7 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
     for (zone_id, sub) in partitions, b in Int.(sub.bus.bus_i)
         push!(get!(bus_zone_appearance, b, Set{Int}()), zone_id)
     end
+
     shared_buses = [b for (b, zs) in bus_zone_appearance if length(zs) > 1]
     shared_set = Set(shared_buses)
 
