@@ -192,7 +192,7 @@ The package was conceived, designed, and developed by **Mateus Kaiss**, as its p
 
 - **Prof. Dr. Kristie Kaminski Küster** for her supervision and guidance in power systems research, as well as for reviewing the implemented code.
 
-- **Dr. Daniel Gebbran Cons Bacilla Ferreira** for his contributions to the design of the distributed methodologies and for his significant role in strengthening the scientific contributions and manuscript preparation of the associated research papers.
+- **Dr. Daniel Gebbran Cons Bacilla Ferreira** for his supervision of the research involving distributed methodologies and for his significant role in strengthening the scientific contributions and manuscript preparation of the associated research papers.
 
 - **Andressa Mathias Pedroso** for leading and implementing the design and development of the official Lirion website.
 
