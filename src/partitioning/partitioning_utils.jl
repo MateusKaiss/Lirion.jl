@@ -135,6 +135,32 @@ end
     )
 end
 
+@inline function _slice_prosumer(
+    full_prosumer::ProsumerRaw{Float64},
+    keep::Vector{Int},
+)
+    return ProsumerRaw{Float64}(
+        full_prosumer.bus[keep],
+        full_prosumer.generation[keep],
+        full_prosumer.demand[keep],
+        full_prosumer.q_generation[keep],
+        full_prosumer.q_demand[keep],
+        full_prosumer.cost_injection[keep],
+        full_prosumer.inverter_capacity[keep],
+    )
+end
+
+@inline function _slice_consumer(
+    full_consumer::ConsumerRaw{Float64},
+    keep::Vector{Int},
+)
+    return ConsumerRaw{Float64}(
+        full_consumer.bus[keep],
+        full_consumer.demand[keep],
+        full_consumer.q_demand[keep],
+    )
+end
+
 @inline function _slice_branch(fullbr::BranchRaw{Float64}, keep::Vector{Int})
     return BranchRaw{Float64}(
         fullbr.f_bus[keep],
@@ -152,6 +178,39 @@ end
         fullbr.mu_sf[keep], fullbr.mu_st[keep],
         fullbr.mu_angmin[keep], fullbr.mu_angmax[keep],
     )
+end
+
+@inline function _filter_gencosts!(
+    zone_case::CaseRaw,
+    full::CaseRaw,
+    zone_bus_set::Set{Int},
+)
+    zone_gen_idx = _filter_by_zone_bus(full.gen.gen_bus, zone_bus_set)
+    zone_case.gen = _slice_gen(full.gen, zone_gen_idx)
+
+    gc = full.gencost
+    zone_case.gencost = GencostRaw{Float64}(
+        gc.model[zone_gen_idx],
+        gc.startup[zone_gen_idx],
+        gc.shutdown[zone_gen_idx],
+        gc.ncost[zone_gen_idx],
+        gc.cost_coefficients[zone_gen_idx],
+    )
+
+    if full.gencost_timeseries !== nothing
+        ts = full.gencost_timeseries
+        zone_gc_ts_idx =
+            findall(i -> in(Int(ts.gen_id[i]), zone_gen_idx), eachindex(ts.gen_id))
+        zone_case.gencost_timeseries = GencostTimeseriesRaw{Float64}(
+            ts.time[zone_gc_ts_idx], ts.gen_id[zone_gc_ts_idx],
+            ts.model[zone_gc_ts_idx],
+            ts.startup[zone_gc_ts_idx], ts.shutdown[zone_gc_ts_idx],
+            ts.ncost[zone_gc_ts_idx], ts.cost_coefficients[zone_gc_ts_idx],
+            ts.tou[zone_gc_ts_idx], ts.feed_in_tariff[zone_gc_ts_idx],
+        )
+    end
+
+    return nothing
 end
 
 @inline function _filter_timeseries!(
@@ -184,39 +243,6 @@ end
         zone_case.consumer_timeseries = ConsumerTimeseriesRaw{Float64}(
             ts.time[zone_ts_idx], ts.bus[zone_ts_idx],
             ts.demand[zone_ts_idx], ts.q_demand[zone_ts_idx],
-        )
-    end
-
-    return nothing
-end
-
-@inline function _filter_gencosts!(
-    zone_case::CaseRaw,
-    full::CaseRaw,
-    zone_bus_set::Set{Int},
-)
-    zone_gen_idx = _filter_by_zone_bus(full.gen.gen_bus, zone_bus_set)
-    zone_case.gen = _slice_gen(full.gen, zone_gen_idx)
-
-    gc = full.gencost
-    zone_case.gencost = GencostRaw{Float64}(
-        gc.model[zone_gen_idx],
-        gc.startup[zone_gen_idx],
-        gc.shutdown[zone_gen_idx],
-        gc.ncost[zone_gen_idx],
-        gc.cost_coefficients[zone_gen_idx],
-    )
-
-    if full.gencost_timeseries !== nothing
-        ts = full.gencost_timeseries
-        zone_gc_ts_idx =
-            findall(i -> in(Int(ts.gen_id[i]), zone_gen_idx), eachindex(ts.gen_id))
-        zone_case.gencost_timeseries = GencostTimeseriesRaw{Float64}(
-            ts.time[zone_gc_ts_idx], ts.gen_id[zone_gc_ts_idx],
-            ts.model[zone_gc_ts_idx],
-            ts.startup[zone_gc_ts_idx], ts.shutdown[zone_gc_ts_idx],
-            ts.ncost[zone_gc_ts_idx], ts.cost_coefficients[zone_gc_ts_idx],
-            ts.tou[zone_gc_ts_idx], ts.feed_in_tariff[zone_gc_ts_idx],
         )
     end
 
