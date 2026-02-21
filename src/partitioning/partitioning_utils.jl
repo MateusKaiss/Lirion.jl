@@ -67,6 +67,23 @@ end
     )
 end
 
+@inline function _slice_bus(full_bus::BusRaw{Float64}, keep::Vector{Int})
+    return BusRaw{Float64}(
+        full_bus.bus_i[keep],
+        full_bus.bus_type[keep],
+        full_bus.pd[keep], full_bus.qd[keep],
+        full_bus.gs[keep], full_bus.bs[keep],
+        full_bus.area[keep],
+        full_bus.vm[keep], full_bus.va[keep],
+        full_bus.base_kv[keep],
+        full_bus.zone[keep],
+        full_bus.vmax[keep], full_bus.vmin[keep],
+        full_bus.lam_p[keep], full_bus.lam_q[keep],
+        full_bus.mu_vmax[keep], full_bus.mu_vmin[keep],
+        full_bus.is_virtual[keep],
+    )
+end
+
 @inline function _mark_virtual_buses!(bus::BusRaw{Float64}, zone_bus_set::Set{Int})
     @inbounds for i in eachindex(bus.bus_i)
         bus_id = bus.bus_i[i]
@@ -77,7 +94,7 @@ end
             bus.qd[i] = 0.0
             bus.gs[i] = 0.0
             bus.bs[i] = 0.0
-            bus.bus_type[i] = 1
+            # bus.bus_type[i] = 1
         end
     end
     return nothing
@@ -88,23 +105,6 @@ end
     zone_bus_set::Set{Int},
 )
     return findall(i -> in(Int(bus_vec[i]), zone_bus_set), eachindex(bus_vec))
-end
-
-@inline function _slice_bus(fullbus::BusRaw{Float64}, keep::Vector{Int})
-    return BusRaw{Float64}(
-        fullbus.bus_i[keep],
-        fullbus.bus_type[keep],
-        fullbus.pd[keep], fullbus.qd[keep],
-        fullbus.gs[keep], fullbus.bs[keep],
-        fullbus.area[keep],
-        fullbus.vm[keep], fullbus.va[keep],
-        fullbus.base_kv[keep],
-        fullbus.zone[keep],
-        fullbus.vmax[keep], fullbus.vmin[keep],
-        fullbus.lam_p[keep], fullbus.lam_q[keep],
-        fullbus.mu_vmax[keep], fullbus.mu_vmin[keep],
-        fullbus.is_virtual[keep],
-    )
 end
 
 @inline function _slice_gen(fullgen::GenRaw{Float64}, keep::Vector{Int})
