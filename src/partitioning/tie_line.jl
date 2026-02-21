@@ -76,18 +76,13 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
                 _slice_storage(full.storage, zone_storage_idx)
         end
 
-        zone_branch_idx = findall(
-            i ->
-                full_branch_in_service_mask[i] &&
-                    (
-                        full_f_bus_ids[i] in zone_internal_bus_set ||
-                        full_t_bus_ids[i] in zone_internal_bus_set
-                    ),
-            eachindex(full_f_bus_ids),
+        zone_branch_idx = _filter_branches_incident_to_zone(
+            full_f_bus_ids,
+            full_t_bus_ids,
+            full_branch_in_service_mask,
+            zone_internal_bus_set,
         )
-
-        zone_subprob_case.branch =
-            _slice_branch(full.branch, zone_branch_idx)
+        zone_subprob_case.branch = _slice_branch(full.branch, zone_branch_idx)
 
         zone_subprob_case.dist.branch_full = full.branch
         zone_subprob_case.dist.branch_local_indices = zone_branch_idx
