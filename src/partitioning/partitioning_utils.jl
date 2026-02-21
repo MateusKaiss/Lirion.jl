@@ -101,34 +101,37 @@ end
 end
 
 @inline function _filter_by_zone_bus(
-    bus_vec::AbstractVector{<:Integer},
-    zone_bus_set::Set{Int},
+    component_bus_ids::AbstractVector{<:Integer},
+    zone_internal_bus_set::Set{Int},
 )
-    return findall(i -> in(Int(bus_vec[i]), zone_bus_set), eachindex(bus_vec))
+    return findall(
+        idx -> component_bus_ids[idx] in zone_internal_bus_set,
+        eachindex(component_bus_ids),
+    )
 end
 
-@inline function _slice_gen(fullgen::GenRaw{Float64}, keep::Vector{Int})
+@inline function _slice_gen(full_gen::GenRaw{Float64}, keep::Vector{Int})
     return GenRaw{Float64}(
-        fullgen.gen_bus[keep],
-        fullgen.pg[keep], fullgen.qg[keep],
-        fullgen.qmax[keep], fullgen.qmin[keep],
-        fullgen.vg[keep],
-        fullgen.mbase[keep],
-        fullgen.gen_status[keep],
-        fullgen.pmax[keep], fullgen.pmin[keep],
-        fullgen.pc1[keep],
-        fullgen.pc2[keep],
-        fullgen.qc1min[keep], fullgen.qc1max[keep],
-        fullgen.qc2min[keep], fullgen.qc2max[keep],
-        fullgen.ramp_agc[keep],
-        fullgen.ramp_10[keep],
-        fullgen.ramp_30[keep],
-        fullgen.ramp_q[keep],
-        fullgen.apf[keep],
-        fullgen.mu_pmax[keep], fullgen.mu_pmin[keep],
-        fullgen.mu_qmax[keep], fullgen.mu_qmin[keep],
-        fullgen.plant_type[keep],
-        fullgen.curtailment_cost[keep],
+        full_gen.gen_bus[keep],
+        full_gen.pg[keep], full_gen.qg[keep],
+        full_gen.qmax[keep], full_gen.qmin[keep],
+        full_gen.vg[keep],
+        full_gen.mbase[keep],
+        full_gen.gen_status[keep],
+        full_gen.pmax[keep], full_gen.pmin[keep],
+        full_gen.pc1[keep],
+        full_gen.pc2[keep],
+        full_gen.qc1min[keep], full_gen.qc1max[keep],
+        full_gen.qc2min[keep], full_gen.qc2max[keep],
+        full_gen.ramp_agc[keep],
+        full_gen.ramp_10[keep],
+        full_gen.ramp_30[keep],
+        full_gen.ramp_q[keep],
+        full_gen.apf[keep],
+        full_gen.mu_pmax[keep], full_gen.mu_pmin[keep],
+        full_gen.mu_qmax[keep], full_gen.mu_qmin[keep],
+        full_gen.plant_type[keep],
+        full_gen.curtailment_cost[keep],
     )
 end
 

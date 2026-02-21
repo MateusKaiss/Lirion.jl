@@ -121,9 +121,6 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
         partitions[Int(zone_id)] = zone_subprob_case
     end
 
-    # -------------------------
-    # compute shared buses across zones
-    # -------------------------
     bus_zone_appearance = Dict{Int, Set{Int}}()
     for (zone_id, zone_subprob_case) in partitions,
         bus_id in Int.(zone_subprob_case.bus.bus_i)
