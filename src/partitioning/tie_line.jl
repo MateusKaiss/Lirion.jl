@@ -32,56 +32,65 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
             full_branch_in_service_mask,
         )
 
-        all_bus_set = union(zone_bus_set, external_neighbor_bus_set)
+        zone_subproblem_bus_set = union(zone_bus_set, external_neighbor_bus_set)
+        zone_bus_idx_in_full = findall(b -> in(b, zone_subproblem_bus_set), full_bus_ids)
+    
+        zone_case = _build_zone_meta(full, zone_id)
 
-        sub_bus_idx = findall(b -> in(b, all_bus_set), full_bus_ids)
+        zone_case.bus = _slice_bus(full.bus, zone_bus_idx_in_full)
+        _mark_virtual_buses!(zone_case.bus, zone_bus_set)
 
-        sub = _build_sub_meta(full, zone_id)
-        sub.bus = _slice_bus(full.bus, sub_bus_idx)
-        _mark_virtual_buses!(sub.bus, zone_bus_set)
+        # generators
+        zone_gen_idx = _filter_by_zone_bus(full.gen.gen_bus, zone_bus_set)
+        zone_case.gen = _slice_gen(full.gen, zone_gen_idx)
 
-        gen_keep = _filter_by_zone_bus(Int.(full.gen.gen_bus), zone_bus_set)
-        sub.gen = _slice_gen(full.gen, gen_keep)
-
+        # optional tables
         if full.prosumer !== nothing
-            keep = _filter_by_zone_bus(Int.(full.prosumer.bus), zone_bus_set)
-            sub.prosumer = ProsumerRaw{Float64}(
-                full.prosumer.bus[keep],
-                full.prosumer.generation[keep],
-                full.prosumer.demand[keep],
-                full.prosumer.q_generation[keep],
-                full.prosumer.q_demand[keep],
-                full.prosumer.cost_injection[keep],
-                full.prosumer.inverter_capacity[keep],
+            zone_prosumer_idx = _filter_by_zone_bus(full.prosumer.bus, zone_bus_set)
+            zone_case.prosumer = ProsumerRaw{Float64}(
+                full.prosumer.bus[zone_prosumer_idx],
+                full.prosumer.generation[zone_prosumer_idx],
+                full.prosumer.demand[zone_prosumer_idx],
+                full.prosumer.q_generation[zone_prosumer_idx],
+                full.prosumer.q_demand[zone_prosumer_idx],
+                full.prosumer.cost_injection[zone_prosumer_idx],
+                full.prosumer.inverter_capacity[zone_prosumer_idx],
             )
         end
 
         if full.consumer !== nothing
-            keep = _filter_by_zone_bus(Int.(full.consumer.bus), zone_bus_set)
-            sub.consumer = ConsumerRaw{Float64}(
-                full.consumer.bus[keep],
-                full.consumer.demand[keep],
-                full.consumer.q_demand[keep],
+            zone_consumer_idx = _filter_by_zone_bus(full.consumer.bus, zone_bus_set)
+            zone_case.consumer = ConsumerRaw{Float64}(
+                full.consumer.bus[zone_consumer_idx],
+                full.consumer.demand[zone_consumer_idx],
+                full.consumer.q_demand[zone_consumer_idx],
             )
         end
 
         if full.storage !== nothing
-            keep = _filter_by_zone_bus(Int.(full.storage.storage_bus), zone_bus_set)
-            sub.storage = StorageRaw{Float64}(
-                full.storage.storage_bus[keep],
-                full.storage.ps[keep], full.storage.qs[keep],
-                full.storage.energy[keep], full.storage.energy_rating[keep],
-                full.storage.charge_rating[keep], full.storage.discharge_rating[keep],
-                full.storage.charge_efficiency[keep],
-                full.storage.discharge_efficiency[keep],
-                full.storage.thermal_rating[keep],
-                full.storage.qmin[keep], full.storage.qmax[keep],
-                full.storage.r[keep], full.storage.x[keep],
-                full.storage.p_loss[keep], full.storage.q_loss[keep],
-                full.storage.status[keep],
+            zone_storage_idx = _filter_by_zone_bus(full.storage.storage_bus, zone_bus_set)
+            zone_case.storage = StorageRaw{Float64}(
+                full.storage.storage_bus[zone_storage_idx],
+                full.storage.ps[zone_storage_idx], full.storage.qs[zone_storage_idx],
+                full.storage.energy[zone_storage_idx],
+                full.storage.energy_rating[zone_storage_idx],
+                full.storage.charge_rating[zone_storage_idx],
+                full.storage.discharge_rating[zone_storage_idx],
+                full.storage.charge_efficiency[zone_storage_idx],
+                full.storage.discharge_efficiency[zone_storage_idx],
+                full.storage.thermal_rating[zone_storage_idx],
+                full.storage.qmin[zone_storage_idx],
+                full.storage.qmax[zone_storage_idx],
+                full.storage.r[zone_storage_idx], full.storage.x[zone_storage_idx],
+                full.storage.p_loss[zone_storage_idx],
+                full.storage.q_loss[zone_storage_idx],
+                full.storage.status[zone_storage_idx],
             )
         end
 
+        # -------------------------
+        # zone branches (in service, incident to zone internal buses)
+        # -------------------------
         zone_branch_idx = findall(
             i ->
                 full_branch_in_service_mask[i] &&
@@ -91,39 +100,44 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
                     ),
             eachindex(full_f_bus_ids),
         )
-        sub.branch = _slice_branch(full.branch, zone_branch_idx)
 
-        sub.dist.branch_full = full.branch
-        sub.dist.branch_local_indices = zone_branch_idx
-        empty!(sub.dist.branch_global_to_local)
-        @inbounds for (loc, glob) in enumerate(zone_branch_idx)
-            sub.dist.branch_global_to_local[glob] = loc
+        zone_case.branch = _slice_branch(full.branch, zone_branch_idx)
+
+        # distributed meta for mapping local <-> global branch indices
+        zone_case.dist.branch_full = full.branch
+        zone_case.dist.branch_local_indices = zone_branch_idx
+        empty!(zone_case.dist.branch_global_to_local)
+
+        @inbounds for (local_branch_idx, global_branch_idx) in enumerate(zone_branch_idx)
+            zone_case.dist.branch_global_to_local[global_branch_idx] = local_branch_idx
         end
 
-        _filter_timeseries!(sub, full, zone_bus_set)
-        _filter_gencosts!(sub, full, zone_bus_set)
+        _filter_timeseries!(zone_case, full, zone_bus_set)
+        _filter_gencosts!(zone_case, full, zone_bus_set)
 
-        add_case_index_maps!(sub)
+        add_case_index_maps!(zone_case)
 
-        sub.dist.bus_set = Set(Int.(sub.bus.bus_i))
-        partitions[Int(zone_id)] = sub
+        zone_case.dist.bus_set = Set(Int.(zone_case.bus.bus_i))
+
+        partitions[Int(zone_id)] = zone_case
     end
 
     # -------------------------
     # compute shared buses across zones
     # -------------------------
     bus_zone_appearance = Dict{Int, Set{Int}}()
-    for (zone_id, sub) in partitions, b in Int.(sub.bus.bus_i)
-        push!(get!(bus_zone_appearance, b, Set{Int}()), zone_id)
+    for (zone_id, zone_case) in partitions, bus_id in Int.(zone_case.bus.bus_i)
+        push!(get!(bus_zone_appearance, bus_id, Set{Int}()), zone_id)
     end
 
-    shared_buses = [b for (b, zs) in bus_zone_appearance if length(zs) > 1]
-    shared_set = Set(shared_buses)
+    shared_bus_ids = [bus_id for (bus_id, zs) in bus_zone_appearance if length(zs) > 1]
+    shared_bus_set = Set(shared_bus_ids)
 
-    for (_, sub) in partitions
-        sub_bus_ids = Int.(sub.bus.bus_i)
-        sub.dist.shared_buses_zone = [b for b in sub_bus_ids if in(b, shared_set)]
+    for (_, zone_case) in partitions
+        zone_case_bus_ids = Int.(zone_case.bus.bus_i)
+        zone_case.dist.shared_buses_zone =
+            [b for b in zone_case_bus_ids if in(b, shared_bus_set)]
     end
 
-    return partitions, shared_buses
+    return partitions, shared_bus_ids
 end

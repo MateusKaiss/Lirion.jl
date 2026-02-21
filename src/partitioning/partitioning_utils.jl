@@ -1,3 +1,8 @@
+
+# ==============================================================================
+# Interzonal branches (tie lines) finder
+# ==============================================================================
+
 function _find_interzonal_branches(full::CaseRaw, ::TieLine)
     full_bus_zones = Int.(full.bus.zone)
     full_bus_ids = Int.(full.bus.bus_i)
@@ -20,6 +25,10 @@ function _find_interzonal_branches(full::CaseRaw, ::TieLine)
     end
     return interzonal_branches
 end
+
+# ==============================================================================
+# Helpers
+# ==============================================================================
 
 @inline function branch_in_service_mask(branch::BranchRaw)
     return branch.br_status .== 1
@@ -48,7 +57,7 @@ end
     return external_neighbor_bus_set
 end
 
-@inline function _build_sub_meta(full::CaseRaw, zone_id::Int)
+@inline function _build_zone_meta(full::CaseRaw, zone_id::Int)
     return CaseRaw(;
         name = "$(full.name)_zone_$zone_id",
         source_type = full.source_type,
@@ -60,8 +69,9 @@ end
 
 @inline function _mark_virtual_buses!(bus::BusRaw{Float64}, zone_bus_set::Set{Int})
     @inbounds for i in eachindex(bus.bus_i)
-        b = bus.bus_i[i]
-        bus.is_virtual[i] = !in(b, zone_bus_set)
+        bus_id = bus.bus_i[i]
+        bus.is_virtual[i] = !in(bus_id, zone_bus_set)
+
         if bus.is_virtual[i]
             bus.pd[i] = 0.0
             bus.qd[i] = 0.0
@@ -141,59 +151,69 @@ end
     )
 end
 
-@inline function _filter_timeseries!(sub::CaseRaw, full::CaseRaw, zone_bus_set::Set{Int})
+@inline function _filter_timeseries!(
+    zone_case::CaseRaw,
+    full::CaseRaw,
+    zone_bus_set::Set{Int},
+)
     if full.bus_timeseries !== nothing
         ts = full.bus_timeseries
-        keep = _filter_by_zone_bus(ts.bus, zone_bus_set)
-        sub.bus_timeseries = BusTimeseriesRaw{Float64}(
-            ts.time[keep], ts.bus[keep],
-            ts.pd[keep], ts.qd[keep], ts.gs[keep], ts.bs[keep],
+        zone_ts_idx = _filter_by_zone_bus(ts.bus, zone_bus_set)
+        zone_case.bus_timeseries = BusTimeseriesRaw{Float64}(
+            ts.time[zone_ts_idx], ts.bus[zone_ts_idx],
+            ts.pd[zone_ts_idx], ts.qd[zone_ts_idx], ts.gs[zone_ts_idx],
+            ts.bs[zone_ts_idx],
         )
     end
 
     if full.prosumer_timeseries !== nothing
         ts = full.prosumer_timeseries
-        keep = _filter_by_zone_bus(ts.bus, zone_bus_set)
-        sub.prosumer_timeseries = ProsumerTimeseriesRaw{Float64}(
-            ts.time[keep], ts.bus[keep],
-            ts.p_pv[keep], ts.p_load[keep], ts.p_curtail[keep],
+        zone_ts_idx = _filter_by_zone_bus(ts.bus, zone_bus_set)
+        zone_case.prosumer_timeseries = ProsumerTimeseriesRaw{Float64}(
+            ts.time[zone_ts_idx], ts.bus[zone_ts_idx],
+            ts.p_pv[zone_ts_idx], ts.p_load[zone_ts_idx], ts.p_curtail[zone_ts_idx],
         )
     end
 
     if full.consumer_timeseries !== nothing
         ts = full.consumer_timeseries
-        keep = _filter_by_zone_bus(ts.bus, zone_bus_set)
-        sub.consumer_timeseries = ConsumerTimeseriesRaw{Float64}(
-            ts.time[keep], ts.bus[keep],
-            ts.demand[keep], ts.q_demand[keep],
+        zone_ts_idx = _filter_by_zone_bus(ts.bus, zone_bus_set)
+        zone_case.consumer_timeseries = ConsumerTimeseriesRaw{Float64}(
+            ts.time[zone_ts_idx], ts.bus[zone_ts_idx],
+            ts.demand[zone_ts_idx], ts.q_demand[zone_ts_idx],
         )
     end
 
     return nothing
 end
 
-@inline function _filter_gencosts!(sub::CaseRaw, full::CaseRaw, zone_bus_set::Set{Int})
-    # generators kept by zone buses
-    gen_keep = _filter_by_zone_bus(full.gen.gen_bus, zone_bus_set)
-    sub.gen = _slice_gen(full.gen, gen_keep)
+@inline function _filter_gencosts!(
+    zone_case::CaseRaw,
+    full::CaseRaw,
+    zone_bus_set::Set{Int},
+)
+    zone_gen_idx = _filter_by_zone_bus(full.gen.gen_bus, zone_bus_set)
+    zone_case.gen = _slice_gen(full.gen, zone_gen_idx)
 
     gc = full.gencost
-    sub.gencost = GencostRaw{Float64}(
-        gc.model[gen_keep],
-        gc.startup[gen_keep],
-        gc.shutdown[gen_keep],
-        gc.ncost[gen_keep],
-        gc.cost_coefficients[gen_keep],
+    zone_case.gencost = GencostRaw{Float64}(
+        gc.model[zone_gen_idx],
+        gc.startup[zone_gen_idx],
+        gc.shutdown[zone_gen_idx],
+        gc.ncost[zone_gen_idx],
+        gc.cost_coefficients[zone_gen_idx],
     )
 
     if full.gencost_timeseries !== nothing
         ts = full.gencost_timeseries
-        keep = findall(i -> in(Int(ts.gen_id[i]), gen_keep), eachindex(ts.gen_id))
-        sub.gencost_timeseries = GencostTimeseriesRaw{Float64}(
-            ts.time[keep], ts.gen_id[keep], ts.model[keep],
-            ts.startup[keep], ts.shutdown[keep],
-            ts.ncost[keep], ts.cost_coefficients[keep],
-            ts.tou[keep], ts.feed_in_tariff[keep],
+        zone_gc_ts_idx =
+            findall(i -> in(Int(ts.gen_id[i]), zone_gen_idx), eachindex(ts.gen_id))
+        zone_case.gencost_timeseries = GencostTimeseriesRaw{Float64}(
+            ts.time[zone_gc_ts_idx], ts.gen_id[zone_gc_ts_idx],
+            ts.model[zone_gc_ts_idx],
+            ts.startup[zone_gc_ts_idx], ts.shutdown[zone_gc_ts_idx],
+            ts.ncost[zone_gc_ts_idx], ts.cost_coefficients[zone_gc_ts_idx],
+            ts.tou[zone_gc_ts_idx], ts.feed_in_tariff[zone_gc_ts_idx],
         )
     end
 
