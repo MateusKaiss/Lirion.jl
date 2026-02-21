@@ -28,21 +28,21 @@ end
 @inline function _collect_external_neighbor_buses!(
     external_neighbor_bus_set::Set{Int},
     zone_bus_set::Set{Int},
-    full_f_bus::AbstractVector{<:Integer},
-    full_t_bus::AbstractVector{<:Integer},
+    full_f_bus_ids::AbstractVector{Int},
+    full_t_bus_ids::AbstractVector{Int},
     full_branch_in_service_mask::AbstractVector{Bool},
 )
-    @inbounds for i in eachindex(full_f_bus)
+    @inbounds for i in eachindex(full_f_bus_ids)
         full_branch_in_service_mask[i] || continue
 
-        f = Int(full_f_bus[i])
-        t = Int(full_t_bus[i])
+        full_f_bus_id = full_f_bus_ids[i]
+        full_t_bus_id = full_t_bus_ids[i]
 
-        f_in = in(f, zone_bus_set)
-        t_in = in(t, zone_bus_set)
+        f_in_zone = in(full_f_bus_id, zone_bus_set)
+        t_in_zone = in(full_t_bus_id, zone_bus_set)
 
-        if f_in ⊻ t_in
-            push!(external_neighbor_bus_set, f_in ? t : f)
+        if f_in_zone ⊻ t_in_zone # XOR Logic - A ⊻ B is true only if exactly one of them is true
+            push!(external_neighbor_bus_set, f_in_zone ? full_t_bus_id : full_f_bus_id)
         end
     end
     return external_neighbor_bus_set

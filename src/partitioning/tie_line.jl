@@ -11,8 +11,8 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
     full_bus_zones = Int.(full.bus.zone)
     zone_ids = sort!(unique(full_bus_zones))
 
-    full_f_bus = Int.(full.branch.f_bus)
-    full_t_bus = Int.(full.branch.t_bus)
+    full_f_bus_ids = Int.(full.branch.f_bus)
+    full_t_bus_ids = Int.(full.branch.t_bus)
 
     full_branch_in_service_mask = branch_in_service_mask(full.branch)
 
@@ -24,12 +24,11 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
         zone_bus_set = Set{Int}(zone_bus_ids)
 
         external_neighbor_bus_set = Set{Int}()
-
         _collect_external_neighbor_buses!(
             external_neighbor_bus_set,
             zone_bus_set,
-            full_f_bus,
-            full_t_bus,
+            full_f_bus_ids,
+            full_t_bus_ids,
             full_branch_in_service_mask,
         )
 
@@ -87,10 +86,10 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
             i ->
                 full_branch_in_service_mask[i] &&
                     (
-                        in(Int(full_f_bus[i]), zone_bus_set) ||
-                        in(Int(full_t_bus[i]), zone_bus_set)
+                        in(Int(full_f_bus_ids[i]), zone_bus_set) ||
+                        in(Int(full_t_bus_ids[i]), zone_bus_set)
                     ),
-            eachindex(full_f_bus),
+            eachindex(full_f_bus_ids),
         )
         sub.branch = _slice_branch(full.branch, zone_branch_idx)
 
