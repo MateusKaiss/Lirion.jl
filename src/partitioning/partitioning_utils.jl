@@ -186,13 +186,15 @@ end
     full_branch_in_service_mask::AbstractVector{Bool},
     zone_internal_bus_set::Set{Int},
 )
-    return findall(eachindex(full_f_bus_ids)) do br_idx
-        return full_branch_in_service_mask[br_idx] &&
-               (
-            full_f_bus_ids[br_idx] in zone_internal_bus_set ||
-            full_t_bus_ids[br_idx] in zone_internal_bus_set
-        )
-    end
+    return findall(
+        br_idx ->
+            full_branch_in_service_mask[br_idx] &&
+                (
+                    full_f_bus_ids[br_idx] in zone_internal_bus_set ||
+                    full_t_bus_ids[br_idx] in zone_internal_bus_set
+                ),
+        eachindex(full_f_bus_ids),
+    )
 end
 
 @inline function _filter_gencosts!(
