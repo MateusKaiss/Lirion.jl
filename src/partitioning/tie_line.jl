@@ -58,6 +58,14 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
             zone_gen_idx,
         )
 
+        zone_branch_idx_in_full = _filter_branches_incident_to_zone(
+            full_f_bus_ids,
+            full_t_bus_ids,
+            full_branch_in_service_mask,
+            zone_internal_bus_set,
+        )
+        zone_subprob_case.branch = _slice_branch(full.branch, zone_branch_idx_in_full)
+
         if full.prosumer !== nothing
             zone_prosumer_idx =
                 _filter_by_zone_bus(full.prosumer.bus, zone_internal_bus_set)
@@ -82,14 +90,6 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
                 _slice_storage(full.storage, zone_storage_idx)
         end
 
-        zone_branch_idx_in_full = _filter_branches_incident_to_zone(
-            full_f_bus_ids,
-            full_t_bus_ids,
-            full_branch_in_service_mask,
-            zone_internal_bus_set,
-        )
-        zone_subprob_case.branch = _slice_branch(full.branch, zone_branch_idx_in_full)
-
         _filter_timeseries!(
             zone_subprob_case,
             full,
@@ -99,6 +99,8 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
 
         zone_subprob_case.dist.branch_full = full.branch
         zone_subprob_case.dist.zone_branch_idx_in_full = zone_branch_idx_in_full
+        zone_subprob_case.dist.bus_set =
+            Set(Int.(zone_subprob_case.bus.bus_i))
         empty!(zone_subprob_case.dist.branch_idx_full_to_zone)
 
         @inbounds for (local_idx, global_idx) in enumerate(zone_branch_idx_in_full)
@@ -106,9 +108,6 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
         end
 
         add_case_index_maps!(zone_subprob_case)
-
-        zone_subprob_case.dist.bus_set =
-            Set(Int.(zone_subprob_case.bus.bus_i))
 
         partitions[zone_id] = zone_subprob_case
     end
