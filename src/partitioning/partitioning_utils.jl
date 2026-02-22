@@ -197,14 +197,11 @@ end
     )
 end
 
-@inline function _filter_gencosts!(
+@inline function _slice_gencosts!(
     zone_case::CaseRaw,
     full::CaseRaw,
-    zone_bus_set::Set{Int},
+    zone_gen_idx::Vector{Int},
 )
-    zone_gen_idx = _filter_by_zone_bus(full.gen.gen_bus, zone_bus_set)
-    zone_case.gen = _slice_gen(full.gen, zone_gen_idx)
-
     gc = full.gencost
     zone_case.gencost = GencostRaw{Float64}(
         gc.model[zone_gen_idx],
@@ -213,20 +210,6 @@ end
         gc.ncost[zone_gen_idx],
         gc.cost_coefficients[zone_gen_idx],
     )
-
-    if full.gencost_timeseries !== nothing
-        ts = full.gencost_timeseries
-        zone_gc_ts_idx =
-            findall(i -> in(Int(ts.gen_id[i]), zone_gen_idx), eachindex(ts.gen_id))
-        zone_case.gencost_timeseries = GencostTimeseriesRaw{Float64}(
-            ts.time[zone_gc_ts_idx], ts.gen_id[zone_gc_ts_idx],
-            ts.model[zone_gc_ts_idx],
-            ts.startup[zone_gc_ts_idx], ts.shutdown[zone_gc_ts_idx],
-            ts.ncost[zone_gc_ts_idx], ts.cost_coefficients[zone_gc_ts_idx],
-            ts.tou[zone_gc_ts_idx], ts.feed_in_tariff[zone_gc_ts_idx],
-        )
-    end
-
     return nothing
 end
 
@@ -234,6 +217,7 @@ end
     zone_case::CaseRaw,
     full::CaseRaw,
     zone_bus_set::Set{Int},
+    zone_gen_idx::Vector{Int},
 )
     if full.bus_timeseries !== nothing
         ts = full.bus_timeseries
@@ -260,6 +244,20 @@ end
         zone_case.consumer_timeseries = ConsumerTimeseriesRaw{Float64}(
             ts.time[zone_ts_idx], ts.bus[zone_ts_idx],
             ts.demand[zone_ts_idx], ts.q_demand[zone_ts_idx],
+        )
+    end
+
+    if full.gencost_timeseries !== nothing
+        ts = full.gencost_timeseries
+        zone_gc_ts_idx =
+            findall(i -> in(Int(ts.gen_id[i]), zone_gen_idx), eachindex(ts.gen_id))
+
+        zone_case.gencost_timeseries = GencostTimeseriesRaw{Float64}(
+            ts.time[zone_gc_ts_idx], ts.gen_id[zone_gc_ts_idx],
+            ts.model[zone_gc_ts_idx],
+            ts.startup[zone_gc_ts_idx], ts.shutdown[zone_gc_ts_idx],
+            ts.ncost[zone_gc_ts_idx], ts.cost_coefficients[zone_gc_ts_idx],
+            ts.tou[zone_gc_ts_idx], ts.feed_in_tariff[zone_gc_ts_idx],
         )
     end
 

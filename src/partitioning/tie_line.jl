@@ -52,6 +52,12 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
         zone_subprob_case.gen =
             _slice_gen(full.gen, zone_gen_idx)
 
+        _slice_gencosts!(
+            zone_subprob_case,
+            full,
+            zone_gen_idx,
+        )
+
         if full.prosumer !== nothing
             zone_prosumer_idx =
                 _filter_by_zone_bus(full.prosumer.bus, zone_internal_bus_set)
@@ -84,6 +90,13 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
         )
         zone_subprob_case.branch = _slice_branch(full.branch, zone_branch_idx_in_full)
 
+        _filter_timeseries!(
+            zone_subprob_case,
+            full,
+            zone_internal_bus_set,
+            zone_gen_idx,
+        )
+
         zone_subprob_case.dist.branch_full = full.branch
         zone_subprob_case.dist.zone_branch_idx_in_full = zone_branch_idx_in_full
         empty!(zone_subprob_case.dist.branch_idx_full_to_zone)
@@ -91,18 +104,6 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
         @inbounds for (local_idx, global_idx) in enumerate(zone_branch_idx_in_full)
             zone_subprob_case.dist.branch_idx_full_to_zone[global_idx] = local_idx
         end
-
-        _filter_timeseries!(
-            zone_subprob_case,
-            full,
-            zone_internal_bus_set,
-        )
-
-        _filter_gencosts!(
-            zone_subprob_case,
-            full,
-            zone_internal_bus_set,
-        )
 
         add_case_index_maps!(zone_subprob_case)
 
