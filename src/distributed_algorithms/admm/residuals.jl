@@ -59,7 +59,7 @@ function primal_residual_branch_ac(
     acc = 0.0
     for part in partitions
         @inbounds for e in interzonal_branches
-            l_local = get(part.branch_global_to_local, e, 0)
+            l_local = get(part.branch_idx_full_to_zone, e, 0)
             l_local == 0 && continue
 
             P_loc, Q_loc = _pq_flow_from_exprs(part, l_local; t = 1)
@@ -108,7 +108,7 @@ function primal_residual_branch_dc(
     for part in partitions
         m = part.model::JuMP.Model
         @inbounds for e in interzonal_branches
-            l_local = get(part.branch_global_to_local, e, 0)
+            l_local = get(part.branch_idx_full_to_zone, e, 0)
             l_local == 0 && continue
             acc += (_dc_flow_val_model(m, part, l_local) - get(flow_consensus, e, 0.0))^2
         end
@@ -148,7 +148,7 @@ function primal_residual_branch_rt_socp(
     for sub in partitions
         m = sub.model::JuMP.Model
         @inbounds for e in interzonal_branches
-            l = get(sub.branch_global_to_local, e, 0)
+            l = get(sub.branch_idx_full_to_zone, e, 0)
             l == 0 && continue
             R, T = _rt_from_exprs(m, l, 1)
             acc +=
@@ -169,7 +169,7 @@ function primal_residual_branch_pq_socp(
     for sub in partitions
         m = sub.model::JuMP.Model
         @inbounds for e in interzonal_branches
-            l = get(sub.branch_global_to_local, e, 0)
+            l = get(sub.branch_idx_full_to_zone, e, 0)
             l == 0 && continue
             P, Q = _pq_flow_from_exprs(m, l, 1)
             acc +=

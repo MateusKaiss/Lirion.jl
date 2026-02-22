@@ -279,8 +279,8 @@ end
 
 mutable struct DistributedRawMeta
     branch_full::Union{Nothing, BranchRaw{Float64}}
-    branch_local_indices::Vector{Int}
-    branch_global_to_local::Dict{Int, Int}
+    zone_branch_idx_in_full::Vector{Int}
+    branch_idx_full_to_zone::Dict{Int, Int}
     shared_buses_zone::Vector{Int}
     bus_set::Set{Int}
     function DistributedRawMeta()

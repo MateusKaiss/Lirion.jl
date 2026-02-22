@@ -25,9 +25,9 @@ Base.@kwdef mutable struct PartitionDC
     bus::BusData
     branch::BranchData
 
-    branch_local_indices::Vector{Int} = Int[]
+    zone_branch_idx_in_full::Vector{Int} = Int[]
     shared_buses_zone::Vector{Int} = Int[]
-    branch_global_to_local::Dict{Int, Int} = Dict{Int, Int}()
+    branch_idx_full_to_zone::Dict{Int, Int} = Dict{Int, Int}()
 
     bus_local_index::Dict{Int, Int} = Dict{Int, Int}()
     consensus_bus_local_idxs::Vector{Int} = Int[]
@@ -59,9 +59,9 @@ Base.@kwdef mutable struct PartitionAC
     bus::BusData
     branch::BranchData
 
-    branch_local_indices::Vector{Int} = Int[]
+    zone_branch_idx_in_full::Vector{Int} = Int[]
     shared_buses_zone::Vector{Int} = Int[]
-    branch_global_to_local::Dict{Int, Int} = Dict{Int, Int}()
+    branch_idx_full_to_zone::Dict{Int, Int} = Dict{Int, Int}()
 
     bus_local_index::Dict{Int, Int} = Dict{Int, Int}()
     consensus_bus_local_idxs::Vector{Int} = Int[]
@@ -101,9 +101,9 @@ Base.@kwdef mutable struct PartitionSOCP
     bus::BusData
     branch::BranchData
 
-    branch_local_indices::Vector{Int} = Int[]
+    zone_branch_idx_in_full::Vector{Int} = Int[]
     shared_buses_zone::Vector{Int} = Int[]
-    branch_global_to_local::Dict{Int, Int} = Dict{Int, Int}()
+    branch_idx_full_to_zone::Dict{Int, Int} = Dict{Int, Int}()
 
     bus_local_index::Dict{Int, Int} = Dict{Int, Int}()
     consensus_bus_local_idxs::Vector{Int} = Int[]
@@ -158,8 +158,8 @@ function build_dc_partitions(sys::DistributedSystem)::Partitions{PartitionDC}
             id = zone,
             bus = s.bus,
             branch = s.branch,
-            branch_local_indices = sys.branch_local_indices[i],
-            branch_global_to_local = sys.branch_global_to_local[i],
+            zone_branch_idx_in_full = sys.zone_branch_idx_in_full[i],
+            branch_idx_full_to_zone = sys.branch_idx_full_to_zone[i],
             shared_buses_zone = sys.shared_buses_zone[i],
             objective_params = s.objective,
         )
@@ -182,8 +182,8 @@ function build_ac_partitions(sys::DistributedSystem)::Partitions{PartitionAC}
             id = zone,
             bus = s.bus,
             branch = s.branch,
-            branch_local_indices = sys.branch_local_indices[i],
-            branch_global_to_local = sys.branch_global_to_local[i],
+            zone_branch_idx_in_full = sys.zone_branch_idx_in_full[i],
+            branch_idx_full_to_zone = sys.branch_idx_full_to_zone[i],
             shared_buses_zone = sys.shared_buses_zone[i],
             objective_params = s.objective,
         )
@@ -206,8 +206,8 @@ function build_socp_partitions(sys::DistributedSystem)::Partitions{PartitionSOCP
             id = zone,
             bus = s.bus,
             branch = s.branch,
-            branch_local_indices = sys.branch_local_indices[i],
-            branch_global_to_local = sys.branch_global_to_local[i],
+            zone_branch_idx_in_full = sys.zone_branch_idx_in_full[i],
+            branch_idx_full_to_zone = sys.branch_idx_full_to_zone[i],
             shared_buses_zone = sys.shared_buses_zone[i],
             objective_params = s.objective,
         )

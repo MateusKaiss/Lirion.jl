@@ -79,7 +79,7 @@ function build_quad_branch_expr!(
     quad = zero(JuMP.QuadExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(part.branch_global_to_local, e, nothing)
+        l_local = get(part.branch_idx_full_to_zone, e, nothing)
         l_local === nothing && continue
 
         P_loc, Q_loc = _pq_flow_from_exprs(part, l_local)
@@ -104,7 +104,7 @@ function build_quad_branch_expr!(
     quad = zero(JuMP.QuadExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(part.branch_global_to_local, e, nothing)
+        l_local = get(part.branch_idx_full_to_zone, e, nothing)
         l_local === nothing && continue
         P = m[:p_flow_branches][l_local, 1]
         quad += 0.5 * rho_flow * P^2
@@ -128,7 +128,7 @@ function build_quad_branch_rt_expr!(
     quad = zero(JuMP.QuadExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(sub.branch_global_to_local, e, nothing)
+        l_local = get(sub.branch_idx_full_to_zone, e, nothing)
         l_local === nothing && continue
 
         Rloc, Tloc = _rt_from_exprs(m, l_local)
@@ -154,7 +154,7 @@ function build_quad_branch_pq_expr!(
     quad = zero(JuMP.QuadExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(sub.branch_global_to_local, e, nothing)
+        l_local = get(sub.branch_idx_full_to_zone, e, nothing)
         l_local === nothing && continue
 
         P_loc, Q_loc = _pq_flow_from_exprs(m, l_local)
@@ -257,7 +257,7 @@ function build_linear_branch_term(
     lin = zero(JuMP.AffExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(part.branch_global_to_local, e, nothing)
+        l_local = get(part.branch_idx_full_to_zone, e, nothing)
         l_local === nothing && continue
 
         P, Q = _pq_flow_from_exprs(part, l_local)
@@ -286,7 +286,7 @@ function build_linear_branch_term(
     lin = zero(JuMP.AffExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(part.branch_global_to_local, e, nothing)
+        l_local = get(part.branch_idx_full_to_zone, e, nothing)
         l_local === nothing && continue
 
         P = m[:p_flow_branches][l_local, 1]   # <- definição única
@@ -315,7 +315,7 @@ function build_linear_branch_rt_term(
     lin = zero(JuMP.AffExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(sub.branch_global_to_local, e, nothing)
+        l_local = get(sub.branch_idx_full_to_zone, e, nothing)
         l_local === nothing && continue
 
         R, T = _rt_from_exprs(m, l_local)
@@ -342,7 +342,7 @@ function build_linear_branch_pq_term(
     lin = zero(JuMP.AffExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(sub.branch_global_to_local, e, nothing)
+        l_local = get(sub.branch_idx_full_to_zone, e, nothing)
         l_local === nothing && continue
 
         P, Q = _pq_flow_from_exprs(m, l_local)
@@ -378,7 +378,7 @@ function soft_anchor_branch_expr!(
 
     if use_pq && !isempty(sub.zone_edges)
         @inbounds for e in sub.zone_edges
-            l = get(sub.branch_global_to_local, e, nothing)
+            l = get(sub.branch_idx_full_to_zone, e, nothing)
             l === nothing && continue
             P, Q = _pq_flow_from_exprs(m, l)
             quad += 0.5 * κPQ * (P^2 + Q^2)

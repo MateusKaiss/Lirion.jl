@@ -4,8 +4,8 @@ struct DistributedSystem
 
     parts::Vector{SystemData}
 
-    branch_local_indices::Vector{Vector{Int}}
-    branch_global_to_local::Vector{Dict{Int, Int}}
+    zone_branch_idx_in_full::Vector{Vector{Int}}
+    branch_idx_full_to_zone::Vector{Dict{Int, Int}}
     shared_buses_zone::Vector{Vector{Int}}
 
     shared_buses::Vector{Int}
@@ -18,11 +18,11 @@ end
 @inline get_zone_idx(sys::DistributedSystem, zone::Int) =
     (@inbounds sys.zone_to_idx[zone])
 
-@inline get_branch_local_indices(sys::DistributedSystem, zone::Int) =
-    (@inbounds sys.branch_local_indices[sys.zone_to_idx[zone]])
+@inline get_zone_branch_idx_in_full(sys::DistributedSystem, zone::Int) =
+    (@inbounds sys.zone_branch_idx_in_full[sys.zone_to_idx[zone]])
 
-@inline get_branch_global_to_local(sys::DistributedSystem, zone::Int) =
-    (@inbounds sys.branch_global_to_local[sys.zone_to_idx[zone]])
+@inline get_branch_idx_full_to_zone(sys::DistributedSystem, zone::Int) =
+    (@inbounds sys.branch_idx_full_to_zone[sys.zone_to_idx[zone]])
 
 @inline get_shared_buses_zone(sys::DistributedSystem, zone::Int) =
     (@inbounds sys.shared_buses_zone[sys.zone_to_idx[zone]])
@@ -108,8 +108,8 @@ function _build_inputs(
 
     parts = Vector{SystemData}(undef, n_zones)
 
-    branch_local_indices = Vector{Vector{Int}}(undef, n_zones)
-    branch_global_to_local = Vector{Dict{Int, Int}}(undef, n_zones)
+    zone_branch_idx_in_full = Vector{Vector{Int}}(undef, n_zones)
+    branch_idx_full_to_zone = Vector{Dict{Int, Int}}(undef, n_zones)
     shared_buses_zone = Vector{Vector{Int}}(undef, n_zones)
 
     @inbounds for i in 1:n_zones
@@ -118,8 +118,8 @@ function _build_inputs(
 
         parts[i] = build_system_data(zone_raw)
 
-        branch_local_indices[i] = zone_raw.dist.branch_local_indices
-        branch_global_to_local[i] = zone_raw.dist.branch_global_to_local
+        zone_branch_idx_in_full[i] = zone_raw.dist.zone_branch_idx_in_full
+        branch_idx_full_to_zone[i] = zone_raw.dist.branch_idx_full_to_zone
         shared_buses_zone[i] = zone_raw.dist.shared_buses_zone
     end
 
@@ -127,8 +127,8 @@ function _build_inputs(
         zones,
         zone_to_idx,
         parts,
-        branch_local_indices,
-        branch_global_to_local,
+        zone_branch_idx_in_full,
+        branch_idx_full_to_zone,
         shared_buses_zone,
         shared_buses,
         interzonal_branches,

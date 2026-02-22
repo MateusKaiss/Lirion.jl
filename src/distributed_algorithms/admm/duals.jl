@@ -182,7 +182,7 @@ function update_duals_branch_ac!(
         lambdaQz = get!(dualsQ, z, Dict{Int, Float64}())
 
         @inbounds for e in part.zone_edges
-            l_local = get(part.branch_global_to_local, e, 0)
+            l_local = get(part.branch_idx_full_to_zone, e, 0)
             l_local == 0 && continue
 
             P_loc, Q_loc = _pq_flow_from_exprs(part, l_local)
@@ -244,7 +244,7 @@ function update_duals_flow!(
         dz = get!(duals, z, Dict{Int, Float64}())
 
         @inbounds for e in part.zone_edges
-            l_local = get(part.branch_global_to_local, e, 0)
+            l_local = get(part.branch_idx_full_to_zone, e, 0)
             l_local == 0 && continue
             p_val = _dc_flow_val_model(m, part, l_local)
             dz[e] = get(dz, e, 0.0) + rho * (p_val - get(flow_consensus, e, 0.0))
@@ -274,7 +274,7 @@ end
         dT = get!(duals_t, z, Dict{Int, Float64}())
 
         @inbounds for e in part.zone_edges
-            l = get(part.branch_global_to_local, e, 0)
+            l = get(part.branch_idx_full_to_zone, e, 0)
             l == 0 && continue
             R, T = _rt_from_exprs(m, l)
             dR[e] = get(dR, e, 0.0) + rho_r * (JuMP.value(R) - get(r_consensus, e, 0.0))
@@ -305,7 +305,7 @@ end
         dQ = get!(dualsQ, z, Dict{Int, Float64}())
 
         @inbounds for e in part.zone_edges
-            l = get(part.branch_global_to_local, e, 0)
+            l = get(part.branch_idx_full_to_zone, e, 0)
             l == 0 && continue
             P, Q = _pq_flow_from_exprs(m, l)
             dP[e] = get(dP, e, 0.0) + rhoP * (JuMP.value(P) - get(p_flow_consensus, e, 0.0))

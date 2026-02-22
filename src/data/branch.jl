@@ -90,7 +90,7 @@ function get_branch_parameters(raw::CaseRaw)
     status = br.br_status
     n = length(from)
 
-    local_indices = raw.dist.branch_local_indices
+    local_indices = raw.dist.zone_branch_idx_in_full
     global_index = isempty(local_indices) ? collect(1:n) : Vector{Int}(local_indices)
 
     tap_position = ones(Float64, n)

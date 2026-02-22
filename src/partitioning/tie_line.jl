@@ -76,20 +76,20 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
                 _slice_storage(full.storage, zone_storage_idx)
         end
 
-        zone_branch_idx = _filter_branches_incident_to_zone(
+        zone_branch_idx_in_full = _filter_branches_incident_to_zone(
             full_f_bus_ids,
             full_t_bus_ids,
             full_branch_in_service_mask,
             zone_internal_bus_set,
         )
-        zone_subprob_case.branch = _slice_branch(full.branch, zone_branch_idx)
+        zone_subprob_case.branch = _slice_branch(full.branch, zone_branch_idx_in_full)
 
         zone_subprob_case.dist.branch_full = full.branch
-        zone_subprob_case.dist.branch_local_indices = zone_branch_idx
-        empty!(zone_subprob_case.dist.branch_global_to_local)
+        zone_subprob_case.dist.zone_branch_idx_in_full = zone_branch_idx_in_full
+        empty!(zone_subprob_case.dist.branch_idx_full_to_zone)
 
-        @inbounds for (local_idx, global_idx) in enumerate(zone_branch_idx)
-            zone_subprob_case.dist.branch_global_to_local[global_idx] = local_idx
+        @inbounds for (local_idx, global_idx) in enumerate(zone_branch_idx_in_full)
+            zone_subprob_case.dist.branch_idx_full_to_zone[global_idx] = local_idx
         end
 
         _filter_timeseries!(
