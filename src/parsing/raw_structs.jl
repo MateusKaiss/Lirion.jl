@@ -279,12 +279,24 @@ end
 
 mutable struct DistributedRawMeta
     branch_full::Union{Nothing, BranchRaw{Float64}}
+
     zone_branch_idx_in_full::Vector{Int}
     branch_idx_full_to_zone::Dict{Int, Int}
-    shared_buses_zone::Vector{Int}
+
+    zone_shared_bus_ids::Vector{Int}
+    full_shared_bus_ids::Vector{Int}
+
     bus_set::Set{Int}
+
     function DistributedRawMeta()
-        return new(nothing, Int[], Dict{Int, Int}(), Int[], Set{Int}())
+        return new(
+            nothing,
+            Int[],
+            Dict{Int, Int}(),
+            Int[],
+            Int[],
+            Set{Int}(),
+        )
     end
 end
 
@@ -331,12 +343,14 @@ mutable struct CaseRaw
             String(source_type),
             String(source_version),
             Float64(baseMVA),
-            Int(T), empty_bus_raw(Float64),
+            Int(T),
+            empty_bus_raw(Float64),
             empty_gen_raw(Float64),
             empty_branch_raw(Float64),
-            empty_gencost_raw(Float64), nothing, nothing, nothing, nothing, nothing,
-            nothing,
-            nothing, nothing, nothing, nothing, CaseIndexMaps(),
+            empty_gencost_raw(Float64),
+            nothing, nothing, nothing, nothing, nothing, nothing,
+            nothing, nothing, nothing, nothing,
+            CaseIndexMaps(),
             DistributedRawMeta(),
         )
     end
@@ -347,22 +361,41 @@ end
 end
 
 slice_bus_ts(ts::BusTimeseriesRaw{T}, order::Vector{Int}) where {T} =
-    BusTimeseriesRaw{T}(_slice_vec(ts.time, order), _slice_vec(ts.bus, order),
-        _slice_vec(ts.pd, order), _slice_vec(ts.qd, order),
-        _slice_vec(ts.gs, order), _slice_vec(ts.bs, order))
+    BusTimeseriesRaw{T}(
+        _slice_vec(ts.time, order),
+        _slice_vec(ts.bus, order),
+        _slice_vec(ts.pd, order),
+        _slice_vec(ts.qd, order),
+        _slice_vec(ts.gs, order),
+        _slice_vec(ts.bs, order),
+    )
 
 slice_consumer_ts(ts::ConsumerTimeseriesRaw{T}, order::Vector{Int}) where {T} =
-    ConsumerTimeseriesRaw{T}(_slice_vec(ts.time, order), _slice_vec(ts.bus, order),
-        _slice_vec(ts.demand, order), _slice_vec(ts.q_demand, order))
+    ConsumerTimeseriesRaw{T}(
+        _slice_vec(ts.time, order),
+        _slice_vec(ts.bus, order),
+        _slice_vec(ts.demand, order),
+        _slice_vec(ts.q_demand, order),
+    )
 
 slice_prosumer_ts(ts::ProsumerTimeseriesRaw{T}, order::Vector{Int}) where {T} =
-    ProsumerTimeseriesRaw{T}(_slice_vec(ts.time, order), _slice_vec(ts.bus, order),
-        _slice_vec(ts.p_pv, order), _slice_vec(ts.p_load, order),
-        _slice_vec(ts.p_curtail, order))
+    ProsumerTimeseriesRaw{T}(
+        _slice_vec(ts.time, order),
+        _slice_vec(ts.bus, order),
+        _slice_vec(ts.p_pv, order),
+        _slice_vec(ts.p_load, order),
+        _slice_vec(ts.p_curtail, order),
+    )
 
 slice_gencost_ts(ts::GencostTimeseriesRaw{T}, order::Vector{Int}) where {T} =
-    GencostTimeseriesRaw{T}(_slice_vec(ts.time, order), _slice_vec(ts.gen_id, order),
-        _slice_vec(ts.model, order), _slice_vec(ts.startup, order),
-        _slice_vec(ts.shutdown, order), _slice_vec(ts.ncost, order),
-        _slice_vec(ts.cost_coefficients, order), _slice_vec(ts.tou, order),
-        _slice_vec(ts.feed_in_tariff, order))
+    GencostTimeseriesRaw{T}(
+        _slice_vec(ts.time, order),
+        _slice_vec(ts.gen_id, order),
+        _slice_vec(ts.model, order),
+        _slice_vec(ts.startup, order),
+        _slice_vec(ts.shutdown, order),
+        _slice_vec(ts.ncost, order),
+        _slice_vec(ts.cost_coefficients, order),
+        _slice_vec(ts.tou, order),
+        _slice_vec(ts.feed_in_tariff, order),
+    )

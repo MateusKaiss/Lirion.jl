@@ -98,16 +98,13 @@ function _build_inputs(
         algorithm.kwargs...,
     )
 
-    parts_dict, shared_buses = prepare_distributed_partitions(raw, algorithm.sectioning)
+    parts_dict = prepare_distributed_partitions(raw, algorithm.sectioning)
     interzonal_branches = _find_interzonal_branches(raw, algorithm.sectioning)
 
     zones = sort!(collect(keys(parts_dict)))
-    zone_to_idx = Dict{Int, Int}(z => i for (i, z) in pairs(zones))
-
     n_zones = length(zones)
 
     parts = Vector{SystemData}(undef, n_zones)
-
     zone_branch_idx_in_full = Vector{Vector{Int}}(undef, n_zones)
     branch_idx_full_to_zone = Vector{Dict{Int, Int}}(undef, n_zones)
     shared_buses_zone = Vector{Vector{Int}}(undef, n_zones)
@@ -120,8 +117,11 @@ function _build_inputs(
 
         zone_branch_idx_in_full[i] = zone_raw.dist.zone_branch_idx_in_full
         branch_idx_full_to_zone[i] = zone_raw.dist.branch_idx_full_to_zone
-        shared_buses_zone[i] = zone_raw.dist.shared_buses_zone
+        shared_buses_zone[i] = zone_raw.dist.zone_shared_bus_ids
     end
+
+    shared_buses = raw.dist.full_shared_bus_ids
+    zone_to_idx = Dict{Int, Int}(z => i for (i, z) in pairs(zones))
 
     admm_sys = DistributedSystem(
         zones,

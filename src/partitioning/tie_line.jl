@@ -125,14 +125,13 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
 
     full_shared_bus_set = Set(full_shared_bus_ids)
 
+    full.dist.full_shared_bus_ids = full_shared_bus_ids
+
     for (_, zone_case) in partitions
         zone_case_bus_ids = Int.(zone_case.bus.bus_i)
-
-        zone_shared_bus_ids =
-            [b for b in zone_case_bus_ids if b in full_shared_bus_set]
-
-        zone_case.dist.shared_buses_zone = zone_shared_bus_ids
+        zone_shared_bus_ids = [b for b in zone_case_bus_ids if b in full_shared_bus_set]
+        zone_case.dist.zone_shared_bus_ids = zone_shared_bus_ids
     end
 
-    return partitions, full_shared_bus_ids
+    return partitions
 end
