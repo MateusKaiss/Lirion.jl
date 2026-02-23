@@ -1,20 +1,4 @@
 # ==============================================================================
-# Distributed system
-# ==============================================================================
-
-struct DistributedSystem
-    zones::Vector{Int}
-    parts::Vector{SystemData}
-
-    zone_branch_idx_in_full::Vector{Vector{Int}}
-    full_to_zone_branch_idx::Vector{Vector{Int}}
-    shared_buses_zone::Vector{Vector{Int}}
-
-    shared_buses::Vector{Int}
-    interzonal_branches::Vector{Int}
-end
-
-# ==============================================================================
 # Inputs
 # ==============================================================================
 
@@ -82,46 +66,11 @@ function _build_inputs(
     preprocess_case_data!(raw, OPFModel)
 
     cfg = DistributedOPFModel(
-        model,
-        algorithm.coupling,
-        algorithm.sectioning,
-        algorithm.max_iter;
+        model, algorithm.coupling, algorithm.sectioning, algorithm.max_iter;
         algorithm.kwargs...,
     )
 
-    parts_dict = prepare_distributed_partitions(raw, algorithm.sectioning)
-    interzonal_branches = _find_interzonal_branches(raw, algorithm.sectioning)
-
-    zones = sort!(collect(keys(parts_dict)))
-    n_zones = length(zones)
-
-    parts = Vector{SystemData}(undef, n_zones)
-    zone_branch_idx_in_full = Vector{Vector{Int}}(undef, n_zones)
-    full_to_zone_branch_idx = Vector{Vector{Int}}(undef, n_zones)
-    shared_buses_zone = Vector{Vector{Int}}(undef, n_zones)
-
-    @inbounds for i in 1:n_zones
-        z = zones[i]
-        zone_raw = parts_dict[z]::CaseRaw
-
-        parts[i] = build_system_data(zone_raw)
-
-        zone_branch_idx_in_full[i] = zone_raw.dist.zone_branch_idx_in_full
-        full_to_zone_branch_idx[i] = zone_raw.dist.full_to_zone_branch_idx
-        shared_buses_zone[i] = zone_raw.dist.zone_shared_bus_ids
-    end
-
-    shared_buses = raw.dist.full_shared_bus_ids
-
-    admm_sys = DistributedSystem(
-        zones,
-        parts,
-        zone_branch_idx_in_full,
-        full_to_zone_branch_idx,
-        shared_buses_zone,
-        shared_buses,
-        interzonal_branches,
-    )
+    admm_sys = build_distributed_system(raw, algorithm.sectioning)
 
     return LirionInputs(path, cfg, optimizer, outputs, nothing, admm_sys)
 end

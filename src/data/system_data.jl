@@ -1,14 +1,4 @@
 # ============================================================
-# ADMM zone meta (unchanged shape)
-# ============================================================
-
-struct ADMMZoneMeta
-    zone_branch_idx_in_full::Vector{Int}
-    full_to_zone_branch_idx::Vector{Int}
-    shared_buses_zone::Vector{Int}
-end
-
-# ============================================================
 # SystemData
 # ============================================================
 
@@ -33,6 +23,26 @@ struct SystemData
     raw::Dict{String, Any}
 end
 
+# ==============================================================================
+# Distributed system
+# ==============================================================================
+
+struct DistributedSystem
+    zones::Vector{Int}
+    parts::Vector{SystemData}
+
+    zone_branch_idx_in_full::Vector{Vector{Int}}
+    full_to_zone_branch_idx::Vector{Vector{Int}}
+    shared_buses_zone::Vector{Vector{Int}}
+
+    shared_buses::Vector{Int}
+    interzonal_branches::Vector{Int}
+end
+
+# ==============================================================================
+# Utils
+# ==============================================================================
+
 function _raw_snapshot(raw::CaseRaw)
     d = Dict{String, Any}()
     d["name"] = raw.name
@@ -43,7 +53,7 @@ function _raw_snapshot(raw::CaseRaw)
 end
 
 # ============================================================
-# Builder: CaseRaw -> SystemData
+# Builders
 # ============================================================
 
 function build_system_data(raw::CaseRaw)::SystemData
@@ -76,5 +86,41 @@ function build_system_data(raw::CaseRaw)::SystemData
         powerflow_data,
         objective_data,
         _raw_snapshot(raw),
+    )
+end
+
+function build_distributed_system(raw::CaseRaw, sectioning::Sectioning)::DistributedSystem
+    parts_dict = prepare_distributed_partitions(raw, sectioning)
+    interzonal_branches = _find_interzonal_branches(raw, sectioning)
+
+    zones = sort!(collect(keys(parts_dict)))
+    n_zones = length(zones)
+
+    parts = Vector{SystemData}(undef, n_zones)
+    zone_branch_idx_in_full = Vector{Vector{Int}}(undef, n_zones)
+    full_to_zone_branch_idx = Vector{Vector{Int}}(undef, n_zones)
+    shared_buses_zone = Vector{Vector{Int}}(undef, n_zones)
+
+    @inbounds for i in 1:n_zones
+        z = zones[i]
+        zone_raw = parts_dict[z]::CaseRaw
+
+        parts[i] = build_system_data(zone_raw)
+
+        zone_branch_idx_in_full[i] = zone_raw.dist.zone_branch_idx_in_full
+        full_to_zone_branch_idx[i] = zone_raw.dist.full_to_zone_branch_idx
+        shared_buses_zone[i] = zone_raw.dist.zone_shared_bus_ids
+    end
+
+    shared_buses = raw.dist.full_shared_bus_ids
+
+    return DistributedSystem(
+        zones,
+        parts,
+        zone_branch_idx_in_full,
+        full_to_zone_branch_idx,
+        shared_buses_zone,
+        shared_buses,
+        interzonal_branches,
     )
 end
