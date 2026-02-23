@@ -1,8 +1,6 @@
-
 struct Partitions{P}
     parts::Vector{P}
     zones::Vector{Int}
-    zone_to_idx::Dict{Int, Int}
 end
 
 @inline Base.length(ps::Partitions) = length(ps.parts)
@@ -11,9 +9,6 @@ end
     st > length(ps.parts) && return nothing
     @inbounds return (ps.parts[st], st + 1)
 end
-
-@inline get_partition(ps::Partitions, zone::Int) =
-    (@inbounds ps.parts[ps.zone_to_idx[zone]])
 
 # =======================================================================
 # ADMM Partitions structs
@@ -141,17 +136,15 @@ Base.@kwdef mutable struct PartitionSOCP
 end
 
 # =======================================================================
-# ADMM Partitions Builders (meta vem do sys direto)
+# ADMM Partitions Builders
 # =======================================================================
 
 function build_dc_partitions(sys::DistributedSystem)::Partitions{PartitionDC}
-    zones = sys.zones
-    zone_to_idx = sys.zone_to_idx
-    n_zones = length(zones)
+    n = length(sys.zones)
+    parts = Vector{PartitionDC}(undef, n)
 
-    parts = Vector{PartitionDC}(undef, n_zones)
-    @inbounds for i in 1:n_zones
-        zone = zones[i]
+    @inbounds for i in 1:n
+        zone = sys.zones[i]
         s = sys.parts[i]
 
         parts[i] = PartitionDC(;
@@ -165,17 +158,15 @@ function build_dc_partitions(sys::DistributedSystem)::Partitions{PartitionDC}
         )
     end
 
-    return Partitions{PartitionDC}(parts, zones, zone_to_idx)
+    return Partitions{PartitionDC}(parts, sys.zones)
 end
 
 function build_ac_partitions(sys::DistributedSystem)::Partitions{PartitionAC}
-    zones = sys.zones
-    zone_to_idx = sys.zone_to_idx
-    n_zones = length(zones)
+    n = length(sys.zones)
+    parts = Vector{PartitionAC}(undef, n)
 
-    parts = Vector{PartitionAC}(undef, n_zones)
-    @inbounds for i in 1:n_zones
-        zone = zones[i]
+    @inbounds for i in 1:n
+        zone = sys.zones[i]
         s = sys.parts[i]
 
         parts[i] = PartitionAC(;
@@ -189,17 +180,15 @@ function build_ac_partitions(sys::DistributedSystem)::Partitions{PartitionAC}
         )
     end
 
-    return Partitions{PartitionAC}(parts, zones, zone_to_idx)
+    return Partitions{PartitionAC}(parts, sys.zones)
 end
 
 function build_socp_partitions(sys::DistributedSystem)::Partitions{PartitionSOCP}
-    zones = sys.zones
-    zone_to_idx = sys.zone_to_idx
-    n_zones = length(zones)
+    n = length(sys.zones)
+    parts = Vector{PartitionSOCP}(undef, n)
 
-    parts = Vector{PartitionSOCP}(undef, n_zones)
-    @inbounds for i in 1:n_zones
-        zone = zones[i]
+    @inbounds for i in 1:n
+        zone = sys.zones[i]
         s = sys.parts[i]
 
         parts[i] = PartitionSOCP(;
@@ -213,5 +202,5 @@ function build_socp_partitions(sys::DistributedSystem)::Partitions{PartitionSOCP
         )
     end
 
-    return Partitions{PartitionSOCP}(parts, zones, zone_to_idx)
+    return Partitions{PartitionSOCP}(parts, sys.zones)
 end

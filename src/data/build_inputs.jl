@@ -1,7 +1,9 @@
+# ==============================================================================
+# Distributed system
+# ==============================================================================
+
 struct DistributedSystem
     zones::Vector{Int}
-    zone_to_idx::Dict{Int, Int}
-
     parts::Vector{SystemData}
 
     zone_branch_idx_in_full::Vector{Vector{Int}}
@@ -12,20 +14,9 @@ struct DistributedSystem
     interzonal_branches::Vector{Int}
 end
 
-@inline get_zone(sys::DistributedSystem, zone::Int) =
-    (@inbounds sys.parts[sys.zone_to_idx[zone]])
-
-@inline get_zone_idx(sys::DistributedSystem, zone::Int) =
-    (@inbounds sys.zone_to_idx[zone])
-
-@inline get_zone_branch_idx_in_full(sys::DistributedSystem, zone::Int) =
-    (@inbounds sys.zone_branch_idx_in_full[sys.zone_to_idx[zone]])
-
-@inline get_branch_idx_full_to_zone(sys::DistributedSystem, zone::Int) =
-    (@inbounds sys.branch_idx_full_to_zone[sys.zone_to_idx[zone]])
-
-@inline get_shared_buses_zone(sys::DistributedSystem, zone::Int) =
-    (@inbounds sys.shared_buses_zone[sys.zone_to_idx[zone]])
+# ==============================================================================
+# Inputs
+# ==============================================================================
 
 struct LirionInputs
     database_path::String
@@ -121,11 +112,9 @@ function _build_inputs(
     end
 
     shared_buses = raw.dist.full_shared_bus_ids
-    zone_to_idx = Dict{Int, Int}(z => i for (i, z) in pairs(zones))
 
     admm_sys = DistributedSystem(
         zones,
-        zone_to_idx,
         parts,
         zone_branch_idx_in_full,
         branch_idx_full_to_zone,

@@ -163,6 +163,7 @@ function init_socp_hybrid_partition!(
     part.obj_static =
         part.obj_base + part.quad_bus_expr_socp + part.quad_pq_expr_socp +
         part.quad_rt_expr_socp
+
     @objective(model, Min, part.obj_static)
 
     return nothing
@@ -247,10 +248,10 @@ function run_admm(
     v2_consensus_prev = similar(v2_consensus)
 
     duals_v2 = Dict{Int, Vector{Float64}}(
-        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+        z => zeros(Float64, n_shared_buses) for z in zone_ids
     )
     dual_v2_buf = Dict{Int, Vector{Float64}}(
-        zone_id => zeros(Float64, n_shared_buses) for zone_id in zone_ids
+        z => zeros(Float64, n_shared_buses) for z in zone_ids
     )
 
     r_consensus = Dict{Int, Float64}(e => 0.0 for e in interzonal_branches)
@@ -285,7 +286,7 @@ function run_admm(
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            part = get_partition(partitions, zone_id)
+            part = partitions.parts[i]
             model = part.model::JuMP.Model
 
             v2_dual_buf_z = dual_v2_buf[zone_id]
@@ -320,8 +321,8 @@ function run_admm(
             )
         end
 
-        @inbounds for (i, zone_id) in enumerate(zone_ids)
-            part = get_partition(partitions, zone_id)
+        @inbounds for i in 1:n_zones
+            part = partitions.parts[i]
             out = results[i]
             part.has_solution = true
             part.generation_cost_model_expr = out.gen_cost_expr
@@ -531,7 +532,7 @@ function run_admm(
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            part = get_partition(partitions, zone_id)
+            part = partitions.parts[i]
             model = part.model::JuMP.Model
 
             lin = build_linear_branch_pq_term(
@@ -735,7 +736,7 @@ function run_admm(
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            part = get_partition(partitions, zone_id)
+            part = partitions.parts[i]
             model = part.model::JuMP.Model
 
             v2_dual_buf_z = dual_v2_buf[zone_id]

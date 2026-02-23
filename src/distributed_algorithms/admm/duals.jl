@@ -48,8 +48,11 @@ end
     theta_consensus_prev = nothing,
     v_mag_consensus_prev = nothing,
 )
-    @inbounds for zone in zone_ids
-        part = get_partition(partitions, zone)
+    n = length(zone_ids)
+    @inbounds for i in 1:n
+        zone = zone_ids[i]
+        part = partitions.parts[i]
+
         update_duals_bus_ac_vec!(
             duals_theta[zone],
             duals_v_mag[zone],
@@ -98,8 +101,11 @@ end
     shared_buses_sorted::AbstractVector{Int},
     shared_buses_to_pos::Dict{Int, Int},
 )
-    @inbounds for zone in zone_ids
-        part = get_partition(partitions, zone)
+    n = length(zone_ids)
+    @inbounds for i in 1:n
+        zone = zone_ids[i]
+        part = partitions.parts[i]
+
         update_duals_theta_vec!(
             dual_theta[zone],
             part,
@@ -144,8 +150,11 @@ end
     shared_buses_sorted::AbstractVector{Int},
     shared_buses_to_pos::Dict{Int, Int},
 )
-    @inbounds for z in zone_ids
-        part = get_partition(partitions, z)
+    n = length(zone_ids)
+    @inbounds for i in 1:n
+        z = zone_ids[i]
+        part = partitions.parts[i]
+
         update_duals_v2_vec!(
             duals_v2[z],
             part,
@@ -267,8 +276,11 @@ end
     rho_r::Float64,
     rho_t::Float64,
 )
-    @inbounds for z in zone_ids
-        part = get_partition(partitions, z)
+    n = length(zone_ids)
+    @inbounds for i in 1:n
+        z = zone_ids[i]
+        part = partitions.parts[i]
+
         m = part.model::JuMP.Model
         dR = get!(duals_r, z, Dict{Int, Float64}())
         dT = get!(duals_t, z, Dict{Int, Float64}())
@@ -298,8 +310,11 @@ end
     rhoP::Float64,
     rhoQ::Float64,
 )
-    @inbounds for z in zone_ids
-        part = get_partition(partitions, z)
+    n = length(zone_ids)
+    @inbounds for i in 1:n
+        z = zone_ids[i]
+        part = partitions.parts[i]
+
         m = part.model::JuMP.Model
         dP = get!(dualsP, z, Dict{Int, Float64}())
         dQ = get!(dualsQ, z, Dict{Int, Float64}())

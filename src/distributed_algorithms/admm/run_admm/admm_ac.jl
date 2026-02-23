@@ -259,7 +259,7 @@ function run_admm(
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            part = get_partition(partitions, zone_id)
+            part = partitions.parts[i]
             model = part.model::JuMP.Model
 
             theta_dual_buf_z = dual_theta_buf[zone_id]
@@ -288,8 +288,8 @@ function run_admm(
             )
         end
 
-        @inbounds for (i, zone_id) in enumerate(zone_ids)
-            part = get_partition(partitions, zone_id)
+        @inbounds for i in 1:n_zones
+            part = partitions.parts[i]
             out = results[i]
             part.has_solution = true
             part.generation_cost_model_expr = out.expr_cost
@@ -479,7 +479,7 @@ function run_admm(
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            part = get_partition(partitions, zone_id)
+            part = partitions.parts[i]
             model = part.model::JuMP.Model
 
             lin = build_linear_branch_term(
@@ -502,8 +502,8 @@ function run_admm(
             )
         end
 
-        @inbounds for (i, zone_id) in enumerate(zone_ids)
-            part = get_partition(partitions, zone_id)
+        @inbounds for i in 1:n_zones
+            part = partitions.parts[i]
             out = results[i]
             part.has_solution = true
             part.generation_cost_model_expr = out.expr_cost
@@ -695,7 +695,7 @@ function run_admm(
 
         Threads.@threads for i in 1:n_zones
             zone_id = zone_ids[i]
-            part = get_partition(partitions, zone_id)
+            part = partitions.parts[i]
             model = part.model::JuMP.Model
 
             θbuf = dual_theta_buf[zone_id]
@@ -740,8 +740,8 @@ function run_admm(
             )
         end
 
-        @inbounds for (i, zone_id) in enumerate(zone_ids)
-            part = get_partition(partitions, zone_id)
+        @inbounds for i in 1:n_zones
+            part = partitions.parts[i]
             out = results[i]
             part.has_solution = true
             part.generation_cost_model_expr = out.expr_cost

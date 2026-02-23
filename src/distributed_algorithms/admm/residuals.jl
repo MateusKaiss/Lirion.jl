@@ -415,6 +415,7 @@ function dual_residual_branch_ac(
     end
     return sqrt(s)
 end
+
 # ------------------------------------------------------------
 # DC residuals: dual (bus / branch)  [S ESCALADO POR ρ]
 # ------------------------------------------------------------
@@ -433,10 +434,6 @@ dual_residual_branch_dc(
     keys_all = union(keys(flow), keys(flow_prev))
     rho * sqrt(sum((get(flow, e, 0.0) - get(flow_prev, e, 0.0))^2 for e in keys_all))
 end
-
-# ------------------------------------------------------------
-# SOCP residuals: dual (bus / branch RT / branch PQ)
-# ------------------------------------------------------------
 
 # ------------------------------------------------------------
 # SOCP residuals: dual (bus / branch RT / branch PQ)  [ESCALADO POR ρ]
@@ -495,8 +492,8 @@ end
 # ------------------------------------------------------------
 
 function eps_dual_bus_ac_unscaled(
-    duals_theta::Dict{Int, Vector{Float64}},   # yθ (não escalado), por zona
-    duals_v_mag::Dict{Int, Vector{Float64}},   # yV (não escalado), por zona
+    duals_theta::Dict{Int, Vector{Float64}},
+    duals_v_mag::Dict{Int, Vector{Float64}},
     partitions::Partitions{PartitionAC},
     zone_ids::Vector{Int},
     shared_buses_to_pos::Dict{Int, Int},
@@ -506,8 +503,9 @@ function eps_dual_bus_ac_unscaled(
     n = 0
     y_norm_sq = 0.0
 
-    @inbounds for zone_id in zone_ids
-        part = get_partition(partitions, zone_id)
+    @inbounds for i in 1:length(zone_ids)
+        zone_id = zone_ids[i]
+        part = partitions.parts[i]
         yθ = duals_theta[zone_id]
         yV = duals_v_mag[zone_id]
 
@@ -523,8 +521,8 @@ function eps_dual_bus_ac_unscaled(
 end
 
 function eps_dual_branch_ac_unscaled(
-    duals_p_flow::Dict{Int, Dict{Int, Float64}},  # yp (não escalado)
-    duals_q_flow::Dict{Int, Dict{Int, Float64}},  # yq (não escalado)
+    duals_p_flow::Dict{Int, Dict{Int, Float64}},
+    duals_q_flow::Dict{Int, Dict{Int, Float64}},
     zone_ids::Vector{Int},
     interzonal_branches::Vector{Int},
     eps_abs::Float64,
@@ -539,7 +537,6 @@ function eps_dual_branch_ac_unscaled(
 
         for e in interzonal_branches
             haskey(yp, e) || continue
-            # assumindo simetria: se yp tem e, yq também deve ter (mas não dependo disso)
             n += 2
             y_norm_sq += get(yp, e, 0.0)^2 + get(yq, e, 0.0)^2
         end
@@ -551,7 +548,7 @@ end
 
 # eps_dual baseado no dual "não escalado" y (bus)
 function eps_dual_bus_dc_unscaled(
-    dual_theta::Dict{Int, Vector{Float64}},   # y (não escalado)
+    dual_theta::Dict{Int, Vector{Float64}},
     partitions::Partitions{PartitionDC},
     zone_ids::Vector{Int},
     shared_buses_to_pos::Dict{Int, Int},
@@ -560,8 +557,9 @@ function eps_dual_bus_dc_unscaled(
 )
     n = 0
     y_norm_sq = 0.0
-    for zone_id in zone_ids
-        part = get_partition(partitions, zone_id)
+    @inbounds for i in 1:length(zone_ids)
+        zone_id = zone_ids[i]
+        part = partitions.parts[i]
         y = dual_theta[zone_id]
         @inbounds for b in part.shared_buses_zone
             j = shared_buses_to_pos[b]
@@ -573,10 +571,9 @@ function eps_dual_bus_dc_unscaled(
     return sqrt(n) * eps_abs + eps_rel * sqrt(y_norm_sq)
 end
 
-# eps_dual baseado no dual "não escalado" y (branch)  <<< NOVO
 function eps_dual_branch_dc_unscaled(
-    duals_flow::Dict{Int, Dict{Int, Float64}},  # y (não escalado) por zona e por aresta global
-    partitions::Partitions{PartitionDC},        # (mantido p/ simetria; pode não ser usado)
+    duals_flow::Dict{Int, Dict{Int, Float64}},
+    partitions::Partitions{PartitionDC},
     zone_ids::Vector{Int},
     interzonal_branches::Vector{Int},
     eps_abs::Float64,
@@ -611,8 +608,9 @@ function eps_dual_bus_socp_unscaled(
     n = 0
     y_norm_sq = 0.0
 
-    @inbounds for zone_id in zone_ids
-        part = get_partition(partitions, zone_id)
+    @inbounds for i in 1:length(zone_ids)
+        zone_id = zone_ids[i]
+        part = partitions.parts[i]
         y = duals_v2[zone_id]
         for b in part.shared_buses_zone
             j = shared_buses_to_pos[b]
@@ -626,8 +624,8 @@ function eps_dual_bus_socp_unscaled(
 end
 
 function eps_dual_branch_rt_socp_unscaled(
-    duals_r::Dict{Int, Dict{Int, Float64}},   # y_r (não escalado)
-    duals_t::Dict{Int, Dict{Int, Float64}},   # y_t (não escalado)
+    duals_r::Dict{Int, Dict{Int, Float64}},
+    duals_t::Dict{Int, Dict{Int, Float64}},
     zone_ids::Vector{Int},
     interzonal_branches::Vector{Int},
     eps_abs::Float64,
