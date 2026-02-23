@@ -281,7 +281,7 @@ mutable struct DistributedRawMeta
     branch_full::Union{Nothing, BranchRaw{Float64}}
 
     zone_branch_idx_in_full::Vector{Int}
-    branch_idx_full_to_zone::Dict{Int, Int}
+    full_to_zone_branch_idx::Vector{Int}
 
     zone_shared_bus_ids::Vector{Int}
     full_shared_bus_ids::Vector{Int}
@@ -292,7 +292,7 @@ mutable struct DistributedRawMeta
         return new(
             nothing,
             Int[],
-            Dict{Int, Int}(),
+            Int[],
             Int[],
             Int[],
             Set{Int}(),

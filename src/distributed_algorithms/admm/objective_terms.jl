@@ -79,8 +79,8 @@ function build_quad_branch_expr!(
     quad = zero(JuMP.QuadExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(part.branch_idx_full_to_zone, e, nothing)
-        l_local === nothing && continue
+        l_local = part.full_to_zone_branch_idx[e]
+        l_local == 0 && continue
 
         P_loc, Q_loc = _pq_flow_from_exprs(part, l_local)
         quad += 0.5 * rhoP * P_loc^2 + 0.5 * rhoQ * Q_loc^2
@@ -104,8 +104,9 @@ function build_quad_branch_expr!(
     quad = zero(JuMP.QuadExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(part.branch_idx_full_to_zone, e, nothing)
-        l_local === nothing && continue
+        l_local = part.full_to_zone_branch_idx[e]
+        l_local == 0 && continue
+
         P = m[:p_flow_branches][l_local, 1]
         quad += 0.5 * rho_flow * P^2
     end
@@ -128,8 +129,8 @@ function build_quad_branch_rt_expr!(
     quad = zero(JuMP.QuadExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(sub.branch_idx_full_to_zone, e, nothing)
-        l_local === nothing && continue
+        l_local = sub.full_to_zone_branch_idx[e]
+        l_local == 0 && continue
 
         Rloc, Tloc = _rt_from_exprs(m, l_local)
         quad += 0.5 * rho_r * Rloc^2 + 0.5 * rho_t * Tloc^2
@@ -154,8 +155,8 @@ function build_quad_branch_pq_expr!(
     quad = zero(JuMP.QuadExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(sub.branch_idx_full_to_zone, e, nothing)
-        l_local === nothing && continue
+        l_local = sub.full_to_zone_branch_idx[e]
+        l_local == 0 && continue
 
         P_loc, Q_loc = _pq_flow_from_exprs(m, l_local)
         quad += 0.5 * rhoP * P_loc^2 + 0.5 * rhoQ * Q_loc^2
@@ -174,10 +175,9 @@ end
 # ----------------------------
 # BUS linear term (AC)
 # ----------------------------
-
 function build_linear_bus_term(
     part::PartitionAC,
-    shared_buses_sorted::Vector{Int},
+    shared_buses_sorted::Vector{Int},       # compat (não usado)
     shared_buses_to_pos::Dict{Int, Int},
     theta_consensus::Vector{Float64},
     v_mag_consensus::Vector{Float64},
@@ -203,7 +203,7 @@ end
 # ----------------------------
 function build_linear_bus_term(
     part::PartitionDC,
-    shared_buses_sorted::Vector{Int},
+    shared_buses_sorted::Vector{Int},       # compat (não usado)
     shared_buses_to_pos::Dict{Int, Int},
     theta_consensus::Vector{Float64},
     theta_dual_buf_z::Vector{Float64},
@@ -257,8 +257,8 @@ function build_linear_branch_term(
     lin = zero(JuMP.AffExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(part.branch_idx_full_to_zone, e, nothing)
-        l_local === nothing && continue
+        l_local = part.full_to_zone_branch_idx[e]
+        l_local == 0 && continue
 
         P, Q = _pq_flow_from_exprs(part, l_local)
 
@@ -286,10 +286,10 @@ function build_linear_branch_term(
     lin = zero(JuMP.AffExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(part.branch_idx_full_to_zone, e, nothing)
-        l_local === nothing && continue
+        l_local = part.full_to_zone_branch_idx[e]
+        l_local == 0 && continue
 
-        P = m[:p_flow_branches][l_local, 1]   # <- definição única
+        P = m[:p_flow_branches][l_local, 1]
         z = get(flow_consensus, e, 0.0)
         d = get(duals_flow, e, 0.0)
 
@@ -315,8 +315,8 @@ function build_linear_branch_rt_term(
     lin = zero(JuMP.AffExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(sub.branch_idx_full_to_zone, e, nothing)
-        l_local === nothing && continue
+        l_local = sub.full_to_zone_branch_idx[e]
+        l_local == 0 && continue
 
         R, T = _rt_from_exprs(m, l_local)
         lin += (get(duals_r, e, 0.0) - rho_r * get(r_consensus, e, 0.0)) * R
@@ -342,8 +342,8 @@ function build_linear_branch_pq_term(
     lin = zero(JuMP.AffExpr)
 
     @inbounds for e in zone_edges
-        l_local = get(sub.branch_idx_full_to_zone, e, nothing)
-        l_local === nothing && continue
+        l_local = sub.full_to_zone_branch_idx[e]
+        l_local == 0 && continue
 
         P, Q = _pq_flow_from_exprs(m, l_local)
         lin += (get(duals_p_flow, e, 0.0) - rhoP * get(p_consensus, e, 0.0)) * P
@@ -378,8 +378,9 @@ function soft_anchor_branch_expr!(
 
     if use_pq && !isempty(sub.zone_edges)
         @inbounds for e in sub.zone_edges
-            l = get(sub.branch_idx_full_to_zone, e, nothing)
-            l === nothing && continue
+            l = sub.full_to_zone_branch_idx[e]
+            l == 0 && continue
+
             P, Q = _pq_flow_from_exprs(m, l)
             quad += 0.5 * κPQ * (P^2 + Q^2)
         end

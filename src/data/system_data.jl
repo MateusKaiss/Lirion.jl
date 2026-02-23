@@ -3,9 +3,9 @@
 # ============================================================
 
 struct ADMMZoneMeta
-    zone_branch_idx_in_full::Vector{Int}         # global branch indices in full case
-    branch_idx_full_to_zone::Dict{Int, Int}    # global -> local index inside this zone
-    shared_buses_zone::Vector{Int}            # bus IDs shared with other zones
+    zone_branch_idx_in_full::Vector{Int}
+    full_to_zone_branch_idx::Vector{Int}
+    shared_buses_zone::Vector{Int}
 end
 
 # ============================================================

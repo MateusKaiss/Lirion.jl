@@ -13,6 +13,8 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
     full_t_bus_ids = Int.(full.branch.t_bus)
     full_branch_in_service_mask = branch_in_service_mask(full.branch)
 
+    n_full_branches = length(full_f_bus_ids)
+
     zone_ids = sort!(unique(full_bus_zones))
     partitions = Dict{Int, CaseRaw}()
 
@@ -30,27 +32,23 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
             full_branch_in_service_mask,
         )
 
-        zone_subprob_bus_set =
-            union(zone_internal_bus_set, external_neighbor_bus_set)
+        zone_subprob_bus_set = union(zone_internal_bus_set, external_neighbor_bus_set)
 
         zone_subprob_bus_idx_full =
             findall(b -> b in zone_subprob_bus_set, full_bus_ids)
 
         zone_subprob_case = _build_zone_meta(full, zone_id)
 
-        zone_subprob_case.bus =
-            _slice_bus(full.bus, zone_subprob_bus_idx_full)
+        zone_subprob_case.bus = _slice_bus(full.bus, zone_subprob_bus_idx_full)
 
         _mark_virtual_buses!(
             zone_subprob_case.bus,
             zone_internal_bus_set,
         )
 
-        zone_gen_idx =
-            _filter_by_zone_bus(full.gen.gen_bus, zone_internal_bus_set)
+        zone_gen_idx = _filter_by_zone_bus(full.gen.gen_bus, zone_internal_bus_set)
 
-        zone_subprob_case.gen =
-            _slice_gen(full.gen, zone_gen_idx)
+        zone_subprob_case.gen = _slice_gen(full.gen, zone_gen_idx)
 
         _slice_gencosts!(
             zone_subprob_case,
@@ -99,12 +97,12 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
 
         zone_subprob_case.dist.branch_full = full.branch
         zone_subprob_case.dist.zone_branch_idx_in_full = zone_branch_idx_in_full
-        zone_subprob_case.dist.bus_set =
-            Set(Int.(zone_subprob_case.bus.bus_i))
-        empty!(zone_subprob_case.dist.branch_idx_full_to_zone)
+        zone_subprob_case.dist.bus_set = Set(Int.(zone_subprob_case.bus.bus_i))
 
+        # dense map: global -> local (0 = absent)
+        zone_subprob_case.dist.full_to_zone_branch_idx = fill(0, n_full_branches)
         @inbounds for (local_idx, global_idx) in enumerate(zone_branch_idx_in_full)
-            zone_subprob_case.dist.branch_idx_full_to_zone[global_idx] = local_idx
+            zone_subprob_case.dist.full_to_zone_branch_idx[global_idx] = local_idx
         end
 
         add_case_index_maps!(zone_subprob_case)
@@ -120,8 +118,7 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
         push!(get!(bus_to_zones, bus_id, Set{Int}()), zone_id)
     end
 
-    full_shared_bus_ids =
-        [bus_id for (bus_id, zs) in bus_to_zones if length(zs) > 1]
+    full_shared_bus_ids = [bus_id for (bus_id, zs) in bus_to_zones if length(zs) > 1]
 
     full_shared_bus_set = Set(full_shared_bus_ids)
 

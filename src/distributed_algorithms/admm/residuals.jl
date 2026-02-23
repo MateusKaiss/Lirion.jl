@@ -32,7 +32,7 @@ function primal_residual_bus_ac_components(
     partitions::Partitions{PartitionAC},
     theta_consensus_vec::Vector{Float64},
     v_mag_consensus_vec::Vector{Float64},
-    shared_buses_sorted::Vector{Int},
+    shared_buses_sorted::Vector{Int},   # compat (não usado)
     shared_buses_to_pos::Dict{Int, Int},
 )
     rtheta = 0.0
@@ -59,7 +59,7 @@ function primal_residual_branch_ac(
     acc = 0.0
     for part in partitions
         @inbounds for e in interzonal_branches
-            l_local = get(part.branch_idx_full_to_zone, e, 0)
+            l_local = part.full_to_zone_branch_idx[e]
             l_local == 0 && continue
 
             P_loc, Q_loc = _pq_flow_from_exprs(part, l_local; t = 1)
@@ -84,7 +84,7 @@ end
 function primal_residual_bus_dc(
     partitions::Partitions{PartitionDC},
     theta_consensus_vec::Vector{Float64},
-    shared_buses_sorted::Vector{Int},
+    shared_buses_sorted::Vector{Int},   # compat (não usado)
     shared_buses_to_pos::Dict{Int, Int},
 )
     acc = 0.0
@@ -108,7 +108,7 @@ function primal_residual_branch_dc(
     for part in partitions
         m = part.model::JuMP.Model
         @inbounds for e in interzonal_branches
-            l_local = get(part.branch_idx_full_to_zone, e, 0)
+            l_local = part.full_to_zone_branch_idx[e]
             l_local == 0 && continue
             acc += (_dc_flow_val_model(m, part, l_local) - get(flow_consensus, e, 0.0))^2
         end
@@ -148,8 +148,9 @@ function primal_residual_branch_rt_socp(
     for sub in partitions
         m = sub.model::JuMP.Model
         @inbounds for e in interzonal_branches
-            l = get(sub.branch_idx_full_to_zone, e, 0)
+            l = sub.full_to_zone_branch_idx[e]
             l == 0 && continue
+
             R, T = _rt_from_exprs(m, l, 1)
             acc +=
                 (value(R) - get(r_consensus, e, 0.0))^2 +
@@ -169,8 +170,9 @@ function primal_residual_branch_pq_socp(
     for sub in partitions
         m = sub.model::JuMP.Model
         @inbounds for e in interzonal_branches
-            l = get(sub.branch_idx_full_to_zone, e, 0)
+            l = sub.full_to_zone_branch_idx[e]
             l == 0 && continue
+
             P, Q = _pq_flow_from_exprs(m, l, 1)
             acc +=
                 (value(P) - get(p_flow_consensus, e, 0.0))^2 +
@@ -188,8 +190,8 @@ function eps_primal_bus_ac_vec(
     partitions::Partitions{PartitionAC},
     theta_consensus_vec::Vector{Float64},
     v_mag_consensus_vec::Vector{Float64},
-    shared_buses_sorted::Vector{Int},
-    shared_buses_to_pos::Dict{Int, Int},
+    shared_buses_sorted::Vector{Int},   # compat (não usado)
+    shared_buses_to_pos::Dict{Int, Int},# compat (não usado)
     eps_abs::Float64,
     eps_rel::Float64,
 )
@@ -231,34 +233,11 @@ end
 # DC tolerances: eps_primal / eps_dual (bus / branch)
 # ------------------------------------------------------------
 
-# function eps_primal_bus_dc(
-#     partitions::Partitions{PartitionDC},
-#     theta_consensus_vec::Vector{Float64},
-#     shared_buses_sorted::Vector{Int},
-#     shared_buses_to_pos::Dict{Int, Int},
-#     eps_abs::Float64,
-#     eps_rel::Float64,
-# )
-#     N = max(1, length(shared_buses_sorted))
-#     norm_x_sq = 0.0
-
-#     for part in partitions
-#         thetabuf = snapshot_theta!(part)
-#         pos = part.bus_local_index
-#         @inbounds for b in part.shared_buses_zone
-#             norm_x_sq += thetabuf[pos[b]]^2
-#         end
-#     end
-
-#     norm_z_sq = sum(theta_consensus_vec[j]^2 for j in eachindex(theta_consensus_vec))
-#     return sqrt(N) * eps_abs + eps_rel * max(sqrt(norm_x_sq), sqrt(norm_z_sq))
-# end
-
 function eps_primal_bus_dc(
     partitions::Partitions{PartitionDC},
     theta_consensus_vec::Vector{Float64},
-    shared_buses_sorted::Vector{Int},
-    shared_buses_to_pos::Dict{Int, Int},
+    shared_buses_sorted::Vector{Int},    # compat (não usado)
+    shared_buses_to_pos::Dict{Int, Int}, # compat (não usado)
     eps_abs::Float64,
     eps_rel::Float64,
 )
@@ -546,7 +525,6 @@ function eps_dual_branch_ac_unscaled(
     return sqrt(n) * eps_abs + eps_rel * sqrt(y_norm_sq)
 end
 
-# eps_dual baseado no dual "não escalado" y (bus)
 function eps_dual_bus_dc_unscaled(
     dual_theta::Dict{Int, Vector{Float64}},
     partitions::Partitions{PartitionDC},

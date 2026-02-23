@@ -22,7 +22,7 @@ Base.@kwdef mutable struct PartitionDC
 
     zone_branch_idx_in_full::Vector{Int} = Int[]
     shared_buses_zone::Vector{Int} = Int[]
-    branch_idx_full_to_zone::Dict{Int, Int} = Dict{Int, Int}()
+    full_to_zone_branch_idx::Vector{Int} = Int[]
 
     bus_local_index::Dict{Int, Int} = Dict{Int, Int}()
     consensus_bus_local_idxs::Vector{Int} = Int[]
@@ -56,7 +56,7 @@ Base.@kwdef mutable struct PartitionAC
 
     zone_branch_idx_in_full::Vector{Int} = Int[]
     shared_buses_zone::Vector{Int} = Int[]
-    branch_idx_full_to_zone::Dict{Int, Int} = Dict{Int, Int}()
+    full_to_zone_branch_idx::Vector{Int} = Int[]
 
     bus_local_index::Dict{Int, Int} = Dict{Int, Int}()
     consensus_bus_local_idxs::Vector{Int} = Int[]
@@ -98,7 +98,7 @@ Base.@kwdef mutable struct PartitionSOCP
 
     zone_branch_idx_in_full::Vector{Int} = Int[]
     shared_buses_zone::Vector{Int} = Int[]
-    branch_idx_full_to_zone::Dict{Int, Int} = Dict{Int, Int}()
+    full_to_zone_branch_idx::Vector{Int} = Int[]
 
     bus_local_index::Dict{Int, Int} = Dict{Int, Int}()
     consensus_bus_local_idxs::Vector{Int} = Int[]
@@ -152,7 +152,7 @@ function build_dc_partitions(sys::DistributedSystem)::Partitions{PartitionDC}
             bus = s.bus,
             branch = s.branch,
             zone_branch_idx_in_full = sys.zone_branch_idx_in_full[i],
-            branch_idx_full_to_zone = sys.branch_idx_full_to_zone[i],
+            full_to_zone_branch_idx = sys.full_to_zone_branch_idx[i],
             shared_buses_zone = sys.shared_buses_zone[i],
             objective_params = s.objective,
         )
@@ -174,7 +174,7 @@ function build_ac_partitions(sys::DistributedSystem)::Partitions{PartitionAC}
             bus = s.bus,
             branch = s.branch,
             zone_branch_idx_in_full = sys.zone_branch_idx_in_full[i],
-            branch_idx_full_to_zone = sys.branch_idx_full_to_zone[i],
+            full_to_zone_branch_idx = sys.full_to_zone_branch_idx[i],
             shared_buses_zone = sys.shared_buses_zone[i],
             objective_params = s.objective,
         )
@@ -196,7 +196,7 @@ function build_socp_partitions(sys::DistributedSystem)::Partitions{PartitionSOCP
             bus = s.bus,
             branch = s.branch,
             zone_branch_idx_in_full = sys.zone_branch_idx_in_full[i],
-            branch_idx_full_to_zone = sys.branch_idx_full_to_zone[i],
+            full_to_zone_branch_idx = sys.full_to_zone_branch_idx[i],
             shared_buses_zone = sys.shared_buses_zone[i],
             objective_params = s.objective,
         )

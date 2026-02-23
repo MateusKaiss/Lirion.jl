@@ -9,7 +9,8 @@ function sorted_ids_and_id2idx(ids::Vector{Int})
 end
 
 @inline function _zone_cut_edges(part, interzonal_branches::AbstractVector{Int})
-    return [e for e in interzonal_branches if haskey(part.branch_idx_full_to_zone, e)]
+    m = part.full_to_zone_branch_idx
+    return [e for e in interzonal_branches if m[e] != 0]
 end
 
 # ------------------------------------------------------------
@@ -134,15 +135,14 @@ end
     has_vals = JuMP.has_values(model)
     @inbounds for i in eachindex(consensus_bus_local_idxs)
         consensus_bus_local_idx = consensus_bus_local_idxs[i]
-        buf[i] =
-            _val_at(
-                model,
-                bus_var,
-                zone_bus_ids[consensus_bus_local_idx],
-                1,
-                default,
-                has_vals,
-            )
+        buf[i] = _val_at(
+            model,
+            bus_var,
+            zone_bus_ids[consensus_bus_local_idx],
+            1,
+            default,
+            has_vals,
+        )
     end
     return buf
 end
@@ -170,6 +170,7 @@ end
     )
 
 # -------- SOCP: shared --------
+
 @inline snapshot_v2_shared!(part::PartitionSOCP) =
     _snapshot_shared_var!(
         part.v2_shared_buf, part.model, part.v2_var,
