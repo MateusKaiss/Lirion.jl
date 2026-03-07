@@ -48,10 +48,10 @@ function _build_inputs(
     optimizer::Any,
     outputs::Bool,
 )::LirionInputs
-    raw = load_input_data(path)
-    preprocess_case_data!(raw, OPFModel)
+    raw_case = load_input_data(path)
+    preprocess_case_data!(raw_case, OPFModel)
 
-    full_sys = build_system_data(raw)
+    full_sys = build_system_data(raw_case)
     return LirionInputs(path, model, optimizer, outputs, full_sys, nothing)
 end
 
@@ -62,15 +62,15 @@ function _build_inputs(
     optimizer::Any,
     outputs::Bool,
 )::LirionInputs
-    raw = load_input_data(path)
-    preprocess_case_data!(raw, OPFModel)
+    raw_case = load_input_data(path)
+    preprocess_case_data!(raw_case, OPFModel)
 
     cfg = DistributedOPFModel(
         model, algorithm.coupling, algorithm.sectioning, algorithm.max_iter;
         algorithm.kwargs...,
     )
 
-    admm_sys = build_distributed_system(raw, algorithm.sectioning)
+    admm_sys = build_distributed_system(raw_case, algorithm.sectioning)
 
     return LirionInputs(path, cfg, optimizer, outputs, nothing, admm_sys)
 end

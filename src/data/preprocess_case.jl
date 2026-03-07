@@ -6,12 +6,12 @@ function map_items_by_bus(bus_vec::AbstractVector{<:Integer})
     return mapping
 end
 
-function add_case_index_maps!(raw::CaseRaw)
-    m = raw.maps
+function add_case_index_maps!(raw_case::CaseRaw)
+    m = raw_case.maps
 
     empty!(m.bus_idx_map)
-    if raw.bus !== nothing
-        bus_ids = raw.bus.bus_i
+    if raw_case.bus !== nothing
+        bus_ids = raw_case.bus.bus_i
         @inbounds for (i, b) in enumerate(bus_ids)
             m.bus_idx_map[Int(b)] = i
         end
@@ -19,8 +19,8 @@ function add_case_index_maps!(raw::CaseRaw)
 
     empty!(m.bus_to_gens)
     empty!(m.gen_idx_map)
-    if raw.gen !== nothing
-        gen_bus = raw.gen.gen_bus
+    if raw_case.gen !== nothing
+        gen_bus = raw_case.gen.gen_bus
         resize!(m.gen_idx_map, length(gen_bus))
         @inbounds for (i, b) in enumerate(gen_bus)
             m.gen_idx_map[i] = Int(b)
@@ -31,9 +31,9 @@ function add_case_index_maps!(raw::CaseRaw)
     empty!(m.bus_to_branches_from)
     empty!(m.bus_to_branches_to)
     empty!(m.bus_to_neighbors)
-    if raw.branch !== nothing
-        f_bus = raw.branch.f_bus
-        t_bus = raw.branch.t_bus
+    if raw_case.branch !== nothing
+        f_bus = raw_case.branch.f_bus
+        t_bus = raw_case.branch.t_bus
 
         m.bus_to_branches_from = map_items_by_bus(f_bus)
         m.bus_to_branches_to = map_items_by_bus(t_bus)
@@ -47,30 +47,30 @@ function add_case_index_maps!(raw::CaseRaw)
     end
 
     empty!(m.bus_to_prosumers)
-    if raw.prosumer !== nothing
-        m.bus_to_prosumers = map_items_by_bus(raw.prosumer.bus)
+    if raw_case.prosumer !== nothing
+        m.bus_to_prosumers = map_items_by_bus(raw_case.prosumer.bus)
     end
 
     empty!(m.bus_to_batteries)
-    if raw.storage !== nothing
-        m.bus_to_batteries = map_items_by_bus(raw.storage.storage_bus)
+    if raw_case.storage !== nothing
+        m.bus_to_batteries = map_items_by_bus(raw_case.storage.storage_bus)
     end
 
-    return raw
+    return raw_case
 end
 
-function convert_angles_to_rad!(raw::CaseRaw)
+function convert_angles_to_rad!(raw_case::CaseRaw)
     deg2rad = π / 180
 
-    if raw.bus !== nothing
-        va = raw.bus.va
+    if raw_case.bus !== nothing
+        va = raw_case.bus.va
         @inbounds for i in eachindex(va)
             va[i] *= deg2rad
         end
     end
 
-    if raw.branch !== nothing
-        br = raw.branch
+    if raw_case.branch !== nothing
+        br = raw_case.branch
         vshift = br.shift
         vmin = br.angmin
         vmax = br.angmax
@@ -86,22 +86,22 @@ function convert_angles_to_rad!(raw::CaseRaw)
         end
     end
 
-    return raw
+    return raw_case
 end
 
-function convert_to_pu!(raw::CaseRaw)
-    Sbase = raw.baseMVA
+function convert_to_pu!(raw_case::CaseRaw)
+    Sbase = raw_case.baseMVA
 
-    if raw.bus !== nothing
-        b = raw.bus
+    if raw_case.bus !== nothing
+        b = raw_case.bus
         b.pd ./= Sbase
         b.qd ./= Sbase
         b.gs ./= Sbase
         b.bs ./= Sbase
     end
 
-    if raw.gen !== nothing
-        g = raw.gen
+    if raw_case.gen !== nothing
+        g = raw_case.gen
         g.pg ./= Sbase
         g.qg ./= Sbase
         g.pmax ./= Sbase
@@ -110,15 +110,15 @@ function convert_to_pu!(raw::CaseRaw)
         g.qmin ./= Sbase
     end
 
-    if raw.branch !== nothing
-        br = raw.branch
+    if raw_case.branch !== nothing
+        br = raw_case.branch
         br.rate_a ./= Sbase
         br.rate_b ./= Sbase
         br.rate_c ./= Sbase
     end
 
-    if raw.storage !== nothing
-        s = raw.storage
+    if raw_case.storage !== nothing
+        s = raw_case.storage
         s.ps ./= Sbase
         s.qs ./= Sbase
         s.energy ./= Sbase
@@ -132,34 +132,34 @@ function convert_to_pu!(raw::CaseRaw)
         s.p_loss ./= Sbase
     end
 
-    return raw
+    return raw_case
 end
 
-function convert_timeseries_to_pu!(raw::CaseRaw)
-    Sbase = raw.baseMVA
+function convert_timeseries_to_pu!(raw_case::CaseRaw)
+    Sbase = raw_case.baseMVA
 
-    if raw.bus_timeseries !== nothing
-        ts = raw.bus_timeseries
+    if raw_case.bus_timeseries !== nothing
+        ts = raw_case.bus_timeseries
         ts.pd ./= Sbase
         ts.qd ./= Sbase
         ts.gs ./= Sbase
         ts.bs ./= Sbase
     end
 
-    if raw.prosumer_timeseries !== nothing
-        ts = raw.prosumer_timeseries
+    if raw_case.prosumer_timeseries !== nothing
+        ts = raw_case.prosumer_timeseries
         ts.p_load ./= Sbase
         ts.p_pv ./= Sbase
         ts.p_curtail ./= Sbase
     end
 
-    if raw.consumer_timeseries !== nothing
-        ts = raw.consumer_timeseries
+    if raw_case.consumer_timeseries !== nothing
+        ts = raw_case.consumer_timeseries
         ts.demand ./= Sbase
         ts.q_demand ./= Sbase
     end
 
-    return raw
+    return raw_case
 end
 
 # ---------------------------------------------------------------------
@@ -168,34 +168,37 @@ end
 # This whole timeseries preprocessing pipeline still needs a full review.
 # ---------------------------------------------------------------------
 
-function preprocess_case_data!(raw::CaseRaw, ::Type{T} = OPFModel) where {T <: OPFModel}
+function preprocess_case_data!(
+    raw_case::CaseRaw,
+    ::Type{T} = OPFModel,
+) where {T <: OPFModel}
     if is_centralized_model(T)
-        all_time_steps = get_model_times(raw)
+        all_time_steps = get_model_times(raw_case)
         time_horizon = isempty(all_time_steps) ? 1 : maximum(all_time_steps)
-        raw.T = time_horizon
+        raw_case.T = time_horizon
     end
 
-    time_horizon = raw.T
+    time_horizon = raw_case.T
 
-    check_time_alignment(raw)
+    check_time_alignment(raw_case)
 
-    ensure_bus_timeseries!(raw, time_horizon)
-    ensure_gencost_timeseries!(raw, time_horizon)
-    ensure_prosumer_timeseries!(raw, time_horizon)
-    ensure_consumer_timeseries!(raw, time_horizon)
+    ensure_bus_timeseries!(raw_case, time_horizon)
+    ensure_gencost_timeseries!(raw_case, time_horizon)
+    ensure_prosumer_timeseries!(raw_case, time_horizon)
+    ensure_consumer_timeseries!(raw_case, time_horizon)
 
-    extend_bus_timeseries!(raw, time_horizon)
-    extend_gencost_timeseries!(raw, time_horizon)
-    extend_prosumer_timeseries!(raw, time_horizon)
-    extend_consumer_timeseries!(raw, time_horizon)
+    extend_bus_timeseries!(raw_case, time_horizon)
+    extend_gencost_timeseries!(raw_case, time_horizon)
+    extend_prosumer_timeseries!(raw_case, time_horizon)
+    extend_consumer_timeseries!(raw_case, time_horizon)
 
-    sort_timeseries_by_time_and_id!(raw)
+    sort_timeseries_by_time_and_id!(raw_case)
 
-    convert_angles_to_rad!(raw)
-    add_case_index_maps!(raw)
+    convert_angles_to_rad!(raw_case)
+    add_case_index_maps!(raw_case)
 
-    convert_to_pu!(raw)
-    convert_timeseries_to_pu!(raw)
+    convert_to_pu!(raw_case)
+    convert_timeseries_to_pu!(raw_case)
 
     return nothing
 end
