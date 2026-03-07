@@ -5,7 +5,7 @@
 struct LirionInputs
     database_path::String
     model_type::Union{Type{<:OPFModel}, DistributedOPFModel}
-    optimizer::Any
+    optimizer::Union{Nothing, Type{<:MOI.AbstractOptimizer}}
     write_outputs::Bool
     system::Union{Nothing, SystemData}
     admm_system::Union{Nothing, DistributedSystem}
