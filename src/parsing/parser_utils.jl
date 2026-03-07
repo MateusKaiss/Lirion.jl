@@ -408,10 +408,6 @@ function _handle_cells_assignment!(
     return cd["line_count"]
 end
 
-# ------------------------------------------------------------------------------
-# Public-ish wrappers
-# ------------------------------------------------------------------------------
-
 function parse_matlab_file(path::String; kwargs...)
     open(path, "r") do io
         return parse_matlab_string(read(io, String); kwargs...)

@@ -88,6 +88,7 @@ include("data/admm_structs.jl")
 include("parsing/parser_utils.jl")
 include("parsing/matpower_parser.jl")
 include("parsing/csv_parser.jl")
+include("parsing/parse_case.jl")
 
 # ------------------------------------------------------------------
 # Model construction and centralized solution
