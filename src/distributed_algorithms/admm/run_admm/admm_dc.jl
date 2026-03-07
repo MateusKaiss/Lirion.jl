@@ -169,7 +169,7 @@ end
 function run_admm(
     sys::DistributedSystem,
     config::DistributedOPFModel,
-    ::ADMM{State, DCTag};
+    ::ADMM{State, DC};
     optimizer_factory = nothing,
 )::LirionRunResult
     t0_ns = time_ns()
@@ -332,7 +332,7 @@ end
 function run_admm(
     sys::DistributedSystem,
     config::DistributedOPFModel,
-    ::ADMM{Power, DCTag};
+    ::ADMM{Power, DC};
     optimizer_factory = nothing,
 )::LirionRunResult
     t0_ns = time_ns()
@@ -474,7 +474,7 @@ end
 function run_admm(
     sys::DistributedSystem,
     config::DistributedOPFModel,
-    ::ADMM{Hybrid, DCTag};
+    ::ADMM{Hybrid, DC};
     optimizer_factory = nothing,
 )::LirionRunResult
     t0_ns = time_ns()

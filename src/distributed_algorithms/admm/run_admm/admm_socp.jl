@@ -210,7 +210,7 @@ end
 function run_admm(
     sys::DistributedSystem,
     config::DistributedOPFModel,
-    ::ADMM{State, SOCPTag};
+    ::ADMM{State, SOCP};
     optimizer_factory = nothing,
 )::LirionRunResult
     t0_ns = time_ns()
@@ -475,7 +475,7 @@ end
 function run_admm(
     sys::DistributedSystem,
     config::DistributedOPFModel,
-    ::ADMM{Power, SOCPTag};
+    ::ADMM{Power, SOCP};
     optimizer_factory = nothing,
 )::LirionRunResult
     t0_ns = time_ns()
@@ -649,7 +649,7 @@ end
 function run_admm(
     sys::DistributedSystem,
     config::DistributedOPFModel,
-    ::ADMM{Hybrid, SOCPTag};
+    ::ADMM{Hybrid, SOCP};
     optimizer_factory = nothing,
 )::LirionRunResult
     t0_ns = time_ns()

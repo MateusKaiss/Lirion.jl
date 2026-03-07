@@ -27,7 +27,6 @@ function run_lirion(inputs::LirionInputs)::LirionRunResult
         @assert sys !== nothing
 
         data = sys.raw
-
         result_dict = build_result_dict(result_model, sys)
 
         if inputs.write_outputs

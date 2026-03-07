@@ -17,19 +17,10 @@ struct Power <: ADMMVariant end
 struct Hybrid <: ADMMVariant end
 
 # ============================================================
-# OPF TAGS FOR DISTRIBUTED VARIANTS
-# ============================================================
-
-abstract type OPFTag end
-struct DCTag <: OPFTag end
-struct ACTag <: OPFTag end
-struct SOCPTag <: OPFTag end
-
-# ============================================================
 # ADMM TYPE COMBINATOR
 # ============================================================
 
-struct ADMM{V <: ADMMVariant, B <: OPFTag} end
+struct ADMM{V <: ADMMVariant, M <: OPFModel} end
 
 # ============================================================
 # SECTIONING / DECOMPOSITION STRATEGIES
@@ -41,15 +32,15 @@ struct DummyBus <: Sectioning end
 struct Metis <: Sectioning end
 
 # ============================================================
-# Algorithm spec (TIPADO via dispatch)
+# Algorithm spec
 # ============================================================
 
 abstract type AbstractAlgorithm end
 struct CentralizedAlgorithm <: AbstractAlgorithm end
 
 struct ADMMAlgorithmSpec <: AbstractAlgorithm
-    coupling::Symbol            # :state | :power | :hybrid
-    sectioning::Sectioning      # TieLine(), DummyBus(), Metis(), ...
+    coupling::Symbol
+    sectioning::Sectioning
     max_iter::Int
     kwargs::NamedTuple
 end
@@ -93,7 +84,7 @@ const _RHO_RULES = Dict{Tuple{DataType, Symbol}, NamedTuple}(
     ),
 
     # ----------------------------
-    # SOCP (SEM rho_theta; usa rho_v2 e exige rho_r/rho_t no state)
+    # SOCP
     # ----------------------------
     (SOCP, :state) => (
         allowed = Set([:rho_v2, :rho_r, :rho_t]),
@@ -128,8 +119,8 @@ function _normalize_rhos_strict(
     coupling::Symbol;
     rho::Union{Nothing, Real} = nothing,
     rho_theta::Union{Nothing, Real} = nothing,
-    rho_v::Union{Nothing, Real} = nothing,      # AC only (forbidden in SOCP)
-    rho_v2::Union{Nothing, Real} = nothing,     # SOCP only (stored in field rho_v)
+    rho_v::Union{Nothing, Real} = nothing,
+    rho_v2::Union{Nothing, Real} = nothing,
     rho_p::Union{Nothing, Real} = nothing,
     rho_q::Union{Nothing, Real} = nothing,
     rho_r::Union{Nothing, Real} = nothing,
@@ -170,16 +161,16 @@ function _normalize_rhos_strict(
         )
     end
 
-    ρ_generic = rho === nothing ? nothing : _asfloat(rho, :rho)
+    rho_generic = rho === nothing ? nothing : _asfloat(rho, :rho)
 
-    if ρ_generic !== nothing
-        (:rho_theta in required) && (rho_theta = something(rho_theta, ρ_generic))
-        (:rho_v in required) && (rho_v = something(rho_v, ρ_generic))
-        (:rho_v2 in required) && (rho_v2 = something(rho_v2, ρ_generic))
-        (:rho_p in required) && (rho_p = something(rho_p, ρ_generic))
-        (:rho_q in required) && (rho_q = something(rho_q, ρ_generic))
-        (:rho_r in required) && (rho_r = something(rho_r, ρ_generic))
-        (:rho_t in required) && (rho_t = something(rho_t, ρ_generic))
+    if rho_generic !== nothing
+        (:rho_theta in required) && (rho_theta = something(rho_theta, rho_generic))
+        (:rho_v in required) && (rho_v = something(rho_v, rho_generic))
+        (:rho_v2 in required) && (rho_v2 = something(rho_v2, rho_generic))
+        (:rho_p in required) && (rho_p = something(rho_p, rho_generic))
+        (:rho_q in required) && (rho_q = something(rho_q, rho_generic))
+        (:rho_r in required) && (rho_r = something(rho_r, rho_generic))
+        (:rho_t in required) && (rho_t = something(rho_t, rho_generic))
     end
 
     function _get_required_value(sym::Symbol)
@@ -196,11 +187,11 @@ function _normalize_rhos_strict(
     req_sorted = sort!(collect(required))
     anchor_val = _get_required_value(req_sorted[1])
 
-    ρθ =
+    rho_theta_val =
         (base_model === SOCP) ? anchor_val :
         ((:rho_theta in required) ? _asfloat(rho_theta, :rho_theta) : anchor_val)
 
-    ρv = if base_model === AC
+    rho_v_val = if base_model === AC
         (:rho_v in required) ? _asfloat(rho_v, :rho_v) : anchor_val
     elseif base_model === SOCP
         (:rho_v2 in required) ? _asfloat(rho_v2, :rho_v2) : anchor_val
@@ -208,12 +199,19 @@ function _normalize_rhos_strict(
         anchor_val
     end
 
-    ρp = (:rho_p in required) ? _asfloat(rho_p, :rho_p) : anchor_val
-    ρq = (:rho_q in required) ? _asfloat(rho_q, :rho_q) : anchor_val
-    ρr = (:rho_r in required) ? _asfloat(rho_r, :rho_r) : anchor_val
-    ρt = (:rho_t in required) ? _asfloat(rho_t, :rho_t) : anchor_val
+    rho_p_val = (:rho_p in required) ? _asfloat(rho_p, :rho_p) : anchor_val
+    rho_q_val = (:rho_q in required) ? _asfloat(rho_q, :rho_q) : anchor_val
+    rho_r_val = (:rho_r in required) ? _asfloat(rho_r, :rho_r) : anchor_val
+    rho_t_val = (:rho_t in required) ? _asfloat(rho_t, :rho_t) : anchor_val
 
-    return (rho_theta = ρθ, rho_v = ρv, rho_p = ρp, rho_q = ρq, rho_r = ρr, rho_t = ρt)
+    return (
+        rho_theta = rho_theta_val,
+        rho_v = rho_v_val,
+        rho_p = rho_p_val,
+        rho_q = rho_q_val,
+        rho_r = rho_r_val,
+        rho_t = rho_t_val,
+    )
 end
 
 # ============================================================
@@ -228,7 +226,6 @@ mutable struct DistributedOPFModel
 
     rho_theta::Float64
     rho_v::Float64
-
     rho_p::Float64
     rho_q::Float64
     rho_r::Float64
@@ -262,6 +259,9 @@ mutable struct DistributedOPFModel
         tau_incr::Real = 1.05,
         tau_decr::Real = 0.98,
     )
+        base_model in (DC, AC, SOCP) ||
+            throw(ArgumentError("Invalid base_model=$base_model. Allowed: DC, AC, SOCP"))
+
         coupling in (:state, :power, :hybrid) ||
             throw(
                 ArgumentError(
@@ -328,10 +328,20 @@ DistributedOPFModel(
 ) = begin
     sec = _sectioning(sectioning)
     rhos = _normalize_rhos_strict(base_model, coupling; rho = rho)
+
     DistributedOPFModel(
-        base_model, coupling, sec, max_iter,
-        rhos.rho_theta, rhos.rho_v, rhos.rho_p, rhos.rho_q, rhos.rho_r, rhos.rho_t,
-        eps_abs, eps_rel;
+        base_model,
+        coupling,
+        sec,
+        max_iter,
+        rhos.rho_theta,
+        rhos.rho_v,
+        rhos.rho_p,
+        rhos.rho_q,
+        rhos.rho_r,
+        rhos.rho_t,
+        eps_abs,
+        eps_rel;
         adaptive_rho = adaptive_rho,
         mu_incr = mu_incr,
         mu_decr = mu_decr,
@@ -362,8 +372,10 @@ DistributedOPFModel(
     tau_decr::Real = 0.98,
 ) = begin
     sec = _sectioning(sectioning)
+
     rhos = _normalize_rhos_strict(
-        base_model, coupling;
+        base_model,
+        coupling;
         rho = rho,
         rho_theta = rho_theta,
         rho_v = rho_v,
@@ -375,9 +387,18 @@ DistributedOPFModel(
     )
 
     DistributedOPFModel(
-        base_model, coupling, sec, max_iter,
-        rhos.rho_theta, rhos.rho_v, rhos.rho_p, rhos.rho_q, rhos.rho_r, rhos.rho_t,
-        eps_abs, eps_rel;
+        base_model,
+        coupling,
+        sec,
+        max_iter,
+        rhos.rho_theta,
+        rhos.rho_v,
+        rhos.rho_p,
+        rhos.rho_q,
+        rhos.rho_r,
+        rhos.rho_t,
+        eps_abs,
+        eps_rel;
         adaptive_rho = adaptive_rho,
         mu_incr = mu_incr,
         mu_decr = mu_decr,
@@ -395,7 +416,7 @@ end
 @inline is_centralized_model(x) = !is_distributed_model(x)
 
 # ============================================================
-# shims
+# Shims
 # ============================================================
 
 rho(c::DistributedOPFModel) = c.rho_theta
@@ -424,7 +445,10 @@ function Base.setproperty!(c::DistributedOPFModel, s::Symbol, v)
 
         return vf
     elseif s === :rho_v2
-        c.rho_v = Float64(v)
+        v isa Real || throw(ArgumentError("rho_v2 must be Real, got $(typeof(v))"))
+        vf = Float64(v)
+        vf > 0 || throw(ArgumentError("rho_v2 must be > 0, got $vf"))
+        c.rho_v = vf
         return c.rho_v
     else
         Base.setfield!(c, s, v)

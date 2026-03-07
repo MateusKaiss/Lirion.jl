@@ -23,7 +23,7 @@ centralized() = CentralizedAlgorithm()
 end
 
 @inline function admm(;
-    coupling::Symbol = :hybrid,               # :state | :power | :hybrid
+    coupling::Symbol = :hybrid,
     sectioning = :tie_line,
     max_iter::Int = 350,
     kwargs...,
@@ -51,11 +51,11 @@ end
 @inline function _plots_stem(model_type)::String
     if model_type isa DistributedOPFModel
         return "admm_" *
-               lowercase(string(model_type.base_model)) * "_" *
+               lowercase(string(nameof(model_type.base_model))) * "_" *
                string(model_type.coupling) * "_" *
                _sectioning_name(model_type.sectioning)
     else
-        return "opf_" * lowercase(string(model_type))
+        return "opf_" * lowercase(string(nameof(model_type)))
     end
 end
 

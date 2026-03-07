@@ -9,22 +9,11 @@
 end
 
 # ------------------------------------------------------------
-# Base model -> Tag type
-# ------------------------------------------------------------
-@inline function _base_tag_type(::Type{B}) where {B <: OPFModel}
-    B === DC && return DCTag
-    B === AC && return ACTag
-    B === SOCP && return SOCPTag
-    return error("Unknown base_model: $(B). Expected DC, AC, or SOCP.")
-end
-
-# ------------------------------------------------------------
-# ADMM tag (type-level) used by run_admm dispatch
 # ------------------------------------------------------------
 @inline function admm_tag(cfg::DistributedOPFModel)
     V = _variant_type(Val(cfg.coupling))
-    B = _base_tag_type(cfg.base_model)
-    return ADMM{V, B}()
+    M = cfg.base_model
+    return ADMM{V, M}()
 end
 
 # ------------------------------------------------------------
