@@ -49,10 +49,22 @@ end
 # Basic types
 # ------------------------------------------------------------------
 include("types.jl")
-include("parsing/raw_structs.jl")
 
 # ------------------------------------------------------------------
-# data: static data + time series + SystemData
+# Raw case representation (returned by parsers)
+# ------------------------------------------------------------------
+include("data/raw_structs.jl")
+
+# ------------------------------------------------------------------
+# Case parsing (.m / .csv)
+# ------------------------------------------------------------------
+include("parsing/matlab_parser_core.jl")
+include("parsing/matpower_tables.jl")
+include("parsing/csv_tables.jl")
+include("parsing/case_parser.jl")
+
+# ------------------------------------------------------------------
+# Data layer: static data + time series + SystemData
 # ------------------------------------------------------------------
 include("data/timeseries_utils.jl")
 include("data/timeseries/bus_timeseries.jl")
@@ -83,16 +95,9 @@ include("data/build_inputs.jl")
 include("data/admm_structs.jl")
 
 # ------------------------------------------------------------------
-# Case parsing (.m / .csv)
-# ------------------------------------------------------------------
-include("parsing/parser_utils.jl")
-include("parsing/matpower_parser.jl")
-include("parsing/csv_parser.jl")
-include("parsing/parse_case.jl")
-
-# ------------------------------------------------------------------
 # Model construction and centralized solution
 # ------------------------------------------------------------------
+
 # --- BUS
 include("modeling/bus/variables.jl")
 include("modeling/bus/dispatch.jl")
@@ -164,12 +169,12 @@ include("distributed_algorithms/admm/run_admm/admm_socp.jl")
 include("api.jl")
 
 # ------------------------------------------------------------------
-# New function-based
+# New function-based API
 # ------------------------------------------------------------------
 include("solve.jl")
 
 # ------------------------------------------------------------------
-# Public exports (API)
+# Public exports
 # ------------------------------------------------------------------
 export solve, dc, ac, socp,
     centralized, admm,

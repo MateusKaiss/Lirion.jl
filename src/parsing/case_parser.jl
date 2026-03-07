@@ -124,10 +124,6 @@ function _parse_case(dir::String, ::CsvFolder)::CaseRaw
         @warn "baseMVA.csv not found. Using 100.0"
     end
 
-    # -------------------------
-    # core tables
-    # -------------------------
-
     let p = joinpath(d, "bus.csv")
         if isfile(p)
             tbl = _parse_csv_table_dict(p, _mp_bus_columns_csv)
@@ -165,7 +161,6 @@ function _parse_case(dir::String, ::CsvFolder)::CaseRaw
     let p = joinpath(d, "branch.csv")
         if isfile(p)
             tbl = _parse_csv_table_dict(p, _mp_branch_columns_csv)
-            # NÃO converte angmin/angmax aqui.
             case.branch = _branch_from_tbl(tbl)
         end
     end
@@ -221,9 +216,6 @@ function _parse_case(dir::String, ::CsvFolder)::CaseRaw
         end
     end
 
-    # -------------------------
-    # timeseries folder
-    # -------------------------
     tdir = joinpath(d, "time")
     if isdir(tdir)
         let p = joinpath(tdir, "bus_timeseries.csv")

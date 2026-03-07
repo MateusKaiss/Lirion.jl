@@ -91,27 +91,6 @@ function _col_or_default(
     return _col_or_default(df, col, String, default)
 end
 
-function _parse_csv_table_dict(path::String, columns::Vector{Tuple{String, Type}})
-    df = _read_csv(path)
-    tbl = Dict{String, Any}()
-    for (name, typ) in columns
-        if typ == Int
-            tbl[name] = _col_or_default(df, name, Int, 0)
-        elseif typ == Float64
-            tbl[name] = _col_or_default(df, name, Float64, 0.0)
-        elseif typ == String || typ == Union{String, SubString{String}}
-            tbl[name] = _col_or_default(df, name, String, "")
-        else
-            tbl[name] = _col_or_default(df, name, String, "")
-        end
-    end
-    return tbl
-end
-
-# -------------------------
-# gencost + gencost_timeseries (colunas c1,c2,...)
-# -------------------------
-
 @inline function _safe_int(x, default::Int = 0)::Int
     return (x === missing || x === nothing) ? default : Int(x)
 end
@@ -221,10 +200,6 @@ function _parse_gencost_timeseries_csv(path::String)::GencostTimeseriesRaw{Float
     )
 end
 
-# -------------------------
-# Prosumer timeseries: compat (p_pv/p_load/p_curtail) ou (generation/demand)
-# -------------------------
-
 function _prosumer_ts_from_tbl_csv(tbl::Dict{String, Any})
     n = length(tbl["time"])
 
@@ -256,4 +231,21 @@ function _prosumer_ts_from_tbl_csv(tbl::Dict{String, Any})
         fill(0.0, n),
         fill(0.0, n),
     )
+end
+
+function _parse_csv_table_dict(path::String, columns::Vector{Tuple{String, Type}})
+    df = _read_csv(path)
+    tbl = Dict{String, Any}()
+    for (name, typ) in columns
+        if typ == Int
+            tbl[name] = _col_or_default(df, name, Int, 0)
+        elseif typ == Float64
+            tbl[name] = _col_or_default(df, name, Float64, 0.0)
+        elseif typ == String || typ == Union{String, SubString{String}}
+            tbl[name] = _col_or_default(df, name, String, "")
+        else
+            tbl[name] = _col_or_default(df, name, String, "")
+        end
+    end
+    return tbl
 end
