@@ -16,7 +16,7 @@ end
 function run_lirion(inputs::LirionInputs)::LirionRunResult
     @info "Case: $(inputs.database_path)"
     @info "Model: $(inputs.model_type)"
-    @info "Optimizer (raw): $(inputs.optimizer)"
+    @info "Optimizer (case_raw): $(inputs.optimizer)"
 
     if is_distributed_model(inputs.model_type)
         return run_distributed(inputs)
@@ -26,7 +26,7 @@ function run_lirion(inputs::LirionInputs)::LirionRunResult
         sys = inputs.system
         @assert sys !== nothing
 
-        data = sys.raw
+        data = sys.case_raw
         result_dict = build_result_dict(result_model, sys)
 
         if inputs.write_outputs

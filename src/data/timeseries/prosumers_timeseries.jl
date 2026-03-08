@@ -9,8 +9,8 @@ struct ProsumerTimeseriesData
     p_curtail::Vector{Float64}
 end
 
-function build_prosumer_timeseries_data(raw::CaseRaw)::ProsumerTimeseriesData
-    ts = raw.prosumer_timeseries
+function build_prosumer_timeseries_data(case_raw::CaseRaw)::ProsumerTimeseriesData
+    ts = case_raw.prosumer_timeseries
     if ts === nothing || isempty(ts.time)
         return ProsumerTimeseriesData(
             false,
@@ -30,7 +30,7 @@ function build_prosumer_timeseries_data(raw::CaseRaw)::ProsumerTimeseriesData
         ts.bus,
         ts.p_pv,
         ts.p_load,
-        fill(0.0, length(ts.bus)),  # q_generation (não existe no raw atual)
+        fill(0.0, length(ts.bus)),  # q_generation (não existe no case_raw atual)
         fill(0.0, length(ts.bus)),  # q_demand
         ts.p_curtail,
     )

@@ -8,8 +8,8 @@ struct BusTimeseriesData
     bs::Vector{Float64}
 end
 
-function build_bus_timeseries_data(raw::CaseRaw)::BusTimeseriesData
-    ts = raw.bus_timeseries
+function build_bus_timeseries_data(case_raw::CaseRaw)::BusTimeseriesData
+    ts = case_raw.bus_timeseries
     if ts === nothing || isempty(ts.time)
         return BusTimeseriesData(
             false,

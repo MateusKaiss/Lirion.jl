@@ -24,8 +24,8 @@ end
 # ---------------------------------------------------------------------
 # Battery Parameters (CaseRaw)
 # ---------------------------------------------------------------------
-function get_battery_parameters(raw::CaseRaw)
-    if raw.storage === nothing
+function get_battery_parameters(case_raw::CaseRaw)
+    if case_raw.storage === nothing
         return (
             n = 0,
             bus = Int[],
@@ -46,7 +46,7 @@ function get_battery_parameters(raw::CaseRaw)
         )
     end
 
-    s = raw.storage::StorageRaw{Float64}
+    s = case_raw.storage::StorageRaw{Float64}
     n = length(s.storage_bus)
 
     return (
@@ -69,8 +69,8 @@ function get_battery_parameters(raw::CaseRaw)
     )
 end
 
-function build_battery_data(raw::CaseRaw)::BatteryData
-    p = get_battery_parameters(raw)
+function build_battery_data(case_raw::CaseRaw)::BatteryData
+    p = get_battery_parameters(case_raw)
 
     return BatteryData(
         p.n,

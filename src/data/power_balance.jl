@@ -41,21 +41,21 @@ function _dict_to_busvec(
     return result
 end
 
-function get_power_flow_parameters(raw::CaseRaw)
-    @assert raw.bus !== nothing && raw.branch !== nothing
+function get_power_flow_parameters(case_raw::CaseRaw)
+    @assert case_raw.bus !== nothing && case_raw.branch !== nothing
 
-    bus = raw.bus::BusRaw{Float64}
-    br = raw.branch::BranchRaw{Float64}
+    bus = case_raw.bus::BusRaw{Float64}
+    br = case_raw.branch::BranchRaw{Float64}
 
     bus_ids = bus.bus_i
     nbus = length(bus_ids)
 
     # prefer maps from preprocess
-    bus_idx_map = raw.maps.bus_idx_map
+    bus_idx_map = case_raw.maps.bus_idx_map
 
-    gen_bus = raw.gen === nothing ? Int[] : raw.gen.gen_bus
-    bat_bus = raw.storage === nothing ? Int[] : raw.storage.storage_bus
-    pros_bus = raw.prosumer === nothing ? Int[] : raw.prosumer.bus
+    gen_bus = case_raw.gen === nothing ? Int[] : case_raw.gen.gen_bus
+    bat_bus = case_raw.storage === nothing ? Int[] : case_raw.storage.storage_bus
+    pros_bus = case_raw.prosumer === nothing ? Int[] : case_raw.prosumer.bus
 
     branch_bus_from = br.f_bus
     branch_bus_to = br.t_bus
@@ -64,30 +64,30 @@ function get_power_flow_parameters(raw::CaseRaw)
     shunt_gs = bus.gs
     shunt_bs = bus.bs
 
-    gen_status = raw.gen === nothing ? Int[] : raw.gen.gen_status
+    gen_status = case_raw.gen === nothing ? Int[] : case_raw.gen.gen_status
     is_virtual = bus.is_virtual
-    has_timeseries = raw.T > 1
+    has_timeseries = case_raw.T > 1
 
     # maps -> busvec
     bus_to_gens =
-        isempty(raw.maps.bus_to_gens) ? [Int[] for _ in 1:nbus] :
-        _dict_to_busvec(bus_ids, bus_idx_map, raw.maps.bus_to_gens)
+        isempty(case_raw.maps.bus_to_gens) ? [Int[] for _ in 1:nbus] :
+        _dict_to_busvec(bus_ids, bus_idx_map, case_raw.maps.bus_to_gens)
 
     bus_to_bats =
-        isempty(raw.maps.bus_to_batteries) ? [Int[] for _ in 1:nbus] :
-        _dict_to_busvec(bus_ids, bus_idx_map, raw.maps.bus_to_batteries)
+        isempty(case_raw.maps.bus_to_batteries) ? [Int[] for _ in 1:nbus] :
+        _dict_to_busvec(bus_ids, bus_idx_map, case_raw.maps.bus_to_batteries)
 
     bus_to_pros =
-        isempty(raw.maps.bus_to_prosumers) ? [Int[] for _ in 1:nbus] :
-        _dict_to_busvec(bus_ids, bus_idx_map, raw.maps.bus_to_prosumers)
+        isempty(case_raw.maps.bus_to_prosumers) ? [Int[] for _ in 1:nbus] :
+        _dict_to_busvec(bus_ids, bus_idx_map, case_raw.maps.bus_to_prosumers)
 
     bus_to_br_from =
-        isempty(raw.maps.bus_to_branches_from) ? [Int[] for _ in 1:nbus] :
-        _dict_to_busvec(bus_ids, bus_idx_map, raw.maps.bus_to_branches_from)
+        isempty(case_raw.maps.bus_to_branches_from) ? [Int[] for _ in 1:nbus] :
+        _dict_to_busvec(bus_ids, bus_idx_map, case_raw.maps.bus_to_branches_from)
 
     bus_to_br_to =
-        isempty(raw.maps.bus_to_branches_to) ? [Int[] for _ in 1:nbus] :
-        _dict_to_busvec(bus_ids, bus_idx_map, raw.maps.bus_to_branches_to)
+        isempty(case_raw.maps.bus_to_branches_to) ? [Int[] for _ in 1:nbus] :
+        _dict_to_busvec(bus_ids, bus_idx_map, case_raw.maps.bus_to_branches_to)
 
     # these may not exist in your preprocess yet
     bus_to_inter_in = [Int[] for _ in 1:nbus]
@@ -118,8 +118,8 @@ function get_power_flow_parameters(raw::CaseRaw)
     )
 end
 
-function build_power_flow_data(raw::CaseRaw)::PowerFlowData
-    p = get_power_flow_parameters(raw)
+function build_power_flow_data(case_raw::CaseRaw)::PowerFlowData
+    p = get_power_flow_parameters(case_raw)
     return PowerFlowData(
         p.bus_ids,
         p.bus_idx_map,

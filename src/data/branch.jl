@@ -21,7 +21,7 @@ struct BranchData{T <: Real}
     rate_c::Vector{T}
 
     tap::Vector{T}
-    shift::Vector{T}            # radians (keep consistent with raw)
+    shift::Vector{T}            # radians (keep consistent with case_raw)
     angmin::Vector{T}
     angmax::Vector{T}
 
@@ -65,10 +65,10 @@ end
 # Parameter extraction
 # ------------------------------------------------------------------------------
 
-function get_branch_parameters(raw::CaseRaw)
-    @assert raw.branch !== nothing && raw.bus !== nothing "CaseRaw.branch/bus is nothing"
-    br = raw.branch::BranchRaw{Float64}
-    bus = raw.bus::BusRaw{Float64}
+function get_branch_parameters(case_raw::CaseRaw)
+    @assert case_raw.branch !== nothing && case_raw.bus !== nothing "CaseRaw.branch/bus is nothing"
+    br = case_raw.branch::BranchRaw{Float64}
+    bus = case_raw.bus::BusRaw{Float64}
 
     from = br.f_bus
     to = br.t_bus
@@ -90,7 +90,7 @@ function get_branch_parameters(raw::CaseRaw)
     status = br.br_status
     n = length(from)
 
-    local_indices = raw.dist.zone_branch_idx_in_full
+    local_indices = case_raw.dist.zone_branch_idx_in_full
     global_index = isempty(local_indices) ? collect(1:n) : Vector{Int}(local_indices)
 
     tap_position = ones(Float64, n)
@@ -111,7 +111,7 @@ function get_branch_parameters(raw::CaseRaw)
     end
 
     bus_ids = bus.bus_i
-    bus_idx_map = raw.maps.bus_idx_map
+    bus_idx_map = case_raw.maps.bus_idx_map
 
     den = r .^ 2 .+ x .^ 2
     g = r ./ den
@@ -136,7 +136,7 @@ function get_branch_parameters(raw::CaseRaw)
         g = g,
         b = b,
         tr = tr,
-        ti = ti, s_base = Float64(raw.baseMVA),
+        ti = ti, s_base = Float64(case_raw.baseMVA),
         initial_voltage_magnitude = Float64.(bus.vm),
         initial_voltage_angle = Float64.(bus.va), bus_ids = bus_ids,
         bus_idx_map = bus_idx_map,
@@ -148,8 +148,8 @@ end
 # Builder
 # ------------------------------------------------------------------------------
 
-function build_branch_data(raw::CaseRaw)::BranchData{Float64}
-    p = get_branch_parameters(raw)
+function build_branch_data(case_raw::CaseRaw)::BranchData{Float64}
+    p = get_branch_parameters(case_raw)
 
     return BranchData{Float64}(
         p.n,

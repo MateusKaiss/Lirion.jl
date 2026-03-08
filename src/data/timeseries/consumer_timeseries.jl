@@ -6,8 +6,8 @@ struct ConsumerTimeseriesData
     q_demand::Vector{Float64}
 end
 
-function build_consumer_timeseries_data(raw::CaseRaw)::ConsumerTimeseriesData
-    ts = raw.consumer_timeseries
+function build_consumer_timeseries_data(case_raw::CaseRaw)::ConsumerTimeseriesData
+    ts = case_raw.consumer_timeseries
     if ts === nothing || isempty(ts.time)
         return ConsumerTimeseriesData(false, Int[], Int[], Float64[], Float64[])
     end

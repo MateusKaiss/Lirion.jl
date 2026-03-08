@@ -13,15 +13,15 @@ struct ObjectiveData
 end
 
 function get_objective_parameters(
-    raw::CaseRaw;
-    gencost_timeseries::Union{Nothing, GencostTimeseriesRaw{Float64}} = raw.gencost_timeseries,
+    case_raw::CaseRaw;
+    gencost_timeseries::Union{Nothing, GencostTimeseriesRaw{Float64}} = case_raw.gencost_timeseries,
 )
-    T = raw.T
+    T = case_raw.T
     has_timeseries = T > 1
 
-    ng = raw.gen === nothing ? 0 : length(raw.gen.gen_bus)
-    nbatt = raw.storage === nothing ? 0 : length(raw.storage.storage_bus)
-    npros = raw.prosumer === nothing ? 0 : length(raw.prosumer.bus)
+    ng = case_raw.gen === nothing ? 0 : length(case_raw.gen.gen_bus)
+    nbatt = case_raw.storage === nothing ? 0 : length(case_raw.storage.storage_bus)
+    npros = case_raw.prosumer === nothing ? 0 : length(case_raw.prosumer.bus)
 
     generator_costs = Dict{Int, Dict{Int, Vector{Float64}}}()
 
@@ -35,18 +35,18 @@ function get_objective_parameters(
         end
     else
         generator_costs[1] = Dict{Int, Vector{Float64}}()
-        if raw.gencost !== nothing
-            @inbounds for g in 1:length(raw.gencost.cost_coefficients)
-                generator_costs[1][g] = raw.gencost.cost_coefficients[g]
+        if case_raw.gencost !== nothing
+            @inbounds for g in 1:length(case_raw.gencost.cost_coefficients)
+                generator_costs[1][g] = case_raw.gencost.cost_coefficients[g]
             end
         end
     end
 
-    num_poly = raw.gencost === nothing ? Int[] : raw.gencost.ncost
-    curt = raw.gen === nothing ? Float64[] : raw.gen.curtailment_cost
-    ptype = raw.gen === nothing ? String[] : raw.gen.plant_type
-    gstat = raw.gen === nothing ? Int[] : raw.gen.gen_status
-    pcost = raw.prosumer === nothing ? Float64[] : raw.prosumer.cost_injection
+    num_poly = case_raw.gencost === nothing ? Int[] : case_raw.gencost.ncost
+    curt = case_raw.gen === nothing ? Float64[] : case_raw.gen.curtailment_cost
+    ptype = case_raw.gen === nothing ? String[] : case_raw.gen.plant_type
+    gstat = case_raw.gen === nothing ? Int[] : case_raw.gen.gen_status
+    pcost = case_raw.prosumer === nothing ? Float64[] : case_raw.prosumer.cost_injection
 
     return (
         number_of_generators = ng,
@@ -62,8 +62,8 @@ function get_objective_parameters(
     )
 end
 
-function build_objective_data(raw::CaseRaw)::ObjectiveData
-    p = get_objective_parameters(raw)
+function build_objective_data(case_raw::CaseRaw)::ObjectiveData
+    p = get_objective_parameters(case_raw)
     return ObjectiveData(
         p.number_of_generators,
         p.number_of_batteries,
@@ -75,6 +75,6 @@ function build_objective_data(raw::CaseRaw)::ObjectiveData
         p.number_of_prosumers,
         p.prosumer_costs,
         p.has_timeseries,
-        raw.baseMVA,
+        case_raw.baseMVA,
     )
 end

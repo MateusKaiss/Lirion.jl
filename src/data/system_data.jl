@@ -20,7 +20,7 @@ struct SystemData
     powerflow::PowerFlowData
     objective::ObjectiveData
 
-    raw::Dict{String, Any}
+    case_raw::Dict{String, Any}
 end
 
 # ==============================================================================
@@ -43,12 +43,12 @@ end
 # Utils
 # ==============================================================================
 
-function _raw_snapshot(raw::CaseRaw)
+function _raw_snapshot(case_raw::CaseRaw)
     d = Dict{String, Any}()
-    d["name"] = raw.name
-    d["baseMVA"] = raw.baseMVA
-    d["T"] = raw.T
-    d["maps"] = raw.maps
+    d["name"] = case_raw.name
+    d["baseMVA"] = case_raw.baseMVA
+    d["T"] = case_raw.T
+    d["maps"] = case_raw.maps
     return d
 end
 
@@ -56,24 +56,24 @@ end
 # Builders
 # ============================================================
 
-function build_system_data(raw::CaseRaw)::SystemData
-    bus_data = build_bus_data(raw)
-    branch_data = build_branch_data(raw)
-    gen_data = build_gen_data(raw)
-    battery_data = build_battery_data(raw)
-    prosumer_data = build_prosumer_data(raw)
+function build_system_data(case_raw::CaseRaw)::SystemData
+    bus_data = build_bus_data(case_raw)
+    branch_data = build_branch_data(case_raw)
+    gen_data = build_gen_data(case_raw)
+    battery_data = build_battery_data(case_raw)
+    prosumer_data = build_prosumer_data(case_raw)
 
-    bus_ts_data = build_bus_timeseries_data(raw)
-    prosumer_ts_data = build_prosumer_timeseries_data(raw)
-    consumer_ts_data = build_consumer_timeseries_data(raw)
-    gencost_ts_data = build_gencost_timeseries_data(raw)
+    bus_ts_data = build_bus_timeseries_data(case_raw)
+    prosumer_ts_data = build_prosumer_timeseries_data(case_raw)
+    consumer_ts_data = build_consumer_timeseries_data(case_raw)
+    gencost_ts_data = build_gencost_timeseries_data(case_raw)
 
-    powerflow_data = build_power_flow_data(raw)
-    objective_data = build_objective_data(raw)
+    powerflow_data = build_power_flow_data(case_raw)
+    objective_data = build_objective_data(case_raw)
 
     return SystemData(
-        raw.baseMVA,
-        raw.T,
+        case_raw.baseMVA,
+        case_raw.T,
         bus_data,
         branch_data,
         gen_data,
@@ -85,13 +85,16 @@ function build_system_data(raw::CaseRaw)::SystemData
         gencost_ts_data,
         powerflow_data,
         objective_data,
-        _raw_snapshot(raw),
+        _raw_snapshot(case_raw),
     )
 end
 
-function build_distributed_system(raw::CaseRaw, sectioning::Sectioning)::DistributedSystem
-    parts_dict = prepare_distributed_partitions(raw, sectioning)
-    interzonal_branches = _find_interzonal_branches(raw, sectioning)
+function build_distributed_system(
+    case_raw::CaseRaw,
+    sectioning::Sectioning,
+)::DistributedSystem
+    parts_dict = prepare_distributed_partitions(case_raw, sectioning)
+    interzonal_branches = _find_interzonal_branches(case_raw, sectioning)
 
     zones = sort!(collect(keys(parts_dict)))
     n_zones = length(zones)
@@ -112,7 +115,7 @@ function build_distributed_system(raw::CaseRaw, sectioning::Sectioning)::Distrib
         shared_buses_zone[i] = zone_raw.dist.zone_shared_bus_ids
     end
 
-    shared_buses = raw.dist.full_shared_bus_ids
+    shared_buses = case_raw.dist.full_shared_bus_ids
 
     return DistributedSystem(
         zones,

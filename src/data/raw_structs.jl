@@ -160,7 +160,7 @@ struct ProsumerRaw{T <: Real} <: AbstractRawTable
 end
 
 # -------------------------
-# Timeseries raw tables
+# Timeseries case_raw tables
 # -------------------------
 
 struct BusTimeseriesRaw{T <: Real} <: AbstractRawTable

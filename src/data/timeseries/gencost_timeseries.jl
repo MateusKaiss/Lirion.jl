@@ -11,8 +11,8 @@ struct GencostTimeseriesData
     feed_in_tariff::Vector{Float64}
 end
 
-function build_gencost_timeseries_data(raw::CaseRaw)::GencostTimeseriesData
-    ts = raw.gencost_timeseries
+function build_gencost_timeseries_data(case_raw::CaseRaw)::GencostTimeseriesData
+    ts = case_raw.gencost_timeseries
     if ts === nothing || isempty(ts.time)
         return GencostTimeseriesData(
             false, Int[], Int[], Int[], Float64[], Float64[], Int[],

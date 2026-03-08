@@ -52,9 +52,9 @@ function get_bus_parameters(bus::BusRaw{T}) where {T <: Real}
     )
 end
 
-function build_bus_data(raw::CaseRaw)::BusData{Float64}
-    @assert raw.bus !== nothing "CaseRaw.bus is nothing"
-    bus = raw.bus::BusRaw{Float64}
+function build_bus_data(case_raw::CaseRaw)::BusData{Float64}
+    @assert case_raw.bus !== nothing "CaseRaw.bus is nothing"
+    bus = case_raw.bus::BusRaw{Float64}
 
     params = get_bus_parameters(bus)
     bus_ids = params.bus_ids

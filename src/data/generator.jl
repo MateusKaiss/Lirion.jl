@@ -19,8 +19,8 @@ struct GenData{T <: Real}
     curtailment_cost::Vector{T}
 end
 
-function get_generator_parameters(raw::CaseRaw)
-    if raw.gen === nothing
+function get_generator_parameters(case_raw::CaseRaw)
+    if case_raw.gen === nothing
         return (
             n = 0,
             bus = Int[],
@@ -36,7 +36,7 @@ function get_generator_parameters(raw::CaseRaw)
         )
     end
 
-    gen = raw.gen::GenRaw{Float64}
+    gen = case_raw.gen::GenRaw{Float64}
     n = length(gen.gen_bus)
 
     pg = gen.pg
@@ -74,8 +74,8 @@ function get_generator_parameters(raw::CaseRaw)
     )
 end
 
-function build_gen_data(raw::CaseRaw)::GenData{Float64}
-    p = get_generator_parameters(raw)
+function build_gen_data(case_raw::CaseRaw)::GenData{Float64}
+    p = get_generator_parameters(case_raw)
     return GenData{Float64}(
         p.n,
         p.bus,

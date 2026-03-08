@@ -12,14 +12,16 @@ struct ProsumerData
     inverter_capacity::Vector{Float64}
 end
 
-function get_prosumer_parameters(raw::CaseRaw)
-    T = raw.T
-    has_ts = raw.prosumer_timeseries !== nothing && !isempty(raw.prosumer_timeseries.time)
+function get_prosumer_parameters(case_raw::CaseRaw)
+    T = case_raw.T
+    has_ts =
+        case_raw.prosumer_timeseries !== nothing &&
+        !isempty(case_raw.prosumer_timeseries.time)
 
     if has_ts && T > 1
-        ts = raw.prosumer_timeseries::ProsumerTimeseriesRaw{Float64}
+        ts = case_raw.prosumer_timeseries::ProsumerTimeseriesRaw{Float64}
         nb = length(unique(ts.bus))
-        s = raw.prosumer
+        s = case_raw.prosumer
         return (
             is_timeseries = true,
             number_of_prosumers = nb,
@@ -36,7 +38,7 @@ function get_prosumer_parameters(raw::CaseRaw)
         )
     end
 
-    s = raw.prosumer
+    s = case_raw.prosumer
     nb = s === nothing ? 0 : length(s.bus)
     return (
         is_timeseries = false,
@@ -53,8 +55,8 @@ function get_prosumer_parameters(raw::CaseRaw)
     )
 end
 
-function build_prosumer_data(raw::CaseRaw)::ProsumerData
-    p = get_prosumer_parameters(raw)
+function build_prosumer_data(case_raw::CaseRaw)::ProsumerData
+    p = get_prosumer_parameters(case_raw)
     return ProsumerData(
         p.is_timeseries,
         p.number_of_prosumers,
