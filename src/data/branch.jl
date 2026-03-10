@@ -17,19 +17,21 @@ struct BranchData
     rate_a::Vector{Float64}
     rate_b::Vector{Float64}
     rate_c::Vector{Float64}
+
     tap::Vector{Float64}
     shift::Vector{Float64}
     ang_min::Vector{Float64}
     ang_max::Vector{Float64}
+
     tap_position::Vector{Float64}
     tap_angle::Vector{Float64}
     inv_tap::Vector{Float64}
+
     g::Vector{Float64}
     b::Vector{Float64}
+
     tr::Vector{Float64}
     ti::Vector{Float64}
-    vm_start::Vector{Float64}
-    va_start::Vector{Float64}
 
     bus_ids::Vector{Int}
     bus_idx_map::Dict{Int, Int}
@@ -85,8 +87,6 @@ function get_branch_parameters(case_raw::CaseRaw)
         status[i] == 1 && push!(active, i)
     end
 
-    local_indices = case_raw.dist.zone_branch_idx_in_full
-
     r = branch_raw.br_r
     x = branch_raw.br_x
     denominator = r .^ 2 .+ x .^ 2
@@ -95,14 +95,18 @@ function get_branch_parameters(case_raw::CaseRaw)
 
     return (
         n = n,
-        s_base = case_raw.baseMVA, from = from,
+        s_base = case_raw.baseMVA,
+        from = from,
         to = to,
         status = status,
-        active = active, r = r,
+        active = active,
+        r = r,
         x = x,
-        b_sh = branch_raw.br_b, rate_a = branch_raw.rate_a,
+        b_sh = branch_raw.br_b,
+        rate_a = branch_raw.rate_a,
         rate_b = branch_raw.rate_b,
-        rate_c = branch_raw.rate_c, tap = tap,
+        rate_c = branch_raw.rate_c,
+        tap = tap,
         shift = shift,
         ang_min = branch_raw.angmin,
         ang_max = branch_raw.angmax,
@@ -112,8 +116,7 @@ function get_branch_parameters(case_raw::CaseRaw)
         g = g,
         b = b,
         tr = tr,
-        ti = ti, vm_start = bus_raw.vm,
-        va_start = bus_raw.va, bus_ids = bus_raw.bus_i,
+        ti = ti, bus_ids = bus_raw.bus_i,
         bus_idx_map = case_raw.maps.bus_idx_map,
         zone = bus_raw.zone,
     )
@@ -145,10 +148,7 @@ function build_branch_data(case_raw::CaseRaw)::BranchData
         params.g,
         params.b,
         params.tr,
-        params.ti,
-        params.vm_start,
-        params.va_start,
-        params.bus_ids,
+        params.ti, params.bus_ids,
         params.bus_idx_map,
         params.zone,
     )
