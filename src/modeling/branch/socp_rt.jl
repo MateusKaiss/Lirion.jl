@@ -59,8 +59,8 @@ function create_rt_variables_with_bounds!(
     @variable(model, R[l in active, t in 1:T], base_name = "R")
     @variable(model, T_var[l in active, t in 1:T], base_name = "T_var")
 
-    vm_start = bus.vstart
-    va_start = bus.vastart
+    vm_start = bus.vm_start
+    va_start = bus.va_start
     shf = br.tap_angle
 
     @inbounds for l in active, t in 1:T

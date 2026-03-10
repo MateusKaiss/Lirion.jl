@@ -6,7 +6,7 @@ end
     ref = bus.reference_bus
     ref === nothing && return 0.0
     idx = bus.id_to_idx[ref]
-    va0 = bus.vastart[idx]
+    va0 = bus.va_start[idx]
 
     return (va0 === nothing || isnan(va0)) ? 0.0 : va0
 end
@@ -22,7 +22,7 @@ end
 function create_voltage_angle_variables!(model::JuMP.Model, bus::BusData)
     T = get(model.ext, :time_periods, 1)
     bus_ids = bus.id
-    va_start = bus.vastart
+    va_start = bus.va_start
 
     @variable(model, theta[b in bus_ids, t in 1:T])
 
@@ -53,7 +53,7 @@ function create_voltage_magnitude_variables!(model::JuMP.Model, bus::BusData)
         v_magnitude[b in bus_ids, t in 1:T],
         lower_bound = bus.vmin[bus.id_to_idx[b]],
         upper_bound = bus.vmax[bus.id_to_idx[b]],
-        start = something(bus.vstart[bus.id_to_idx[b]], 1.0),
+        start = something(bus.vm_start[bus.id_to_idx[b]], 1.0),
     )
 
     return nothing
@@ -68,7 +68,7 @@ function create_socp_bus_variables!(model::JuMP.Model, bus::BusData)
         v_magnitude_sq[b in bus_ids, t in 1:T],
         lower_bound = bus.vmin[bus.id_to_idx[b]]^2,
         upper_bound = bus.vmax[bus.id_to_idx[b]]^2,
-        start = (something(bus.vstart[bus.id_to_idx[b]], 1.0))^2,
+        start = (something(bus.vm_start[bus.id_to_idx[b]], 1.0))^2,
     )
 
     return nothing
