@@ -70,24 +70,24 @@ function get_battery_parameters(case_raw::CaseRaw)
 end
 
 function build_battery_data(case_raw::CaseRaw)::BatteryData
-    p = get_battery_parameters(case_raw)
+    params = get_battery_parameters(case_raw)
 
     return BatteryData(
-        p.n,
-        p.bus,
-        p.min_storage,
-        p.max_storage,
-        p.charge_ramp,
-        p.discharge_ramp,
-        p.initial_storage,
-        p.qmin,
-        p.qmax,
-        p.thermal_limit,
-        p.charge_efficiency,
-        p.discharge_efficiency,
-        p.r,
-        p.x,
-        p.p_loss,
-        p.q_loss,
+        params.n,
+        params.bus,
+        params.min_storage,
+        params.max_storage,
+        params.charge_ramp,
+        params.discharge_ramp,
+        params.initial_storage,
+        params.qmin,
+        params.qmax,
+        params.thermal_limit,
+        params.charge_efficiency,
+        params.discharge_efficiency,
+        params.r,
+        params.x,
+        params.p_loss,
+        params.q_loss,
     )
 end

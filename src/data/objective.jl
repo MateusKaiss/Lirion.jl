@@ -63,18 +63,18 @@ function get_objective_parameters(
 end
 
 function build_objective_data(case_raw::CaseRaw)::ObjectiveData
-    p = get_objective_parameters(case_raw)
+    params = get_objective_parameters(case_raw)
     return ObjectiveData(
-        p.number_of_generators,
-        p.number_of_batteries,
-        p.generator_costs,
-        p.num_polynomial_coefs,
-        p.curtailment_cost,
-        p.plant_type,
-        p.generator_status,
-        p.number_of_prosumers,
-        p.prosumer_costs,
-        p.has_timeseries,
+        params.number_of_generators,
+        params.number_of_batteries,
+        params.generator_costs,
+        params.num_polynomial_coefs,
+        params.curtailment_cost,
+        params.plant_type,
+        params.generator_status,
+        params.number_of_prosumers,
+        params.prosumer_costs,
+        params.has_timeseries,
         case_raw.baseMVA,
     )
 end

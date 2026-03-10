@@ -78,22 +78,22 @@ function get_generator_parameters(case_raw::CaseRaw)
 end
 
 function build_gen_data(case_raw::CaseRaw)::GenData
-    p = get_generator_parameters(case_raw)
+    params = get_generator_parameters(case_raw)
 
     return GenData(
-        p.n,
-        p.bus,
-        p.pg,
-        p.qg,
-        p.pmin,
-        p.pmax,
-        p.qmin,
-        p.qmax,
-        p.status,
-        p.existing,
-        p.initial_pg,
-        p.initial_qg,
-        p.plant_type,
-        p.curtailment_cost,
+        params.n,
+        params.bus,
+        params.pg,
+        params.qg,
+        params.pmin,
+        params.pmax,
+        params.qmin,
+        params.qmax,
+        params.status,
+        params.existing,
+        params.initial_pg,
+        params.initial_qg,
+        params.plant_type,
+        params.curtailment_cost,
     )
 end

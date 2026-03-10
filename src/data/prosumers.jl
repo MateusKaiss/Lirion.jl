@@ -56,18 +56,18 @@ function get_prosumer_parameters(case_raw::CaseRaw)
 end
 
 function build_prosumer_data(case_raw::CaseRaw)::ProsumerData
-    p = get_prosumer_parameters(case_raw)
+    params = get_prosumer_parameters(case_raw)
     return ProsumerData(
-        p.is_timeseries,
-        p.number_of_prosumers,
-        p.time,
-        p.bus_index,
-        p.generation,
-        p.demand,
-        p.q_generation,
-        p.q_demand,
-        p.curtailment,
-        p.cost_injection,
-        p.inverter_capacity,
+        params.is_timeseries,
+        params.number_of_prosumers,
+        params.time,
+        params.bus_index,
+        params.generation,
+        params.demand,
+        params.q_generation,
+        params.q_demand,
+        params.curtailment,
+        params.cost_injection,
+        params.inverter_capacity,
     )
 end

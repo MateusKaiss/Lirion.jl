@@ -42,8 +42,8 @@ end
     _parse_case(String(path), csv)
 
 function load_input_data(path::AbstractString)::CaseRaw
-    p = abspath(String(path))
-    return _load(p, detect_input(p))
+    params = abspath(String(path))
+    return _load(params, detect_input(params))
 end
 
 # ============================================================

@@ -27,16 +27,19 @@ end
 function get_bus_parameters(case_raw::CaseRaw)
     @assert case_raw.bus !== nothing "CaseRaw.bus is nothing"
 
-    bus = case_raw.bus::BusRaw{Float64}
+    bus_raw = case_raw.bus::BusRaw{Float64}
 
-    bus_ids = bus.bus_i
-    bus_type = bus.bus_type
+    bus_ids = bus_raw.bus_i
+    bus_type = bus_raw.bus_type
+
     reference_bus_idx = findfirst(==(3), bus_type)
     reference_bus = reference_bus_idx === nothing ? nothing : bus_ids[reference_bus_idx]
 
     n = length(bus_ids)
-    vm = bus.vm
-    va = bus.va
+
+    vm = bus_raw.vm
+    va = bus_raw.va
+
     vm_start = Vector{Union{Nothing, Float64}}(undef, n)
     va_start = Vector{Union{Nothing, Float64}}(undef, n)
 
@@ -48,27 +51,28 @@ function get_bus_parameters(case_raw::CaseRaw)
     end
 
     id_to_idx = Dict{Int, Int}()
-    @inbounds for (i, b) in pairs(bus_ids)
-        id_to_idx[b] = i
+    sizehint!(id_to_idx, n)
+
+    @inbounds for i in 1:n
+        id_to_idx[bus_ids[i]] = i
     end
 
     return (
         n = n,
         id = bus_ids,
-        bus_type = bus.bus_type,
-        pd = bus.pd,
-        qd = bus.qd,
-        gs = bus.gs,
-        bs = bus.bs,
-        area = bus.area,
-        vm = bus.vm,
-        va = bus.va,
-        base_kv = bus.base_kv,
-        zone = bus.zone,
-        v_max = bus.vmax,
-        v_min = bus.vmin,
+        bus_type = bus_type,
+        pd = bus_raw.pd,
+        qd = bus_raw.qd,
+        gs = bus_raw.gs,
+        bs = bus_raw.bs,
+        area = bus_raw.area,
+        vm = vm,
+        va = va,
+        base_kv = bus_raw.base_kv,
+        zone = bus_raw.zone,
+        v_max = bus_raw.vmax,
+        v_min = bus_raw.vmin,
         reference_bus = reference_bus,
-        
         id_to_idx = id_to_idx,
         vm_start = vm_start,
         va_start = va_start,
@@ -76,26 +80,26 @@ function get_bus_parameters(case_raw::CaseRaw)
 end
 
 function build_bus_data(case_raw::CaseRaw)::BusData
-    p = get_bus_parameters(case_raw)
+    params = get_bus_parameters(case_raw)
 
     return BusData(
-        p.n,
-        p.id,
-        p.bus_type,
-        p.pd,
-        p.qd,
-        p.gs,
-        p.bs,
-        p.area,
-        p.vm,
-        p.va,
-        p.base_kv,
-        p.zone,
-        p.v_max,
-        p.v_min,
-        p.reference_bus,
-        p.id_to_idx,
-        p.vm_start,
-        p.va_start,
+        params.n,
+        params.id,
+        params.bus_type,
+        params.pd,
+        params.qd,
+        params.gs,
+        params.bs,
+        params.area,
+        params.vm,
+        params.va,
+        params.base_kv,
+        params.zone,
+        params.v_max,
+        params.v_min,
+        params.reference_bus,
+        params.id_to_idx,
+        params.vm_start,
+        params.va_start,
     )
 end
