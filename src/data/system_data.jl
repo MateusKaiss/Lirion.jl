@@ -6,9 +6,9 @@ struct SystemData
     baseMVA::Float64
     T::Int
 
-    bus::BusData{Float64}
+    bus::BusData
     branch::BranchData
-    gen::GenData{Float64}
+    gen::GenData
     battery::BatteryData
     prosumer::ProsumerData
 

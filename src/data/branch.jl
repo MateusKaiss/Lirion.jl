@@ -2,71 +2,71 @@
 # Branch data
 # ============================================================
 
-struct BranchData{T <: Real}
+struct BranchData
     n::Int
-    s_base::T
+    s_base::Float64
 
     from::Vector{Int}
     to::Vector{Int}
     status::Vector{Int}
-    global_index::Vector{Int}   # global branch ids (full case) for this local vector
-    active::Vector{Int}         # local indices i where status[i] == 1
+    global_index::Vector{Int}
+    active::Vector{Int}
 
-    r::Vector{T}
-    x::Vector{T}
-    b_sh::Vector{T}
+    r::Vector{Float64}
+    x::Vector{Float64}
+    b_sh::Vector{Float64}
 
-    rate_a::Vector{T}
-    rate_b::Vector{T}
-    rate_c::Vector{T}
+    rate_a::Vector{Float64}
+    rate_b::Vector{Float64}
+    rate_c::Vector{Float64}
 
-    tap::Vector{T}
-    shift::Vector{T}            # radians (keep consistent with case_raw)
-    angmin::Vector{T}
-    angmax::Vector{T}
+    tap::Vector{Float64}
+    shift::Vector{Float64}
+    angmin::Vector{Float64}
+    angmax::Vector{Float64}
 
-    tap_position::Vector{T}
-    tap_angle::Vector{T}        # radians
-    inv_tap::Vector{T}
-    g::Vector{T}
-    b::Vector{T}
-    tr::Vector{T}
-    ti::Vector{T}
+    tap_position::Vector{Float64}
+    tap_angle::Vector{Float64}
+    inv_tap::Vector{Float64}
+    g::Vector{Float64}
+    b::Vector{Float64}
+    tr::Vector{Float64}
+    ti::Vector{Float64}
 
-    initial_voltage_magnitude::Vector{T}
-    initial_voltage_angle::Vector{T}
+    initial_voltage_magnitude::Vector{Float64}
+    initial_voltage_angle::Vector{Float64}
 
     bus_ids::Vector{Int}
     bus_idx_map::Dict{Int, Int}
     zone::Vector{Int}
 end
 
-# ------------------------------------------------------------------------------
+# ---------------------------------------------------------------------
 # Tap + phase-shift helpers
-# ------------------------------------------------------------------------------
-
-@inline function _tap_params(tap_raw::T, shift_rad::T) where {T <: Real}
-    if isnan(tap_raw) || tap_raw == zero(T)
-        tap_pos = one(T)
-        tap_ang = zero(T)
-        inv_tap = one(T)
+# ---------------------------------------------------------------------
+@inline function _tap_params(tap_raw::Float64, shift_rad::Float64)
+    if isnan(tap_raw) || tap_raw == 0.0
+        tap_pos = 1.0
+        tap_ang = 0.0
+        inv_tap = 1.0
     else
         tap_pos = tap_raw
         tap_ang = shift_rad
-        inv_tap = one(T) / tap_raw
+        inv_tap = 1.0 / tap_raw
     end
 
     tr = tap_pos * cos(tap_ang)
     ti = tap_pos * sin(tap_ang)
+
     return tap_pos, tap_ang, inv_tap, tr, ti
 end
 
-# ------------------------------------------------------------------------------
-# Parameter extraction
-# ------------------------------------------------------------------------------
-
+# ---------------------------------------------------------------------
+# Branch Parameters (CaseRaw)
+# ---------------------------------------------------------------------
 function get_branch_parameters(case_raw::CaseRaw)
     @assert case_raw.branch !== nothing && case_raw.bus !== nothing "CaseRaw.branch/bus is nothing"
+
     br = case_raw.branch::BranchRaw{Float64}
     bus = case_raw.bus::BusRaw{Float64}
 
@@ -110,68 +110,74 @@ function get_branch_parameters(case_raw::CaseRaw)
         status[i] == 1 && push!(active, i)
     end
 
-    bus_ids = bus.bus_i
-    bus_idx_map = case_raw.maps.bus_idx_map
-
     den = r .^ 2 .+ x .^ 2
     g = r ./ den
     b = -x ./ den
 
     return (
         n = n,
+        s_base = case_raw.baseMVA,
         from = from,
         to = to,
         status = status,
         global_index = global_index,
-        active = active, r = r,
+        active = active,
+        r = r,
         x = x,
-        b_sh = b_sh, rate_a = rate_a,
+        b_sh = b_sh,
+        rate_a = rate_a,
         rate_b = rate_b,
-        rate_c = rate_c, tap = tap_raw,
+        rate_c = rate_c,
+        tap = tap_raw,
         shift = shift_rad,
         angmin = angmin,
-        angmax = angmax, tap_position = tap_position,
+        angmax = angmax,
+        tap_position = tap_position,
         tap_angle = tap_angle,
         inv_tap = inv_tap,
         g = g,
         b = b,
         tr = tr,
-        ti = ti, s_base = Float64(case_raw.baseMVA),
-        initial_voltage_magnitude = Float64.(bus.vm),
-        initial_voltage_angle = Float64.(bus.va), bus_ids = bus_ids,
-        bus_idx_map = bus_idx_map,
+        ti = ti,
+        initial_voltage_magnitude = bus.vm,
+        initial_voltage_angle = bus.va,
+        bus_ids = bus.bus_i,
+        bus_idx_map = case_raw.maps.bus_idx_map,
         zone = bus.zone,
     )
 end
 
-# ------------------------------------------------------------------------------
-# Builder
-# ------------------------------------------------------------------------------
-
-function build_branch_data(case_raw::CaseRaw)::BranchData{Float64}
+function build_branch_data(case_raw::CaseRaw)::BranchData
     p = get_branch_parameters(case_raw)
 
-    return BranchData{Float64}(
+    return BranchData(
         p.n,
-        p.s_base, p.from,
+        p.s_base,
+        p.from,
         p.to,
         p.status,
         p.global_index,
-        p.active, p.r,
+        p.active,
+        p.r,
         p.x,
-        p.b_sh, p.rate_a,
+        p.b_sh,
+        p.rate_a,
         p.rate_b,
-        p.rate_c, p.tap,
+        p.rate_c,
+        p.tap,
         p.shift,
         p.angmin,
-        p.angmax, p.tap_position,
+        p.angmax,
+        p.tap_position,
         p.tap_angle,
         p.inv_tap,
         p.g,
         p.b,
         p.tr,
-        p.ti, p.initial_voltage_magnitude,
-        p.initial_voltage_angle, p.bus_ids,
+        p.ti,
+        p.initial_voltage_magnitude,
+        p.initial_voltage_angle,
+        p.bus_ids,
         p.bus_idx_map,
         p.zone,
     )
