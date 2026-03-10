@@ -14,7 +14,7 @@ function create_socp_battery_constraints!(model::JuMP.Model, bat::BatteryData)
         start = 0.0,
     )
 
-    vmin_global = get(model.ext, :vmin, 0.9)
+    vmin_global = get(model.ext, :v_min, 0.9)
     @inbounds for b in 1:B, t in 1:T
         ub = (bat.thermal_limit[b] / vmin_global)^2
         set_upper_bound(ccms[b, t], ub)

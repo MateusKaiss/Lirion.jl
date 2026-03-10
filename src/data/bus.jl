@@ -15,9 +15,10 @@ struct BusData
     va::Vector{Float64}
     base_kv::Vector{Float64}
     zone::Vector{Int}
-    vmax::Vector{Float64}
-    vmin::Vector{Float64}
+    v_max::Vector{Float64}
+    v_min::Vector{Float64}
     reference_bus::Union{Nothing, Int}
+
     id_to_idx::Dict{Int, Int}
     vm_start::Vector{Union{Nothing, Float64}}
     va_start::Vector{Union{Nothing, Float64}}
@@ -30,14 +31,12 @@ function get_bus_parameters(case_raw::CaseRaw)
 
     bus_ids = bus.bus_i
     bus_type = bus.bus_type
-    vm = bus.vm
-    va = bus.va
-
     reference_bus_idx = findfirst(==(3), bus_type)
     reference_bus = reference_bus_idx === nothing ? nothing : bus_ids[reference_bus_idx]
 
     n = length(bus_ids)
-
+    vm = bus.vm
+    va = bus.va
     vm_start = Vector{Union{Nothing, Float64}}(undef, n)
     va_start = Vector{Union{Nothing, Float64}}(undef, n)
 
@@ -66,9 +65,10 @@ function get_bus_parameters(case_raw::CaseRaw)
         va = bus.va,
         base_kv = bus.base_kv,
         zone = bus.zone,
-        vmax = bus.vmax,
-        vmin = bus.vmin,
+        v_max = bus.vmax,
+        v_min = bus.vmin,
         reference_bus = reference_bus,
+        
         id_to_idx = id_to_idx,
         vm_start = vm_start,
         va_start = va_start,
@@ -91,8 +91,8 @@ function build_bus_data(case_raw::CaseRaw)::BusData
         p.va,
         p.base_kv,
         p.zone,
-        p.vmax,
-        p.vmin,
+        p.v_max,
+        p.v_min,
         p.reference_bus,
         p.id_to_idx,
         p.vm_start,

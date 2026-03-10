@@ -16,10 +16,10 @@
         idx_i = bus.id_to_idx[bus_i]
         idx_j = bus.id_to_idx[bus_j]
 
-        vm_fr_min = bus.vmin[idx_i]
-        vm_fr_max = bus.vmax[idx_i]
-        vm_to_min = bus.vmin[idx_j]
-        vm_to_max = bus.vmax[idx_j]
+        vm_fr_min = bus.v_min[idx_i]
+        vm_fr_max = bus.v_max[idx_i]
+        vm_to_min = bus.v_min[idx_j]
+        vm_to_max = bus.v_max[idx_j]
 
         amin = angmin[l]
         amax = angmax[l]

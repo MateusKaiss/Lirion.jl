@@ -72,17 +72,17 @@ function convert_angles_to_rad!(raw_case::CaseRaw)
     if raw_case.branch !== nothing
         br = raw_case.branch
         vshift = br.shift
-        vmin = br.angmin
-        vmax = br.angmax
+        v_min = br.angmin
+        v_max = br.angmax
 
         @inbounds for i in eachindex(vshift)
             vshift[i] *= deg2rad
         end
-        @inbounds for i in eachindex(vmin)
-            vmin[i] *= deg2rad
+        @inbounds for i in eachindex(v_min)
+            v_min[i] *= deg2rad
         end
-        @inbounds for i in eachindex(vmax)
-            vmax[i] *= deg2rad
+        @inbounds for i in eachindex(v_max)
+            v_max[i] *= deg2rad
         end
     end
 

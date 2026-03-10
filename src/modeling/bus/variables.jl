@@ -51,8 +51,8 @@ function create_voltage_magnitude_variables!(model::JuMP.Model, bus::BusData)
     @variable(
         model,
         v_magnitude[b in bus_ids, t in 1:T],
-        lower_bound = bus.vmin[bus.id_to_idx[b]],
-        upper_bound = bus.vmax[bus.id_to_idx[b]],
+        lower_bound = bus.v_min[bus.id_to_idx[b]],
+        upper_bound = bus.v_max[bus.id_to_idx[b]],
         start = something(bus.vm_start[bus.id_to_idx[b]], 1.0),
     )
 
@@ -66,8 +66,8 @@ function create_socp_bus_variables!(model::JuMP.Model, bus::BusData)
     @variable(
         model,
         v_magnitude_sq[b in bus_ids, t in 1:T],
-        lower_bound = bus.vmin[bus.id_to_idx[b]]^2,
-        upper_bound = bus.vmax[bus.id_to_idx[b]]^2,
+        lower_bound = bus.v_min[bus.id_to_idx[b]]^2,
+        upper_bound = bus.v_max[bus.id_to_idx[b]]^2,
         start = (something(bus.vm_start[bus.id_to_idx[b]], 1.0))^2,
     )
 
