@@ -41,13 +41,13 @@ function create_socp_branch_constraints!(model::JuMP.Model, br::BranchData)
     T = get(model.ext, :time_periods, 1)
     active = br.active
 
-    @constraint(model, branch_angle_lb[i in active, t in 1:T; !isnan(br.angmin[i])],
-        br.angmin[i] <=
+    @constraint(model, branch_angle_lb[i in active, t in 1:T; !isnan(br.ang_min[i])],
+        br.ang_min[i] <=
         model[:theta][br.from[i], t] - model[:theta][br.to[i], t]
     )
-    @constraint(model, branch_angle_ub[i in active, t in 1:T; !isnan(br.angmax[i])],
+    @constraint(model, branch_angle_ub[i in active, t in 1:T; !isnan(br.ang_max[i])],
         model[:theta][br.from[i], t] - model[:theta][br.to[i], t] <=
-        br.angmax[i]
+        br.ang_max[i]
     )
 
     @constraint(model, [l in active, t in 1:T],

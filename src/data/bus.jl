@@ -18,10 +18,10 @@ struct BusData
     v_max::Vector{Float64}
     v_min::Vector{Float64}
     reference_bus::Union{Nothing, Int}
-
-    id_to_idx::Dict{Int, Int}
     vm_start::Vector{Union{Nothing, Float64}}
     va_start::Vector{Union{Nothing, Float64}}
+
+    id_to_idx::Dict{Int, Int}
 end
 
 function get_bus_parameters(case_raw::CaseRaw)
@@ -73,9 +73,9 @@ function get_bus_parameters(case_raw::CaseRaw)
         v_max = bus_raw.vmax,
         v_min = bus_raw.vmin,
         reference_bus = reference_bus,
-        id_to_idx = id_to_idx,
         vm_start = vm_start,
         va_start = va_start,
+        id_to_idx = id_to_idx,
     )
 end
 
@@ -98,8 +98,8 @@ function build_bus_data(case_raw::CaseRaw)::BusData
         params.v_max,
         params.v_min,
         params.reference_bus,
-        params.id_to_idx,
         params.vm_start,
         params.va_start,
+        params.id_to_idx,
     )
 end

@@ -1,6 +1,6 @@
 @inline function _rt_product_bounds(bus::BusData, br::BranchData)
-    angmin = br.angmin
-    angmax = br.angmax
+    ang_min = br.ang_min
+    ang_max = br.ang_max
     bf = br.from
     bt = br.to
     L = br.n
@@ -21,8 +21,8 @@
         vm_to_min = bus.v_min[idx_j]
         vm_to_max = bus.v_max[idx_j]
 
-        amin = angmin[l]
-        amax = angmax[l]
+        amin = ang_min[l]
+        amax = ang_max[l]
 
         if amin >= 0
             R_max[l] = min(R_max[l], vm_fr_max * vm_to_max * cos(amin))
@@ -109,11 +109,11 @@ function add_rt_tangent_angle_cuts!(model::JuMP.Model, br::BranchData)
     R = model[:R]
     T_var = model[:T_var]
 
-    @constraint(model, [l in active, t in 1:T; !isnan(br.angmax[l])],
-        T_var[l, t] <= _tan_clip(br.angmax[l]) * R[l, t]
+    @constraint(model, [l in active, t in 1:T; !isnan(br.ang_max[l])],
+        T_var[l, t] <= _tan_clip(br.ang_max[l]) * R[l, t]
     )
-    @constraint(model, [l in active, t in 1:T; !isnan(br.angmin[l])],
-        T_var[l, t] >= _tan_clip(br.angmin[l]) * R[l, t]
+    @constraint(model, [l in active, t in 1:T; !isnan(br.ang_min[l])],
+        T_var[l, t] >= _tan_clip(br.ang_min[l]) * R[l, t]
     )
     return nothing
 end

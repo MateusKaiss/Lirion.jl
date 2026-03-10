@@ -84,15 +84,15 @@ function create_ac_branch_constraints!(model::JuMP.Model, br::BranchData)
     )
 
     @constraint(model,
-        branch_angle_lb[i in active, t in 1:T; !isnan(br.angmin[i])],
-        br.angmin[i] <=
+        branch_angle_lb[i in active, t in 1:T; !isnan(br.ang_min[i])],
+        br.ang_min[i] <=
         model[:theta][br.from[i], t] - model[:theta][br.to[i], t]
     )
 
     @constraint(model,
-        branch_angle_ub[i in active, t in 1:T; !isnan(br.angmax[i])],
+        branch_angle_ub[i in active, t in 1:T; !isnan(br.ang_max[i])],
         model[:theta][br.from[i], t] - model[:theta][br.to[i], t] <=
-        br.angmax[i]
+        br.ang_max[i]
     )
 
     return nothing
