@@ -190,7 +190,7 @@ Lirion.jl originated as part of the undergraduate thesis of its principal develo
 
 The package was conceived, designed, and developed by **Mateus Kaiss**, as its principal author and maintainer, with support from:
 
-- **Dr. Daniel Gebbran Cons Bacilla Ferreira** for his supervision of the research involving distributed methodologies and for his significant role in strengthening the scientific contributions of the research.
+- **Dr. Daniel Gebbran Cons Bacilla Ferreira** for his supervision of the research involving distributed methodologies and for his significant role in strengthening the scientific contributions of this work.
 
 - **Prof. Dr. Kristie Kaminski Küster** for her supervision and guidance in power systems research, as well as for reviewing the implemented code.
 
