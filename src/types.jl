@@ -3,6 +3,7 @@
 # ============================================================
 
 abstract type OPFModel end
+
 struct DC <: OPFModel end
 struct AC <: OPFModel end
 struct SOCP <: OPFModel end
@@ -12,6 +13,7 @@ struct SOCP <: OPFModel end
 # ============================================================
 
 abstract type ADMMVariant end
+
 struct State <: ADMMVariant end
 struct Power <: ADMMVariant end
 struct Hybrid <: ADMMVariant end
@@ -32,13 +34,14 @@ struct DummyBus <: Sectioning end
 struct Metis <: Sectioning end
 
 # ============================================================
-# Algorithm spec
+# Algorithm Specifications
 # ============================================================
 
 abstract type AbstractAlgorithm end
+
 struct CentralizedAlgorithm <: AbstractAlgorithm end
 
-struct ADMMAlgorithmSpec <: AbstractAlgorithm
+struct ADMMAlgorithm <: AbstractAlgorithm
     coupling::Symbol
     sectioning::Sectioning
     max_iter::Int

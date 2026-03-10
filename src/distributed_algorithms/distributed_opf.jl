@@ -9,6 +9,7 @@
 end
 
 # ------------------------------------------------------------
+# ADMM type-level tag used by run_admm dispatch
 # ------------------------------------------------------------
 @inline function admm_tag(cfg::DistributedOPFModel)
     V = _variant_type(Val(cfg.coupling))
@@ -19,12 +20,9 @@ end
 # ------------------------------------------------------------
 # Distributed runner
 # ------------------------------------------------------------
-function run_distributed(inputs::LirionInputs)::LirionRunResult
-    @assert inputs.model_type isa DistributedOPFModel
-    @assert inputs.admm_system !== nothing "Distributed run requires inputs.admm_system"
-
-    cfg = inputs.model_type::DistributedOPFModel
-    sys = inputs.admm_system::DistributedSystem
+function run_distributed(inputs::DistributedInputs)::LirionRunResult
+    cfg = inputs.model_type
+    sys = inputs.system
 
     @info "Running distributed OPF"
     @info "  coupling   = $(cfg.coupling)"

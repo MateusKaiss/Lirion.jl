@@ -27,7 +27,6 @@ function get_model_times(sys::SystemData)
     !isempty(sys.gencost_ts.time) && push!(time_vecs, sys.gencost_ts.time)
 
     if isempty(time_vecs)
-        # fallback: 1..T
         return collect(1:sys.T)
     end
 
@@ -35,6 +34,7 @@ function get_model_times(sys::SystemData)
     sort!(times)
     return times
 end
+
 # =========================
 # SUBPROBLEM PIPELINE
 # =========================
@@ -99,11 +99,9 @@ end
 # BUILDER
 # =========================
 
-function build_model(inputs::LirionInputs; optimizer = nothing)
+function build_model(inputs::CentralizedInputs; optimizer = nothing)
     sys = inputs.system
-    @assert sys !== nothing
-
-    model_type = inputs.model_type::Type{<:OPFModel}
+    model_type = inputs.model_type
 
     opt = _resolve_optimizer(optimizer, inputs.optimizer, model_type)
 

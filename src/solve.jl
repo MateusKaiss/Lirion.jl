@@ -13,33 +13,35 @@
     return p
 end
 
-function run_lirion(inputs::LirionInputs)::LirionRunResult
+function run_lirion(inputs::CentralizedInputs)::LirionRunResult
     @info "Case: $(inputs.database_path)"
     @info "Model: $(inputs.model_type)"
-    @info "Optimizer (case_raw): $(inputs.optimizer)"
+    @info "Optimizer (raw): $(inputs.optimizer)"
 
-    if is_distributed_model(inputs.model_type)
-        return run_distributed(inputs)
-    else
-        result_model = solve_model(inputs)
+    result_model = solve_model(inputs)
 
-        sys = inputs.system
-        @assert sys !== nothing
+    sys = inputs.system
+    data = sys.case_raw
+    result_dict = build_result_dict(result_model, sys)
 
-        data = sys.case_raw
-        result_dict = build_result_dict(result_model, sys)
-
-        if inputs.write_outputs
-            save_result_to_csv(result_dict, data, inputs.database_path)
-        end
-
-        return LirionRunResult(;
-            result = result_dict,
-            model = result_model,
-            system = sys,
-            diagnostics = NoDiagnostics(),
-        )
+    if inputs.write_outputs
+        save_result_to_csv(result_dict, data, inputs.database_path)
     end
+
+    return LirionRunResult(;
+        result = result_dict,
+        model = result_model,
+        system = sys,
+        diagnostics = NoDiagnostics(),
+    )
+end
+
+function run_lirion(inputs::DistributedInputs)::LirionRunResult
+    @info "Case: $(inputs.database_path)"
+    @info "Model: $(inputs.model_type)"
+    @info "Optimizer (raw): $(inputs.optimizer)"
+
+    return run_distributed(inputs)
 end
 
 function solve(

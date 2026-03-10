@@ -2,13 +2,22 @@
 # Inputs
 # ==============================================================================
 
-struct LirionInputs
+abstract type AbstractLirionInputs end
+
+struct CentralizedInputs <: AbstractLirionInputs
     database_path::String
-    model_type::Union{Type{<:OPFModel}, DistributedOPFModel}
+    model_type::Type{<:OPFModel}
     optimizer::Union{Nothing, Type{<:MOI.AbstractOptimizer}}
     write_outputs::Bool
-    system::Union{Nothing, SystemData}
-    admm_system::Union{Nothing, DistributedSystem}
+    system::SystemData
+end
+
+struct DistributedInputs <: AbstractLirionInputs
+    database_path::String
+    model_type::DistributedOPFModel
+    optimizer::Union{Nothing, Type{<:MOI.AbstractOptimizer}}
+    write_outputs::Bool
+    system::DistributedSystem
 end
 
 # ============================================================
@@ -47,21 +56,28 @@ function _build_inputs(
     model::Type{<:OPFModel},
     optimizer::Any,
     outputs::Bool,
-)::LirionInputs
+)::CentralizedInputs
     raw_case = load_input_data(path)
     preprocess_case_data!(raw_case, OPFModel)
 
     full_sys = build_system_data(raw_case)
-    return LirionInputs(path, model, optimizer, outputs, full_sys, nothing)
+
+    return CentralizedInputs(
+        path,
+        model,
+        optimizer,
+        outputs,
+        full_sys,
+    )
 end
 
 function _build_inputs(
     path::String,
-    algorithm::ADMMAlgorithmSpec;
+    algorithm::ADMMAlgorithm;
     model::Type{<:OPFModel},
     optimizer::Any,
     outputs::Bool,
-)::LirionInputs
+)::DistributedInputs
     raw_case = load_input_data(path)
     preprocess_case_data!(raw_case, OPFModel)
 
@@ -70,7 +86,13 @@ function _build_inputs(
         algorithm.kwargs...,
     )
 
-    admm_sys = build_distributed_system(raw_case, algorithm.sectioning)
+    dist_sys = build_distributed_system(raw_case, algorithm.sectioning)
 
-    return LirionInputs(path, cfg, optimizer, outputs, nothing, admm_sys)
+    return DistributedInputs(
+        path,
+        cfg,
+        optimizer,
+        outputs,
+        dist_sys,
+    )
 end

@@ -32,7 +32,7 @@ end
         throw(ArgumentError("Invalid coupling=$coupling. Allowed: :state, :power, :hybrid"))
     max_iter > 0 || throw(ArgumentError("max_iter must be > 0"))
 
-    return ADMMAlgorithmSpec(coupling, _sectioning(sectioning), max_iter, (; kwargs...))
+    return ADMMAlgorithm(coupling, _sectioning(sectioning), max_iter, (; kwargs...))
 end
 
 # -----------------------------

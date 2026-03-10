@@ -22,7 +22,7 @@ function optimize_model!(
 end
 
 function solve_model(
-    inputs::LirionInputs;
+    inputs::CentralizedInputs;
     label::AbstractString = "centralized OPF",
     allow_local::Bool = true,
 )
