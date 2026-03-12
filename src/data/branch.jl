@@ -61,11 +61,12 @@ function get_branch_parameters(case_raw::CaseRaw)
     status = branch_raw.br_status
     tap = branch_raw.tap
     shift = branch_raw.shift
+
     r = branch_raw.br_r
     x = branch_raw.br_x
-    denominator = r .^ 2 .+ x .^ 2
-    g = r ./ denominator
-    b = -x ./ denominator
+    z_mag_sq = r .^ 2 .+ x .^ 2
+    g = r ./ z_mag_sq
+    b = -x ./ z_mag_sq
 
     n = length(from)
 
