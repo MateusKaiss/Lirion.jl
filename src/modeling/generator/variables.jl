@@ -29,7 +29,7 @@ function create_active_generation_variables!(model::JuMP.Model, gen::GenData)
     T = get(model.ext, :time_periods, 1)
     G = gen.n
 
-    pg_start = _build_start_vector(gen.initial_pg, gen.pg)
+    pg_start = _build_start_vector(gen.pg_start, gen.pg)
 
     @variable(
         model,
@@ -47,7 +47,7 @@ function create_reactive_generation_variables!(model::JuMP.Model, gen::GenData)
     T = get(model.ext, :time_periods, 1)
     G = gen.n
 
-    qg_start = _build_start_vector(gen.initial_qg, gen.qg)
+    qg_start = _build_start_vector(gen.qg_start, gen.qg)
 
     @variable(
         model,
