@@ -30,8 +30,8 @@ function build_prosumer_timeseries_data(case_raw::CaseRaw)::ProsumerTimeseriesDa
         ts.bus,
         ts.p_pv,
         ts.p_load,
-        fill(0.0, length(ts.bus)),  # q_generation (não existe no case_raw atual)
-        fill(0.0, length(ts.bus)),  # q_demand
+        fill(0.0, length(ts.bus)),
+        fill(0.0, length(ts.bus)),
         ts.p_curtail,
     )
 end
