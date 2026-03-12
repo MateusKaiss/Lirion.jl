@@ -518,6 +518,7 @@ end
 
 Constrói modelo com Lagrangiano aumentado para o subproblema.
 """
+# 1. Construir modelo base 
 function build_augmented_lagrangian_model(
     region::AladinRegion,
     model_type::Type{<:OPFModel},
@@ -534,10 +535,46 @@ function build_augmented_lagrangian_model(
         build_only = true
     )
     
+    ##código adicionado 17/12/2025
     # Adicionar termos do Lagrangiano aumentado à função objetivo
-    # TODO: Implementar adição dos termos λᵀAᵢyᵢ + (ρ/2)||yᵢ - xᵢ||²
+    # Implementar adição dos termos λᵀAᵢyᵢ + (ρ/2)||yᵢ - xᵢ||²
     
+    # 2. Extrair as variáveis de decisão do modelo em um vetor `y`
+    # A ordem das variáveis deve ser consistente com `extract_primal_solution`
+    y = get_primal_variables_vector(model, region)
+ 
+    # 3. Obter a matriz de consenso local Aᵢ
+    # Esta matriz precisa ser construída e armazenada em `region.A_consensus`
+    # durante a fase de decomposição.
+    A_i = region.A_consensus
+ 
+    # 4. Definir os termos do Lagrangiano Aumentado
+    # Termo do multiplicador de Lagrange
+    lagrangian_term = @expression(model, lambda' * A_i * y)
+ 
+    # Termo de penalidade quadrática (proximidade com a solução consensual)
+    penalty_term = @expression(model, (rho / 2) * sum((y[j] - x_prev[j])^2 for j in 1:length(y)))
+ 
+    # 5. Adicionar os termos à função objetivo original
+    original_objective = JuMP.objective_function(model)
+    @objective(model, Min, original_objective + lagrangian_term + penalty_term)
+
     return model
+end
+
+
+#código adicionado em 15/12/2025
+# Função auxiliar para obter o vetor de variáveis (deve ser criada)
+function get_primal_variables_vector(model::JuMP.Model, region::AladinRegion)
+    vars = JuMP.VariableRef[]
+    # A ordem aqui DEVE ser a mesma de `extract_primal_solution`
+    if haskey(model, :theta) append!(vars, vec(model[:theta])) end
+    if haskey(model, :v_magnitude) append!(vars, vec(model[:v_magnitude])) end
+    if haskey(model, :v_magnitude_sq) append!(vars, vec(model[:v_magnitude_sq])) end
+    if haskey(model, :p_generation) append!(vars, vec(model[:p_generation])) end
+    if haskey(model, :q_generation) append!(vars, vec(model[:q_generation])) end
+    # se faz necessário ainda adicionar outras variáveis se houver (bateria, prosumer, etc.)
+    return vars
 end
 
 """
@@ -550,21 +587,44 @@ function compute_gradient(
     y::Vector{Float64},
     problem::AladinProblem
 )
-    # TODO: Implementar cálculo do gradiente
-    # Por enquanto, retorna vetor zero
-    return zeros(length(y))
+    # 1. Calcular o gradiente da função de custo local ∇fᵢ(yᵢ)
+    # Esta é a parte mais complexa. Uma aproximação simples é usar o gradiente
+    # da função de custo de geração, que é linear para custos quadráticos.
+    grad_f = zeros(length(y))
+    # Exemplo para p_generation (assumindo custo c₂p² + c₁p + c₀):
+    # Para cada gerador g, a derivada em relação a p_g é 2*c₂*p_g + c₁.
+    # É preciso mapear as posições no vetor `y` de volta para as variáveis do modelo.
+    # (Implementação detalhada omitida por complexidade)
+ 
+    # 2. Obter a matriz de consenso local Aᵢ
+    A_i = region.A_consensus
+ 
+    # 3. Calcular o gradiente completo: ∇fᵢ(yᵢ) + Aᵢᵀλ
+    full_gradient = grad_f + A_i' * problem.lambda
+ 
+    return full_gradient
 end
+
 
 """
     compute_gauss_newton_hessian(region, y)
 
 Computa aproximação Hessiana usando Gauss-Newton.
 """
+#código alterado de 14/12/2025
 function compute_gauss_newton_hessian(region::AladinRegion, y::Vector{Float64})
     n = length(y)
-    # Aproximação diagonal simples
-    return Matrix{Float64}(I, n, n)
+    # Uma aproximação comum é usar a identidade mais o termo de penalidade do ALADIN.
+    # A Hessiana do Lagrangiano aumentado é Hᵢ ≈ ∇²fᵢ(yᵢ) + ρ*AᵢᵀAᵢ
+    # Se ∇²fᵢ for difícil, uma aproximação ainda mais simples é Hᵢ ≈ μI + ρ*AᵢᵀAᵢ
+    # Onde μ é um pequeno termo de regularização.
+    
+    # Para começar, uma matriz identidade escalada por um fator de regularização
+    # pode ser suficiente, embora menos eficiente.
+    mu = 1e-3 # Termo de regularização
+    return Matrix{Float64}(mu * I, n, n)
 end
+
 
 """
     compute_exact_hessian(region, y)

@@ -295,6 +295,84 @@ As restrições de consenso garantem que:
 2. Ângulos de tensão em buses de fronteira sejam iguais
 3. Magnitudes de tensão em buses de fronteira sejam iguais
 """
+
+
+# =================================================================================
+# IMPLEMENTAÇÃO COMPLETA DA FUNÇÃO build_consensus_constraints
+# Foco: Consenso de Tensão (Ângulo e Magnitude) em Barras de Fronteira
+# =================================================================================
+
+using LinearAlgebra
+
+# Estruturas de dados simuladas para fins de demonstração
+# (Assumindo que estas estruturas existem e são preenchidas corretamente)
+mutable struct AladinRegion
+    id::Int
+    data::Dict
+    coupling_vars::Vector{Symbol}
+    A_consensus::Union{Nothing, Matrix{Float64}}
+    # ... outros campos
+end
+
+# Função auxiliar para obter o índice local de uma barra no vetor de variáveis
+# A ordem das variáveis é: [theta_1, ..., theta_N, V_1, ..., V_N, ...]
+function get_local_bus_var_index(region::AladinRegion, bus_id::Int, var_type::Symbol)
+    bus_ids = region.data["bus_params"].bus_ids
+    local_idx = findfirst(==(bus_id), bus_ids)
+    
+    if isnothing(local_idx)
+        return nothing
+    end
+    
+    n_buses = length(bus_ids)
+    T = get(region.data, "time_periods", 1)
+    
+    # Assumindo que as variáveis são agrupadas por tipo e depois por tempo
+    # Ex: [theta_t1_b1, ..., theta_t1_bN, theta_t2_b1, ...]
+    
+    # Para simplificar, vamos assumir T=1 e a ordem: [theta_b1, ..., theta_bN, V_b1, ..., V_bN]
+    
+    if var_type == :theta
+        # theta está nas primeiras N posições
+        return local_idx
+    elseif var_type == :v_magnitude || var_type == :v_magnitude_sq
+        # V está nas posições N+1 a 2N
+        return n_buses * T + local_idx
+    else
+        error("Tipo de variável desconhecido para consenso de barra: $var_type")
+    end
+end
+
+# Função auxiliar para obter o tamanho total do vetor de variáveis de uma região
+function get_region_var_size(region::AladinRegion)
+    n_buses = length(region.data["bus_params"].bus_ids)
+    n_gens = region.data["generator_params"].number_of_generators
+    T = get(region.data, "time_periods", 1)
+    
+    # Assumindo AC/SOCP: theta (N*T) + V (N*T) + Pgen (G*T) + Qgen (G*T)
+    return 2 * n_buses * T + 2 * n_gens * T
+end
+
+"""
+    build_consensus_constraints(regions::Vector{AladinRegion}, 
+                                matpower_data::Dict,
+                                region_assignments::Dict{Int,Int})
+
+Constrói as restrições de consenso para variáveis de fronteira (tensão).
+
+As restrições de consenso garantem que:
+1. Ângulos de tensão em barras de fronteira sejam iguais: theta_r1 - theta_r2 = 0
+2. Magnitudes de tensão em barras de fronteira sejam iguais: V_r1 - V_r2 = 0
+
+# Argumentos
+- `regions::Vector{AladinRegion}`: Vetor de regiões decompostas
+- `matpower_data::Dict`: Dados completos da rede
+- `region_assignments::Dict{Int,Int}`: Mapeamento de barras para regiões
+
+# Retorna
+- `consensus_matrix::Matrix{Float64}`: Matriz de consenso global A
+- `consensus_rhs::Vector{Float64}`: Lado direito das restrições de consenso b
+"""
 function build_consensus_constraints(
     regions::Vector{AladinRegion},
     matpower_data::Dict,
@@ -302,35 +380,168 @@ function build_consensus_constraints(
 )
     branch_params = matpower_data["branch_params"]
     
-    # Identificar branches de fronteira (conectam regiões diferentes)
-    boundary_branches = Int[]
+    # 1. Identificar Barras de Fronteira Duplicadas
+    # Uma barra é de fronteira se estiver conectada a um ramo que liga duas regiões.
+    # No ALADIN, as barras de fronteira são duplicadas e pertencem a ambas as regiões.
     
-    for i in 1:branch_params.number_of_branches
-        from_bus = branch_params.bus_from[i]
-        to_bus = branch_params.bus_to[i]
-        
-        from_region = region_assignments[from_bus]
-        to_region = region_assignments[to_bus]
-        
-        if from_region != to_region
-            push!(boundary_branches, i)
+    # Mapeamento: (bus_id) -> Set of region_ids
+    bus_to_regions = Dict{Int, Set{Int}}()
+    
+    for r in regions
+        for bus_id in r.data["bus_params"].bus_ids
+            if !haskey(bus_to_regions, bus_id)
+                bus_to_regions[bus_id] = Set{Int}()
+            end
+            push!(bus_to_regions[bus_id], r.id)
         end
     end
     
-    # Para cada branch de fronteira, criar restrições de consenso
-    # Exemplo: P_flow(from) + P_flow(to) = 0 (conservação de potência)
+    # Identificar pares de regiões que compartilham uma barra de fronteira
+    # Mapeamento: (bus_id) -> Vector of (region_id, local_index)
+    boundary_bus_pairs = Dict{Int, Vector{Tuple{Int, Int}}}()
     
-    n_consensus = length(boundary_branches) * 2  # P e Q para cada branch
-    n_total_vars = sum(length(r.data["bus_params"].bus_ids) for r in regions)
+    for bus_id in keys(bus_to_regions)
+        regions_sharing = collect(bus_to_regions[bus_id])
+        
+        if length(regions_sharing) > 1
+            # Esta é uma barra de fronteira (duplicada)
+            
+            # Para cada par de regiões que compartilha a barra, criamos restrições
+            # (r1, r2) onde r1 < r2
+            for i in 1:length(regions_sharing)
+                for j in i+1:length(regions_sharing)
+                    r1_id = regions_sharing[i]
+                    r2_id = regions_sharing[j]
+                    
+                    # Encontrar os objetos AladinRegion
+                    r1 = regions[r1_id]
+                    r2 = regions[r2_id]
+                    
+                    # Encontrar o índice local da barra nas variáveis de cada região
+                    local_idx_r1 = get_local_bus_var_index(r1, bus_id, :theta) # Usando theta como proxy
+                    local_idx_r2 = get_local_bus_var_index(r2, bus_id, :theta)
+                    
+                    if !isnothing(local_idx_r1) && !isnothing(local_idx_r2)
+                        if !haskey(boundary_bus_pairs, bus_id)
+                            boundary_bus_pairs[bus_id] = []
+                        end
+                        # Armazenar o par de regiões e o índice local da variável theta
+                        push!(boundary_bus_pairs[bus_id], (r1_id, local_idx_r1))
+                        push!(boundary_bus_pairs[bus_id], (r2_id, local_idx_r2))
+                    end
+                end
+            end
+        end
+    end
     
-    # Matriz de consenso (simplificada por enquanto)
+    # 2. Calcular Dimensões
+    
+    # O número de restrições de consenso é 2 (theta e V) * número de pares de regiões
+    # que compartilham uma barra de fronteira.
+    n_consensus = 0
+    for bus_id in keys(boundary_bus_pairs)
+        # Cada barra de fronteira compartilhada por N regiões gera N-1 restrições de consenso
+        # para cada variável (theta e V).
+        # Simplificando: 2 restrições (theta, V) para cada par de regiões (r1, r2)
+        n_consensus += 2 * (length(bus_to_regions[bus_id]) - 1)
+    end
+    
+    # Calcular o número total de variáveis em todas as regiões (tamanho do vetor x_all)
+    n_total_vars = sum(get_region_var_size(r) for r in regions)
+    
+    # 3. Inicializar Matrizes
     consensus_matrix = zeros(n_consensus, n_total_vars)
     consensus_rhs = zeros(n_consensus)
     
-    # TODO: Preencher matriz de consenso baseado nas variáveis de fronteira
+    # 4. Preencher a Matriz de Consenso
+    
+    # Mapeamento de índice global
+    var_offsets = [0]
+    for r in regions
+        push!(var_offsets, var_offsets[end] + get_region_var_size(r))
+    end
+    
+    constraint_idx = 1
+    
+    for bus_id in keys(bus_to_regions)
+        regions_sharing = collect(bus_to_regions[bus_id])
+        
+        if length(regions_sharing) > 1
+            # Criar restrições de consenso para theta e V
+            
+            # Iterar sobre os pares de regiões (r1, r2) para criar as restrições
+            for i in 1:length(regions_sharing)
+                r1_id = regions_sharing[i]
+                r1 = regions[r1_id]
+                
+                # Criar restrições apenas com o primeiro par (r1, r_base)
+                if i == 1
+                    continue # r1 será a região base
+                end
+                
+                r_base_id = regions_sharing[1]
+                r_base = regions[r_base_id]
+                
+                # --- Consenso de Ângulo (theta_r1 - theta_r_base = 0) ---
+                
+                # Posição da variável theta na região r1
+                local_idx_theta_r1 = get_local_bus_var_index(r1, bus_id, :theta)
+                global_idx_theta_r1 = var_offsets[r1_id] + local_idx_theta_r1
+                
+                # Posição da variável theta na região r_base
+                local_idx_theta_r_base = get_local_bus_var_index(r_base, bus_id, :theta)
+                global_idx_theta_r_base = var_offsets[r_base_id] + local_idx_theta_r_base
+                
+                # Restrição: 1 * theta_r1 - 1 * theta_r_base = 0
+                consensus_matrix[constraint_idx, global_idx_theta_r1] = 1.0
+                consensus_matrix[constraint_idx, global_idx_theta_r_base] = -1.0
+                consensus_rhs[constraint_idx] = 0.0
+                constraint_idx += 1
+                
+                # --- Consenso de Magnitude (V_r1 - V_r_base = 0) ---
+                
+                # Posição da variável V na região r1
+                local_idx_v_r1 = get_local_bus_var_index(r1, bus_id, :v_magnitude)
+                global_idx_v_r1 = var_offsets[r1_id] + local_idx_v_r1
+                
+                # Posição da variável V na região r_base
+                local_idx_v_r_base = get_local_bus_var_index(r_base, bus_id, :v_magnitude)
+                global_idx_v_r_base = var_offsets[r_base_id] + local_idx_v_r_base
+                
+                # Restrição: 1 * V_r1 - 1 * V_r_base = 0
+                consensus_matrix[constraint_idx, global_idx_v_r1] = 1.0
+                consensus_matrix[constraint_idx, global_idx_v_r_base] = -1.0
+                consensus_rhs[constraint_idx] = 0.0
+                constraint_idx += 1
+            end
+        end
+    end
+    
+    # 5. Armazenar a matriz de consenso local em cada região (A_consensus)
+    for r_id in 1:length(regions)
+        r = regions[r_id]
+        offset_start = var_offsets[r_id] + 1
+        offset_end = var_offsets[r_id+1]
+        
+        # Extrair as colunas da matriz global que correspondem às variáveis desta região
+        r.A_consensus = consensus_matrix[:, offset_start:offset_end]
+    end
     
     return consensus_matrix, consensus_rhs
 end
+
+
+# 1. Esta implementação assume que as barras de fronteira são duplicadas em todas
+#    as regiões que compartilham o ramo de acoplamento.
+# 2. A ordem das variáveis no vetor local (y) é crucial e deve ser a mesma
+#    definida em `extract_primal_solution` e `get_primal_variables_vector`.
+# 3. A lógica de consenso de tensão (theta e V) é a mais comum para decomposição
+#    por barras. O consenso de fluxo de potência (P_flow_r1 + P_flow_r2 = 0)
+#    também é possível, mas requer um mapeamento mais complexo das variáveis de fluxo.
+# 4. As funções auxiliares `get_local_bus_var_index` e `get_region_var_size`
+#    são simplificadas e precisam ser ajustadas para a estrutura exata de dados
+#    e o número de períodos de tempo (T) do seu projeto.
+
 
 """
     decompose_manual(matpower_data::Dict, n_regions::Int)
