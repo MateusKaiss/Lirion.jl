@@ -30,12 +30,8 @@ struct BranchData
     g::Vector{Float64}
     b::Vector{Float64}
 
-    tr::Vector{Float64}
-    ti::Vector{Float64}
-
-    bus_ids::Vector{Int}
-    bus_idx_map::Dict{Int, Int}
-    zone::Vector{Int}
+    tap_real::Vector{Float64}
+    tap_imag::Vector{Float64}
 end
 
 @inline function _tap_params(tap_raw::Float64, shift_rad::Float64)
@@ -49,35 +45,38 @@ end
         inv_tap = 1.0 / tap_raw
     end
 
-    tr = tap_position * cos(tap_angle)
-    ti = tap_position * sin(tap_angle)
+    tap_real = tap_position * cos(tap_angle)
+    tap_imag = tap_position * sin(tap_angle)
 
-    return tap_position, tap_angle, inv_tap, tr, ti
+    return tap_position, tap_angle, inv_tap, tap_real, tap_imag
 end
 
 function get_branch_parameters(case_raw::CaseRaw)
     @assert case_raw.branch !== nothing && case_raw.bus !== nothing "CaseRaw.branch/bus is nothing"
 
     branch_raw = case_raw.branch::BranchRaw{Float64}
-    bus_raw = case_raw.bus::BusRaw{Float64}
 
     from = branch_raw.f_bus
     to = branch_raw.t_bus
     status = branch_raw.br_status
-
-    n = length(from)
-
     tap = branch_raw.tap
     shift = branch_raw.shift
+    r = branch_raw.br_r
+    x = branch_raw.br_x
+    denominator = r .^ 2 .+ x .^ 2
+    g = r ./ denominator
+    b = -x ./ denominator
+
+    n = length(from)
 
     tap_position = Vector{Float64}(undef, n)
     tap_angle = Vector{Float64}(undef, n)
     inv_tap = Vector{Float64}(undef, n)
-    tr = Vector{Float64}(undef, n)
-    ti = Vector{Float64}(undef, n)
+    tap_real = Vector{Float64}(undef, n)
+    tap_imag = Vector{Float64}(undef, n)
 
     @inbounds for i in 1:n
-        tap_position[i], tap_angle[i], inv_tap[i], tr[i], ti[i] =
+        tap_position[i], tap_angle[i], inv_tap[i], tap_real[i], tap_imag[i] =
             _tap_params(tap[i], shift[i])
     end
 
@@ -86,12 +85,6 @@ function get_branch_parameters(case_raw::CaseRaw)
     @inbounds for i in 1:n
         status[i] == 1 && push!(active, i)
     end
-
-    r = branch_raw.br_r
-    x = branch_raw.br_x
-    denominator = r .^ 2 .+ x .^ 2
-    g = r ./ denominator
-    b = -x ./ denominator
 
     return (
         n = n,
@@ -115,10 +108,8 @@ function get_branch_parameters(case_raw::CaseRaw)
         inv_tap = inv_tap,
         g = g,
         b = b,
-        tr = tr,
-        ti = ti, bus_ids = bus_raw.bus_i,
-        bus_idx_map = case_raw.maps.bus_idx_map,
-        zone = bus_raw.zone,
+        tap_real = tap_real,
+        tap_imag = tap_imag,
     )
 end
 
@@ -147,9 +138,7 @@ function build_branch_data(case_raw::CaseRaw)::BranchData
         params.inv_tap,
         params.g,
         params.b,
-        params.tr,
-        params.ti, params.bus_ids,
-        params.bus_idx_map,
-        params.zone,
+        params.tap_real,
+        params.tap_imag,
     )
 end
