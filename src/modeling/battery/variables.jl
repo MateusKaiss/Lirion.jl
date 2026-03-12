@@ -10,7 +10,7 @@ function create_battery_variables!(model::JuMP.Model, bat::BatteryData)
         storage[b in 1:B, t in 1:T],
         lower_bound = 0.0,
         upper_bound = bat.max_storage[b],
-        start = bat.initial_storage[b],
+        start = bat.energy_start[b],
     )
 
     @variable(

@@ -7,7 +7,7 @@ function _battery_energy_balance!(model::JuMP.Model, bat::BatteryData)
     # t = 1
     @constraint(model, [b in 1:B],
         model[:storage][b, 1] ==
-        bat.initial_storage[b] +
+        bat.energy_start[b] +
         model[:charge][b, 1] * bat.charge_efficiency[b] -
         model[:discharge][b, 1] / bat.discharge_efficiency[b]
     )
