@@ -191,7 +191,7 @@ function update_duals_branch_ac!(
         lambdaQz = get!(dualsQ, z, Dict{Int, Float64}())
 
         @inbounds for e in part.zone_edges
-            l_local = part.full_to_zone_branch_idx[e]
+            l_local = part.branch_idx_full_to_zone[e]
             l_local == 0 && continue
 
             P_loc, Q_loc = _pq_flow_from_exprs(part, l_local)
@@ -253,7 +253,7 @@ function update_duals_flow!(
         dz = get!(duals, z, Dict{Int, Float64}())
 
         @inbounds for e in part.zone_edges
-            l_local = part.full_to_zone_branch_idx[e]
+            l_local = part.branch_idx_full_to_zone[e]
             l_local == 0 && continue
 
             p_val = _dc_flow_val_model(m, part, l_local)
@@ -287,7 +287,7 @@ end
         dT = get!(duals_t, z, Dict{Int, Float64}())
 
         @inbounds for e in part.zone_edges
-            l = part.full_to_zone_branch_idx[e]
+            l = part.branch_idx_full_to_zone[e]
             l == 0 && continue
 
             R, T = _rt_from_exprs(m, l)
@@ -322,7 +322,7 @@ end
         dQ = get!(dualsQ, z, Dict{Int, Float64}())
 
         @inbounds for e in part.zone_edges
-            l = part.full_to_zone_branch_idx[e]
+            l = part.branch_idx_full_to_zone[e]
             l == 0 && continue
 
             P, Q = _pq_flow_from_exprs(m, l)

@@ -9,7 +9,7 @@ function sorted_ids_and_id2idx(ids::Vector{Int})
 end
 
 @inline function _zone_cut_edges(part, interzonal_branches::AbstractVector{Int})
-    m = part.full_to_zone_branch_idx
+    m = part.branch_idx_full_to_zone
     return [e for e in interzonal_branches if m[e] != 0]
 end
 

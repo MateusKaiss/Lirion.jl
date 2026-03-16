@@ -61,7 +61,7 @@ function compute_ac_branch_consensus!(
 
     for part in partitions
         @inbounds for e in part.zone_edges
-            l_local = part.full_to_zone_branch_idx[e]
+            l_local = part.branch_idx_full_to_zone[e]
             l_local == 0 && continue
 
             P_loc, Q_loc = _pq_flow_from_exprs(part, l_local)
@@ -133,7 +133,7 @@ function compute_flow_consensus!(
     for part in partitions
         m = part.model::JuMP.Model
         @inbounds for e in part.zone_edges
-            l_local = part.full_to_zone_branch_idx[e]
+            l_local = part.branch_idx_full_to_zone[e]
             l_local == 0 && continue
 
             p = _dc_flow_val_model(m, part, l_local)
@@ -191,7 +191,7 @@ function compute_pq_consensus!(
     for sub in partitions
         m = sub.model::JuMP.Model
         @inbounds for e in sub.zone_edges
-            l = sub.full_to_zone_branch_idx[e]
+            l = sub.branch_idx_full_to_zone[e]
             l == 0 && continue
 
             P, Q = _pq_flow_from_exprs(m, l)
@@ -224,7 +224,7 @@ function compute_rt_consensus!(
     for sub in partitions
         m = sub.model::JuMP.Model
         @inbounds for e in sub.zone_edges
-            l = sub.full_to_zone_branch_idx[e]
+            l = sub.branch_idx_full_to_zone[e]
             l == 0 && continue
 
             R, T = _rt_from_exprs(m, l)

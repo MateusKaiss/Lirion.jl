@@ -32,7 +32,7 @@ struct DistributedSystem
     parts::Vector{SystemData}
 
     zone_branch_idx_in_full::Vector{Vector{Int}}
-    full_to_zone_branch_idx::Vector{Vector{Int}}
+    branch_idx_full_to_zone::Vector{Vector{Int}}
     shared_buses_zone::Vector{Vector{Int}}
 
     shared_buses::Vector{Int}
@@ -101,7 +101,7 @@ function build_distributed_system(
 
     parts = Vector{SystemData}(undef, n_zones)
     zone_branch_idx_in_full = Vector{Vector{Int}}(undef, n_zones)
-    full_to_zone_branch_idx = Vector{Vector{Int}}(undef, n_zones)
+    branch_idx_full_to_zone = Vector{Vector{Int}}(undef, n_zones)
     shared_buses_zone = Vector{Vector{Int}}(undef, n_zones)
 
     @inbounds for i in 1:n_zones
@@ -111,7 +111,7 @@ function build_distributed_system(
         parts[i] = build_system_data(zone_raw)
 
         zone_branch_idx_in_full[i] = zone_raw.dist.zone_branch_idx_in_full
-        full_to_zone_branch_idx[i] = zone_raw.dist.full_to_zone_branch_idx
+        branch_idx_full_to_zone[i] = zone_raw.dist.branch_idx_full_to_zone
         shared_buses_zone[i] = zone_raw.dist.zone_shared_bus_ids
     end
 
@@ -121,7 +121,7 @@ function build_distributed_system(
         zones,
         parts,
         zone_branch_idx_in_full,
-        full_to_zone_branch_idx,
+        branch_idx_full_to_zone,
         shared_buses_zone,
         shared_buses,
         interzonal_branches,
