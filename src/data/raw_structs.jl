@@ -278,8 +278,6 @@ mutable struct CaseIndexMaps
 end
 
 mutable struct DistributedRawMeta
-    branch_full::Union{Nothing, BranchRaw{Float64}}
-
     zone_branch_idx_in_full::Vector{Int}
     full_to_zone_branch_idx::Vector{Int}
 
@@ -290,7 +288,6 @@ mutable struct DistributedRawMeta
 
     function DistributedRawMeta()
         return new(
-            nothing,
             Int[],
             Int[],
             Int[],

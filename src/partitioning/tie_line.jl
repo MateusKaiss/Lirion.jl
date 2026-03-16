@@ -80,7 +80,6 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
             zone_gen_idx,
         )
 
-        zone_subprob_case.dist.branch_full = full.branch
         zone_subprob_case.dist.zone_branch_idx_in_full = zone_branch_idx_in_full
         zone_subprob_case.dist.bus_set = Set(zone_subprob_case.bus.bus_i)
 

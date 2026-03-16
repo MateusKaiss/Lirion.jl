@@ -157,29 +157,38 @@ end
     )
 end
 
-@inline function _slice_prosumer(
-    full_prosumer::ProsumerRaw{Float64},
-    keep::Vector{Int},
+@inline function _slice_gencosts!(
+    zone_case::CaseRaw,
+    full::CaseRaw,
+    zone_gen_idx::Vector{Int},
 )
-    return ProsumerRaw{Float64}(
-        full_prosumer.bus[keep],
-        full_prosumer.generation[keep],
-        full_prosumer.demand[keep],
-        full_prosumer.q_generation[keep],
-        full_prosumer.q_demand[keep],
-        full_prosumer.cost_injection[keep],
-        full_prosumer.inverter_capacity[keep],
+    gc = full.gencost
+
+    zone_case.gencost = GencostRaw{Float64}(
+        gc.model[zone_gen_idx],
+        gc.startup[zone_gen_idx],
+        gc.shutdown[zone_gen_idx],
+        gc.ncost[zone_gen_idx],
+        gc.cost_coefficients[zone_gen_idx],
     )
+
+    return nothing
 end
 
-@inline function _slice_consumer(
-    full_consumer::ConsumerRaw{Float64},
-    keep::Vector{Int},
+@inline function _filter_branches_incident_to_zone(
+    full_f_bus_ids::AbstractVector{<:Integer},
+    full_t_bus_ids::AbstractVector{<:Integer},
+    full_branch_in_service_mask::AbstractVector{Bool},
+    zone_internal_bus_set::Set{Int},
 )
-    return ConsumerRaw{Float64}(
-        full_consumer.bus[keep],
-        full_consumer.demand[keep],
-        full_consumer.q_demand[keep],
+    return findall(
+        i ->
+            full_branch_in_service_mask[i] &&
+                (
+                    full_f_bus_ids[i] in zone_internal_bus_set ||
+                    full_t_bus_ids[i] in zone_internal_bus_set
+                ),
+        eachindex(full_f_bus_ids),
     )
 end
 
@@ -209,39 +218,30 @@ end
     )
 end
 
-@inline function _filter_branches_incident_to_zone(
-    full_f_bus_ids::AbstractVector{<:Integer},
-    full_t_bus_ids::AbstractVector{<:Integer},
-    full_branch_in_service_mask::AbstractVector{Bool},
-    zone_internal_bus_set::Set{Int},
+@inline function _slice_prosumer(
+    full_prosumer::ProsumerRaw{Float64},
+    keep::Vector{Int},
 )
-    return findall(
-        i ->
-            full_branch_in_service_mask[i] &&
-                (
-                    full_f_bus_ids[i] in zone_internal_bus_set ||
-                    full_t_bus_ids[i] in zone_internal_bus_set
-                ),
-        eachindex(full_f_bus_ids),
+    return ProsumerRaw{Float64}(
+        full_prosumer.bus[keep],
+        full_prosumer.generation[keep],
+        full_prosumer.demand[keep],
+        full_prosumer.q_generation[keep],
+        full_prosumer.q_demand[keep],
+        full_prosumer.cost_injection[keep],
+        full_prosumer.inverter_capacity[keep],
     )
 end
 
-@inline function _slice_gencosts!(
-    zone_case::CaseRaw,
-    full::CaseRaw,
-    zone_gen_idx::Vector{Int},
+@inline function _slice_consumer(
+    full_consumer::ConsumerRaw{Float64},
+    keep::Vector{Int},
 )
-    gc = full.gencost
-
-    zone_case.gencost = GencostRaw{Float64}(
-        gc.model[zone_gen_idx],
-        gc.startup[zone_gen_idx],
-        gc.shutdown[zone_gen_idx],
-        gc.ncost[zone_gen_idx],
-        gc.cost_coefficients[zone_gen_idx],
+    return ConsumerRaw{Float64}(
+        full_consumer.bus[keep],
+        full_consumer.demand[keep],
+        full_consumer.q_demand[keep],
     )
-
-    return nothing
 end
 
 @inline function _filter_timeseries!(
