@@ -280,7 +280,6 @@ end
 mutable struct DistributedRawMeta
     zone_branch_idx_in_full::Vector{Int}
     branch_idx_full_to_zone::Vector{Int}
-
     zone_shared_bus_ids::Vector{Int}
     full_shared_bus_ids::Vector{Int}
 
