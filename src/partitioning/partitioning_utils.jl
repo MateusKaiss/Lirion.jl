@@ -5,20 +5,19 @@
 function _find_interzonal_branches(full::CaseRaw, ::TieLine)
     full_bus_ids = full.bus.bus_i
     full_bus_zones = full.bus.zone
-
-    bus_to_zone = Dict{Int, Int}()
-    sizehint!(bus_to_zone, length(full_bus_ids))
-
-    @inbounds for i in eachindex(full_bus_ids)
-        bus_to_zone[full_bus_ids[i]] = full_bus_zones[i]
-    end
-
     f_bus = full.branch.f_bus
     t_bus = full.branch.t_bus
     br_status = full.branch.br_status
 
+    bus_to_zone = Dict{Int, Int}()
+    sizehint!(bus_to_zone, length(full_bus_ids))
+
     interzonal_branches = Int[]
     sizehint!(interzonal_branches, length(f_bus))
+
+    @inbounds for i in eachindex(full_bus_ids)
+        bus_to_zone[full_bus_ids[i]] = full_bus_zones[i]
+    end
 
     @inbounds for i in eachindex(f_bus)
         br_status[i] == 1 || continue
