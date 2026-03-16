@@ -284,15 +284,12 @@ mutable struct DistributedRawMeta
     zone_shared_bus_ids::Vector{Int}
     full_shared_bus_ids::Vector{Int}
 
-    bus_set::Set{Int}
-
     function DistributedRawMeta()
         return new(
             Int[],
             Int[],
             Int[],
             Int[],
-            Set{Int}(),
         )
     end
 end
