@@ -1,5 +1,5 @@
 # =====================================================================
-# Helpers para variáveis de geração / curtailment
+# Helpers
 # =====================================================================
 
 function has_curtailment(gen::GenData, g::Int)
@@ -22,10 +22,10 @@ function _build_start_vector(
 end
 
 # =====================================================================
-# Variáveis de geração (p/q) e curtailment
+# VARIABLES
 # =====================================================================
 
-function create_active_generation_variables!(model::JuMP.Model, gen::GenData)
+function add_active_generation_variables!(model::JuMP.Model, gen::GenData)
     T = get(model.ext, :time_periods, 1)
     G = gen.n
 
@@ -43,7 +43,7 @@ function create_active_generation_variables!(model::JuMP.Model, gen::GenData)
     return nothing
 end
 
-function create_reactive_generation_variables!(model::JuMP.Model, gen::GenData)
+function add_reactive_generation_variables!(model::JuMP.Model, gen::GenData)
     T = get(model.ext, :time_periods, 1)
     G = gen.n
 
@@ -61,7 +61,7 @@ function create_reactive_generation_variables!(model::JuMP.Model, gen::GenData)
     return nothing
 end
 
-function create_curtailment_variables!(model::JuMP.Model, gen::GenData)
+function add_curtailment_variables!(model::JuMP.Model, gen::GenData)
     T = get(model.ext, :time_periods, 1)
     G = gen.n
 

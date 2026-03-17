@@ -1,4 +1,4 @@
-function create_curtailment_constraints!(model::JuMP.Model, gen::GenData)
+function add_curtailment_constraints!(model::JuMP.Model, gen::GenData)
     T = get(model.ext, :time_periods, 1)
     G = gen.n
 

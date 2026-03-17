@@ -48,7 +48,7 @@ end
     branches!(model, sys, model_type)
     generators!(model, sys, model_type)
     batteries!(model, sys, model_type)
-    prosumer!(model, sys, model_type)
+    prosumers!(model, sys, model_type)
     active_power_balance!(model, sys, model_type)
     reactive_power_balance!(model, sys, model_type)
     objective!(model, sys, model_type)

@@ -1,4 +1,4 @@
-function create_dc_branch_expressions!(model::JuMP.Model, br::BranchData)
+function add_dc_branch_expressions!(model::JuMP.Model, br::BranchData)
     T = get(model.ext, :time_periods, 1)
     active = br.active
 
@@ -16,10 +16,11 @@ function create_dc_branch_expressions!(model::JuMP.Model, br::BranchData)
     @expression(model, losses_branches[i in active, t in 1:T],
         model[:p_flow_branches][i, t]^2 * br.r[i]
     )
+
     return nothing
 end
 
-function create_dc_branch_constraints!(model::JuMP.Model, br::BranchData)
+function add_dc_branch_constraints!(model::JuMP.Model, br::BranchData)
     T = get(model.ext, :time_periods, 1)
     active = br.active
 

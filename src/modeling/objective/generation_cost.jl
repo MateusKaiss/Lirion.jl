@@ -1,4 +1,4 @@
-function compute_generation_cost(model::JuMP.Model, obj::ObjectiveData)
+function add_generation_cost!(model::JuMP.Model, obj::ObjectiveData)
     T = get(model.ext, :time_periods, 1)
     active_generators = findall(obj.generator_status .== 1)
 
@@ -6,6 +6,7 @@ function compute_generation_cost(model::JuMP.Model, obj::ObjectiveData)
         sum(
             begin
                 coefs = obj.generator_costs[t][g]
+
                 sum(
                     coefs[i] *
                     (obj.sbase * model[:p_generation][g, t])^(length(coefs) - i)
@@ -18,23 +19,6 @@ function compute_generation_cost(model::JuMP.Model, obj::ObjectiveData)
     )
 
     model[:generation_cost] = generation_cost
+
     return nothing
 end
-
-# function compute_curtailment_cost(model::JuMP.Model, obj::ObjectiveData)
-#     T = get(model.ext, :time_periods, 1)
-#     renewable_generators = findall(
-#         g -> obj.plant_type[g] == "R" && obj.generator_status[g] == 1,
-#         1:obj.number_of_generators,
-#     )
-#
-#     @expression(model, curtailment_cost,
-#         sum(
-#             obj.curtailment_cost[g] * model[:curtailment][g, t]
-#             for g in renewable_generators, t in 1:T
-#         )
-#     )
-#
-#     model[:curtailment_cost] = curtailment_cost
-#     return nothing
-# end

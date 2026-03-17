@@ -1,6 +1,3 @@
-# =====================================================================
-# Reactive Power Balance
-# =====================================================================
 function compute_reactive_power_balance(
     model::JuMP.Model,
     sys::SystemData,
@@ -12,76 +9,52 @@ function compute_reactive_power_balance(
     bus = sys.bus
     bus_ts = sys.bus_ts
     consumer_ts = sys.consumer_ts
+
     bus_idx = pf.bus_idx_map[bus_id]
 
-    # --------------------------------------------------------------
-    # Geração reativa
-    # --------------------------------------------------------------
-    q_gen = if haskey(model, :q_generation)
+    q_gen =
+        haskey(model, :q_generation) ?
         sum(
             model[:q_generation][g, t]
             for g in pf.bus_to_generators[bus_idx]
             if gen.existing[g];
             init = 0.0,
-        )
-    else
-        0.0
-    end
+        ) : 0.0
 
-    # --------------------------------------------------------------
-    # Baterias
-    # --------------------------------------------------------------
-    q_bat = if haskey(model, :q_battery_injected)
+    q_bat =
+        haskey(model, :q_battery_injected) ?
         sum(
-            model[:q_battery_injected][b, t] for
-            b in pf.bus_to_batteries[bus_idx];
+            model[:q_battery_injected][b, t]
+            for b in pf.bus_to_batteries[bus_idx];
             init = 0.0,
-        )
-    else
-        0.0
-    end
+        ) : 0.0
 
-    # --------------------------------------------------------------
-    # Prosumers
-    # --------------------------------------------------------------
-    q_pros = if haskey(model, :q_prosumer_injected)
+    q_pros =
+        haskey(model, :q_prosumer_injected) ?
         sum(
-            model[:q_prosumer_injected][p, t] for
-            p in pf.bus_to_prosumers[bus_idx];
+            model[:q_prosumer_injected][p, t]
+            for p in pf.bus_to_prosumers[bus_idx];
             init = 0.0,
-        )
-    else
-        0.0
-    end
+        ) : 0.0
 
-    # --------------------------------------------------------------
-    # Fluxos de ramo
-    # --------------------------------------------------------------
-    q_out = if haskey(model, :q_flow_branches)
+    q_out =
+        haskey(model, :q_flow_branches) ?
         sum(
-            model[:q_flow_branches][l, t] for
-            l in pf.bus_to_branches_from[bus_idx]
+            model[:q_flow_branches][l, t]
+            for l in pf.bus_to_branches_from[bus_idx]
             if pf.branch_status[l] == 1;
             init = 0.0,
-        )
-    else
-        0.0
-    end
+        ) : 0.0
 
-    q_in = if haskey(model, :q_reverse_flow_branches)
+    q_in =
+        haskey(model, :q_reverse_flow_branches) ?
         sum(
-            model[:q_reverse_flow_branches][l, t] for
-            l in pf.bus_to_branches_to[bus_idx]
+            model[:q_reverse_flow_branches][l, t]
+            for l in pf.bus_to_branches_to[bus_idx]
             if pf.branch_status[l] == 1;
             init = 0.0,
-        )
-    else
-        0.0
-    end
+        ) : 0.0
 
-    # --------------------------------------------------------------
-    # Carga reativa de barra (qd): timeseries ou estática de BusData
-    # --------------------------------------------------------------
     qd = 0.0
     if bus_ts.has_timeseries && !isempty(bus_ts.time)
         @inbounds for i in eachindex(bus_ts.bus)
@@ -93,9 +66,6 @@ function compute_reactive_power_balance(
         qd = bus.qd[bus_idx]
     end
 
-    # --------------------------------------------------------------
-    # Carga reativa adicional de "consumer" (consumer_ts)
-    # --------------------------------------------------------------
     q_cons = 0.0
     if consumer_ts.has_timeseries && !isempty(consumer_ts.time)
         @inbounds for i in eachindex(consumer_ts.bus)

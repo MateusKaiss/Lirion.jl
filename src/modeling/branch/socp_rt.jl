@@ -30,12 +30,14 @@
             T_max[l] = min(T_max[l], vm_fr_max * vm_to_max * sin(amax))
             T_min[l] = max(T_min[l], vm_fr_min * vm_to_min * sin(amin))
         end
+
         if amax <= 0
             R_max[l] = min(R_max[l], vm_fr_max * vm_to_max * cos(amax))
             R_min[l] = max(R_min[l], vm_fr_min * vm_to_min * cos(amin))
             T_max[l] = min(T_max[l], vm_fr_min * vm_to_max * sin(amax))
             T_min[l] = max(T_min[l], vm_fr_max * vm_to_max * sin(amin))
         end
+
         if amin < 0 && amax > 0
             R_max[l] = min(R_max[l], vm_fr_max * vm_to_max * 1.0)
             R_min[l] = max(R_min[l], vm_fr_min * vm_to_min * min(cos(amin), cos(amax)))
@@ -47,7 +49,7 @@
     return R_min, R_max, T_min, T_max
 end
 
-function create_rt_variables_with_bounds!(
+function add_rt_variables_with_bounds!(
     model::JuMP.Model,
     bus::BusData,
     br::BranchData;
@@ -86,6 +88,7 @@ function create_rt_variables_with_bounds!(
 
     if bounded
         R_min, R_max, T_min, T_max = _rt_product_bounds(bus, br)
+
         @inbounds for l in active, t in 1:T
             isfinite(R_min[l]) && set_lower_bound(R[l, t], R_min[l])
             isfinite(R_max[l]) && set_upper_bound(R[l, t], R_max[l])
@@ -93,6 +96,7 @@ function create_rt_variables_with_bounds!(
             isfinite(T_max[l]) && set_upper_bound(T_var[l, t], T_max[l])
         end
     end
+
     return nothing
 end
 
@@ -112,8 +116,10 @@ function add_rt_tangent_angle_cuts!(model::JuMP.Model, br::BranchData)
     @constraint(model, [l in active, t in 1:T; !isnan(br.ang_max[l])],
         T_var[l, t] <= _tan_clip(br.ang_max[l]) * R[l, t]
     )
+
     @constraint(model, [l in active, t in 1:T; !isnan(br.ang_min[l])],
         T_var[l, t] >= _tan_clip(br.ang_min[l]) * R[l, t]
     )
+
     return nothing
 end

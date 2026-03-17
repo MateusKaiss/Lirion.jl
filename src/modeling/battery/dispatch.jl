@@ -1,52 +1,44 @@
-
-# =======================================================================
-# Dispatch by model type (DC / AC / SOCP)
-# =======================================================================
-
 function batteries!(
     model::JuMP.Model,
     sys::SystemData,
-    ::Type{DC},
+    model_type::Type{<:OPFModel},
 )
     bat = sys.battery
+
     if bat.n == 0
-        @info "No battery information in SystemData (DC). Skipping storage modeling."
+        @info "No battery information in SystemData. Skipping storage modeling."
         return nothing
     end
 
-    create_battery_variables!(model, bat)
-    create_dc_battery_constraints!(model, bat)
+    add_battery_variables!(model, bat)
+    add_battery_constraints!(model, bat, model_type)
+
     return nothing
 end
 
-function batteries!(
-    model::JuMP.Model,
-    sys::SystemData,
-    ::Type{AC},
-)
-    bat = sys.battery
-    if bat.n == 0
-        @info "No battery information in SystemData (AC). Skipping storage modeling."
-        return nothing
-    end
+# =======================================================================
+# VARIABLES
+# =======================================================================
 
-    create_battery_variables!(model, bat)
-    create_ac_battery_constraints!(model, bat)
+function add_battery_variables!(model::JuMP.Model, bat::BatteryData)
+    add_storage_variables!(model, bat)
+    add_charge_discharge_variables!(model, bat)
+    add_battery_power_variables!(model, bat)
     return nothing
 end
 
-function batteries!(
-    model::JuMP.Model,
-    sys::SystemData,
-    ::Type{SOCP},
-)
-    bat = sys.battery
-    if bat.n == 0
-        @info "No battery information in SystemData (SOCP). Skipping storage modeling."
-        return nothing
-    end
+# =======================================================================
+# CONSTRAINTS
+# =======================================================================
 
-    create_battery_variables!(model, bat)
-    create_socp_battery_constraints!(model, bat)
-    return nothing
+function add_battery_constraints!(model::JuMP.Model, bat::BatteryData, ::Type{DC})
+    return add_dc_battery_constraints!(model, bat)
+end
+
+function add_battery_constraints!(model::JuMP.Model, bat::BatteryData, ::Type{AC})
+    return add_ac_battery_constraints!(model, bat)
+end
+
+function add_battery_constraints!(model::JuMP.Model, bat::BatteryData, ::Type{SOCP})
+    return add_socp_battery_constraints!(model, bat)
 end

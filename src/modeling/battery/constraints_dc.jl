@@ -2,7 +2,7 @@
 # DC battery constraints
 # =======================================================================
 
-function create_dc_battery_constraints!(model::JuMP.Model, bat::BatteryData)
+function add_dc_battery_constraints!(model::JuMP.Model, bat::BatteryData)
     _battery_no_simultaneous_charge_discharge!(model, bat)
     _battery_thermal_limit!(model, bat)
     _battery_energy_balance!(model, bat)

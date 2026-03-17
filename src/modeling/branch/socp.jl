@@ -1,5 +1,4 @@
-
-function create_socp_branch_expressions!(model::JuMP.Model, br::BranchData)
+function add_socp_branch_expressions!(model::JuMP.Model, br::BranchData)
     T = get(model.ext, :time_periods, 1)
     active = br.active
 
@@ -15,6 +14,7 @@ function create_socp_branch_expressions!(model::JuMP.Model, br::BranchData)
         (-br.g[l] * tap_real[l] + br.b[l] * tap_imag[l]) * inv_tap[l]^2 * R[l, t] +
         (-br.b[l] * tap_real[l] - br.g[l] * tap_imag[l]) * inv_tap[l]^2 * Tv[l, t]
     )
+
     @expression(model, q_flow_branches[l in active, t in 1:T],
         -(br.b[l] + br.b_sh[l] / 2) * inv_tap[l]^2 *
         model[:v_magnitude_sq][br.from[l], t] -
@@ -27,6 +27,7 @@ function create_socp_branch_expressions!(model::JuMP.Model, br::BranchData)
         (-br.g[l] * tap_real[l] - br.b[l] * tap_imag[l]) * inv_tap[l]^2 * R[l, t] +
         (-br.b[l] * tap_real[l] + br.g[l] * tap_imag[l]) * inv_tap[l]^2 * (-Tv[l, t])
     )
+
     @expression(model, q_reverse_flow_branches[l in active, t in 1:T],
         -(br.b[l] + br.b_sh[l] / 2) *
         model[:v_magnitude_sq][br.to[l], t] -
@@ -37,7 +38,7 @@ function create_socp_branch_expressions!(model::JuMP.Model, br::BranchData)
     return nothing
 end
 
-function create_socp_branch_constraints!(model::JuMP.Model, br::BranchData)
+function add_socp_branch_constraints!(model::JuMP.Model, br::BranchData)
     T = get(model.ext, :time_periods, 1)
     active = br.active
 
@@ -45,6 +46,7 @@ function create_socp_branch_constraints!(model::JuMP.Model, br::BranchData)
         br.ang_min[i] <=
         model[:theta][br.from[i], t] - model[:theta][br.to[i], t]
     )
+
     @constraint(model, branch_angle_ub[i in active, t in 1:T; !isnan(br.ang_max[i])],
         model[:theta][br.from[i], t] - model[:theta][br.to[i], t] <=
         br.ang_max[i]
@@ -66,6 +68,7 @@ function create_socp_branch_constraints!(model::JuMP.Model, br::BranchData)
             model[:q_flow_branches][l, t],
         ] in JuMP.SecondOrderCone()
     )
+
     @constraint(model, [l in active, t in 1:T],
         [
             br.rate_a[l],

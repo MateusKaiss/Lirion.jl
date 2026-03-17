@@ -1,4 +1,4 @@
-function compute_power_balance(
+function compute_active_power_balance(
     model::JuMP.Model,
     sys::SystemData,
     bus_id::Int,
@@ -9,11 +9,9 @@ function compute_power_balance(
     bus = sys.bus
     bus_ts = sys.bus_ts
     consumer_ts = sys.consumer_ts
+
     bus_idx = pf.bus_idx_map[bus_id]
 
-    # --------------------------------------------------------------
-    # Geração Ativa
-    # --------------------------------------------------------------
     p_gen = sum(
         model[:p_generation][g, t]
         for g in pf.bus_to_generators[bus_idx]
@@ -21,60 +19,40 @@ function compute_power_balance(
         init = 0.0,
     )
 
-    # --------------------------------------------------------------
-    # Baterias
-    # --------------------------------------------------------------
-    p_bat = if haskey(model, :p_battery_injected)
+    p_bat =
+        haskey(model, :p_battery_injected) ?
         sum(
-            model[:p_battery_injected][b, t] for
-            b in pf.bus_to_batteries[bus_idx];
+            model[:p_battery_injected][b, t]
+            for b in pf.bus_to_batteries[bus_idx];
             init = 0.0,
-        )
-    else
-        0.0
-    end
+        ) : 0.0
 
-    # --------------------------------------------------------------
-    # Prosumers
-    # --------------------------------------------------------------
-    p_pros = if haskey(model, :p_prosumer_injected)
+    p_pros =
+        haskey(model, :p_prosumer_injected) ?
         sum(
-            model[:p_prosumer_injected][p, t] for
-            p in pf.bus_to_prosumers[bus_idx];
+            model[:p_prosumer_injected][p, t]
+            for p in pf.bus_to_prosumers[bus_idx];
             init = 0.0,
-        )
-    else
-        0.0
-    end
+        ) : 0.0
 
-    # --------------------------------------------------------------
-    # Fluxos de ramo
-    # --------------------------------------------------------------
-    p_out = if haskey(model, :p_flow_branches)
+    p_out =
+        haskey(model, :p_flow_branches) ?
         sum(
-            model[:p_flow_branches][l, t] for
-            l in pf.bus_to_branches_from[bus_idx]
+            model[:p_flow_branches][l, t]
+            for l in pf.bus_to_branches_from[bus_idx]
             if pf.branch_status[l] == 1;
             init = 0.0,
-        )
-    else
-        0.0
-    end
+        ) : 0.0
 
-    p_in = if haskey(model, :p_reverse_flow_branches)
+    p_in =
+        haskey(model, :p_reverse_flow_branches) ?
         sum(
-            model[:p_reverse_flow_branches][l, t] for
-            l in pf.bus_to_branches_to[bus_idx]
+            model[:p_reverse_flow_branches][l, t]
+            for l in pf.bus_to_branches_to[bus_idx]
             if pf.branch_status[l] == 1;
             init = 0.0,
-        )
-    else
-        0.0
-    end
+        ) : 0.0
 
-    # --------------------------------------------------------------
-    # Carga de barra (pd): timeseries OU estática
-    # --------------------------------------------------------------
     pd = 0.0
     if bus_ts.has_timeseries && !isempty(bus_ts.time)
         @inbounds for i in eachindex(bus_ts.bus)
@@ -86,9 +64,6 @@ function compute_power_balance(
         pd = bus.pd[bus_idx]
     end
 
-    # --------------------------------------------------------------
-    # Carga adicional de "consumer" (ConsumerTimeseriesData)
-    # --------------------------------------------------------------
     p_cons = 0.0
     if consumer_ts.has_timeseries && !isempty(consumer_ts.time)
         @inbounds for i in eachindex(consumer_ts.bus)
@@ -96,14 +71,6 @@ function compute_power_balance(
                 p_cons += consumer_ts.demand[i]
             end
         end
-    end
-
-    if haskey(model.ext, :p_virtual) &&
-       bus_id in axes(model.ext[:p_virtual], 1) &&
-       t in axes(model.ext[:p_virtual], 2)
-        p_virt = model.ext[:p_virtual][bus_id, t]
-    else
-        p_virt = 0.0
     end
 
     return p_gen - p_bat - p_pros - pd - p_cons - p_out - p_in

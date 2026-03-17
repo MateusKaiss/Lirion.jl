@@ -1,4 +1,4 @@
-function create_ac_branch_expressions!(model::JuMP.Model, br::BranchData)
+function add_ac_branch_expressions!(model::JuMP.Model, br::BranchData)
     T = get(model.ext, :time_periods, 1)
     active = br.active
 
@@ -67,10 +67,11 @@ function create_ac_branch_expressions!(model::JuMP.Model, br::BranchData)
             )
         )
     )
+
     return nothing
 end
 
-function create_ac_branch_constraints!(model::JuMP.Model, br::BranchData)
+function add_ac_branch_constraints!(model::JuMP.Model, br::BranchData)
     T = get(model.ext, :time_periods, 1)
     active = br.active
 
@@ -78,6 +79,7 @@ function create_ac_branch_constraints!(model::JuMP.Model, br::BranchData)
         model[:p_flow_branches][l, t]^2 +
         model[:q_flow_branches][l, t]^2 <= br.rate_a[l]^2
     )
+
     @constraint(model, [l in active, t in 1:T],
         model[:p_reverse_flow_branches][l, t]^2 +
         model[:q_reverse_flow_branches][l, t]^2 <= br.rate_a[l]^2

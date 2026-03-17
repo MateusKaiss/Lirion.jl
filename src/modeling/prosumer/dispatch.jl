@@ -1,12 +1,8 @@
-
-# =======================================================================
-# Dispatch by model type (DC / AC / SOCP)
-# =======================================================================
-function prosumer!(
+function prosumers!(
     model::JuMP.Model,
     sys::SystemData,
-    ::Type{T},
-) where {T <: OPFModel}
+    model_type::Type{<:OPFModel},
+)
     pros = sys.prosumer
 
     if pros.number_of_prosumers == 0
@@ -14,8 +10,32 @@ function prosumer!(
         return nothing
     end
 
-    create_prosumer_variables!(model, pros)
-    create_prosumer_constraints!(model, pros)
+    add_prosumer_variables!(model, sys, model_type)
+    add_prosumer_constraints!(model, sys, model_type)
 
     return nothing
+end
+
+# =======================================================================
+# VARIABLES
+# =======================================================================
+
+function add_prosumer_variables!(
+    model::JuMP.Model,
+    sys::SystemData,
+    ::Type{<:OPFModel},
+)
+    return add_prosumer_variables!(model, sys.prosumer)
+end
+
+# =======================================================================
+# CONSTRAINTS
+# =======================================================================
+
+function add_prosumer_constraints!(
+    model::JuMP.Model,
+    sys::SystemData,
+    ::Type{<:OPFModel},
+)
+    return add_prosumer_constraints!(model, sys.prosumer)
 end

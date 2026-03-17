@@ -1,40 +1,58 @@
-# =======================================================================
-# Dispatch by model type (DC / AC / SOCP)
-# =======================================================================
-
 function branches!(
     model::JuMP.Model,
     sys::SystemData,
-    ::Type{DC},
+    model_type::Type{<:OPFModel},
 )
-    br = sys.branch
-    create_dc_branch_expressions!(model, br)
-    create_dc_branch_constraints!(model, br)
+    add_branch_variables!(model, sys, model_type)
+    add_branch_expressions!(model, sys, model_type)
+    add_branch_constraints!(model, sys, model_type)
     return nothing
 end
 
-function branches!(
-    model::JuMP.Model,
-    sys::SystemData,
-    ::Type{AC},
-)
-    br = sys.branch
-    create_ac_branch_expressions!(model, br)
-    create_ac_branch_constraints!(model, br)
+# =======================================================================
+# VARIABLES
+# =======================================================================
+
+function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{DC})
     return nothing
 end
 
-function branches!(
-    model::JuMP.Model,
-    sys::SystemData,
-    ::Type{SOCP},
-)
-    bus = sys.bus
-    br = sys.branch
-
-    create_rt_variables_with_bounds!(model, bus, br)
-    create_socp_branch_expressions!(model, br)
-    create_socp_branch_constraints!(model, br)
-
+function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{AC})
     return nothing
+end
+
+function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{SOCP})
+    return add_rt_variables_with_bounds!(model, sys.bus, sys.branch)
+end
+
+# =======================================================================
+# EXPRESSIONS
+# =======================================================================
+
+function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{DC})
+    return add_dc_branch_expressions!(model, sys.branch)
+end
+
+function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{AC})
+    return add_ac_branch_expressions!(model, sys.branch)
+end
+
+function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{SOCP})
+    return add_socp_branch_expressions!(model, sys.branch)
+end
+
+# =======================================================================
+# CONSTRAINTS
+# =======================================================================
+
+function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{DC})
+    return add_dc_branch_constraints!(model, sys.branch)
+end
+
+function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{AC})
+    return add_ac_branch_constraints!(model, sys.branch)
+end
+
+function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{SOCP})
+    return add_socp_branch_constraints!(model, sys.branch)
 end

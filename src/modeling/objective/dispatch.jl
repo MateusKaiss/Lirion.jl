@@ -1,42 +1,39 @@
-
-# =======================================================================
-# Dispatch by model type (DC / AC / SOCP)
-# =======================================================================
 function objective!(
     model::JuMP.Model,
     sys::SystemData,
-    ::Type{DC},
+    model_type::Type{<:OPFModel},
 )
     obj = sys.objective
-    compute_generation_cost(model, obj)
 
-    @objective(model, Min,
-        model[:generation_cost]
-    )
+    add_objective_expressions!(model, obj, model_type)
+    add_objective_function!(model)
+
+    return nothing
 end
 
-function objective!(
-    model::JuMP.Model,
-    sys::SystemData,
-    ::Type{AC},
-)
-    obj = sys.objective
-    compute_generation_cost(model, obj)
+# =======================================================================
+# EXPRESSIONS
+# =======================================================================
 
-    @objective(model, Min,
-        model[:generation_cost]
-    )
+function add_objective_expressions!(model::JuMP.Model, obj::ObjectiveData, ::Type{DC})
+    return add_generation_cost!(model, obj)
 end
 
-function objective!(
-    model::JuMP.Model,
-    sys::SystemData,
-    ::Type{SOCP},
-)
-    obj = sys.objective
-    compute_generation_cost(model, obj)
+function add_objective_expressions!(model::JuMP.Model, obj::ObjectiveData, ::Type{AC})
+    return add_generation_cost!(model, obj)
+end
 
+function add_objective_expressions!(model::JuMP.Model, obj::ObjectiveData, ::Type{SOCP})
+    return add_generation_cost!(model, obj)
+end
+
+# =======================================================================
+# OBJECTIVE FUNCTION
+# =======================================================================
+
+function add_objective_function!(model::JuMP.Model)
     @objective(model, Min,
         model[:generation_cost]
     )
+    return nothing
 end

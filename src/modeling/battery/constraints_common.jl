@@ -1,5 +1,3 @@
-
-# Balanço de energia (comum a DC/AC/SOCP)
 function _battery_energy_balance!(model::JuMP.Model, bat::BatteryData)
     T = get(model.ext, :time_periods, 1)
     B = bat.n

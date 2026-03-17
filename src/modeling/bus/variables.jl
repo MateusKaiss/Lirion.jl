@@ -19,7 +19,7 @@ end
     end
 end
 
-function create_voltage_angle_variables!(model::JuMP.Model, bus::BusData)
+function add_voltage_angle_variables!(model::JuMP.Model, bus::BusData)
     T = get(model.ext, :time_periods, 1)
     bus_ids = bus.id
     va_start = bus.va_start
@@ -44,7 +44,7 @@ function create_voltage_angle_variables!(model::JuMP.Model, bus::BusData)
     return nothing
 end
 
-function create_voltage_magnitude_variables!(model::JuMP.Model, bus::BusData)
+function add_voltage_magnitude_variables!(model::JuMP.Model, bus::BusData)
     T = get(model.ext, :time_periods, 1)
     bus_ids = bus.id
 
@@ -59,7 +59,7 @@ function create_voltage_magnitude_variables!(model::JuMP.Model, bus::BusData)
     return nothing
 end
 
-function create_socp_bus_variables!(model::JuMP.Model, bus::BusData)
+function add_socp_bus_variables!(model::JuMP.Model, bus::BusData)
     T = get(model.ext, :time_periods, 1)
     bus_ids = bus.id
 

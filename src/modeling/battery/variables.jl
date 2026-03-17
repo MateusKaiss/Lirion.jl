@@ -1,7 +1,8 @@
 # =======================================================================
-# Battery variables
+# STORAGE
 # =======================================================================
-function create_battery_variables!(model::JuMP.Model, bat::BatteryData)
+
+function add_storage_variables!(model::JuMP.Model, bat::BatteryData)
     T = get(model.ext, :time_periods, 1)
     B = bat.n
 
@@ -12,6 +13,18 @@ function create_battery_variables!(model::JuMP.Model, bat::BatteryData)
         upper_bound = bat.max_storage[b],
         start = bat.energy_start[b],
     )
+
+    model[:storage] = storage
+    return nothing
+end
+
+# =======================================================================
+# CHARGE / DISCHARGE
+# =======================================================================
+
+function add_charge_discharge_variables!(model::JuMP.Model, bat::BatteryData)
+    T = get(model.ext, :time_periods, 1)
+    B = bat.n
 
     @variable(
         model,
@@ -28,6 +41,20 @@ function create_battery_variables!(model::JuMP.Model, bat::BatteryData)
         upper_bound = bat.discharge_ramp[b],
         start = 0.0,
     )
+
+    model[:charge] = charge
+    model[:discharge] = discharge
+
+    return nothing
+end
+
+# =======================================================================
+# POWER (P/Q)
+# =======================================================================
+
+function add_battery_power_variables!(model::JuMP.Model, bat::BatteryData)
+    T = get(model.ext, :time_periods, 1)
+    B = bat.n
 
     @variable(
         model,
@@ -52,6 +79,10 @@ function create_battery_variables!(model::JuMP.Model, bat::BatteryData)
         upper_bound = bat.qmax[b],
         start = 0.0,
     )
+
+    model[:p_battery_injected] = p_battery_injected
+    model[:q_battery_injected] = q_battery_injected
+    model[:qsc] = qsc
 
     return nothing
 end

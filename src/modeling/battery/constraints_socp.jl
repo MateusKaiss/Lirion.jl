@@ -1,7 +1,8 @@
 # =======================================================================
 # SOCP battery constraints
 # =======================================================================
-function create_socp_battery_constraints!(model::JuMP.Model, bat::BatteryData)
+
+function add_socp_battery_constraints!(model::JuMP.Model, bat::BatteryData)
     T = get(model.ext, :time_periods, 1)
     B = bat.n
 
@@ -15,6 +16,7 @@ function create_socp_battery_constraints!(model::JuMP.Model, bat::BatteryData)
     )
 
     vmin_global = get(model.ext, :v_min, 0.9)
+
     @inbounds for b in 1:B, t in 1:T
         ub = (bat.thermal_limit[b] / vmin_global)^2
         set_upper_bound(ccms[b, t], ub)
@@ -23,6 +25,7 @@ function create_socp_battery_constraints!(model::JuMP.Model, bat::BatteryData)
     @constraint(model, [b in 1:B, t in 1:T],
         model[:charge][b, t] <= z_b[b, t] * bat.charge_ramp[b]
     )
+
     @constraint(model, [b in 1:B, t in 1:T],
         model[:discharge][b, t] <= (1 - z_b[b, t]) * bat.discharge_ramp[b]
     )
