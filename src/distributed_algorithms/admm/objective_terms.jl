@@ -18,7 +18,7 @@ function build_quad_bus_expr!(
     v_mag = part.v_mag_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     quad = zero(JuMP.QuadExpr)
 
-    @inbounds for b in part.shared_buses_zone
+    @inbounds for b in part.zone_shared_bus_ids
         quad += 0.5 * rho_theta * theta[b, 1]^2 + 0.5 * rho_v_mag * v_mag[b, 1]^2
     end
 
@@ -38,7 +38,7 @@ function build_quad_bus_expr!(
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     quad = zero(JuMP.QuadExpr)
 
-    @inbounds for b in part.shared_buses_zone
+    @inbounds for b in part.zone_shared_bus_ids
         quad += 0.5 * rho_theta * theta[b, 1]^2
     end
 
@@ -58,7 +58,7 @@ function build_quad_bus_expr!(
     v2 = m[:v_magnitude_sq]
     quad = zero(JuMP.QuadExpr)
 
-    @inbounds for b in sub.shared_buses_zone
+    @inbounds for b in sub.zone_shared_bus_ids
         quad += 0.5 * rho_v2 * v2[b, 1]^2
     end
 
@@ -190,7 +190,7 @@ function build_linear_bus_term(
     v_mag = part.v_mag_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     lin = zero(JuMP.AffExpr)
 
-    @inbounds for b in part.shared_buses_zone
+    @inbounds for b in part.zone_shared_bus_ids
         j = shared_buses_to_pos[b]
         lin += (theta_dual_buf_z[j] - rho_theta * theta_consensus[j]) * theta[b, 1]
         lin += (v_mag_dual_buf_z[j] - rho_v * v_mag_consensus[j]) * v_mag[b, 1]
@@ -212,7 +212,7 @@ function build_linear_bus_term(
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     lin = zero(JuMP.AffExpr)
 
-    @inbounds for b in part.shared_buses_zone
+    @inbounds for b in part.zone_shared_bus_ids
         j = shared_buses_to_pos[b]
         lin += (theta_dual_buf_z[j] - rho_theta * theta_consensus[j]) * theta[b, 1]
     end
@@ -234,7 +234,7 @@ function build_linear_bus_term(
     v2 = m[:v_magnitude_sq]
     lin = zero(JuMP.AffExpr)
 
-    @inbounds for b in sub.shared_buses_zone
+    @inbounds for b in sub.zone_shared_bus_ids
         j = shared_buses_to_pos[b]
         lin += (v2_dual_buf_z[j] - rho_v2 * v2_consensus[j]) * v2[b, 1]
     end

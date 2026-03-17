@@ -176,7 +176,7 @@ function run_admm(
     @assert config.base_model == DC "ADMM state/DC requer base_model == DC."
     @assert config.coupling == :state "Dispatch State/DC requer coupling=:state."
 
-    shared_buses = sys.shared_buses
+    full_shared_bus_ids = sys.full_shared_bus_ids
     max_iter = config.max_iter
 
     rho = Ref(config.rho_theta)
@@ -189,7 +189,7 @@ function run_admm(
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(shared_buses)
+    shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(full_shared_bus_ids)
     n_shared_buses = length(shared_buses_sorted)
 
     dual_theta =
@@ -481,7 +481,7 @@ function run_admm(
     @assert config.base_model == DC "Hybrid ADMM/DC requer DC."
     @assert config.coupling == :hybrid "Dispatch Hybrid/DC requer coupling=:hybrid."
 
-    shared_buses = sys.shared_buses
+    full_shared_bus_ids = sys.full_shared_bus_ids
     interzonal_branches = sys.interzonal_branches
     max_iter = config.max_iter
 
@@ -499,7 +499,7 @@ function run_admm(
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(shared_buses)
+    shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(full_shared_bus_ids)
     n_shared_buses = length(shared_buses_sorted)
 
     theta_consensus = zeros(Float64, n_shared_buses)

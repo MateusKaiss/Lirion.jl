@@ -33,9 +33,9 @@ struct DistributedSystem
 
     zone_branch_idx_in_full::Vector{Vector{Int}}
     branch_idx_full_to_zone::Vector{Vector{Int}}
-    shared_buses_zone::Vector{Vector{Int}}
+    zone_shared_bus_ids::Vector{Vector{Int}}
 
-    shared_buses::Vector{Int}
+    full_shared_bus_ids::Vector{Int}
     interzonal_branches::Vector{Int}
 end
 
@@ -102,28 +102,28 @@ function build_distributed_system(
     parts = Vector{SystemData}(undef, n_zones)
     zone_branch_idx_in_full = Vector{Vector{Int}}(undef, n_zones)
     branch_idx_full_to_zone = Vector{Vector{Int}}(undef, n_zones)
-    shared_buses_zone = Vector{Vector{Int}}(undef, n_zones)
+    zone_shared_bus_ids = Vector{Vector{Int}}(undef, n_zones)
 
     @inbounds for i in 1:n_zones
-        z = zones[i]
-        zone_raw = parts_dict[z]::CaseRaw
+        zone_id = zones[i]
+        zone_raw = parts_dict[zone_id]::CaseRaw
 
         parts[i] = build_system_data(zone_raw)
 
         zone_branch_idx_in_full[i] = zone_raw.dist.zone_branch_idx_in_full
         branch_idx_full_to_zone[i] = zone_raw.dist.branch_idx_full_to_zone
-        shared_buses_zone[i] = zone_raw.dist.zone_shared_bus_ids
+        zone_shared_bus_ids[i] = zone_raw.dist.zone_shared_bus_ids
     end
 
-    shared_buses = case_raw.dist.full_shared_bus_ids
+    full_shared_bus_ids = case_raw.dist.full_shared_bus_ids
 
     return DistributedSystem(
         zones,
         parts,
         zone_branch_idx_in_full,
         branch_idx_full_to_zone,
-        shared_buses_zone,
-        shared_buses,
+        zone_shared_bus_ids,
+        full_shared_bus_ids,
         interzonal_branches,
     )
 end

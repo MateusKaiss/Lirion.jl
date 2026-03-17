@@ -17,7 +17,7 @@
 )
     theta_shared_local = snapshot_theta_shared!(part)
     v_mag_shared_local = snapshot_v_mag_shared!(part)
-    shared_bus_ids = part.shared_buses_zone
+    shared_bus_ids = part.zone_shared_bus_ids
 
     @inbounds for i in eachindex(shared_bus_ids)
         j = shared_buses_to_pos[shared_bus_ids[i]]
@@ -83,7 +83,7 @@ end
     shared_buses_to_pos::Dict{Int, Int},
 )
     theta_shared_local = snapshot_theta_shared!(part)
-    shared_bus_ids = part.shared_buses_zone
+    shared_bus_ids = part.zone_shared_bus_ids
 
     @inbounds for i in eachindex(shared_bus_ids)
         j = shared_buses_to_pos[shared_bus_ids[i]]
@@ -131,7 +131,7 @@ end
     shared_buses_to_pos::Dict{Int, Int},
 )
     v2s = snapshot_v2_shared!(part)
-    shared_bus_ids = part.shared_buses_zone
+    shared_bus_ids = part.zone_shared_bus_ids
 
     @inbounds for i in eachindex(shared_bus_ids)
         j = shared_buses_to_pos[shared_bus_ids[i]]

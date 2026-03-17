@@ -18,7 +18,7 @@ function primal_residual_bus_ac_vec(
         thetabuf = snapshot_theta_ac!(part)
         Vbuf = snapshot_v_mag!(part)
         pos = part.bus_local_index
-        @inbounds for b in part.shared_buses_zone
+        @inbounds for b in part.zone_shared_bus_ids
             j = shared_buses_to_pos[b]
             acc +=
                 _wrap_angle_diff(thetabuf[pos[b]] - theta_consensus_vec[j])^2 +
@@ -41,7 +41,7 @@ function primal_residual_bus_ac_components(
         thetabuf = snapshot_theta_ac!(part)
         Vbuf = snapshot_v_mag!(part)
         pos = part.bus_local_index
-        @inbounds for b in part.shared_buses_zone
+        @inbounds for b in part.zone_shared_bus_ids
             j = shared_buses_to_pos[b]
             rtheta += _wrap_angle_diff(thetabuf[pos[b]] - theta_consensus_vec[j])^2
             rV += (Vbuf[pos[b]] - v_mag_consensus_vec[j])^2
@@ -91,7 +91,7 @@ function primal_residual_bus_dc(
     for part in partitions
         thetabuf = snapshot_theta!(part)
         pos = part.bus_local_index
-        @inbounds for b in part.shared_buses_zone
+        @inbounds for b in part.zone_shared_bus_ids
             j = shared_buses_to_pos[b]
             acc += (thetabuf[pos[b]] - theta_consensus_vec[j])^2
         end
@@ -130,7 +130,7 @@ function primal_residual_bus_socp_vec(
     for sub in partitions
         v2buf = snapshot_v2!(sub)
         pos = sub.bus_local_index
-        @inbounds for b in sub.shared_buses_zone
+        @inbounds for b in sub.zone_shared_bus_ids
             j = shared_buses_to_pos[b]
             acc += (v2buf[pos[b]] - v2_consensus_vec[j])^2
         end
@@ -197,7 +197,7 @@ function eps_primal_bus_ac_vec(
 )
     dim = 0
     for part in partitions
-        dim += 2 * length(part.shared_buses_zone)
+        dim += 2 * length(part.zone_shared_bus_ids)
     end
 
     z_norm_sq = 0.0
@@ -247,8 +247,8 @@ function eps_primal_bus_dc(
     for part in partitions
         thetabuf = snapshot_theta!(part)
         pos = part.bus_local_index
-        n += length(part.shared_buses_zone)
-        @inbounds for b in part.shared_buses_zone
+        n += length(part.zone_shared_bus_ids)
+        @inbounds for b in part.zone_shared_bus_ids
             norm_x_sq += thetabuf[pos[b]]^2
         end
     end
@@ -295,7 +295,7 @@ function eps_primal_bus_socp_vec(
     for sub in partitions
         v2buf = snapshot_v2!(sub)
         pos = sub.bus_local_index
-        @inbounds for b in sub.shared_buses_zone
+        @inbounds for b in sub.zone_shared_bus_ids
             norm_x_sq += v2buf[pos[b]]^2
         end
     end
@@ -488,7 +488,7 @@ function eps_dual_bus_ac_unscaled(
         yθ = duals_theta[zone_id]
         yV = duals_v_mag[zone_id]
 
-        for b in part.shared_buses_zone
+        for b in part.zone_shared_bus_ids
             j = shared_buses_to_pos[b]
             n += 2
             y_norm_sq += yθ[j]^2 + yV[j]^2
@@ -539,7 +539,7 @@ function eps_dual_bus_dc_unscaled(
         zone_id = zone_ids[i]
         part = partitions.parts[i]
         y = dual_theta[zone_id]
-        @inbounds for b in part.shared_buses_zone
+        @inbounds for b in part.zone_shared_bus_ids
             j = shared_buses_to_pos[b]
             n += 1
             y_norm_sq += y[j]^2
@@ -590,7 +590,7 @@ function eps_dual_bus_socp_unscaled(
         zone_id = zone_ids[i]
         part = partitions.parts[i]
         y = duals_v2[zone_id]
-        for b in part.shared_buses_zone
+        for b in part.zone_shared_bus_ids
             j = shared_buses_to_pos[b]
             n += 1
             y_norm_sq += y[j]^2

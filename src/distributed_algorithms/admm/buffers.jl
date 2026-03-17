@@ -23,7 +23,7 @@ end
 
     part.bus_local_index = Dict{Int, Int}(ids[i] => i for i in 1:n_bus)
 
-    shared_bus_ids = part.shared_buses_zone
+    shared_bus_ids = part.zone_shared_bus_ids
     n_shared = length(shared_bus_ids)
 
     part.consensus_bus_local_idxs = Vector{Int}(undef, n_shared)
@@ -34,7 +34,7 @@ end
     return nothing
 end
 
-@inline _bus_dims(part) = (length(part.bus.id), length(part.shared_buses_zone))
+@inline _bus_dims(part) = (length(part.bus.id), length(part.zone_shared_bus_ids))
 
 function prepare_hotpaths!(part::PartitionAC)
     _prepare_bus_maps!(part)

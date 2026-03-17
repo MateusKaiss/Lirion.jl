@@ -205,7 +205,7 @@ function run_admm(
     @assert config.base_model == AC "ADMM-AC: base_model deve ser AC."
     @assert config.coupling == :state "Dispatch State/AC requer coupling=:state."
 
-    shared_buses = sys.shared_buses
+    full_shared_bus_ids = sys.full_shared_bus_ids
     max_iter = config.max_iter
 
     rho_theta = Ref(config.rho_theta)
@@ -220,7 +220,7 @@ function run_admm(
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(shared_buses)
+    shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(full_shared_bus_ids)
     n_shared_buses = length(shared_buses_sorted)
 
     duals_theta = Dict{Int, Vector{Float64}}(z => zeros(n_shared_buses) for z in zone_ids)
@@ -614,7 +614,7 @@ function run_admm(
     @assert config.base_model == AC "Hybrid AC: base_model deve ser AC."
     @assert config.coupling == :hybrid "Dispatch Hybrid/AC requer coupling=:hybrid."
 
-    shared_buses = sys.shared_buses
+    full_shared_bus_ids = sys.full_shared_bus_ids
     interzonal_branches = sys.interzonal_branches
     max_iter = config.max_iter
 
@@ -636,7 +636,7 @@ function run_admm(
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(shared_buses)
+    shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(full_shared_bus_ids)
     n_shared_buses = length(shared_buses_sorted)
 
     duals_theta = Dict{Int, Vector{Float64}}(z => zeros(n_shared_buses) for z in zone_ids)

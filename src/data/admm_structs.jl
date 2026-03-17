@@ -21,7 +21,7 @@ Base.@kwdef mutable struct PartitionDC
     branch::BranchData
 
     zone_branch_idx_in_full::Vector{Int} = Int[]
-    shared_buses_zone::Vector{Int} = Int[]
+    zone_shared_bus_ids::Vector{Int} = Int[]
     branch_idx_full_to_zone::Vector{Int} = Int[]
 
     bus_local_index::Dict{Int, Int} = Dict{Int, Int}()
@@ -55,7 +55,7 @@ Base.@kwdef mutable struct PartitionAC
     branch::BranchData
 
     zone_branch_idx_in_full::Vector{Int} = Int[]
-    shared_buses_zone::Vector{Int} = Int[]
+    zone_shared_bus_ids::Vector{Int} = Int[]
     branch_idx_full_to_zone::Vector{Int} = Int[]
 
     bus_local_index::Dict{Int, Int} = Dict{Int, Int}()
@@ -97,7 +97,7 @@ Base.@kwdef mutable struct PartitionSOCP
     branch::BranchData
 
     zone_branch_idx_in_full::Vector{Int} = Int[]
-    shared_buses_zone::Vector{Int} = Int[]
+    zone_shared_bus_ids::Vector{Int} = Int[]
     branch_idx_full_to_zone::Vector{Int} = Int[]
 
     bus_local_index::Dict{Int, Int} = Dict{Int, Int}()
@@ -153,7 +153,7 @@ function build_dc_partitions(sys::DistributedSystem)::Partitions{PartitionDC}
             branch = s.branch,
             zone_branch_idx_in_full = sys.zone_branch_idx_in_full[i],
             branch_idx_full_to_zone = sys.branch_idx_full_to_zone[i],
-            shared_buses_zone = sys.shared_buses_zone[i],
+            zone_shared_bus_ids = sys.zone_shared_bus_ids[i],
             objective_params = s.objective,
         )
     end
@@ -175,7 +175,7 @@ function build_ac_partitions(sys::DistributedSystem)::Partitions{PartitionAC}
             branch = s.branch,
             zone_branch_idx_in_full = sys.zone_branch_idx_in_full[i],
             branch_idx_full_to_zone = sys.branch_idx_full_to_zone[i],
-            shared_buses_zone = sys.shared_buses_zone[i],
+            zone_shared_bus_ids = sys.zone_shared_bus_ids[i],
             objective_params = s.objective,
         )
     end
@@ -197,7 +197,7 @@ function build_socp_partitions(sys::DistributedSystem)::Partitions{PartitionSOCP
             branch = s.branch,
             zone_branch_idx_in_full = sys.zone_branch_idx_in_full[i],
             branch_idx_full_to_zone = sys.branch_idx_full_to_zone[i],
-            shared_buses_zone = sys.shared_buses_zone[i],
+            zone_shared_bus_ids = sys.zone_shared_bus_ids[i],
             objective_params = s.objective,
         )
     end

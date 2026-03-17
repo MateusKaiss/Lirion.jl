@@ -221,7 +221,7 @@ function run_admm(
         optimizer_factory = resolve_optimizer(config)
     end
 
-    shared_buses = sys.shared_buses
+    full_shared_bus_ids = sys.full_shared_bus_ids
     interzonal_branches = sys.interzonal_branches
     max_iter = config.max_iter
 
@@ -241,7 +241,7 @@ function run_admm(
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(shared_buses)
+    shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(full_shared_bus_ids)
     n_shared_buses = length(shared_buses_sorted)
 
     v2_consensus = ones(Float64, n_shared_buses)
@@ -660,7 +660,7 @@ function run_admm(
         optimizer_factory = resolve_optimizer(config)
     end
 
-    shared_buses = sys.shared_buses
+    full_shared_bus_ids = sys.full_shared_bus_ids
     interzonal_branches = sys.interzonal_branches
     max_iter = config.max_iter
 
@@ -684,7 +684,7 @@ function run_admm(
     zone_ids = partitions.zones
     n_zones = length(zone_ids)
 
-    shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(shared_buses)
+    shared_buses_sorted, shared_buses_to_pos = sorted_ids_and_id2idx(full_shared_bus_ids)
     n_shared_buses = length(shared_buses_sorted)
 
     v2_consensus = ones(Float64, n_shared_buses)
