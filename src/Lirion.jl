@@ -18,16 +18,11 @@ end
 # ------------------------------------------------------------------
 # Packages
 # ------------------------------------------------------------------
-using PlotlyLight
 using JuMP
 using Ipopt
-using Gurobi
-using DataFrames
-using CSV
 using Dates
 using Statistics
 using Logging
-using SCS
 using OSQP
 using Base.Threads
 using MathOptInterface
@@ -60,7 +55,6 @@ include("data/raw_structs.jl")
 # ------------------------------------------------------------------
 include("parsing/matlab_parser_core.jl")
 include("parsing/matpower_tables.jl")
-include("parsing/csv_tables.jl")
 include("parsing/case_parser.jl")
 
 # ------------------------------------------------------------------
@@ -147,21 +141,51 @@ include("postprocessing/build_results.jl")
 include("postprocessing/build_plots.jl")
 
 # ------------------------------------------------------------------
-# Distributed methods
+# Distributed methods — optimizer + core support
 # ------------------------------------------------------------------
+include("distributed_algorithms/optimizer.jl")
+include("distributed_algorithms/admm/core/admm_support.jl")
+include("distributed_algorithms/admm/core/history.jl")
+include("distributed_algorithms/admm/core/snapshots.jl")
+include("distributed_algorithms/admm/core/flow_accessors.jl")
+include("distributed_algorithms/admm/build_admm_params.jl")
+include("distributed_algorithms/admm/local_solve.jl")
+
+# ------------------------------------------------------------------
+# ADMM workspaces, partitions, objectives (per-formulation)
+# ------------------------------------------------------------------
+
+# DC
+include("distributed_algorithms/admm/dc/workspace.jl")
+include("distributed_algorithms/admm/dc/partition.jl")
+include("distributed_algorithms/admm/dc/objective.jl")
+
+# AC
+include("distributed_algorithms/admm/ac/workspace.jl")
+include("distributed_algorithms/admm/ac/partition.jl")
+include("distributed_algorithms/admm/ac/objective.jl")
+
+# SOCP
+include("distributed_algorithms/admm/socp/workspace.jl")
+include("distributed_algorithms/admm/socp/partition.jl")
+include("distributed_algorithms/admm/socp/objective.jl")
+
+# ------------------------------------------------------------------
+# ADMM unified algorithms (consensus, duals, residuals, rho, save)
+# ------------------------------------------------------------------
+include("distributed_algorithms/admm/core/save.jl")
+include("distributed_algorithms/admm/core/consensus.jl")
+include("distributed_algorithms/admm/core/dual_update.jl")
+include("distributed_algorithms/admm/core/residuals.jl")
+include("distributed_algorithms/admm/core/tolerances.jl")
+include("distributed_algorithms/admm/core/rho_update.jl")
+include("distributed_algorithms/admm/core/logging.jl")
+
+# ------------------------------------------------------------------
+# ADMM loop + distributed OPF runner (after all types are defined)
+# ------------------------------------------------------------------
+include("distributed_algorithms/admm/run_admm.jl")
 include("distributed_algorithms/distributed_opf.jl")
-
-include("distributed_algorithms/admm/admm_support.jl")
-include("distributed_algorithms/admm/buffers.jl")
-include("distributed_algorithms/admm/objective_terms.jl")
-include("distributed_algorithms/admm/consensus.jl")
-include("distributed_algorithms/admm/duals.jl")
-include("distributed_algorithms/admm/residuals.jl")
-include("distributed_algorithms/admm/rho.jl")
-
-include("distributed_algorithms/admm/run_admm/admm_dc.jl")
-include("distributed_algorithms/admm/run_admm/admm_ac.jl")
-include("distributed_algorithms/admm/run_admm/admm_socp.jl")
 
 # ------------------------------------------------------------------
 # Legacy runner / CLI entrypoints
