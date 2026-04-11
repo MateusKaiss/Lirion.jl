@@ -71,7 +71,7 @@ Base.@kwdef mutable struct PartitionAC <: AbstractPartition
 
     obj_base::Union{Nothing, Float64, JuMP.AffExpr, JuMP.QuadExpr, JuMP.NonlinearExpr} =
         nothing
-    quad_bus_expr_ac::Union{Nothing, JuMP.NonlinearExpr} = nothing
+    quad_bus_expr_ac::Union{Nothing, JuMP.QuadExpr, JuMP.NonlinearExpr} = nothing
     quad_branch_expr_ac::Union{Nothing, JuMP.QuadExpr, JuMP.NonlinearExpr} = nothing
 
     objective_params::ObjectiveData
