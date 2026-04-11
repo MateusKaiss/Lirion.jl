@@ -8,7 +8,7 @@ function run_test_timeseries()
                 case_path;
                 model = Lirion.dc(),
                 algorithm = Lirion.centralized(),
-                optimizer = SCS.Optimizer,
+                optimizer = Clarabel.Optimizer,
                 outputs = false,
                 plots = false,
             )
@@ -38,7 +38,7 @@ function run_test_timeseries()
                 case_path;
                 model = Lirion.socp(),
                 algorithm = Lirion.centralized(),
-                optimizer = SCS.Optimizer,
+                optimizer = Clarabel.Optimizer,
                 outputs = false,
                 plots = false,
             )

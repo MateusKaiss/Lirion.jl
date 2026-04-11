@@ -49,7 +49,7 @@ const SOCP_HYBRID_CASES = [
 # OBJECTIVE EXTRACTORS
 # ============================================================
 central_obj_socp(out) = Float64(out.result["objective"])
-dist_obj_socp(out) = Float64(out.result.total_expr_cost)
+dist_obj_socp(out) = Float64(out.result.total_cost)
 
 # ============================================================
 # SOCP - STATE

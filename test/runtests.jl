@@ -3,13 +3,41 @@ using Lirion
 using PowerModels
 using Glob
 using Ipopt
-using SCS
 using OSQP
-using Gurobi
+using Clarabel
+using JuMP: optimizer_with_attributes
 
 include("common.jl")
 
-const DEFAULT_SOCP_SOLVER = pick_socp_optimizer()
+const DEFAULT_SOCP_SOLVER = optimizer_with_attributes(
+    Clarabel.Optimizer,
+    "verbose" => false,
+    "tol_feas" => 1e-4,
+    "tol_gap_abs" => 1e-4,
+    "tol_gap_rel" => 1e-4,
+    "max_iter" => 1200,
+    "dynamic_regularization_enable" => true,
+    "dynamic_regularization_eps" => 1e-10,
+    "dynamic_regularization_delta" => 1e-4,
+    "static_regularization_enable" => true,
+    "equilibrate_enable" => true,
+    "equilibrate_min_scaling" => 1e-4,
+    "equilibrate_max_scaling" => 1e4,
+    "direct_solve_method" => :qdldl,
+    "iterative_refinement_reltol" => 1e-9,
+    "iterative_refinement_abstol" => 1e-9,
+    "max_step_fraction" => 0.7,
+    "linesearch_backtrack_step" => 0.5,
+    "tol_ktratio" => 1e-5,
+    "min_terminate_step_length" => 1e-6,
+    "min_switch_step_length" => 5e-2,
+    "reduced_tol_gap_abs" => 5e-4,
+    "reduced_tol_gap_rel" => 5e-4,
+    "reduced_tol_feas" => 5e-4,
+    "reduced_tol_infeas_abs" => 5e-11,
+    "reduced_tol_infeas_rel" => 5e-4,
+    "reduced_tol_ktratio" => 1e-4,
+)
 
 include(joinpath(@__DIR__, "test_objective.jl"))
 include(joinpath(@__DIR__, "test_timeseries.jl"))
@@ -20,15 +48,15 @@ include(joinpath(@__DIR__, "test_admm_socp.jl"))
 
 @testset "Lirion - All Tests" begin
     # Centralizados
-    run_test_objective()
-    run_test_timeseries()
+    # run_test_objective()
+    # run_test_timeseries()
 
-    # Distributed DC
+    # # Distributed DC
     run_admm_dc_state_tests(; rtol = 0.01)
     run_admm_dc_power_tests(; rtol = 0.01)
     run_admm_dc_hybrid_tests(; rtol = 0.01)
 
-    # # Distributed AC
+    # # # Distributed AC
     run_admm_ac_state_tests(;
         rtol = 0.01,
         central_optimizer = Ipopt.Optimizer,

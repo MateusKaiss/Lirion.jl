@@ -66,25 +66,7 @@ end
 # SOCP solver picker
 # ============================================================
 
-const _SOCP_CHAIN_MAP = Dict(
-    :auto => (Gurobi.Optimizer, SCS.Optimizer),
-    :gurobi => (Gurobi.Optimizer, SCS.Optimizer),
-    :scs => (SCS.Optimizer, Gurobi.Optimizer),
-)
-
-function pick_socp_optimizer(;
-    prefer::Symbol = Symbol(lowercase(get(ENV, "LIRION_SOCP_PREFER", "auto"))),
-)
-    chain = get(_SOCP_CHAIN_MAP, prefer, _SOCP_CHAIN_MAP[:auto])
-    for factory in chain
-        try
-            _ = factory()
-            return factory
-        catch
-        end
-    end
-    return SCS.Optimizer
-end
+pick_socp_optimizer(; prefer::Symbol = :auto) = Clarabel.Optimizer
 
 # ============================================================
 # GENERIC DISTRIBUTED TEST RUNNER

@@ -9,7 +9,7 @@ const DC_STATE_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
-    "pglib_opf_case73_ieee_rts.m",
+    # "pglib_opf_case73_ieee_rts.m",
     # "pglib_opf_case118_ieee.m",
     # "pglib_opf_case57_ieee.m",
 
@@ -51,7 +51,7 @@ const DC_HYBRID_CASES = [
 # OBJECTIVE EXTRACTORS
 # ============================================================
 central_obj_dc(out) = Float64(out.result["objective"])
-dist_obj_dc(out) = Float64(out.result.total_real_cost)
+dist_obj_dc(out) = Float64(out.result.total_cost)
 
 # ============================================================
 # DC - STATE

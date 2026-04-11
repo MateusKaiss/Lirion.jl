@@ -269,8 +269,7 @@ end
 
 function run_test_objective()
     @testset "Lirion vs PowerModels Unified Comparison" begin
-        # DC: às vezes Gurobi pode não estar disponível/licença
-        dc_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer)
+        dc_optimizer = Ipopt.Optimizer
         run_model_tests(
             Lirion.DC,
             "DC";
@@ -286,7 +285,7 @@ function run_test_objective()
             case_list = reduced_testlist_ac,
         )
 
-        socp_optimizer = get_available_optimizer(Gurobi.Optimizer, SCS.Optimizer)
+        socp_optimizer = Clarabel.Optimizer
         run_model_tests(
             Lirion.SOCP,
             "SOCP";
