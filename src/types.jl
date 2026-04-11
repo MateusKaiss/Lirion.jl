@@ -469,6 +469,8 @@ Base.propertynames(c::DistributedOPFModel, private::Bool = false) =
 abstract type AbstractRunDiagnostics end
 struct NoDiagnostics <: AbstractRunDiagnostics end
 
+abstract type AbstractADMMWorkspace end
+
 Base.@kwdef struct ADMMHistory <: AbstractRunDiagnostics
     r_primal::Vector{Float64} = Float64[]
     r_dual::Vector{Float64} = Float64[]

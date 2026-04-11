@@ -1,4 +1,6 @@
-struct Partitions{P}
+abstract type AbstractPartition end
+
+struct Partitions{P <: AbstractPartition}
     parts::Vector{P}
     zones::Vector{Int}
 end
@@ -14,7 +16,7 @@ end
 # ADMM Partitions structs
 # =======================================================================
 
-Base.@kwdef mutable struct PartitionDC
+Base.@kwdef mutable struct PartitionDC <: AbstractPartition
     id::Int
 
     bus::BusData
@@ -35,20 +37,17 @@ Base.@kwdef mutable struct PartitionDC
 
     obj_base::Union{Nothing, Float64, JuMP.AffExpr, JuMP.QuadExpr} = nothing
     quad_bus_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
-    rho_bus_cached::Float64 = 0.0
     quad_branch_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
-    rho_branch_cached::Float64 = 0.0
 
     objective_params::ObjectiveData
     has_solution::Bool = false
 
-    generation_cost_model_expr::Float64 = 0.0
-    real_generation_cost::Float64 = 0.0
+    generation_cost::Float64 = 0.0
 
     zone_edges::Vector{Int} = Int[]
 end
 
-Base.@kwdef mutable struct PartitionAC
+Base.@kwdef mutable struct PartitionAC <: AbstractPartition
     id::Int
 
     bus::BusData
@@ -73,24 +72,17 @@ Base.@kwdef mutable struct PartitionAC
     obj_base::Union{Nothing, Float64, JuMP.AffExpr, JuMP.QuadExpr, JuMP.NonlinearExpr} =
         nothing
     quad_bus_expr_ac::Union{Nothing, JuMP.NonlinearExpr} = nothing
-
-    rho_bus_theta_cached::Float64 = 0.0
-    rho_bus_v_cached::Float64 = 0.0
-
     quad_branch_expr_ac::Union{Nothing, JuMP.QuadExpr, JuMP.NonlinearExpr} = nothing
-    rho_branch_p_cached::Float64 = 0.0
-    rho_branch_q_cached::Float64 = 0.0
 
     objective_params::ObjectiveData
     has_solution::Bool = false
 
-    generation_cost_model_expr::Float64 = 0.0
-    real_generation_cost::Float64 = 0.0
+    generation_cost::Float64 = 0.0
 
     zone_edges::Vector{Int} = Int[]
 end
 
-Base.@kwdef mutable struct PartitionSOCP
+Base.@kwdef mutable struct PartitionSOCP <: AbstractPartition
     id::Int
 
     bus::BusData
@@ -114,40 +106,32 @@ Base.@kwdef mutable struct PartitionSOCP
     obj_static::Union{JuMP.AffExpr, Float64, JuMP.QuadExpr} = 0.0
 
     quad_bus_expr_socp::JuMP.QuadExpr = zero(JuMP.QuadExpr)
-    rho_bus_v2_cached::Float64 = 0.0
-
     quad_rt_expr_socp::JuMP.QuadExpr = zero(JuMP.QuadExpr)
-    rho_branch_r_cached::Float64 = 0.0
-    rho_branch_t_cached::Float64 = 0.0
-
     quad_pq_expr_socp::JuMP.QuadExpr = zero(JuMP.QuadExpr)
-    rho_branch_p_cached::Float64 = 0.0
-    rho_branch_q_cached::Float64 = 0.0
 
     soft_anchor_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
 
     objective_params::ObjectiveData
     has_solution::Bool = false
 
-    generation_cost_model_expr::Float64 = 0.0
-    real_generation_cost::Float64 = 0.0
+    generation_cost::Float64 = 0.0
 
     zone_edges::Vector{Int} = Int[]
 end
 
 # =======================================================================
-# ADMM Partitions Builders
+# ADMM Partitions Builder
 # =======================================================================
 
-function build_dc_partitions(sys::DistributedSystem)::Partitions{PartitionDC}
+function build_partitions(::Type{P}, sys::DistributedSystem) where {P <: AbstractPartition}
     n = length(sys.zones)
-    parts = Vector{PartitionDC}(undef, n)
+    parts = Vector{P}(undef, n)
 
     @inbounds for i in 1:n
         zone = sys.zones[i]
         s = sys.parts[i]
 
-        parts[i] = PartitionDC(;
+        parts[i] = P(;
             id = zone,
             bus = s.bus,
             branch = s.branch,
@@ -158,49 +142,5 @@ function build_dc_partitions(sys::DistributedSystem)::Partitions{PartitionDC}
         )
     end
 
-    return Partitions{PartitionDC}(parts, sys.zones)
-end
-
-function build_ac_partitions(sys::DistributedSystem)::Partitions{PartitionAC}
-    n = length(sys.zones)
-    parts = Vector{PartitionAC}(undef, n)
-
-    @inbounds for i in 1:n
-        zone = sys.zones[i]
-        s = sys.parts[i]
-
-        parts[i] = PartitionAC(;
-            id = zone,
-            bus = s.bus,
-            branch = s.branch,
-            zone_branch_idx_in_full = sys.zone_branch_idx_in_full[i],
-            branch_idx_full_to_zone = sys.branch_idx_full_to_zone[i],
-            zone_shared_bus_ids = sys.zone_shared_bus_ids[i],
-            objective_params = s.objective,
-        )
-    end
-
-    return Partitions{PartitionAC}(parts, sys.zones)
-end
-
-function build_socp_partitions(sys::DistributedSystem)::Partitions{PartitionSOCP}
-    n = length(sys.zones)
-    parts = Vector{PartitionSOCP}(undef, n)
-
-    @inbounds for i in 1:n
-        zone = sys.zones[i]
-        s = sys.parts[i]
-
-        parts[i] = PartitionSOCP(;
-            id = zone,
-            bus = s.bus,
-            branch = s.branch,
-            zone_branch_idx_in_full = sys.zone_branch_idx_in_full[i],
-            branch_idx_full_to_zone = sys.branch_idx_full_to_zone[i],
-            zone_shared_bus_ids = sys.zone_shared_bus_ids[i],
-            objective_params = s.objective,
-        )
-    end
-
-    return Partitions{PartitionSOCP}(parts, sys.zones)
+    return Partitions{P}(parts, sys.zones)
 end

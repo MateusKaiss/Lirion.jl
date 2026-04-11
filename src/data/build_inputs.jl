@@ -7,7 +7,7 @@ abstract type AbstractLirionInputs end
 struct CentralizedInputs <: AbstractLirionInputs
     database_path::String
     model_type::Type{<:OPFModel}
-    optimizer::Union{Nothing, Type{<:MOI.AbstractOptimizer}}
+    optimizer::Any
     write_outputs::Bool
     system::SystemData
 end
@@ -15,7 +15,7 @@ end
 struct DistributedInputs <: AbstractLirionInputs
     database_path::String
     model_type::DistributedOPFModel
-    optimizer::Union{Nothing, Type{<:MOI.AbstractOptimizer}}
+    optimizer::Any
     write_outputs::Bool
     system::DistributedSystem
 end
