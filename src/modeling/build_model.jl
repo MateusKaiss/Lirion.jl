@@ -3,8 +3,9 @@
 # =========================
 
 @inline _select_default_optimizer(::Type{DC}) = OSQP.Optimizer
-@inline _select_default_optimizer(::Type{SOCP}) = SCS.Optimizer
 @inline _select_default_optimizer(::Type{<:OPFModel}) = Ipopt.Optimizer
+
+@inline _select_default_optimizer(::Type{SOCP}) = Clarabel.Optimizer
 
 @inline function _resolve_optimizer(
     user_opt,
