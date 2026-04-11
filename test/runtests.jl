@@ -48,7 +48,7 @@ include(joinpath(@__DIR__, "test_admm_socp.jl"))
 
 @testset "Lirion - All Tests" begin
     # Centralizados
-    # run_test_objective()
+    run_test_objective()
     # run_test_timeseries()
 
     # # Distributed DC
