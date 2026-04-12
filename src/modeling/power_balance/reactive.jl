@@ -7,8 +7,6 @@ function compute_reactive_power_balance(
     pf = sys.powerflow
     gen = sys.gen
     bus = sys.bus
-    bus_ts = sys.bus_ts
-    consumer_ts = sys.consumer_ts
 
     bus_idx = pf.bus_idx_map[bus_id]
 
@@ -55,25 +53,10 @@ function compute_reactive_power_balance(
             init = 0.0,
         ) : 0.0
 
-    qd = 0.0
-    if bus_ts.has_timeseries && !isempty(bus_ts.time)
-        @inbounds for i in eachindex(bus_ts.bus)
-            if bus_ts.bus[i] == bus_id && bus_ts.time[i] == t
-                qd += bus_ts.qd[i]
-            end
-        end
-    else
-        qd = bus.qd[bus_idx]
-    end
-
-    q_cons = 0.0
-    if consumer_ts.has_timeseries && !isempty(consumer_ts.time)
-        @inbounds for i in eachindex(consumer_ts.bus)
-            if consumer_ts.bus[i] == bus_id && consumer_ts.time[i] == t
-                q_cons += consumer_ts.q_demand[i]
-            end
-        end
-    end
+    # O(1) dense-snapshot lookups; fall back to static demand when no
+    # timeseries was provided for this case.
+    qd = pf.has_bus_ts ? pf.qd_ts[bus_idx, t] : bus.qd[bus_idx]
+    q_cons = pf.has_consumer_ts ? pf.consumer_qd_ts[bus_idx, t] : 0.0
 
     return q_gen - q_bat + q_pros - qd - q_cons - q_out - q_in
 end

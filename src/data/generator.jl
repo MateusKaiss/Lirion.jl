@@ -1,7 +1,3 @@
-# ============================================================
-# Generator data
-# ============================================================
-
 struct GenData
     n::Int
     bus::Vector{Int}
@@ -16,11 +12,13 @@ struct GenData
     status::Vector{Int}
     existing::Vector{Bool}
 
-    pg_start::Vector{Union{Nothing, Float64}}
-    qg_start::Vector{Union{Nothing, Float64}}
+    pg_start::Vector{Float64}
+    qg_start::Vector{Float64}
 
     plant_type::Vector{String}
     curtailment_cost::Vector{Float64}
+
+    curtailable::Vector{Int}
 end
 
 function get_gen_parameters(case_raw::CaseRaw)
@@ -32,14 +30,20 @@ function get_gen_parameters(case_raw::CaseRaw)
 
     n = length(gen_raw.gen_bus)
 
-    pg_start = Vector{Union{Nothing, Float64}}(undef, n)
-    qg_start = Vector{Union{Nothing, Float64}}(undef, n)
+    pg_start = Vector{Float64}(undef, n)
+    qg_start = Vector{Float64}(undef, n)
 
     @inbounds for i in 1:n
-        pg_i = pg[i]
-        qg_i = qg[i]
-        pg_start[i] = isnan(pg_i) ? nothing : pg_i
-        qg_start[i] = isnan(qg_i) ? nothing : qg_i
+        pg_start[i] = pg[i]
+        qg_start[i] = qg[i]
+    end
+
+    existing = status .== 1
+    plant_type = gen_raw.plant_type
+
+    curtailable = Int[]
+    @inbounds for g in 1:n
+        (existing[g] && plant_type[g] == "R") && push!(curtailable, g)
     end
 
     return (
@@ -52,11 +56,12 @@ function get_gen_parameters(case_raw::CaseRaw)
         qmin = gen_raw.qmin,
         qmax = gen_raw.qmax,
         status = status,
-        existing = status .== 1,
+        existing = existing,
         pg_start = pg_start,
         qg_start = qg_start,
-        plant_type = gen_raw.plant_type,
+        plant_type = plant_type,
         curtailment_cost = gen_raw.curtailment_cost,
+        curtailable = curtailable,
     )
 end
 
@@ -78,5 +83,6 @@ function build_gen_data(case_raw::CaseRaw)::GenData
         params.qg_start,
         params.plant_type,
         params.curtailment_cost,
+        params.curtailable,
     )
 end

@@ -25,6 +25,38 @@ struct PowerFlowData
     bus_to_branches_to::Vector{Vector{Int}}
     bus_to_inter_in_branches::Vector{Vector{Int}}
     bus_to_inter_out_branches::Vector{Vector{Int}}
+
+    non_virtual_bus_ids::Vector{Int}
+
+    has_bus_ts::Bool
+    has_consumer_ts::Bool
+    pd_ts::Matrix{Float64}
+    qd_ts::Matrix{Float64}
+    consumer_pd_ts::Matrix{Float64}
+    consumer_qd_ts::Matrix{Float64}
+end
+
+# ------------------------------------------------------------
+# Timeseries snapshot builder (bus × time dense aggregation)
+# ------------------------------------------------------------
+
+@inline function _aggregate_bus_time!(
+    out::Matrix{Float64},
+    bus_idx_map::Vector{Int},
+    row_bus::Vector{Int},
+    row_time::Vector{Int},
+    row_value::Vector{Float64},
+)
+    _, T = size(out)
+    @inbounds for i in eachindex(row_bus)
+        bus_id = row_bus[i]
+        t = row_time[i]
+        (bus_id < 1 || bus_id > length(bus_idx_map)) && continue
+        bus_idx = bus_idx_map[bus_id]
+        (bus_idx == 0 || t < 1 || t > T) && continue
+        out[bus_idx, t] += row_value[i]
+    end
+    return nothing
 end
 
 function get_power_flow_parameters(case_raw::CaseRaw)
@@ -76,6 +108,45 @@ function get_power_flow_parameters(case_raw::CaseRaw)
     bus_to_inter_in = [Int[] for _ in 1:nbus]
     bus_to_inter_out = [Int[] for _ in 1:nbus]
 
+    non_virtual_bus_ids = Int[]
+    sizehint!(non_virtual_bus_ids, nbus)
+    @inbounds for i in 1:nbus
+        is_virtual[i] || push!(non_virtual_bus_ids, bus_ids[i])
+    end
+
+    T = case_raw.T
+    bus_ts_raw = case_raw.bus_timeseries
+    consumer_ts_raw = case_raw.consumer_timeseries
+
+    has_bus_ts = bus_ts_raw !== nothing && !isempty(bus_ts_raw.time)
+    has_consumer_ts = consumer_ts_raw !== nothing && !isempty(consumer_ts_raw.time)
+
+    T_dim = max(T, 1)
+    pd_ts = zeros(Float64, nbus, T_dim)
+    qd_ts = zeros(Float64, nbus, T_dim)
+    consumer_pd_ts = zeros(Float64, nbus, T_dim)
+    consumer_qd_ts = zeros(Float64, nbus, T_dim)
+
+    if has_bus_ts
+        _aggregate_bus_time!(
+            pd_ts, bus_idx_map, bus_ts_raw.bus, bus_ts_raw.time, bus_ts_raw.pd,
+        )
+        _aggregate_bus_time!(
+            qd_ts, bus_idx_map, bus_ts_raw.bus, bus_ts_raw.time, bus_ts_raw.qd,
+        )
+    end
+
+    if has_consumer_ts
+        _aggregate_bus_time!(
+            consumer_pd_ts, bus_idx_map,
+            consumer_ts_raw.bus, consumer_ts_raw.time, consumer_ts_raw.demand,
+        )
+        _aggregate_bus_time!(
+            consumer_qd_ts, bus_idx_map,
+            consumer_ts_raw.bus, consumer_ts_raw.time, consumer_ts_raw.q_demand,
+        )
+    end
+
     return (
         bus_ids = bus_ids,
         bus_idx_map = bus_idx_map,
@@ -98,6 +169,13 @@ function get_power_flow_parameters(case_raw::CaseRaw)
         bus_to_branches_to = bus_to_br_to,
         bus_to_inter_in_branches = bus_to_inter_in,
         bus_to_inter_out_branches = bus_to_inter_out,
+        non_virtual_bus_ids = non_virtual_bus_ids,
+        has_bus_ts = has_bus_ts,
+        has_consumer_ts = has_consumer_ts,
+        pd_ts = pd_ts,
+        qd_ts = qd_ts,
+        consumer_pd_ts = consumer_pd_ts,
+        consumer_qd_ts = consumer_qd_ts,
     )
 end
 
@@ -125,5 +203,12 @@ function build_power_flow_data(case_raw::CaseRaw)::PowerFlowData
         params.bus_to_branches_to,
         params.bus_to_inter_in_branches,
         params.bus_to_inter_out_branches,
+        params.non_virtual_bus_ids,
+        params.has_bus_ts,
+        params.has_consumer_ts,
+        params.pd_ts,
+        params.qd_ts,
+        params.consumer_pd_ts,
+        params.consumer_qd_ts,
     )
 end

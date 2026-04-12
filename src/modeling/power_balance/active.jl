@@ -7,8 +7,6 @@ function compute_active_power_balance(
     pf = sys.powerflow
     gen = sys.gen
     bus = sys.bus
-    bus_ts = sys.bus_ts
-    consumer_ts = sys.consumer_ts
 
     bus_idx = pf.bus_idx_map[bus_id]
 
@@ -53,25 +51,8 @@ function compute_active_power_balance(
             init = 0.0,
         ) : 0.0
 
-    pd = 0.0
-    if bus_ts.has_timeseries && !isempty(bus_ts.time)
-        @inbounds for i in eachindex(bus_ts.bus)
-            if bus_ts.bus[i] == bus_id && bus_ts.time[i] == t
-                pd += bus_ts.pd[i]
-            end
-        end
-    else
-        pd = bus.pd[bus_idx]
-    end
-
-    p_cons = 0.0
-    if consumer_ts.has_timeseries && !isempty(consumer_ts.time)
-        @inbounds for i in eachindex(consumer_ts.bus)
-            if consumer_ts.bus[i] == bus_id && consumer_ts.time[i] == t
-                p_cons += consumer_ts.demand[i]
-            end
-        end
-    end
+    pd = pf.has_bus_ts ? pf.pd_ts[bus_idx, t] : bus.pd[bus_idx]
+    p_cons = pf.has_consumer_ts ? pf.consumer_pd_ts[bus_idx, t] : 0.0
 
     return p_gen - p_bat - p_pros - pd - p_cons - p_out - p_in
 end

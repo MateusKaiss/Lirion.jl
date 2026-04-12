@@ -10,6 +10,7 @@ struct ProsumerData
     curtailment::Vector{Float64}
     cost_injection::Vector{Float64}
     inverter_capacity::Vector{Float64}
+    inverter_capacity_sq::Vector{Float64}
 end
 
 function get_prosumer_parameters(case_raw::CaseRaw)
@@ -57,6 +58,7 @@ end
 
 function build_prosumer_data(case_raw::CaseRaw)::ProsumerData
     params = get_prosumer_parameters(case_raw)
+    inverter_cap_sq = params.inverter_capacity .^ 2
     return ProsumerData(
         params.is_timeseries,
         params.number_of_prosumers,
@@ -69,5 +71,6 @@ function build_prosumer_data(case_raw::CaseRaw)::ProsumerData
         params.curtailment,
         params.cost_injection,
         params.inverter_capacity,
+        inverter_cap_sq,
     )
 end

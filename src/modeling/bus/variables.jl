@@ -45,13 +45,20 @@ function add_voltage_magnitude_variables!(model::JuMP.Model, bus::BusData)
     v_max = bus.v_max
     vm_start = bus.vm_start
 
-    @variable(
-        model,
-        v_magnitude[b in bus_ids, t in 1:T],
-        lower_bound = v_min[id_to_idx[b]],
-        upper_bound = v_max[id_to_idx[b]],
-        start = isnan(vm_start[id_to_idx[b]]) ? 1.0 : vm_start[id_to_idx[b]],
-    )
+    @variable(model, v_magnitude[b in bus_ids, t in 1:T])
+
+    @inbounds for b in bus_ids
+        idx = id_to_idx[b]
+        lo = v_min[idx]
+        hi = v_max[idx]
+        start_val = isnan(vm_start[idx]) ? 1.0 : vm_start[idx]
+        for t in 1:T
+            v = v_magnitude[b, t]
+            JuMP.set_lower_bound(v, lo)
+            JuMP.set_upper_bound(v, hi)
+            JuMP.set_start_value(v, start_val)
+        end
+    end
 
     return nothing
 end
@@ -64,13 +71,21 @@ function add_socp_bus_variables!(model::JuMP.Model, bus::BusData)
     v_max = bus.v_max
     vm_start = bus.vm_start
 
-    @variable(
-        model,
-        v_magnitude_sq[b in bus_ids, t in 1:T],
-        lower_bound = v_min[id_to_idx[b]]^2,
-        upper_bound = v_max[id_to_idx[b]]^2,
-        start = (isnan(vm_start[id_to_idx[b]]) ? 1.0 : vm_start[id_to_idx[b]])^2,
-    )
+    @variable(model, v_magnitude_sq[b in bus_ids, t in 1:T])
+
+    @inbounds for b in bus_ids
+        idx = id_to_idx[b]
+        lo = v_min[idx]^2
+        hi = v_max[idx]^2
+        vm0 = isnan(vm_start[idx]) ? 1.0 : vm_start[idx]
+        start_val = vm0 * vm0
+        for t in 1:T
+            v = v_magnitude_sq[b, t]
+            JuMP.set_lower_bound(v, lo)
+            JuMP.set_upper_bound(v, hi)
+            JuMP.set_start_value(v, start_val)
+        end
+    end
 
     return nothing
 end
