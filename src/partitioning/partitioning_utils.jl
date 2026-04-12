@@ -217,6 +217,28 @@ end
     )
 end
 
+@inline function _slice_storage(full_storage::StorageRaw{Float64}, keep::Vector{Int})
+    return StorageRaw{Float64}(
+        full_storage.storage_bus[keep],
+        full_storage.ps[keep],
+        full_storage.qs[keep],
+        full_storage.energy[keep],
+        full_storage.energy_rating[keep],
+        full_storage.charge_rating[keep],
+        full_storage.discharge_rating[keep],
+        full_storage.charge_efficiency[keep],
+        full_storage.discharge_efficiency[keep],
+        full_storage.thermal_rating[keep],
+        full_storage.qmin[keep],
+        full_storage.qmax[keep],
+        full_storage.r[keep],
+        full_storage.x[keep],
+        full_storage.p_loss[keep],
+        full_storage.q_loss[keep],
+        full_storage.status[keep],
+    )
+end
+
 @inline function _slice_prosumer(
     full_prosumer::ProsumerRaw{Float64},
     keep::Vector{Int},
@@ -292,9 +314,20 @@ end
         ts = full.gencost_timeseries
         zone_gc_ts_idx = findall(i -> ts.gen_id[i] in zone_gen_idx, eachindex(ts.gen_id))
 
+        n_global_gen = length(full.gen.gen_bus)
+        global_to_local_gen = zeros(Int, n_global_gen)
+        @inbounds for (local_k, global_k) in enumerate(zone_gen_idx)
+            global_to_local_gen[global_k] = local_k
+        end
+
+        remapped_gen_id = Vector{Int}(undef, length(zone_gc_ts_idx))
+        @inbounds for (k, idx) in enumerate(zone_gc_ts_idx)
+            remapped_gen_id[k] = global_to_local_gen[ts.gen_id[idx]]
+        end
+
         zone_case.gencost_timeseries = GencostTimeseriesRaw{Float64}(
             ts.time[zone_gc_ts_idx],
-            ts.gen_id[zone_gc_ts_idx],
+            remapped_gen_id,
             ts.model[zone_gc_ts_idx],
             ts.startup[zone_gc_ts_idx],
             ts.shutdown[zone_gc_ts_idx],

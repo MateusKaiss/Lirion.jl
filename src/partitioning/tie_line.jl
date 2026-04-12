@@ -100,7 +100,8 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
         end
     end
 
-    full_shared_bus_ids = [bus_id for (bus_id, zones) in bus_to_zones if length(zones) > 1]
+    full_shared_bus_ids =
+        sort!([bus_id for (bus_id, zones) in bus_to_zones if length(zones) > 1])
     full_shared_bus_set = Set(full_shared_bus_ids)
 
     full.dist.full_shared_bus_ids = full_shared_bus_ids
