@@ -46,12 +46,20 @@ end
 # Assignment parsing + scalar typing
 # ------------------------------------------------------------------------------
 
-function _extract_matlab_assignment(string::AbstractString)
-    statement = split(string, ';')[1]
-    statement_parts = split(statement, '=')
-    @assert length(statement_parts) == 2
-    name = strip(statement_parts[1])
-    value = strip(statement_parts[2])
+# Extract `(name, value)` from a MATLAB assignment like `foo.bar = 123;`.
+# Uses substring views + findfirst instead of `split`, avoiding per-line Vector
+# allocations.
+function _extract_matlab_assignment(s::AbstractString)
+    # Trim at first ';' (if present).
+    semi = findfirst(==(';'), s)
+    statement = semi === nothing ? s : SubString(s, firstindex(s), prevind(s, semi))
+
+    # Split at first '='.
+    eq = findfirst(==('='), statement)
+    @assert eq !== nothing "expected '=' in assignment: $(s)"
+
+    name = strip(SubString(statement, firstindex(statement), prevind(statement, eq)))
+    value = strip(SubString(statement, nextind(statement, eq), lastindex(statement)))
     return name, value
 end
 

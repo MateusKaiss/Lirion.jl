@@ -109,16 +109,28 @@ function _parse_gencost_csv(path::String)::GencostRaw{Float64}
     ncost = Vector{Int}(undef, n)
     coeffs = Vector{Vector{Float64}}(undef, n)
 
-    smodel = _sym("model")
-    sstartup = _sym("startup")
-    sshutdown = _sym("shutdown")
-    sncost = _sym("ncost")
+    # Cache columns once (avoids O(n) property lookups inside the loop).
+    col_model = _getcol(df, "model")
+    col_startup = _getcol(df, "startup")
+    col_shutdown = _getcol(df, "shutdown")
+    col_ncost = _getcol(df, "ncost")
+
+    # Cache coefficient columns c1..cK once, growing as needed.
+    max_k = 0
+    @inbounds for i in 1:n
+        k = _safe_int(col_ncost === nothing ? missing : col_ncost[i], 0)
+        k > max_k && (max_k = k)
+    end
+    coeff_cols = Vector{Any}(undef, max_k)
+    @inbounds for j in 1:max_k
+        coeff_cols[j] = _getcol(df, "c$(j)")
+    end
 
     @inbounds for i in 1:n
-        model[i] = _safe_int(df[i, smodel], 0)
-        startup[i] = _safe_f64(df[i, sstartup], 0.0)
-        shutdown[i] = _safe_f64(df[i, sshutdown], 0.0)
-        ncost[i] = _safe_int(df[i, sncost], 0)
+        model[i] = _safe_int(col_model === nothing ? missing : col_model[i], 0)
+        startup[i] = _safe_f64(col_startup === nothing ? missing : col_startup[i], 0.0)
+        shutdown[i] = _safe_f64(col_shutdown === nothing ? missing : col_shutdown[i], 0.0)
+        ncost[i] = _safe_int(col_ncost === nothing ? missing : col_ncost[i], 0)
 
         k = ncost[i]
         if k <= 0
@@ -128,12 +140,8 @@ function _parse_gencost_csv(path::String)::GencostRaw{Float64}
 
         c = Vector{Float64}(undef, k)
         @inbounds for j in 1:k
-            sj = _sym("c$(j)")
-            if sj in propertynames(df)
-                c[j] = _safe_f64(df[i, sj], 0.0)
-            else
-                c[j] = 0.0
-            end
+            col = coeff_cols[j]
+            c[j] = col === nothing ? 0.0 : _safe_f64(col[i], 0.0)
         end
         coeffs[i] = c
     end
@@ -155,25 +163,33 @@ function _parse_gencost_timeseries_csv(path::String)::GencostTimeseriesRaw{Float
     tou = Vector{Float64}(undef, n)
     fit = Vector{Float64}(undef, n)
 
-    stime = _sym("time")
-    sgen_id = _sym("gen_id")
-    smodel = _sym("model")
-    sstartup = _sym("startup")
-    sshutdown = _sym("shutdown")
-    sncost = _sym("ncost")
+    # Cache columns once.
+    col_time = _getcol(df, "time")
+    col_gen_id = _getcol(df, "gen_id")
+    col_model = _getcol(df, "model")
+    col_startup = _getcol(df, "startup")
+    col_shutdown = _getcol(df, "shutdown")
+    col_ncost = _getcol(df, "ncost")
+    col_tou = _getcol(df, "tou")
+    col_fit = _getcol(df, "feed_in_tariff")
 
-    stou = _sym("tou")
-    sfit = _sym("feed_in_tariff")
-    has_tou = stou in propertynames(df)
-    has_fit = sfit in propertynames(df)
+    max_k = 0
+    @inbounds for i in 1:n
+        k = _safe_int(col_ncost === nothing ? missing : col_ncost[i], 0)
+        k > max_k && (max_k = k)
+    end
+    coeff_cols = Vector{Any}(undef, max_k)
+    @inbounds for j in 1:max_k
+        coeff_cols[j] = _getcol(df, "c$(j)")
+    end
 
     @inbounds for i in 1:n
-        time[i] = _safe_int(df[i, stime], 1)
-        gen_id[i] = _safe_int(df[i, sgen_id], 0)
-        model[i] = _safe_int(df[i, smodel], 0)
-        startup[i] = _safe_f64(df[i, sstartup], 0.0)
-        shutdown[i] = _safe_f64(df[i, sshutdown], 0.0)
-        ncost[i] = _safe_int(df[i, sncost], 0)
+        time[i] = _safe_int(col_time === nothing ? missing : col_time[i], 1)
+        gen_id[i] = _safe_int(col_gen_id === nothing ? missing : col_gen_id[i], 0)
+        model[i] = _safe_int(col_model === nothing ? missing : col_model[i], 0)
+        startup[i] = _safe_f64(col_startup === nothing ? missing : col_startup[i], 0.0)
+        shutdown[i] = _safe_f64(col_shutdown === nothing ? missing : col_shutdown[i], 0.0)
+        ncost[i] = _safe_int(col_ncost === nothing ? missing : col_ncost[i], 0)
 
         k = ncost[i]
         if k <= 0
@@ -181,18 +197,14 @@ function _parse_gencost_timeseries_csv(path::String)::GencostTimeseriesRaw{Float
         else
             c = Vector{Float64}(undef, k)
             @inbounds for j in 1:k
-                sj = _sym("c$(j)")
-                if sj in propertynames(df)
-                    c[j] = _safe_f64(df[i, sj], 0.0)
-                else
-                    c[j] = 0.0
-                end
+                col = coeff_cols[j]
+                c[j] = col === nothing ? 0.0 : _safe_f64(col[i], 0.0)
             end
             coeffs[i] = c
         end
 
-        tou[i] = has_tou ? _safe_f64(df[i, stou], 0.0) : 0.0
-        fit[i] = has_fit ? _safe_f64(df[i, sfit], 0.0) : 0.0
+        tou[i] = col_tou === nothing ? 0.0 : _safe_f64(col_tou[i], 0.0)
+        fit[i] = col_fit === nothing ? 0.0 : _safe_f64(col_fit[i], 0.0)
     end
 
     return GencostTimeseriesRaw{Float64}(
