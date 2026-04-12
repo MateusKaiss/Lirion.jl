@@ -93,10 +93,11 @@ function build_distributed_system(
     case_raw::CaseRaw,
     sectioning::Sectioning,
 )::DistributedSystem
-    parts_dict = prepare_distributed_partitions(case_raw, sectioning)
+    partitioning = prepare_distributed_partitions(case_raw, sectioning)
     interzonal_branches = _find_interzonal_branches(case_raw, sectioning)
 
-    zones = sort!(collect(keys(parts_dict)))
+    zones = partitioning.zone_ids
+    parts_raw = partitioning.parts
     n_zones = length(zones)
 
     parts = Vector{SystemData}(undef, n_zones)
@@ -105,8 +106,7 @@ function build_distributed_system(
     zone_shared_bus_ids = Vector{Vector{Int}}(undef, n_zones)
 
     @inbounds for i in 1:n_zones
-        zone_id = zones[i]
-        zone_raw = parts_dict[zone_id]::CaseRaw
+        zone_raw = parts_raw[i]
 
         parts[i] = build_system_data(zone_raw)
 

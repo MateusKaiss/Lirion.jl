@@ -1,10 +1,11 @@
 # ==============================================================================
 # Sectioning dispatch: Tie Line
+# ------------------------------------------------------------------------------
+# Builds the per-zone `CaseRaw` subproblems for tie-line decomposition. All
+# membership tests use dense `Vector{Bool}` scratch buffers indexed by bus id
+# (allocated once, reused across zones via `fill!`). Returns parallel arrays
+# `(zone_ids, parts)` already sorted by `zone_id`.
 # ==============================================================================
-
-# ============================================================
-# Distributed partitioning (tie-line sectioning)
-# ============================================================
 
 function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
     full_bus_ids = full.bus.bus_i
@@ -13,104 +14,122 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
     full_t_bus_ids = full.branch.t_bus
     full_branch_in_service_mask = branch_in_service_mask(full.branch)
 
+    n_full_bus = length(full_bus_ids)
     n_full_branches = length(full_f_bus_ids)
+    max_bus_id = n_full_bus == 0 ? 0 : maximum(full_bus_ids)
 
     zone_ids = sort!(unique(full_bus_zones))
-    partitions = Dict{Int, CaseRaw}()
-    sizehint!(partitions, length(zone_ids))
+    n_zones = length(zone_ids)
+    parts = Vector{CaseRaw}(undef, n_zones)
 
-    for zone_id in zone_ids
-        zone_bus_idx = findall(==(zone_id), full_bus_zones)
-        zone_bus_ids = @views full_bus_ids[zone_bus_idx]
-        zone_internal_bus_set = Set(zone_bus_ids)
+    # Scratch membership buffers (reused across zones via `fill!`).
+    zone_internal_membership = zeros(Bool, max_bus_id)
+    zone_subprob_membership = zeros(Bool, max_bus_id)
 
-        external_neighbor_bus_set = Set{Int}()
+    # Count how many zones each bus belongs to (for shared-bus identification).
+    bus_zone_count = zeros(Int, max_bus_id)
+
+    @inbounds for (i, zone_id) in enumerate(zone_ids)
+        fill!(zone_internal_membership, false)
+        _mark_internal_membership!(
+            zone_internal_membership,
+            full_bus_ids,
+            full_bus_zones,
+            zone_id,
+        )
+
+        copyto!(zone_subprob_membership, zone_internal_membership)
         _collect_external_neighbor_buses!(
-            external_neighbor_bus_set,
-            zone_internal_bus_set,
+            zone_subprob_membership,
+            zone_internal_membership,
             full_f_bus_ids,
             full_t_bus_ids,
             full_branch_in_service_mask,
         )
 
-        zone_subprob_bus_set = union(zone_internal_bus_set, external_neighbor_bus_set)
         zone_subprob_bus_idx_full =
-            findall(bus_id -> bus_id in zone_subprob_bus_set, full_bus_ids)
+            _collect_member_positions(full_bus_ids, zone_subprob_membership)
 
-        zone_subprob_case = _build_zone_meta(full, zone_id)
+        zone_case = _build_zone_meta(full, zone_id)
 
-        zone_subprob_case.bus = _slice_bus(full.bus, zone_subprob_bus_idx_full)
-        _mark_virtual_buses!(zone_subprob_case.bus, zone_internal_bus_set)
+        zone_case.bus = _slice_bus(full.bus, zone_subprob_bus_idx_full)
+        _mark_virtual_buses!(zone_case.bus, zone_internal_membership)
 
-        zone_gen_idx = _filter_by_zone_bus(full.gen.gen_bus, zone_internal_bus_set)
-        zone_subprob_case.gen = _slice_gen(full.gen, zone_gen_idx)
+        zone_gen_idx = _filter_by_zone_bus(full.gen.gen_bus, zone_internal_membership)
+        zone_case.gen = _slice_gen(full.gen, zone_gen_idx)
 
-        _slice_gencosts!(zone_subprob_case, full, zone_gen_idx)
+        _slice_gencosts!(zone_case, full, zone_gen_idx)
 
         zone_branch_idx_in_full = _filter_branches_incident_to_zone(
             full_f_bus_ids,
             full_t_bus_ids,
             full_branch_in_service_mask,
-            zone_internal_bus_set,
+            zone_internal_membership,
         )
-        zone_subprob_case.branch = _slice_branch(full.branch, zone_branch_idx_in_full)
+        zone_case.branch = _slice_branch(full.branch, zone_branch_idx_in_full)
 
         if full.prosumer !== nothing
             zone_prosumer_idx =
-                _filter_by_zone_bus(full.prosumer.bus, zone_internal_bus_set)
-            zone_subprob_case.prosumer = _slice_prosumer(full.prosumer, zone_prosumer_idx)
+                _filter_by_zone_bus(full.prosumer.bus, zone_internal_membership)
+            zone_case.prosumer = _slice_prosumer(full.prosumer, zone_prosumer_idx)
         end
 
         if full.consumer !== nothing
             zone_consumer_idx =
-                _filter_by_zone_bus(full.consumer.bus, zone_internal_bus_set)
-            zone_subprob_case.consumer = _slice_consumer(full.consumer, zone_consumer_idx)
+                _filter_by_zone_bus(full.consumer.bus, zone_internal_membership)
+            zone_case.consumer = _slice_consumer(full.consumer, zone_consumer_idx)
         end
 
         if full.storage !== nothing
             zone_storage_idx =
-                _filter_by_zone_bus(full.storage.storage_bus, zone_internal_bus_set)
-            zone_subprob_case.storage = _slice_storage(full.storage, zone_storage_idx)
+                _filter_by_zone_bus(full.storage.storage_bus, zone_internal_membership)
+            zone_case.storage = _slice_storage(full.storage, zone_storage_idx)
         end
 
         _filter_timeseries!(
-            zone_subprob_case,
+            zone_case,
             full,
-            zone_internal_bus_set,
+            zone_internal_membership,
             zone_gen_idx,
         )
 
-        zone_subprob_case.dist.zone_branch_idx_in_full = zone_branch_idx_in_full
+        zone_case.dist.zone_branch_idx_in_full = zone_branch_idx_in_full
 
-        zone_subprob_case.dist.branch_idx_full_to_zone = fill(0, n_full_branches)
-        @inbounds for (local_idx, global_idx) in enumerate(zone_branch_idx_in_full)
-            zone_subprob_case.dist.branch_idx_full_to_zone[global_idx] = local_idx
+        zone_case.dist.branch_idx_full_to_zone = zeros(Int, n_full_branches)
+        for (local_idx, global_idx) in enumerate(zone_branch_idx_in_full)
+            zone_case.dist.branch_idx_full_to_zone[global_idx] = local_idx
         end
 
-        add_case_index_maps!(zone_subprob_case)
+        add_case_index_maps!(zone_case)
 
-        partitions[zone_id] = zone_subprob_case
-    end
-
-    bus_to_zones = Dict{Int, Set{Int}}()
-
-    for (zone_id, zone_case) in partitions
-        for bus_id in zone_case.bus.bus_i
-            push!(get!(bus_to_zones, bus_id, Set{Int}()), zone_id)
+        # Tally which buses are in this zone's subproblem (internal + virtual).
+        # Used after the loop to identify shared buses (count > 1).
+        for b in zone_case.bus.bus_i
+            bus_zone_count[b] += 1
         end
+
+        parts[i] = zone_case
     end
 
-    full_shared_bus_ids =
-        sort!([bus_id for (bus_id, zones) in bus_to_zones if length(zones) > 1])
-    full_shared_bus_set = Set(full_shared_bus_ids)
+    # Shared buses are those that appear in ≥ 2 zones (internal in one, virtual
+    # in one or more others). Iterating 1..max_bus_id yields sorted output.
+    full_shared_bus_ids = Int[]
+    @inbounds for b in 1:max_bus_id
+        bus_zone_count[b] > 1 && push!(full_shared_bus_ids, b)
+    end
+
+    full_shared_membership = zeros(Bool, max_bus_id)
+    @inbounds for b in full_shared_bus_ids
+        full_shared_membership[b] = true
+    end
 
     full.dist.full_shared_bus_ids = full_shared_bus_ids
 
-    for (_, zone_case) in partitions
-        zone_case.dist.zone_shared_bus_ids = [
-            bus_id for bus_id in zone_case.bus.bus_i if bus_id in full_shared_bus_set
+    @inbounds for zc in parts
+        zc.dist.zone_shared_bus_ids = [
+            bus_id for bus_id in zc.bus.bus_i if full_shared_membership[bus_id]
         ]
     end
 
-    return partitions
+    return (zone_ids = zone_ids, parts = parts)
 end

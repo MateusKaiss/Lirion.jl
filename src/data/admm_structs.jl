@@ -12,7 +12,6 @@ end
     @inbounds return (ps.parts[st], st + 1)
 end
 
-
 Base.@kwdef mutable struct PartitionDC <: AbstractPartition
     id::Int
     position::Int = 0

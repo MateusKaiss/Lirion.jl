@@ -9,19 +9,20 @@ function _find_interzonal_branches(full::CaseRaw, ::TieLine)
     t_bus = full.branch.t_bus
     br_status = full.branch.br_status
 
-    bus_to_zone = Dict{Int, Int}()
-    sizehint!(bus_to_zone, length(full_bus_ids))
+    n_bus = length(full_bus_ids)
+    max_bus_id = n_bus == 0 ? 0 : maximum(full_bus_ids)
+
+    # Dense map: bus_id -> zone id (0 if absent).
+    bus_to_zone = zeros(Int, max_bus_id)
+    @inbounds for i in 1:n_bus
+        bus_to_zone[full_bus_ids[i]] = full_bus_zones[i]
+    end
 
     interzonal_branches = Int[]
     sizehint!(interzonal_branches, length(f_bus))
 
-    @inbounds for i in eachindex(full_bus_ids)
-        bus_to_zone[full_bus_ids[i]] = full_bus_zones[i]
-    end
-
     @inbounds for i in eachindex(f_bus)
         br_status[i] == 1 || continue
-
         if bus_to_zone[f_bus[i]] != bus_to_zone[t_bus[i]]
             push!(interzonal_branches, i)
         end
@@ -30,17 +31,34 @@ function _find_interzonal_branches(full::CaseRaw, ::TieLine)
     return interzonal_branches
 end
 
-# ==============================================================================
-# Helpers
-# ==============================================================================
+# ------------------------------------------------------------------------------
+# Generic helpers
+# ------------------------------------------------------------------------------
 
 @inline function branch_in_service_mask(branch::BranchRaw{Float64})
     return branch.br_status .== 1
 end
 
+# Mark `zone_internal_membership[bus_id] = true` for all internal buses of
+# `zone_id`. Assumes the caller `fill!(membership, false)` before calling.
+@inline function _mark_internal_membership!(
+    zone_internal_membership::Vector{Bool},
+    full_bus_ids::AbstractVector{<:Integer},
+    full_bus_zones::AbstractVector{<:Integer},
+    zone_id::Int,
+)
+    @inbounds for i in eachindex(full_bus_ids)
+        full_bus_zones[i] == zone_id || continue
+        zone_internal_membership[full_bus_ids[i]] = true
+    end
+    return nothing
+end
+
+# Extend `zone_subprob_membership` (which starts as a copy of the internal
+# membership) with external neighbors connected via any in-service branch.
 @inline function _collect_external_neighbor_buses!(
-    external_neighbor_bus_set::Set{Int},
-    zone_bus_set::Set{Int},
+    zone_subprob_membership::Vector{Bool},
+    zone_internal_membership::Vector{Bool},
     full_f_bus_ids::AbstractVector{Int},
     full_t_bus_ids::AbstractVector{Int},
     full_branch_in_service_mask::AbstractVector{Bool},
@@ -51,15 +69,30 @@ end
         f_bus_id = full_f_bus_ids[i]
         t_bus_id = full_t_bus_ids[i]
 
-        f_in_zone = f_bus_id in zone_bus_set
-        t_in_zone = t_bus_id in zone_bus_set
+        f_in_zone = zone_internal_membership[f_bus_id]
+        t_in_zone = zone_internal_membership[t_bus_id]
 
-        if f_in_zone ⊻ t_in_zone
-            push!(external_neighbor_bus_set, f_in_zone ? t_bus_id : f_bus_id)
+        if f_in_zone && !t_in_zone
+            zone_subprob_membership[t_bus_id] = true
+        elseif t_in_zone && !f_in_zone
+            zone_subprob_membership[f_bus_id] = true
         end
     end
+    return nothing
+end
 
-    return external_neighbor_bus_set
+# Collect global bus indices (positions in `full_bus_ids`) whose id is marked
+# in `membership`. Output is naturally in ascending position order.
+@inline function _collect_member_positions(
+    full_bus_ids::AbstractVector{<:Integer},
+    membership::Vector{Bool},
+)
+    out = Int[]
+    sizehint!(out, count(membership))
+    @inbounds for i in eachindex(full_bus_ids)
+        membership[full_bus_ids[i]] && push!(out, i)
+    end
+    return out
 end
 
 @inline function _build_zone_meta(full::CaseRaw, zone_id::Int)
@@ -95,10 +128,13 @@ end
     )
 end
 
-@inline function _mark_virtual_buses!(bus::BusRaw{Float64}, zone_bus_set::Set{Int})
+@inline function _mark_virtual_buses!(
+    bus::BusRaw{Float64},
+    zone_internal_membership::Vector{Bool},
+)
     @inbounds for i in eachindex(bus.bus_i)
         bus_id = bus.bus_i[i]
-        is_virtual = !(bus_id in zone_bus_set)
+        is_virtual = !zone_internal_membership[bus_id]
 
         bus.is_virtual[i] = is_virtual
 
@@ -116,12 +152,15 @@ end
 
 @inline function _filter_by_zone_bus(
     component_bus_ids::AbstractVector{<:Integer},
-    zone_internal_bus_set::Set{Int},
+    zone_internal_membership::Vector{Bool},
 )
-    return findall(
-        i -> component_bus_ids[i] in zone_internal_bus_set,
-        eachindex(component_bus_ids),
-    )
+    out = Int[]
+    @inbounds for i in eachindex(component_bus_ids)
+        b = Int(component_bus_ids[i])
+        b >= 1 && b <= length(zone_internal_membership) &&
+            zone_internal_membership[b] && push!(out, i)
+    end
+    return out
 end
 
 @inline function _slice_gen(full_gen::GenRaw{Float64}, keep::Vector{Int})
@@ -178,17 +217,19 @@ end
     full_f_bus_ids::AbstractVector{<:Integer},
     full_t_bus_ids::AbstractVector{<:Integer},
     full_branch_in_service_mask::AbstractVector{Bool},
-    zone_internal_bus_set::Set{Int},
+    zone_internal_membership::Vector{Bool},
 )
-    return findall(
-        i ->
-            full_branch_in_service_mask[i] &&
-                (
-                    full_f_bus_ids[i] in zone_internal_bus_set ||
-                    full_t_bus_ids[i] in zone_internal_bus_set
-                ),
-        eachindex(full_f_bus_ids),
-    )
+    out = Int[]
+    sizehint!(out, length(full_f_bus_ids))
+    @inbounds for i in eachindex(full_f_bus_ids)
+        full_branch_in_service_mask[i] || continue
+        f = Int(full_f_bus_ids[i])
+        t = Int(full_t_bus_ids[i])
+        if zone_internal_membership[f] || zone_internal_membership[t]
+            push!(out, i)
+        end
+    end
+    return out
 end
 
 @inline function _slice_branch(full_branch::BranchRaw{Float64}, keep::Vector{Int})
@@ -268,12 +309,12 @@ end
 @inline function _filter_timeseries!(
     zone_case::CaseRaw,
     full::CaseRaw,
-    zone_bus_set::Set{Int},
+    zone_internal_membership::Vector{Bool},
     zone_gen_idx::Vector{Int},
 )
     if full.bus_timeseries !== nothing
         ts = full.bus_timeseries
-        zone_ts_idx = _filter_by_zone_bus(ts.bus, zone_bus_set)
+        zone_ts_idx = _filter_by_zone_bus(ts.bus, zone_internal_membership)
 
         zone_case.bus_timeseries = BusTimeseriesRaw{Float64}(
             ts.time[zone_ts_idx],
@@ -287,7 +328,7 @@ end
 
     if full.prosumer_timeseries !== nothing
         ts = full.prosumer_timeseries
-        zone_ts_idx = _filter_by_zone_bus(ts.bus, zone_bus_set)
+        zone_ts_idx = _filter_by_zone_bus(ts.bus, zone_internal_membership)
 
         zone_case.prosumer_timeseries = ProsumerTimeseriesRaw{Float64}(
             ts.time[zone_ts_idx],
@@ -300,7 +341,7 @@ end
 
     if full.consumer_timeseries !== nothing
         ts = full.consumer_timeseries
-        zone_ts_idx = _filter_by_zone_bus(ts.bus, zone_bus_set)
+        zone_ts_idx = _filter_by_zone_bus(ts.bus, zone_internal_membership)
 
         zone_case.consumer_timeseries = ConsumerTimeseriesRaw{Float64}(
             ts.time[zone_ts_idx],
@@ -312,12 +353,21 @@ end
 
     if full.gencost_timeseries !== nothing
         ts = full.gencost_timeseries
-        zone_gc_ts_idx = findall(i -> ts.gen_id[i] in zone_gen_idx, eachindex(ts.gen_id))
 
+        # Remap global gen ids to zone-local gen ids (1..length(zone_gen_idx)).
+        # `zone_gen_idx[k]` is the GLOBAL gen id of local gen `k`.
         n_global_gen = length(full.gen.gen_bus)
         global_to_local_gen = zeros(Int, n_global_gen)
         @inbounds for (local_k, global_k) in enumerate(zone_gen_idx)
             global_to_local_gen[global_k] = local_k
+        end
+
+        zone_gc_ts_idx = Int[]
+        sizehint!(zone_gc_ts_idx, length(ts.gen_id))
+        @inbounds for i in eachindex(ts.gen_id)
+            g = ts.gen_id[i]
+            (g >= 1 && g <= n_global_gen && global_to_local_gen[g] != 0) || continue
+            push!(zone_gc_ts_idx, i)
         end
 
         remapped_gen_id = Vector{Int}(undef, length(zone_gc_ts_idx))

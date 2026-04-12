@@ -6,6 +6,14 @@ const _mp_data_names = [
     "mpc.gencost_timeseries",
 ]
 
+# ==============================================================================
+# Token helpers
+# ------------------------------------------------------------------------------
+# All helpers are `@inline`, type-stable, and allocation-free on the hot path.
+# `tryparse` handles every numeric case natively (incl. Inf/NaN), so no manual
+# fast paths are needed.
+# ==============================================================================
+
 @inline _nrows(data::Vector{Vector{String}}) = length(data)
 
 @inline function _tok(row::Vector{String}, j::Int, default::String = "")
@@ -33,27 +41,12 @@ end
 
 @inline function _as_int(s::String, default::Int = 0)::Int
     isempty(s) && return default
-    if s === "0"
-        return 0
-    end
-    if s === "1"
-        return 1
-    end
     v = tryparse(Int, s)
     return v === nothing ? default : v
 end
 
 @inline function _as_f64(s::String, default::Float64 = 0.0)::Float64
     isempty(s) && return default
-    if s === "Inf" || s === "+Inf"
-        return Inf
-    end
-    if s === "-Inf"
-        return -Inf
-    end
-    if s === "NaN"
-        return NaN
-    end
     v = tryparse(Float64, s)
     return v === nothing ? default : v
 end
