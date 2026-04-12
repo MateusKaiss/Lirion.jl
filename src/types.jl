@@ -12,6 +12,7 @@ struct LPAC <: OPFModel end   # Linear Power AC (Coffrin & Van Hentenryck 2014)
 struct SOCWR <: OPFModel end  # Jabr SOCP (W-rectangular)
 struct SOCBF <: OPFModel end  # Branch Flow SOCP
 struct BFA <: OPFModel end    # Linear Branch Flow Approx (LinDistFlow)
+struct NFA <: OPFModel end    # Network Flow Approximation (LP, active-only)
 
 # ============================================================
 # ADMM VARIANTS

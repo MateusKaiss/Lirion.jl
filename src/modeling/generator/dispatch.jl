@@ -72,6 +72,11 @@ function add_generator_variables!(model::JuMP.Model, gen::GenData, ::Type{BFA})
     return add_curtailment_variables!(model, gen)
 end
 
+function add_generator_variables!(model::JuMP.Model, gen::GenData, ::Type{NFA})
+    add_active_generation_variables!(model, gen)
+    return add_curtailment_variables!(model, gen)
+end
+
 # =======================================================================
 # CONSTRAINTS
 # =======================================================================
@@ -105,5 +110,9 @@ function add_generator_constraints!(model::JuMP.Model, gen::GenData, ::Type{SOCB
 end
 
 function add_generator_constraints!(model::JuMP.Model, gen::GenData, ::Type{BFA})
+    return add_curtailment_constraints!(model, gen)
+end
+
+function add_generator_constraints!(model::JuMP.Model, gen::GenData, ::Type{NFA})
     return add_curtailment_constraints!(model, gen)
 end

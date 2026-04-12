@@ -48,3 +48,7 @@ end
 function add_bus_variables!(model::JuMP.Model, bus::BusData, ::Type{BFA})
     return add_socwr_bus_variables!(model, bus)
 end
+
+function add_bus_variables!(model::JuMP.Model, bus::BusData, ::Type{NFA})
+    return nothing
+end

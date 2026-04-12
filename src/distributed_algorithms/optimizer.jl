@@ -6,6 +6,7 @@
 @inline base_model_tag(::Type{SOCWR}) = Val(:socwr)
 @inline base_model_tag(::Type{SOCBF}) = Val(:socbf)
 @inline base_model_tag(::Type{BFA}) = Val(:bfa)
+@inline base_model_tag(::Type{NFA}) = Val(:nfa)
 
 # ============================================================
 # Silent optimizer factories — built once at module load
@@ -227,6 +228,24 @@ end
 function resolve_optimizer(::Val{:bfa}, inputs_optimizer = nothing)
     inputs_optimizer !== nothing && return _silent_factory(inputs_optimizer)
     return _CLARABEL_SILENT_FACTORY
+end
+
+# ============================================================
+# NFA — pure LP, same solver as DC
+# ============================================================
+
+function resolve_optimizer(::Val{:nfa}, inputs_optimizer = nothing)
+    inputs_optimizer !== nothing && return _silent_factory(inputs_optimizer)
+
+    return optimizer_with_attributes(
+        OSQP.Optimizer,
+        "eps_abs" => 1e-6,
+        "eps_rel" => 1e-6,
+        "max_iter" => 50_000,
+        "verbose" => false,
+        "adaptive_rho" => true,
+        "linsys_solver" => "qdldl",
+    )
 end
 
 # ============================================================

@@ -10,6 +10,7 @@ lpac() = LPAC
 socwr() = SOCWR
 socbf() = SOCBF
 bfa() = BFA
+nfa() = NFA
 
 # -----------------------------
 # Algorithm builders

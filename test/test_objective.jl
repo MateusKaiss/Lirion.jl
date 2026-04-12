@@ -148,6 +148,8 @@ end
         return Lirion.socbf()
     elseif model_type == Lirion.BFA
         return Lirion.bfa()
+    elseif model_type == Lirion.NFA
+        return Lirion.nfa()
     else
         error("Unsupported Lirion model type: $model_type")
     end
@@ -223,6 +225,10 @@ end
         elseif model_type == Lirion.SOCBF
             return Float64(
                 PowerModels.solve_opf_bf(pm_data, SOCBFConicPowerModel, optimizer)["objective"],
+            )
+        elseif model_type == Lirion.NFA
+            return Float64(
+                PowerModels.solve_opf(pm_data, NFAPowerModel, optimizer)["objective"],
             )
         elseif model_type == Lirion.BFA
             return Float64(

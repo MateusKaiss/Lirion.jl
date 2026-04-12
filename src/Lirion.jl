@@ -106,6 +106,7 @@ include("modeling/branch/socwr_rt.jl")
 include("modeling/branch/socwr.jl")
 include("modeling/branch/socbf.jl")
 include("modeling/branch/bfa.jl")
+include("modeling/branch/nfa.jl")
 include("modeling/branch/dispatch.jl")
 
 # --- GENERATOR
@@ -208,7 +209,7 @@ include("solve.jl")
 # Public exports
 # ------------------------------------------------------------------
 export solve,
-    dc, ac, acr, ivr, lpac, socwr, socbf, bfa,
+    dc, ac, acr, ivr, lpac, socwr, socbf, bfa, nfa,
     centralized, admm,
     partition_from_case, partition_metis
 

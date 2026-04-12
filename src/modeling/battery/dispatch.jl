@@ -62,3 +62,7 @@ end
 function add_battery_constraints!(model::JuMP.Model, bat::BatteryData, ::Type{BFA})
     return add_dc_battery_constraints!(model, bat)
 end
+
+function add_battery_constraints!(model::JuMP.Model, bat::BatteryData, ::Type{NFA})
+    return add_dc_battery_constraints!(model, bat)
+end
