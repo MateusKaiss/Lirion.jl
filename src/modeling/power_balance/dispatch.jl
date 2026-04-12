@@ -81,7 +81,7 @@ end
 function add_active_power_balance_constraints!(
     model::JuMP.Model,
     sys::SystemData,
-    ::Type{SOCP},
+    ::Type{SOCWR},
 )
     pf = sys.powerflow
     T = get(model.ext, :time_periods, 1)
@@ -151,7 +151,7 @@ end
 function add_reactive_power_balance_constraints!(
     model::JuMP.Model,
     sys::SystemData,
-    ::Type{SOCP},
+    ::Type{SOCWR},
 )
     pf = sys.powerflow
     T = get(model.ext, :time_periods, 1)

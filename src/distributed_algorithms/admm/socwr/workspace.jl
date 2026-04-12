@@ -1,13 +1,13 @@
 # ============================================================
-# SOCP WORKSPACES
+# SOCWR WORKSPACES
 # ============================================================
 
 # ============================================================
 # STATE (V² + R/T)
 # ============================================================
 
-Base.@kwdef mutable struct SOCPStateWorkspace <: AbstractADMMWorkspace
-    partitions::Partitions{PartitionSOCP}
+Base.@kwdef mutable struct SOCWRStateWorkspace <: AbstractADMMWorkspace
+    partitions::Partitions{PartitionSOCWR}
     id::Vector{Int}
 
     interzonal::Vector{Int}
@@ -62,8 +62,8 @@ end
 # POWER (P/Q)
 # ============================================================
 
-Base.@kwdef mutable struct SOCPPowerWorkspace <: AbstractADMMWorkspace
-    partitions::Partitions{PartitionSOCP}
+Base.@kwdef mutable struct SOCWRPowerWorkspace <: AbstractADMMWorkspace
+    partitions::Partitions{PartitionSOCWR}
     id::Vector{Int}
 
     interzonal::Vector{Int}
@@ -104,8 +104,8 @@ end
 # HYBRID (V² + P/Q + R/T)
 # ============================================================
 
-Base.@kwdef mutable struct SOCPHybridWorkspace <: AbstractADMMWorkspace
-    partitions::Partitions{PartitionSOCP}
+Base.@kwdef mutable struct SOCWRHybridWorkspace <: AbstractADMMWorkspace
+    partitions::Partitions{PartitionSOCWR}
     id::Vector{Int}
 
     interzonal::Vector{Int}
@@ -178,18 +178,18 @@ end
 # RHO HELPERS
 # ============================================================
 
-_get_rhos(ws::SOCPStateWorkspace) = (
+_get_rhos(ws::SOCWRStateWorkspace) = (
     rho_v2 = ws.rho_v2[],
     rho_r = ws.rho_r[],
     rho_t = ws.rho_t[],
 )
 
-_get_rhos(ws::SOCPPowerWorkspace) = (
+_get_rhos(ws::SOCWRPowerWorkspace) = (
     rho_p = ws.rho_p[],
     rho_q = ws.rho_q[],
 )
 
-_get_rhos(ws::SOCPHybridWorkspace) = (
+_get_rhos(ws::SOCWRHybridWorkspace) = (
     rho_v2 = ws.rho_v2[],
     rho_p = ws.rho_p[],
     rho_q = ws.rho_q[],
@@ -201,8 +201,8 @@ _get_rhos(ws::SOCPHybridWorkspace) = (
 # BUILDERS — STATE
 # ============================================================
 
-function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCP})
-    partitions = build_partitions(PartitionSOCP, sys)
+function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCWR})
+    partitions = build_partitions(PartitionSOCWR, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
     n_zones = length(partitions)
@@ -223,7 +223,7 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCP
     rho_r = Ref(config.rho_r)
     rho_t = Ref(config.rho_t)
 
-    return SOCPStateWorkspace(;
+    return SOCWRStateWorkspace(;
         partitions = partitions,
         id = id,
         interzonal = inter,
@@ -251,8 +251,8 @@ end
 # BUILDERS — POWER
 # ============================================================
 
-function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCP})
-    partitions = build_partitions(PartitionSOCP, sys)
+function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWR})
+    partitions = build_partitions(PartitionSOCWR, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
     n_zones = length(partitions)
@@ -270,7 +270,7 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCP
     rho_p = Ref(config.rho_p)
     rho_q = Ref(config.rho_q)
 
-    return SOCPPowerWorkspace(;
+    return SOCWRPowerWorkspace(;
         partitions = partitions,
         id = id,
         interzonal = inter,
@@ -292,8 +292,8 @@ end
 # BUILDERS — HYBRID
 # ============================================================
 
-function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCP})
-    partitions = build_partitions(PartitionSOCP, sys)
+function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
+    partitions = build_partitions(PartitionSOCWR, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
     n_zones = length(partitions)
@@ -318,7 +318,7 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOC
     rho_r = Ref(config.rho_r)
     rho_t = Ref(config.rho_t)
 
-    return SOCPHybridWorkspace(;
+    return SOCWRHybridWorkspace(;
         partitions = partitions,
         id = id,
         interzonal = inter,

@@ -1,5 +1,5 @@
 # ============================================================
-# ADMM Rho Adaptation & Refresh — unified for DC · AC · SOCP
+# ADMM Rho Adaptation & Refresh — unified for DC · AC · SOCWR
 # ============================================================
 
 # ############################################################
@@ -97,23 +97,23 @@ function _refresh_rho_branch_ac!(
     return nothing
 end
 
-# ---- SOCP bus (V²) ----
-function _refresh_rho_bus_socp!(parts::Partitions{PartitionSOCP}, rho, prev_rho)
+# ---- SOCWR bus (V²) ----
+function _refresh_rho_bus_socwr!(parts::Partitions{PartitionSOCWR}, rho, prev_rho)
     rho_val = rho[]
     if rho_val != prev_rho[]
         @inbounds for part in parts.parts
             build_quad_bus_expr!(part, rho_val)
             part.obj_static =
-                part.obj_base + part.quad_bus_expr_socp + part.quad_rt_expr_socp
+                part.obj_base + part.quad_bus_expr_socwr + part.quad_rt_expr_socwr
         end
         prev_rho[] = rho_val
     end
     return nothing
 end
 
-# ---- SOCP branch RT ----
-function _refresh_rho_branch_rt_socp!(
-    parts::Partitions{PartitionSOCP},
+# ---- SOCWR branch RT ----
+function _refresh_rho_branch_rt_socwr!(
+    parts::Partitions{PartitionSOCWR},
     rho_r,
     prev_rho_r,
     rho_t,
@@ -125,7 +125,7 @@ function _refresh_rho_branch_rt_socp!(
         @inbounds for part in parts.parts
             build_quad_branch_rt_expr!(part, rho_r_val, rho_t_val, part.zone_edges)
             part.obj_static =
-                part.obj_base + part.quad_bus_expr_socp + part.quad_rt_expr_socp
+                part.obj_base + part.quad_bus_expr_socwr + part.quad_rt_expr_socwr
         end
         prev_rho_r[] = rho_r_val
         prev_rho_t[] = rho_t_val
@@ -133,9 +133,9 @@ function _refresh_rho_branch_rt_socp!(
     return nothing
 end
 
-# ---- SOCP branch PQ ----
-function _refresh_rho_branch_pq_socp!(
-    parts::Partitions{PartitionSOCP},
+# ---- SOCWR branch PQ ----
+function _refresh_rho_branch_pq_socwr!(
+    parts::Partitions{PartitionSOCWR},
     rho_p,
     prev_rho_p,
     rho_q,
@@ -147,7 +147,7 @@ function _refresh_rho_branch_pq_socp!(
         @inbounds for part in parts.parts
             build_quad_branch_pq_expr!(part, rho_p_val, rho_q_val, part.zone_edges)
             part.obj_static =
-                part.obj_base + part.quad_pq_expr_socp + part.soft_anchor_expr
+                part.obj_base + part.quad_pq_expr_socwr + part.soft_anchor_expr
         end
         prev_rho_p[] = rho_p_val
         prev_rho_q[] = rho_q_val
@@ -155,11 +155,11 @@ function _refresh_rho_branch_pq_socp!(
     return nothing
 end
 
-# ---- SOCP Hybrid (all groups) ----
+# ---- SOCWR Hybrid (all groups) ----
 # NOTE: unified refresh (instead of calling 3 separate helpers like DC/AC Hybrid)
 # because obj_static depends on v2, pq, AND rt — doing it in one pass avoids
 # rebuilding obj_static up to 3 times.
-function _refresh_rho_hybrid_socp!(
+function _refresh_rho_hybrid_socwr!(
     parts,
     rho_v2, prev_rho_v2,
     rho_p, prev_rho_p,
@@ -188,8 +188,8 @@ function _refresh_rho_hybrid_socp!(
         (rho_r_val != prev_rho_r[] || rho_t_val != prev_rho_t[]) &&
             build_quad_branch_rt_expr!(part, rho_r_val, rho_t_val, part.zone_edges)
         part.obj_static =
-            part.obj_base + part.quad_bus_expr_socp + part.quad_pq_expr_socp +
-            part.quad_rt_expr_socp
+            part.obj_base + part.quad_bus_expr_socwr + part.quad_pq_expr_socwr +
+            part.quad_rt_expr_socwr
     end
 
     prev_rho_v2[] = rho_v2_val
@@ -244,10 +244,10 @@ function refresh_rho!(ws::ACHybridWorkspace)
     return nothing
 end
 
-# ---- SOCP ----
-function refresh_rho!(ws::SOCPStateWorkspace)
-    _refresh_rho_bus_socp!(ws.partitions, ws.rho_v2, ws.prev_rho_v2)
-    _refresh_rho_branch_rt_socp!(
+# ---- SOCWR ----
+function refresh_rho!(ws::SOCWRStateWorkspace)
+    _refresh_rho_bus_socwr!(ws.partitions, ws.rho_v2, ws.prev_rho_v2)
+    _refresh_rho_branch_rt_socwr!(
         ws.partitions,
         ws.rho_r, ws.prev_rho_r,
         ws.rho_t, ws.prev_rho_t,
@@ -255,14 +255,14 @@ function refresh_rho!(ws::SOCPStateWorkspace)
     return nothing
 end
 
-refresh_rho!(ws::SOCPPowerWorkspace) = _refresh_rho_branch_pq_socp!(
+refresh_rho!(ws::SOCWRPowerWorkspace) = _refresh_rho_branch_pq_socwr!(
     ws.partitions,
     ws.rho_p, ws.prev_rho_p,
     ws.rho_q, ws.prev_rho_q,
 )
 
-function refresh_rho!(ws::SOCPHybridWorkspace)
-    return _refresh_rho_hybrid_socp!(
+function refresh_rho!(ws::SOCWRHybridWorkspace)
+    return _refresh_rho_hybrid_socwr!(
         ws.partitions,
         ws.rho_v2, ws.prev_rho_v2,
         ws.rho_p, ws.prev_rho_p,
@@ -331,8 +331,8 @@ function rho_update!(ws::ACHybridWorkspace, params::ADMMParams)
     return nothing
 end
 
-# ---- SOCP State (V² + RT) ----
-function rho_update!(ws::SOCPStateWorkspace, params::ADMMParams)
+# ---- SOCWR State (V² + RT) ----
+function rho_update!(ws::SOCWRStateWorkspace, params::ADMMParams)
     params.adaptive || return nothing
 
     _adapt!(ws.rho_v2, ws.r_primal_bus, ws.r_dual_bus, params)
@@ -341,8 +341,8 @@ function rho_update!(ws::SOCPStateWorkspace, params::ADMMParams)
     return nothing
 end
 
-# ---- SOCP Power (PQ) ----
-function rho_update!(ws::SOCPPowerWorkspace, params::ADMMParams)
+# ---- SOCWR Power (PQ) ----
+function rho_update!(ws::SOCWRPowerWorkspace, params::ADMMParams)
     params.adaptive || return nothing
 
     _adapt!(ws.rho_p, ws.r_primal_p, ws.r_dual_p, params)
@@ -350,8 +350,8 @@ function rho_update!(ws::SOCPPowerWorkspace, params::ADMMParams)
     return nothing
 end
 
-# ---- SOCP Hybrid (V² + PQ + RT) ----
-function rho_update!(ws::SOCPHybridWorkspace, params::ADMMParams)
+# ---- SOCWR Hybrid (V² + PQ + RT) ----
+function rho_update!(ws::SOCWRHybridWorkspace, params::ADMMParams)
     params.adaptive || return nothing
 
     _adapt!(ws.rho_v2, ws.r_primal_bus, ws.r_dual_bus, params)

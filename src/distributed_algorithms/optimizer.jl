@@ -1,7 +1,7 @@
 @inline base_model_tag(::Type{DC}) = Val(:dc)
 @inline base_model_tag(::Type{AC}) = Val(:ac)
 @inline base_model_tag(::Type{ACR}) = Val(:acr)
-@inline base_model_tag(::Type{SOCP}) = Val(:socp)
+@inline base_model_tag(::Type{SOCWR}) = Val(:socwr)
 
 # ============================================================
 # Silent optimizer factories — built once at module load
@@ -159,33 +159,33 @@ function resolve_optimizer(::Val{:acr}, inputs_optimizer = nothing)
 end
 
 # ============================================================
-# SOCP
+# SOCWR
 # ============================================================
 
 is_gurobi(m::JuMP.Model)::Bool = occursin("Gurobi", MOI.get(m, MOI.SolverName()))
 
-function _gurobi_socp_factory()
-    return error("Gurobi not loaded. Add `using Gurobi` to use Gurobi for SOCP.")
+function _gurobi_socwr_factory()
+    return error("Gurobi not loaded. Add `using Gurobi` to use Gurobi for SOCWR.")
 end
-function _scs_socp_factory()
-    return error("SCS not loaded. Add `using SCS` to use SCS for SOCP.")
+function _scs_socwr_factory()
+    return error("SCS not loaded. Add `using SCS` to use SCS for SOCWR.")
 end
 
-function resolve_optimizer(::Val{:socp}, inputs_optimizer = nothing)
+function resolve_optimizer(::Val{:socwr}, inputs_optimizer = nothing)
     inputs_optimizer !== nothing && return _silent_factory(inputs_optimizer)
 
     for s in (:clarabel, :gurobi, :scs)
         s === :clarabel && return _CLARABEL_SILENT_FACTORY
         s === :gurobi && try
-            return _gurobi_socp_factory()
+            return _gurobi_socwr_factory()
         catch e
-            @warn "Gurobi unavailable for SOCP ($(sprint(showerror, e))); trying next solver."
+            @warn "Gurobi unavailable for SOCWR ($(sprint(showerror, e))); trying next solver."
             continue
         end
         s === :scs && try
-            return _scs_socp_factory()
+            return _scs_socwr_factory()
         catch e
-            @warn "SCS unavailable for SOCP ($(sprint(showerror, e))); trying next solver."
+            @warn "SCS unavailable for SOCWR ($(sprint(showerror, e))); trying next solver."
             continue
         end
     end

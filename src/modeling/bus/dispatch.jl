@@ -27,7 +27,7 @@ function add_bus_variables!(model::JuMP.Model, bus::BusData, ::Type{ACR})
     return add_rectangular_bus_variables!(model, bus)
 end
 
-function add_bus_variables!(model::JuMP.Model, bus::BusData, ::Type{SOCP})
+function add_bus_variables!(model::JuMP.Model, bus::BusData, ::Type{SOCWR})
     add_voltage_angle_variables!(model, bus)
-    return add_socp_bus_variables!(model, bus)
+    return add_socwr_bus_variables!(model, bus)
 end

@@ -29,7 +29,7 @@ For this Quick Start, however, we recommend downloading two specific cases direc
 
 ---
 
-### Centralized Example Case (AC / DC / SOCP)
+### Centralized Example Case (AC / DC / SOCWR)
 
 Case file:
 
@@ -57,9 +57,9 @@ These two cases are sufficient to reproduce the centralized and distributed exam
 
 3) Centralized OPF (one-liner)
 
-Lirion supports centralized DC, AC, and SOCP OPF via:
+Lirion supports centralized DC, AC, and SOCWR OPF via:
 
-dc(), ac(), socp()
+dc(), ac(), socwr()
 
 algorithm = centralized() (default)
 
@@ -86,7 +86,7 @@ DC → OSQP
 
 AC → Ipopt
 
-SOCP → Clarabel
+SOCWR → Clarabel
 
 4) Distributed OPF with ADMM (minimal configuration)
 
@@ -123,7 +123,7 @@ Once the examples above run, most experimentation in Lirion is just changing:
 
 (1) OPF formulation
 
-model = dc() / ac() / socp()
+model = dc() / ac() / socwr()
 
 (2) Centralized vs Distributed
 

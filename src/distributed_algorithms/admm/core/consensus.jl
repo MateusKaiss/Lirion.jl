@@ -1,9 +1,9 @@
 # ============================================================
-# ADMM Consensus — unified for DC · AC · SOCP
+# ADMM Consensus — unified for DC · AC · SOCWR
 # ============================================================
 
 # ------------------------------------------------------------
-# Bus consensus: single variable, linear averaging (DC theta, SOCP V²)
+# Bus consensus: single variable, linear averaging (DC theta, SOCWR V²)
 # ------------------------------------------------------------
 function _consensus_bus_single!(
     consensus::Vector{Float64},
@@ -98,7 +98,7 @@ function _consensus_branch_single!(
 end
 
 # ------------------------------------------------------------
-# Branch consensus: paired variables (SOCP PQ, SOCP RT)
+# Branch consensus: paired variables (SOCWR PQ, SOCWR RT)
 # ------------------------------------------------------------
 function _consensus_branch_paired!(
     consensus_a::Vector{Float64},
@@ -260,9 +260,9 @@ function consensus!(ws::ACHybridWorkspace)
     return nothing
 end
 
-# ---- SOCP ----
+# ---- SOCWR ----
 
-function consensus!(ws::SOCPStateWorkspace)
+function consensus!(ws::SOCWRStateWorkspace)
     _consensus_bus_single!(
         ws.v2_consensus,
         ws.bus_counts,
@@ -275,22 +275,22 @@ function consensus!(ws::SOCPStateWorkspace)
         ws.branch_counts,
         ws.partitions,
         ws.interzonal,
-        _socp_rt_values,
+        _socwr_rt_values,
     )
     return nothing
 end
 
-consensus!(ws::SOCPPowerWorkspace) =
+consensus!(ws::SOCWRPowerWorkspace) =
     _consensus_branch_paired!(
         ws.p_flow_consensus,
         ws.q_flow_consensus,
         ws.branch_counts,
         ws.partitions,
         ws.interzonal,
-        _socp_pq_values,
+        _socwr_pq_values,
     )
 
-function consensus!(ws::SOCPHybridWorkspace)
+function consensus!(ws::SOCWRHybridWorkspace)
     _consensus_bus_single!(
         ws.v2_consensus,
         ws.bus_counts,
@@ -303,7 +303,7 @@ function consensus!(ws::SOCPHybridWorkspace)
         ws.branch_counts,
         ws.partitions,
         ws.interzonal,
-        _socp_pq_values,
+        _socwr_pq_values,
     )
     _consensus_branch_paired!(
         ws.r_consensus,
@@ -311,7 +311,7 @@ function consensus!(ws::SOCPHybridWorkspace)
         ws.branch_counts,
         ws.partitions,
         ws.interzonal,
-        _socp_rt_values,
+        _socwr_rt_values,
     )
     return nothing
 end

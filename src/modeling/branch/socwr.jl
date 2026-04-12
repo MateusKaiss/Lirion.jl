@@ -1,4 +1,4 @@
-function add_socp_branch_expressions!(model::JuMP.Model, br::BranchData)
+function add_socwr_branch_expressions!(model::JuMP.Model, br::BranchData)
     T = get(model.ext, :time_periods, 1)
     active = br.active
 
@@ -38,7 +38,7 @@ function add_socp_branch_expressions!(model::JuMP.Model, br::BranchData)
     return nothing
 end
 
-function add_socp_branch_constraints!(model::JuMP.Model, br::BranchData)
+function add_socwr_branch_constraints!(model::JuMP.Model, br::BranchData)
     T = get(model.ext, :time_periods, 1)
     active = br.active
 

@@ -17,9 +17,9 @@ _admm_print_tag(::DCHybridWorkspace) = "[ADMM-hybrid/DC]"
 _admm_print_tag(::ACStateWorkspace) = "[ADMM-state/AC]"
 _admm_print_tag(::ACPowerWorkspace) = "[ADMM-power/AC]"
 _admm_print_tag(::ACHybridWorkspace) = "[ADMM-hybrid/AC]"
-_admm_print_tag(::SOCPStateWorkspace) = "[ADMM-state/SOCP]"
-_admm_print_tag(::SOCPPowerWorkspace) = "[ADMM-power/SOCP]"
-_admm_print_tag(::SOCPHybridWorkspace) = "[ADMM-hybrid/SOCP]"
+_admm_print_tag(::SOCWRStateWorkspace) = "[ADMM-state/SOCWR]"
+_admm_print_tag(::SOCWRPowerWorkspace) = "[ADMM-power/SOCWR]"
+_admm_print_tag(::SOCWRHybridWorkspace) = "[ADMM-hybrid/SOCWR]"
 _admm_print_tag(::AbstractADMMWorkspace) = "[ADMM]"
 
 # ------------------------------------------------------------

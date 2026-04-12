@@ -100,8 +100,8 @@ include("modeling/bus/dispatch.jl")
 include("modeling/branch/dc.jl")
 include("modeling/branch/ac.jl")
 include("modeling/branch/acr.jl")
-include("modeling/branch/socp_rt.jl")
-include("modeling/branch/socp.jl")
+include("modeling/branch/socwr_rt.jl")
+include("modeling/branch/socwr.jl")
 include("modeling/branch/dispatch.jl")
 
 # --- GENERATOR
@@ -115,7 +115,7 @@ include("modeling/battery/constraints_common.jl")
 include("modeling/battery/constraints_dc.jl")
 include("modeling/battery/constraints_ac.jl")
 include("modeling/battery/constraints_acr.jl")
-include("modeling/battery/constraints_socp.jl")
+include("modeling/battery/constraints_socwr.jl")
 include("modeling/battery/dispatch.jl")
 
 # --- PROSUMER
@@ -167,10 +167,10 @@ include("distributed_algorithms/admm/ac/workspace.jl")
 include("distributed_algorithms/admm/ac/partition.jl")
 include("distributed_algorithms/admm/ac/objective.jl")
 
-# SOCP
-include("distributed_algorithms/admm/socp/workspace.jl")
-include("distributed_algorithms/admm/socp/partition.jl")
-include("distributed_algorithms/admm/socp/objective.jl")
+# SOCWR
+include("distributed_algorithms/admm/socwr/workspace.jl")
+include("distributed_algorithms/admm/socwr/partition.jl")
+include("distributed_algorithms/admm/socwr/objective.jl")
 
 # ------------------------------------------------------------------
 # ADMM unified algorithms (consensus, duals, residuals, rho, save)
@@ -202,7 +202,7 @@ include("solve.jl")
 # ------------------------------------------------------------------
 # Public exports
 # ------------------------------------------------------------------
-export solve, dc, ac, acr, socp,
+export solve, dc, ac, acr, socwr,
     centralized, admm,
     partition_from_case, partition_metis
 

@@ -7,7 +7,7 @@ abstract type OPFModel end
 struct DC <: OPFModel end
 struct AC <: OPFModel end     # AC polar (V, θ)
 struct ACR <: OPFModel end    # AC rectangular (vr, vi)
-struct SOCP <: OPFModel end
+struct SOCWR <: OPFModel end
 
 # ============================================================
 # ADMM VARIANTS
@@ -88,17 +88,17 @@ const _RHO_RULES = Dict{Tuple{DataType, Symbol}, NamedTuple}(
     ),
 
     # ----------------------------
-    # SOCP
+    # SOCWR
     # ----------------------------
-    (SOCP, :state) => (
+    (SOCWR, :state) => (
         allowed = Set([:rho_v2, :rho_r, :rho_t]),
         required = Set([:rho_v2, :rho_r, :rho_t]),
     ),
-    (SOCP, :power) => (
+    (SOCWR, :power) => (
         allowed = Set([:rho_p, :rho_q]),
         required = Set([:rho_p, :rho_q]),
     ),
-    (SOCP, :hybrid) => (
+    (SOCWR, :hybrid) => (
         allowed = Set([:rho_v2, :rho_p, :rho_q, :rho_r, :rho_t]),
         required = Set([:rho_v2, :rho_p, :rho_q, :rho_r, :rho_t]),
     ),
@@ -134,11 +134,11 @@ function _normalize_rhos_strict(
     allowed = rules.allowed
     required = rules.required
 
-    if base_model === SOCP
+    if base_model === SOCWR
         rho_theta === nothing ||
-            error("SOCP does not accept rho_theta. Use rho_v2, rho_r, rho_t (or rho=...).")
+            error("SOCWR does not accept rho_theta. Use rho_v2, rho_r, rho_t (or rho=...).")
         rho_v === nothing ||
-            error("SOCP does not accept rho_v. Use rho_v2 (or rho=...).")
+            error("SOCWR does not accept rho_v. Use rho_v2 (or rho=...).")
     end
 
     provided = Set{Symbol}()
@@ -192,12 +192,12 @@ function _normalize_rhos_strict(
     anchor_val = _get_required_value(req_sorted[1])
 
     rho_theta_val =
-        (base_model === SOCP) ? anchor_val :
+        (base_model === SOCWR) ? anchor_val :
         ((:rho_theta in required) ? _asfloat(rho_theta, :rho_theta) : anchor_val)
 
     rho_v_val = if base_model === AC
         (:rho_v in required) ? _asfloat(rho_v, :rho_v) : anchor_val
-    elseif base_model === SOCP
+    elseif base_model === SOCWR
         (:rho_v2 in required) ? _asfloat(rho_v2, :rho_v2) : anchor_val
     else
         anchor_val
@@ -263,8 +263,8 @@ mutable struct DistributedOPFModel
         tau_incr::Real = 1.05,
         tau_decr::Real = 0.98,
     )
-        base_model in (DC, AC, SOCP) ||
-            throw(ArgumentError("Invalid base_model=$base_model. Allowed: DC, AC, SOCP"))
+        base_model in (DC, AC, SOCWR) ||
+            throw(ArgumentError("Invalid base_model=$base_model. Allowed: DC, AC, SOCWR"))
 
         coupling in (:state, :power, :hybrid) ||
             throw(

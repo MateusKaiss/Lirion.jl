@@ -44,7 +44,7 @@ However, if no solver is explicitly specified, Lirion automatically selects a de
 |-----------|---------------|---------------|
 | **DC OPF** | `OSQP` | Convex Quadratic Programming |
 | **AC OPF** | `Ipopt` | Nonlinear Programming (NLP) |
-| **SOCP OPF** | `Clarabel` | Conic Optimization (SOCP) |
+| **SOCWR OPF** | `Clarabel` | Conic Optimization (SOCWR) |
 
 These default solvers are installed automatically as dependencies when Lirion is installed.
 
@@ -65,9 +65,9 @@ Below is a non-exhaustive list of well-known solvers compatible with the Julia o
 | Solver | Julia Package | License | Typical Use |
 |--------|--------------|----------|------------|
 | HiGHS | `HiGHS.jl` | MIT | LP / QP (fast open-source alternative) |
-| Gurobi | `Gurobi.jl` | Commercial | LP / QP / MIP / SOCP |
+| Gurobi | `Gurobi.jl` | Commercial | LP / QP / MIP / SOCWR |
 | CPLEX | `CPLEX.jl` | Commercial | LP / QP / MIP |
-| Mosek | `MosekTools.jl` | Commercial | LP / QP / SOCP / SDP |
+| Mosek | `MosekTools.jl` | Commercial | LP / QP / SOCWR / SDP |
 | SCS | `SCS.jl` | MIT | Large-scale conic problems |
 | COSMO | `COSMO.jl` | Apache | Conic optimization |
 | KNITRO | `KNITRO.jl` | Commercial | Large-scale nonlinear optimization |

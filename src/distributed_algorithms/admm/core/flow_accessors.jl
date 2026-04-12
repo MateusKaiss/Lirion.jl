@@ -19,7 +19,7 @@
 # ---------------------------------------------------------------------
 # NOTE / TODO (DC flow helpers / indexing mismatch — investigate)
 #
-# Try to make DC follow the same pattern as AC/SOCP (use
+# Try to make DC follow the same pattern as AC/SOCWR (use
 # model[:p_flow_branches] via _p_flow_from_exprs), but keep
 # _dc_flow_val_model for now to avoid wrong indexing/results to the paper.
 # ---------------------------------------------------------------------
@@ -45,7 +45,7 @@ end
 end
 
 # ------------------------------------------------------------
-# Active + reactive power flow (AC / SOCP)
+# Active + reactive power flow (AC / SOCWR)
 # ------------------------------------------------------------
 
 @inline _pq_flow_from_exprs(model::JuMP.Model, l::Int, t::Int = 1) =
@@ -54,11 +54,11 @@ end
 @inline _pq_flow_from_exprs(part::PartitionAC, l::Int; t::Int = 1) =
     _pq_flow_from_exprs(part.model, l, t)
 
-@inline _pq_flow_from_exprs(part::PartitionSOCP, l::Int; t::Int = 1) =
+@inline _pq_flow_from_exprs(part::PartitionSOCWR, l::Int; t::Int = 1) =
     _pq_flow_from_exprs(part.model, l, t)
 
 # ------------------------------------------------------------
-# Second-order cone auxiliary variables (SOCP)
+# Second-order cone auxiliary variables (SOCWR)
 # ------------------------------------------------------------
 
 @inline _rt_from_exprs(model::JuMP.Model, l::Int, t::Int = 1) =
@@ -71,12 +71,12 @@ end
 @inline _dc_flow_value(part::PartitionDC, l::Int) =
     _dc_flow_val_model(part.model, part, l)
 
-@inline function _socp_pq_values(part::PartitionSOCP, l::Int)
+@inline function _socwr_pq_values(part::PartitionSOCWR, l::Int)
     p, q = _pq_flow_from_exprs(part.model, l)
     return JuMP.value(p), JuMP.value(q)
 end
 
-@inline function _socp_rt_values(part::PartitionSOCP, l::Int)
+@inline function _socwr_rt_values(part::PartitionSOCWR, l::Int)
     r, t = _rt_from_exprs(part.model, l)
     return JuMP.value(r), JuMP.value(t)
 end

@@ -5,7 +5,7 @@
 dc() = DC
 ac() = AC
 acr() = ACR
-socp() = SOCP
+socwr() = SOCWR
 
 # -----------------------------
 # Algorithm builders

@@ -1,8 +1,8 @@
 # =======================================================================
-# SOCP battery constraints
+# SOCWR battery constraints
 # =======================================================================
 
-function add_socp_battery_constraints!(model::JuMP.Model, bat::BatteryData)
+function add_socwr_battery_constraints!(model::JuMP.Model, bat::BatteryData)
     T = get(model.ext, :time_periods, 1)
     B = bat.n
 

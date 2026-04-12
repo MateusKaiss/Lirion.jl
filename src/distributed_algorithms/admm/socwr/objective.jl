@@ -1,12 +1,12 @@
 # ============================================================
-# SOCP OBJECTIVE
+# SOCWR OBJECTIVE
 # ============================================================
 
 # ------------------------------------------------------------
 # QUADRATIC TERMS
 # ------------------------------------------------------------
 
-function build_quad_bus_expr!(part::PartitionSOCP, rho_v2::Float64)
+function build_quad_bus_expr!(part::PartitionSOCWR, rho_v2::Float64)
     v2 = part.v2_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     quad = zero(JuMP.QuadExpr)
 
@@ -14,12 +14,12 @@ function build_quad_bus_expr!(part::PartitionSOCP, rho_v2::Float64)
         quad += 0.5 * rho_v2 * v2[b, 1]^2
     end
 
-    part.quad_bus_expr_socp = quad
+    part.quad_bus_expr_socwr = quad
     return quad
 end
 
 function build_quad_branch_rt_expr!(
-    part::PartitionSOCP,
+    part::PartitionSOCWR,
     rho_r::Float64,
     rho_t::Float64,
     zone_edges::Vector{Int},
@@ -34,12 +34,12 @@ function build_quad_branch_rt_expr!(
         quad += 0.5 * rho_r * r^2 + 0.5 * rho_t * t^2
     end
 
-    part.quad_rt_expr_socp = quad
+    part.quad_rt_expr_socwr = quad
     return quad
 end
 
 function build_quad_branch_pq_expr!(
-    part::PartitionSOCP,
+    part::PartitionSOCWR,
     rho_p::Float64,
     rho_q::Float64,
     zone_edges::Vector{Int},
@@ -54,7 +54,7 @@ function build_quad_branch_pq_expr!(
         quad += 0.5 * rho_p * p^2 + 0.5 * rho_q * q^2
     end
 
-    part.quad_pq_expr_socp = quad
+    part.quad_pq_expr_socwr = quad
     return quad
 end
 
@@ -63,7 +63,7 @@ end
 # ------------------------------------------------------------
 
 function build_linear_bus_term(
-    part::PartitionSOCP,
+    part::PartitionSOCWR,
     v2_consensus::Vector{Float64},
     v2_duals::AbstractVector{Float64},
     rho_v2::Float64,
@@ -81,7 +81,7 @@ function build_linear_bus_term(
 end
 
 function build_linear_branch_rt_term(
-    part::PartitionSOCP,
+    part::PartitionSOCWR,
     zone_edges::Vector{Int},
     r_consensus::Vector{Float64},
     t_consensus::Vector{Float64},
@@ -111,7 +111,7 @@ function build_linear_branch_rt_term(
 end
 
 function build_linear_branch_pq_term(
-    part::PartitionSOCP,
+    part::PartitionSOCWR,
     zone_edges::Vector{Int},
     p_consensus::Vector{Float64},
     q_consensus::Vector{Float64},
@@ -144,7 +144,7 @@ end
 # UPDATE OBJECTIVE
 # ------------------------------------------------------------
 
-function update_objective!(part::PartitionSOCP, ws::SOCPStateWorkspace)
+function update_objective!(part::PartitionSOCWR, ws::SOCWRStateWorkspace)
     p = part.position
 
     lin_bus = build_linear_bus_term(
@@ -169,7 +169,7 @@ function update_objective!(part::PartitionSOCP, ws::SOCPStateWorkspace)
     @objective(part.model, Min, part.obj_static + lin_bus + lin_rt)
 end
 
-function update_objective!(part::PartitionSOCP, ws::SOCPPowerWorkspace)
+function update_objective!(part::PartitionSOCWR, ws::SOCWRPowerWorkspace)
     p = part.position
 
     lin = build_linear_branch_pq_term(
@@ -187,7 +187,7 @@ function update_objective!(part::PartitionSOCP, ws::SOCPPowerWorkspace)
     @objective(part.model, Min, part.obj_static + lin)
 end
 
-function update_objective!(part::PartitionSOCP, ws::SOCPHybridWorkspace)
+function update_objective!(part::PartitionSOCWR, ws::SOCWRHybridWorkspace)
     p = part.position
 
     lin_bus = build_linear_bus_term(

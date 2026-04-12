@@ -6,7 +6,7 @@
 @inline _select_default_optimizer(::Type{<:OPFModel}) = Ipopt.Optimizer
 @inline _select_default_optimizer(::Type{ACR}) = Ipopt.Optimizer
 
-@inline _select_default_optimizer(::Type{SOCP}) = Clarabel.Optimizer
+@inline _select_default_optimizer(::Type{SOCWR}) = Clarabel.Optimizer
 
 @inline function _resolve_optimizer(
     user_opt,

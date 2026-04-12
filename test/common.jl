@@ -63,10 +63,10 @@ function _solve_maybe_optimizer(file::String; optimizer = nothing, kwargs...)
 end
 
 # ============================================================
-# SOCP solver picker
+# SOCWR solver picker
 # ============================================================
 
-pick_socp_optimizer(; prefer::Symbol = :auto) = Clarabel.Optimizer
+pick_socwr_optimizer(; prefer::Symbol = :auto) = Clarabel.Optimizer
 
 # ============================================================
 # GENERIC DISTRIBUTED TEST RUNNER

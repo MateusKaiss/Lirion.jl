@@ -27,7 +27,7 @@ function prepare_hotpaths!(part::PartitionAC)
     return nothing
 end
 
-function prepare_hotpaths!(part::PartitionSOCP)
+function prepare_hotpaths!(part::PartitionSOCWR)
     n_bus, n_shared = _bus_dims(part)
     part.v2_buf = zeros(n_bus)
     part.v2_shared_buf = zeros(n_shared)
@@ -114,7 +114,7 @@ end
 @inline snapshot_v_mag!(part::PartitionAC) =
     _snapshot_bus_var!(part.v_mag_buf, part.model, part.v_mag_var, part.bus.id, 1.0)
 
-@inline snapshot_v2!(part::PartitionSOCP) =
+@inline snapshot_v2!(part::PartitionSOCWR) =
     _snapshot_bus_var!(part.v2_buf, part.model, part.v2_var, part.bus.id, 1.0)
 
 # ------------------------------------------------------------
@@ -139,7 +139,7 @@ end
         part.bus.id, part.shared_bus_local_idx, 1.0,
     )
 
-@inline snapshot_v2_shared!(part::PartitionSOCP) =
+@inline snapshot_v2_shared!(part::PartitionSOCWR) =
     _snapshot_shared_var!(
         part.v2_shared_buf, part.model, part.v2_var,
         part.bus.id, part.shared_bus_local_idx, 1.0,

@@ -19,7 +19,7 @@ Lirion was built to bridge implementation clarity and theoretical rigor in Optim
 
 It provides:
 
-- Centralized DC, AC, and SOCP OPF
+- Centralized DC, AC, and SOCWR OPF
 - Distributed OPF via ADMM and ALADIN
 - Modular coupling-variable experimentation
 - Flexible partitioning strategies
@@ -66,7 +66,7 @@ If no solver is specified, Lirion automatically selects its default solver:
 
 - **DC → OSQP**
 - **AC → Ipopt**
-- **SOCP → Clarabel**
+- **SOCWR → Clarabel**
 
 For detailed installation instructions, solver selection guidance, and a complete list of supported solvers, see the documentation:
 
@@ -75,7 +75,7 @@ https://your-docs-link-here.com/installation
 
 ---
 
-### 🔹 Centralized Example (AC / DC / SOCP)
+### 🔹 Centralized Example (AC / DC / SOCWR)
 
 **Case file:**
 
@@ -104,10 +104,10 @@ You may also switch the formulation:
 
 ```julia
 model = dc()     # DC OPF  → typically uses OSQP.Optimizer
-model = socp()   # SOCP OPF → typically uses Clarabel.Optimizer
+model = socwr()   # SOCWR OPF → typically uses Clarabel.Optimizer
 ```
 
-### 🔹 Distributed Example ( ADMM AC / ADMM DC / ADMM SOCP)
+### 🔹 Distributed Example ( ADMM AC / ADMM DC / ADMM SOCWR)
 #### Run a Distributed AC OPF with ADMM (Hybrid Coupling)
 
 
@@ -174,7 +174,7 @@ Lirion is accompanied by a dedicated technical website jointly created by Mateus
 
 The website contains deeper mathematical material underlying Lirion’s design, including:
 
-- OPF formulations (DC, AC, SOCP)  
+- OPF formulations (DC, AC, SOCWR)  
 - ADMM derivations and penalty update rules  
 - Coupling-variable design theory  
 - Structural and decomposition analysis  

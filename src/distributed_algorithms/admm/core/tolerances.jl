@@ -277,9 +277,9 @@ function compute_tolerances!(ws::ACHybridWorkspace, eps_abs::Float64, eps_rel::F
     return nothing
 end
 
-# ---- SOCP ----
+# ---- SOCWR ----
 
-function compute_tolerances!(ws::SOCPStateWorkspace, eps_abs::Float64, eps_rel::Float64)
+function compute_tolerances!(ws::SOCWRStateWorkspace, eps_abs::Float64, eps_rel::Float64)
     eps_r = hypot(
         _eps_primal_bus(
             ws.partitions,
@@ -317,7 +317,7 @@ function compute_tolerances!(ws::SOCPStateWorkspace, eps_abs::Float64, eps_rel::
     return nothing
 end
 
-function compute_tolerances!(ws::SOCPPowerWorkspace, eps_abs::Float64, eps_rel::Float64)
+function compute_tolerances!(ws::SOCWRPowerWorkspace, eps_abs::Float64, eps_rel::Float64)
     eps_r = _eps_primal_branch(
         ws.partitions,
         (ws.p_flow_consensus, ws.q_flow_consensus),
@@ -338,7 +338,7 @@ function compute_tolerances!(ws::SOCPPowerWorkspace, eps_abs::Float64, eps_rel::
     return nothing
 end
 
-function compute_tolerances!(ws::SOCPHybridWorkspace, eps_abs::Float64, eps_rel::Float64)
+function compute_tolerances!(ws::SOCWRHybridWorkspace, eps_abs::Float64, eps_rel::Float64)
     eps_r = sqrt(
         _eps_primal_bus(
             ws.partitions,

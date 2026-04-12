@@ -1,9 +1,9 @@
 # ============================================================
-# ADMM Dual Update — unified for DC · AC · SOCP
+# ADMM Dual Update — unified for DC · AC · SOCWR
 # ============================================================
 
 # ------------------------------------------------------------
-# Bus duals: single variable, linear (DC theta, SOCP V²)
+# Bus duals: single variable, linear (DC theta, SOCWR V²)
 # ------------------------------------------------------------
 function _update_bus_duals_single!(
     duals::Matrix{Float64},
@@ -73,7 +73,7 @@ function _update_branch_duals_single!(
 end
 
 # ------------------------------------------------------------
-# Branch duals: paired variables (SOCP PQ, SOCP RT)
+# Branch duals: paired variables (SOCWR PQ, SOCWR RT)
 # ------------------------------------------------------------
 function _update_branch_duals_paired!(
     duals_a::Matrix{Float64},
@@ -231,9 +231,9 @@ function dual_update!(ws::ACHybridWorkspace)
     return nothing
 end
 
-# ---- SOCP ----
+# ---- SOCWR ----
 
-function dual_update!(ws::SOCPStateWorkspace)
+function dual_update!(ws::SOCWRStateWorkspace)
     _update_bus_duals_single!(
         ws.duals_v2,
         ws.partitions,
@@ -250,12 +250,12 @@ function dual_update!(ws::SOCPStateWorkspace)
         ws.rho_r[],
         ws.rho_t[],
         ws.interzonal,
-        _socp_rt_values,
+        _socwr_rt_values,
     )
     return nothing
 end
 
-function dual_update!(ws::SOCPPowerWorkspace)
+function dual_update!(ws::SOCWRPowerWorkspace)
     _update_branch_duals_paired!(
         ws.duals_p,
         ws.duals_q,
@@ -265,12 +265,12 @@ function dual_update!(ws::SOCPPowerWorkspace)
         ws.rho_p[],
         ws.rho_q[],
         ws.interzonal,
-        _socp_pq_values,
+        _socwr_pq_values,
     )
     return nothing
 end
 
-function dual_update!(ws::SOCPHybridWorkspace)
+function dual_update!(ws::SOCWRHybridWorkspace)
     _update_bus_duals_single!(
         ws.duals_v2,
         ws.partitions,
@@ -287,7 +287,7 @@ function dual_update!(ws::SOCPHybridWorkspace)
         ws.rho_p[],
         ws.rho_q[],
         ws.interzonal,
-        _socp_pq_values,
+        _socwr_pq_values,
     )
     _update_branch_duals_paired!(
         ws.duals_r,
@@ -298,7 +298,7 @@ function dual_update!(ws::SOCPHybridWorkspace)
         ws.rho_r[],
         ws.rho_t[],
         ws.interzonal,
-        _socp_rt_values,
+        _socwr_rt_values,
     )
     return nothing
 end

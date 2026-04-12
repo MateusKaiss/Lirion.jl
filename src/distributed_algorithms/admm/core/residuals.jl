@@ -1,5 +1,5 @@
 # ============================================================
-# ADMM Residuals — unified for DC · AC · SOCP
+# ADMM Residuals — unified for DC · AC · SOCWR
 # ------------------------------------------------------------
 # Forms (Boyd §5.2, expanded consensus ADMM):
 #
@@ -16,7 +16,7 @@
 # ############################################################
 
 # ------------------------------------------------------------
-# Bus primal residual: single variable (DC theta, SOCP V²)
+# Bus primal residual: single variable (DC theta, SOCWR V²)
 # ------------------------------------------------------------
 function _primal_residual_bus_single(
     partitions::Partitions,
@@ -79,7 +79,7 @@ function _primal_residual_branch_single(
 end
 
 # ------------------------------------------------------------
-# Branch primal residual: paired components (SOCP PQ, SOCP RT)
+# Branch primal residual: paired components (SOCWR PQ, SOCWR RT)
 # ------------------------------------------------------------
 function _primal_residual_branch_paired_components(
     partitions::Partitions,
@@ -132,7 +132,7 @@ end
 # ############################################################
 
 # ------------------------------------------------------------
-# Bus dual residual: single vector (DC theta, SOCP V²)
+# Bus dual residual: single vector (DC theta, SOCWR V²)
 # ------------------------------------------------------------
 function _dual_residual_bus_single(
     partitions::Partitions,
@@ -197,7 +197,7 @@ function _dual_residual_branch_single(
 end
 
 # ------------------------------------------------------------
-# Branch dual residual: paired components (SOCP PQ, SOCP RT, AC P/Q)
+# Branch dual residual: paired components (SOCWR PQ, SOCWR RT, AC P/Q)
 # ------------------------------------------------------------
 function _dual_residual_branch_paired_components(
     partitions::Partitions,
@@ -373,9 +373,9 @@ function compute_residuals!(ws::ACHybridWorkspace)
     return nothing
 end
 
-# ---- SOCP ----
+# ---- SOCWR ----
 
-function compute_residuals!(ws::SOCPStateWorkspace)
+function compute_residuals!(ws::SOCWRStateWorkspace)
     ws.r_primal_bus = _primal_residual_bus_single(
         ws.partitions,
         ws.v2_consensus,
@@ -392,7 +392,7 @@ function compute_residuals!(ws::SOCPStateWorkspace)
         ws.r_consensus,
         ws.t_consensus,
         ws.interzonal,
-        _socp_rt_values,
+        _socwr_rt_values,
     )
     ws.r_dual_r, ws.r_dual_t = _dual_residual_branch_paired_components(
         ws.partitions,
@@ -406,13 +406,13 @@ function compute_residuals!(ws::SOCPStateWorkspace)
     return nothing
 end
 
-function compute_residuals!(ws::SOCPPowerWorkspace)
+function compute_residuals!(ws::SOCWRPowerWorkspace)
     ws.r_primal_p, ws.r_primal_q = _primal_residual_branch_paired_components(
         ws.partitions,
         ws.p_flow_consensus,
         ws.q_flow_consensus,
         ws.interzonal,
-        _socp_pq_values,
+        _socwr_pq_values,
     )
     ws.r_dual_p, ws.r_dual_q = _dual_residual_branch_paired_components(
         ws.partitions,
@@ -426,7 +426,7 @@ function compute_residuals!(ws::SOCPPowerWorkspace)
     return nothing
 end
 
-function compute_residuals!(ws::SOCPHybridWorkspace)
+function compute_residuals!(ws::SOCWRHybridWorkspace)
     ws.r_primal_bus = _primal_residual_bus_single(
         ws.partitions,
         ws.v2_consensus,
@@ -443,7 +443,7 @@ function compute_residuals!(ws::SOCPHybridWorkspace)
         ws.p_flow_consensus,
         ws.q_flow_consensus,
         ws.interzonal,
-        _socp_pq_values,
+        _socwr_pq_values,
     )
     ws.r_dual_p, ws.r_dual_q = _dual_residual_branch_paired_components(
         ws.partitions,
@@ -456,7 +456,7 @@ function compute_residuals!(ws::SOCPHybridWorkspace)
         ws.r_consensus,
         ws.t_consensus,
         ws.interzonal,
-        _socp_rt_values,
+        _socwr_rt_values,
     )
     ws.r_dual_r, ws.r_dual_t = _dual_residual_branch_paired_components(
         ws.partitions,

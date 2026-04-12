@@ -1,9 +1,9 @@
 # ============================================================
-# SOCP PARTITION INITIALIZATION
+# SOCWR PARTITION INITIALIZATION
 # ============================================================
 
 function init_state_partition!(
-    part::PartitionSOCP,
+    part::PartitionSOCWR,
     sys_zone::SystemData,
     optimizer_factory,
     rho_v2::Float64,
@@ -12,7 +12,7 @@ function init_state_partition!(
     interzonal_branches,
 )
     part.zone_edges = _zone_cut_edges(part, interzonal_branches)
-    model = _setup_partition_model!(part, sys_zone, SOCP, optimizer_factory)
+    model = _setup_partition_model!(part, sys_zone, SOCWR, optimizer_factory)
 
     part.v2_var = model[:v_magnitude_sq]
     for I in keys(part.v2_var)
@@ -22,14 +22,14 @@ function init_state_partition!(
     build_quad_bus_expr!(part, rho_v2)
     build_quad_branch_rt_expr!(part, rho_r, rho_t, part.zone_edges)
 
-    part.obj_static = part.obj_base + part.quad_bus_expr_socp + part.quad_rt_expr_socp
+    part.obj_static = part.obj_base + part.quad_bus_expr_socwr + part.quad_rt_expr_socwr
     @objective(model, Min, part.obj_static)
 
     return nothing
 end
 
 function init_power_partition!(
-    part::PartitionSOCP,
+    part::PartitionSOCWR,
     sys_zone::SystemData,
     optimizer_factory,
     rho_p::Float64,
@@ -37,7 +37,7 @@ function init_power_partition!(
     interzonal_branches,
 )
     part.zone_edges = _zone_cut_edges(part, interzonal_branches)
-    model = _setup_partition_model!(part, sys_zone, SOCP, optimizer_factory)
+    model = _setup_partition_model!(part, sys_zone, SOCWR, optimizer_factory)
 
     if is_gurobi(model)
         soft_anchor_branch_expr!(
@@ -53,14 +53,14 @@ function init_power_partition!(
 
     build_quad_branch_pq_expr!(part, rho_p, rho_q, part.zone_edges)
 
-    part.obj_static = part.obj_base + part.quad_pq_expr_socp + part.soft_anchor_expr
+    part.obj_static = part.obj_base + part.quad_pq_expr_socwr + part.soft_anchor_expr
     @objective(model, Min, part.obj_static)
 
     return nothing
 end
 
 function init_hybrid_partition!(
-    part::PartitionSOCP,
+    part::PartitionSOCWR,
     sys_zone::SystemData,
     optimizer_factory,
     rho_v2::Float64,
@@ -71,7 +71,7 @@ function init_hybrid_partition!(
     interzonal_branches,
 )
     part.zone_edges = _zone_cut_edges(part, interzonal_branches)
-    model = _setup_partition_model!(part, sys_zone, SOCP, optimizer_factory)
+    model = _setup_partition_model!(part, sys_zone, SOCWR, optimizer_factory)
 
     part.v2_var = model[:v_magnitude_sq]
     for I in keys(part.v2_var)
@@ -83,8 +83,8 @@ function init_hybrid_partition!(
     build_quad_branch_rt_expr!(part, rho_r, rho_t, part.zone_edges)
 
     part.obj_static =
-        part.obj_base + part.quad_bus_expr_socp + part.quad_pq_expr_socp +
-        part.quad_rt_expr_socp
+        part.obj_base + part.quad_bus_expr_socwr + part.quad_pq_expr_socwr +
+        part.quad_rt_expr_socwr
 
     @objective(model, Min, part.obj_static)
 
@@ -96,7 +96,7 @@ end
 # ============================================================
 
 function init_state_partition!(
-    partitions::Partitions{PartitionSOCP},
+    partitions::Partitions{PartitionSOCWR},
     sys::DistributedSystem,
     optimizer_factory,
     rho_v2::Float64,
@@ -122,7 +122,7 @@ function init_state_partition!(
 end
 
 function init_power_partition!(
-    partitions::Partitions{PartitionSOCP},
+    partitions::Partitions{PartitionSOCWR},
     sys::DistributedSystem,
     optimizer_factory,
     rho_p::Float64,
@@ -146,7 +146,7 @@ function init_power_partition!(
 end
 
 function init_hybrid_partition!(
-    partitions::Partitions{PartitionSOCP},
+    partitions::Partitions{PartitionSOCWR},
     sys::DistributedSystem,
     optimizer_factory,
     rho_v2::Float64,
@@ -176,11 +176,11 @@ function init_hybrid_partition!(
 end
 
 # ============================================================
-# SOCP EXTRAS — soft anchoring (Gurobi stabilization)
+# SOCWR EXTRAS — soft anchoring (Gurobi stabilization)
 # ============================================================
 
 function soft_anchor_branch_expr!(
-    part::PartitionSOCP;
+    part::PartitionSOCWR;
     kappa_v2::Float64 = 1e-6,
     kappa_pq::Float64 = 1e-8,
     use_bus::Bool = true,

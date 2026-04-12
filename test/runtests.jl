@@ -9,7 +9,7 @@ using JuMP: optimizer_with_attributes
 
 include("common.jl")
 
-const DEFAULT_SOCP_SOLVER = optimizer_with_attributes(
+const DEFAULT_SOCWR_SOLVER = optimizer_with_attributes(
     Clarabel.Optimizer,
     "verbose" => false,
     "tol_feas" => 1e-4,
@@ -44,7 +44,7 @@ include(joinpath(@__DIR__, "test_timeseries.jl"))
 
 include(joinpath(@__DIR__, "test_admm_dc.jl"))
 include(joinpath(@__DIR__, "test_admm_ac.jl"))
-include(joinpath(@__DIR__, "test_admm_socp.jl"))
+include(joinpath(@__DIR__, "test_admm_socwr.jl"))
 
 @testset "Lirion - All Tests" begin
     # Centralizados
@@ -73,21 +73,21 @@ include(joinpath(@__DIR__, "test_admm_socp.jl"))
         distributed_optimizer = Ipopt.Optimizer,
     )
 
-    # Distributed SOCP
-    run_admm_socp_state_tests(;
+    # Distributed SOCWR
+    run_admm_socwr_state_tests(;
         rtol = 0.01,
-        central_optimizer = DEFAULT_SOCP_SOLVER,
-        distributed_optimizer = DEFAULT_SOCP_SOLVER,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
     )
-    run_admm_socp_power_tests(;
+    run_admm_socwr_power_tests(;
         rtol = 0.01,
-        central_optimizer = DEFAULT_SOCP_SOLVER,
-        distributed_optimizer = DEFAULT_SOCP_SOLVER,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
     )
-    run_admm_socp_hybrid_tests(;
+    run_admm_socwr_hybrid_tests(;
         rtol = 0.01,
-        central_optimizer = DEFAULT_SOCP_SOLVER,
-        distributed_optimizer = DEFAULT_SOCP_SOLVER,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
     )
 end
 

@@ -113,7 +113,7 @@ function add_rectangular_bus_variables!(model::JuMP.Model, bus::BusData)
     return nothing
 end
 
-function add_socp_bus_variables!(model::JuMP.Model, bus::BusData)
+function add_socwr_bus_variables!(model::JuMP.Model, bus::BusData)
     T = get(model.ext, :time_periods, 1)
     bus_ids = bus.id
     id_to_idx = bus.id_to_idx

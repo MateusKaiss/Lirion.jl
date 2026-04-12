@@ -138,8 +138,8 @@ end
         return Lirion.ac()
     elseif model_type == Lirion.ACR
         return Lirion.acr()
-    elseif model_type == Lirion.SOCP
-        return Lirion.socp()
+    elseif model_type == Lirion.SOCWR
+        return Lirion.socwr()
     else
         error("Unsupported Lirion model type: $model_type")
     end
@@ -154,7 +154,7 @@ end
     # - For DC:  DCPPowerModel
     # - For AC:  ACPPowerModel (via solve_ac_opf)
     # - For ACR: ACRPowerModel
-    # - For SOCP: SOCWRConicPowerModel (no storage) / SOCWRPowerModel (storage helper)
+    # - For SOCWR: SOCWRConicPowerModel (no storage) / SOCWRPowerModel (storage helper)
     if has_storage
         if model_type == Lirion.DC
             return Float64(
@@ -168,7 +168,7 @@ end
             return Float64(
                 PowerModels._solve_opf_strg(pm_data, ACRPowerModel, optimizer)["objective"],
             )
-        elseif model_type == Lirion.SOCP
+        elseif model_type == Lirion.SOCWR
             return Float64(
                 PowerModels._solve_opf_strg(pm_data, SOCWRPowerModel, optimizer)["objective"],
             )
@@ -186,7 +186,7 @@ end
             return Float64(
                 PowerModels.solve_opf(pm_data, ACRPowerModel, optimizer)["objective"],
             )
-        elseif model_type == Lirion.SOCP
+        elseif model_type == Lirion.SOCWR
             return Float64(
                 PowerModels.solve_opf(pm_data, SOCWRConicPowerModel, optimizer)["objective"],
             )
@@ -303,11 +303,11 @@ function run_test_objective()
             case_list = reduced_testlist_ac,
         )
 
-        socp_optimizer = Clarabel.Optimizer
+        socwr_optimizer = Clarabel.Optimizer
         run_model_tests(
-            Lirion.SOCP,
-            "SOCP";
-            optimizer = socp_optimizer,
+            Lirion.SOCWR,
+            "SOCWR";
+            optimizer = socwr_optimizer,
             case_list = reduced_list,
         )
 
@@ -331,9 +331,9 @@ function run_test_objective()
             case_list = battery_cases,
         )
         # run_model_tests(
-        #     Lirion.SOCP,
-        #     "SOCP com baterias";
-        #     optimizer = socp_optimizer,
+        #     Lirion.SOCWR,
+        #     "SOCWR com baterias";
+        #     optimizer = socwr_optimizer,
         #     case_list = battery_cases,
         # )
     end

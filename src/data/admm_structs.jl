@@ -80,7 +80,7 @@ Base.@kwdef mutable struct PartitionAC <: AbstractPartition
     zone_edges::Vector{Int} = Int[]
 end
 
-Base.@kwdef mutable struct PartitionSOCP <: AbstractPartition
+Base.@kwdef mutable struct PartitionSOCWR <: AbstractPartition
     id::Int
     position::Int = 0
 
@@ -104,9 +104,9 @@ Base.@kwdef mutable struct PartitionSOCP <: AbstractPartition
         nothing
     obj_static::Union{JuMP.AffExpr, Float64, JuMP.QuadExpr} = 0.0
 
-    quad_bus_expr_socp::JuMP.QuadExpr = zero(JuMP.QuadExpr)
-    quad_rt_expr_socp::JuMP.QuadExpr = zero(JuMP.QuadExpr)
-    quad_pq_expr_socp::JuMP.QuadExpr = zero(JuMP.QuadExpr)
+    quad_bus_expr_socwr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
+    quad_rt_expr_socwr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
+    quad_pq_expr_socwr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
 
     soft_anchor_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
 

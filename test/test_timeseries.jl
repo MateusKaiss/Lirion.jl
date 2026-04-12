@@ -32,18 +32,18 @@ function run_test_timeseries()
             @test isapprox(obj, 17437.9297122154; atol = 1e-1)
         end
 
-        # --- SOCP ---
-        @testset "SOCP" begin
+        # --- SOCWR ---
+        @testset "SOCWR" begin
             out = Lirion.solve(
                 case_path;
-                model = Lirion.socp(),
+                model = Lirion.socwr(),
                 algorithm = Lirion.centralized(),
                 optimizer = Clarabel.Optimizer,
                 outputs = false,
                 plots = false,
             )
             obj = Float64(out.result["objective"])
-            @info "SOCP objective = $obj"
+            @info "SOCWR objective = $obj"
             @test isapprox(obj, 17205.621331837865; atol = 1.0)
         end
     end

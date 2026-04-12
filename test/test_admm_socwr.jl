@@ -1,11 +1,11 @@
 # ============================================================
-# =========================  SOCP TESTS  =======================
+# =========================  SOCWR TESTS  =======================
 # ============================================================
 
 # ------------------------
-# SOCP - STATE
+# SOCWR - STATE
 # ------------------------
-const SOCP_STATE_CASES = [
+const SOCWR_STATE_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
@@ -18,9 +18,9 @@ const SOCP_STATE_CASES = [
 ]
 
 # ------------------------
-# SOCP - POWER
+# SOCWR - POWER
 # ------------------------
-const SOCP_POWER_CASES = [
+const SOCWR_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
@@ -32,9 +32,9 @@ const SOCP_POWER_CASES = [
 ]
 
 # ------------------------
-# SOCP - HYBRID
+# SOCWR - HYBRID
 # ------------------------
-const SOCP_HYBRID_CASES = [
+const SOCWR_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
@@ -48,13 +48,13 @@ const SOCP_HYBRID_CASES = [
 # ============================================================
 # OBJECTIVE EXTRACTORS
 # ============================================================
-central_obj_socp(out) = Float64(out.result["objective"])
-dist_obj_socp(out) = Float64(out.result.total_cost)
+central_obj_socwr(out) = Float64(out.result["objective"])
+dist_obj_socwr(out) = Float64(out.result.total_cost)
 
 # ============================================================
-# SOCP - STATE
+# SOCWR - STATE
 # ============================================================
-function run_admm_socp_state_tests(;
+function run_admm_socwr_state_tests(;
     rtol = 0.01,
     atol = 1e-6,
     central_optimizer,
@@ -89,14 +89,14 @@ function run_admm_socp_state_tests(;
     )
 
     return run_case_suite(;
-        label = "ADMM-SOCP STATE",
+        label = "ADMM-SOCWR STATE",
         test_dir = test_dir,
-        case_list = SOCP_STATE_CASES,
-        model = Lirion.socp(),
+        case_list = SOCWR_STATE_CASES,
+        model = Lirion.socwr(),
         central_optimizer = central_optimizer,
         distributed_optimizer = distributed_optimizer,
-        objective_central = central_obj_socp,
-        objective_dist = dist_obj_socp,
+        objective_central = central_obj_socwr,
+        objective_dist = dist_obj_socwr,
         make_algorithm = make_alg,
         defaults = defaults,
         overrides = _ -> NamedTuple(),
@@ -106,9 +106,9 @@ function run_admm_socp_state_tests(;
 end
 
 # ============================================================
-# SOCP - POWER
+# SOCWR - POWER
 # ============================================================
-function run_admm_socp_power_tests(;
+function run_admm_socwr_power_tests(;
     rtol = 0.01,
     atol = 1e-6,
     central_optimizer,
@@ -145,14 +145,14 @@ function run_admm_socp_power_tests(;
     )
 
     return run_case_suite(;
-        label = "ADMM-SOCP POWER",
+        label = "ADMM-SOCWR POWER",
         test_dir = test_dir,
-        case_list = SOCP_POWER_CASES,
-        model = Lirion.socp(),
+        case_list = SOCWR_POWER_CASES,
+        model = Lirion.socwr(),
         central_optimizer = central_optimizer,
         distributed_optimizer = distributed_optimizer,
-        objective_central = central_obj_socp,
-        objective_dist = dist_obj_socp,
+        objective_central = central_obj_socwr,
+        objective_dist = dist_obj_socwr,
         make_algorithm = make_alg,
         defaults = defaults,
         overrides = _ -> NamedTuple(),
@@ -162,9 +162,9 @@ function run_admm_socp_power_tests(;
 end
 
 # ============================================================
-# SOCP - HYBRID
+# SOCWR - HYBRID
 # ============================================================
-function run_admm_socp_hybrid_tests(;
+function run_admm_socwr_hybrid_tests(;
     rtol = 0.01,
     atol = 1e-6,
     central_optimizer,
@@ -207,14 +207,14 @@ function run_admm_socp_hybrid_tests(;
     )
 
     return run_case_suite(;
-        label = "ADMM-SOCP HYBRID",
+        label = "ADMM-SOCWR HYBRID",
         test_dir = test_dir,
-        case_list = SOCP_HYBRID_CASES,
-        model = Lirion.socp(),
+        case_list = SOCWR_HYBRID_CASES,
+        model = Lirion.socwr(),
         central_optimizer = central_optimizer,
         distributed_optimizer = distributed_optimizer,
-        objective_central = central_obj_socp,
-        objective_dist = dist_obj_socp,
+        objective_central = central_obj_socwr,
+        objective_dist = dist_obj_socwr,
         make_algorithm = make_alg,
         defaults = defaults,
         overrides = _ -> NamedTuple(),

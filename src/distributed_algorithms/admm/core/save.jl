@@ -47,23 +47,23 @@ function save_prev!(ws::ACHybridWorkspace)
 end
 
 # ============================================================
-# SOCP
+# SOCWR
 # ============================================================
 
-function save_prev!(ws::SOCPStateWorkspace)
+function save_prev!(ws::SOCWRStateWorkspace)
     copyto!(ws.v2_consensus_prev, ws.v2_consensus)
     copyto!(ws.r_consensus_prev, ws.r_consensus)
     copyto!(ws.t_consensus_prev, ws.t_consensus)
     return nothing
 end
 
-function save_prev!(ws::SOCPPowerWorkspace)
+function save_prev!(ws::SOCWRPowerWorkspace)
     copyto!(ws.p_flow_consensus_prev, ws.p_flow_consensus)
     copyto!(ws.q_flow_consensus_prev, ws.q_flow_consensus)
     return nothing
 end
 
-function save_prev!(ws::SOCPHybridWorkspace)
+function save_prev!(ws::SOCWRHybridWorkspace)
     copyto!(ws.v2_consensus_prev, ws.v2_consensus)
     copyto!(ws.p_flow_consensus_prev, ws.p_flow_consensus)
     copyto!(ws.q_flow_consensus_prev, ws.q_flow_consensus)

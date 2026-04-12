@@ -13,7 +13,7 @@
 
 Lirion is a Julia framework for modeling and solving Optimal Power Flow (OPF) problems under both **centralized** and **distributed** optimization paradigms, providing a practical environment for implementing established formulations and investigating novel decomposition and consensus strategies.
 
-At present, Lirion unifies DC, AC, and SOCP OPF formulations within a modular architecture that spans centralized models and distributed implementations based on ADMM and ALADIN, enabling systematic experimentation with partitioning strategies and coupling-variable design.
+At present, Lirion unifies DC, AC, and SOCWR OPF formulations within a modular architecture that spans centralized models and distributed implementations based on ADMM and ALADIN, enabling systematic experimentation with partitioning strategies and coupling-variable design.
 
 !!! important "Mathematical Foundations and Derivations"
     Lirion is accompanied by a dedicated technical website maintained by Mateus Kaiss, the principal developer of the framework.
@@ -38,7 +38,7 @@ Lirion implements classical centralized OPF formulations:
 
 - DC OPF
 - AC OPF
-- SOCP OPF
+- SOCWR OPF
 
 ---
 
@@ -48,7 +48,7 @@ Beyond centralized models, Lirion provides distributed variants based on the **A
 
 Distributed formulations are structured along three main dimensions:
 
-- The base model (DC, AC, or SOCP);
+- The base model (DC, AC, or SOCWR);
 - The choice of **coupling variables**;
 - The **system partitioning strategy**.
 
