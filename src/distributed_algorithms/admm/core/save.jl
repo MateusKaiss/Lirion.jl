@@ -7,22 +7,18 @@
 # ============================================================
 
 function save_prev!(ws::DCStateWorkspace)
-    ws.theta_consensus_prev .= ws.theta_consensus
+    copyto!(ws.theta_consensus_prev, ws.theta_consensus)
     return nothing
 end
 
 function save_prev!(ws::DCPowerWorkspace)
-    for k in ws.interzonal
-        ws.p_flow_consensus_prev[k] = ws.p_flow_consensus[k]
-    end
+    copyto!(ws.p_flow_consensus_prev, ws.p_flow_consensus)
     return nothing
 end
 
 function save_prev!(ws::DCHybridWorkspace)
-    ws.theta_consensus_prev .= ws.theta_consensus
-    for k in ws.interzonal
-        ws.p_flow_consensus_prev[k] = ws.p_flow_consensus[k]
-    end
+    copyto!(ws.theta_consensus_prev, ws.theta_consensus)
+    copyto!(ws.p_flow_consensus_prev, ws.p_flow_consensus)
     return nothing
 end
 
@@ -31,27 +27,22 @@ end
 # ============================================================
 
 function save_prev!(ws::ACStateWorkspace)
-    ws.theta_consensus_prev .= ws.theta_consensus
-    ws.v_mag_consensus_prev .= ws.v_mag_consensus
+    copyto!(ws.theta_consensus_prev, ws.theta_consensus)
+    copyto!(ws.v_mag_consensus_prev, ws.v_mag_consensus)
     return nothing
 end
 
 function save_prev!(ws::ACPowerWorkspace)
-    for k in ws.interzonal
-        ws.p_flow_consensus_prev[k] = ws.p_flow_consensus[k]
-        ws.q_flow_consensus_prev[k] = ws.q_flow_consensus[k]
-    end
+    copyto!(ws.p_flow_consensus_prev, ws.p_flow_consensus)
+    copyto!(ws.q_flow_consensus_prev, ws.q_flow_consensus)
     return nothing
 end
 
 function save_prev!(ws::ACHybridWorkspace)
-    ws.theta_consensus_prev .= ws.theta_consensus
-    ws.v_mag_consensus_prev .= ws.v_mag_consensus
-
-    for k in ws.interzonal
-        ws.p_flow_consensus_prev[k] = ws.p_flow_consensus[k]
-        ws.q_flow_consensus_prev[k] = ws.q_flow_consensus[k]
-    end
+    copyto!(ws.theta_consensus_prev, ws.theta_consensus)
+    copyto!(ws.v_mag_consensus_prev, ws.v_mag_consensus)
+    copyto!(ws.p_flow_consensus_prev, ws.p_flow_consensus)
+    copyto!(ws.q_flow_consensus_prev, ws.q_flow_consensus)
     return nothing
 end
 
@@ -60,31 +51,23 @@ end
 # ============================================================
 
 function save_prev!(ws::SOCPStateWorkspace)
-    ws.v2_consensus_prev .= ws.v2_consensus
-
-    for k in ws.interzonal
-        ws.r_consensus_prev[k] = ws.r_consensus[k]
-        ws.t_consensus_prev[k] = ws.t_consensus[k]
-    end
+    copyto!(ws.v2_consensus_prev, ws.v2_consensus)
+    copyto!(ws.r_consensus_prev, ws.r_consensus)
+    copyto!(ws.t_consensus_prev, ws.t_consensus)
     return nothing
 end
 
 function save_prev!(ws::SOCPPowerWorkspace)
-    for k in ws.interzonal
-        ws.p_flow_consensus_prev[k] = ws.p_flow_consensus[k]
-        ws.q_flow_consensus_prev[k] = ws.q_flow_consensus[k]
-    end
+    copyto!(ws.p_flow_consensus_prev, ws.p_flow_consensus)
+    copyto!(ws.q_flow_consensus_prev, ws.q_flow_consensus)
     return nothing
 end
 
 function save_prev!(ws::SOCPHybridWorkspace)
-    ws.v2_consensus_prev .= ws.v2_consensus
-
-    for k in ws.interzonal
-        ws.p_flow_consensus_prev[k] = ws.p_flow_consensus[k]
-        ws.q_flow_consensus_prev[k] = ws.q_flow_consensus[k]
-        ws.r_consensus_prev[k] = ws.r_consensus[k]
-        ws.t_consensus_prev[k] = ws.t_consensus[k]
-    end
+    copyto!(ws.v2_consensus_prev, ws.v2_consensus)
+    copyto!(ws.p_flow_consensus_prev, ws.p_flow_consensus)
+    copyto!(ws.q_flow_consensus_prev, ws.q_flow_consensus)
+    copyto!(ws.r_consensus_prev, ws.r_consensus)
+    copyto!(ws.t_consensus_prev, ws.t_consensus)
     return nothing
 end

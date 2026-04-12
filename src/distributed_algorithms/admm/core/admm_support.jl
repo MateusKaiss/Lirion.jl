@@ -2,10 +2,6 @@
 
 @inline _elapsed_s(t0_ns::Integer) = (time_ns() - t0_ns) / 1e9
 
-function build_consensus_bus_idx_map(ids::Vector{Int})::Dict{Int, Int}
-    return Dict{Int, Int}(id => i for (i, id) in enumerate(sort(ids)))
-end
-
 @inline function _zone_cut_edges(part, interzonal_branches::AbstractVector{Int})
     m = part.branch_idx_full_to_zone
     return [e for e in interzonal_branches if m[e] != 0]

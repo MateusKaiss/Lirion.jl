@@ -8,22 +8,25 @@ Base.@kwdef mutable struct ACStateWorkspace <: AbstractADMMWorkspace
     partitions::Partitions{PartitionAC}
     id::Vector{Int}
 
-    consensus_bus_idx_map::Dict{Int, Int}
-
     theta_consensus::Vector{Float64}
     v_mag_consensus::Vector{Float64}
 
     theta_consensus_prev::Vector{Float64}
     v_mag_consensus_prev::Vector{Float64}
 
-    duals_theta::Dict{Int, Vector{Float64}}
-    duals_v_mag::Dict{Int, Vector{Float64}}
+    duals_theta::Matrix{Float64}
+    duals_v_mag::Matrix{Float64}
 
     rho_theta::Base.RefValue{Float64}
     rho_v::Base.RefValue{Float64}
 
     prev_rho_theta::Base.RefValue{Float64}
     prev_rho_v::Base.RefValue{Float64}
+
+    # Scratch vectors for circular mean (reused per iter)
+    sin_sum::Vector{Float64}
+    cos_sum::Vector{Float64}
+    bus_counts::Vector{Int}
 
     r_primal::Float64 = 0.0
     r_dual::Float64 = 0.0
@@ -48,20 +51,24 @@ Base.@kwdef mutable struct ACPowerWorkspace <: AbstractADMMWorkspace
 
     interzonal::Vector{Int}
 
-    p_flow_consensus::Dict{Int, Float64}
-    q_flow_consensus::Dict{Int, Float64}
+    p_flow_consensus::Vector{Float64}
+    q_flow_consensus::Vector{Float64}
 
-    p_flow_consensus_prev::Dict{Int, Float64}
-    q_flow_consensus_prev::Dict{Int, Float64}
+    p_flow_consensus_prev::Vector{Float64}
+    q_flow_consensus_prev::Vector{Float64}
 
-    duals_p_flow::Dict{Int, Dict{Int, Float64}}
-    duals_q_flow::Dict{Int, Dict{Int, Float64}}
+    duals_p_flow::Matrix{Float64}
+    duals_q_flow::Matrix{Float64}
 
     rho_p::Base.RefValue{Float64}
     rho_q::Base.RefValue{Float64}
 
     prev_rho_p::Base.RefValue{Float64}
     prev_rho_q::Base.RefValue{Float64}
+
+    # Scratch counters for NaN-safe AC branch consensus (per-iter).
+    p_branch_counts::Vector{Int}
+    q_branch_counts::Vector{Int}
 
     r_primal::Float64 = 0.0
     r_dual::Float64 = 0.0
@@ -84,7 +91,6 @@ Base.@kwdef mutable struct ACHybridWorkspace <: AbstractADMMWorkspace
     partitions::Partitions{PartitionAC}
     id::Vector{Int}
 
-    consensus_bus_idx_map::Dict{Int, Int}
     interzonal::Vector{Int}
 
     theta_consensus::Vector{Float64}
@@ -93,17 +99,17 @@ Base.@kwdef mutable struct ACHybridWorkspace <: AbstractADMMWorkspace
     theta_consensus_prev::Vector{Float64}
     v_mag_consensus_prev::Vector{Float64}
 
-    p_flow_consensus::Dict{Int, Float64}
-    q_flow_consensus::Dict{Int, Float64}
+    p_flow_consensus::Vector{Float64}
+    q_flow_consensus::Vector{Float64}
 
-    p_flow_consensus_prev::Dict{Int, Float64}
-    q_flow_consensus_prev::Dict{Int, Float64}
+    p_flow_consensus_prev::Vector{Float64}
+    q_flow_consensus_prev::Vector{Float64}
 
-    duals_theta::Dict{Int, Vector{Float64}}
-    duals_v_mag::Dict{Int, Vector{Float64}}
+    duals_theta::Matrix{Float64}
+    duals_v_mag::Matrix{Float64}
 
-    duals_p_flow::Dict{Int, Dict{Int, Float64}}
-    duals_q_flow::Dict{Int, Dict{Int, Float64}}
+    duals_p_flow::Matrix{Float64}
+    duals_q_flow::Matrix{Float64}
 
     rho_theta::Base.RefValue{Float64}
     rho_v::Base.RefValue{Float64}
@@ -114,6 +120,13 @@ Base.@kwdef mutable struct ACHybridWorkspace <: AbstractADMMWorkspace
     prev_rho_v::Base.RefValue{Float64}
     prev_rho_p::Base.RefValue{Float64}
     prev_rho_q::Base.RefValue{Float64}
+
+    # Scratch buffers
+    sin_sum::Vector{Float64}
+    cos_sum::Vector{Float64}
+    bus_counts::Vector{Int}
+    p_branch_counts::Vector{Int}
+    q_branch_counts::Vector{Int}
 
     r_primal::Float64 = 0.0
     r_dual::Float64 = 0.0
@@ -138,21 +151,21 @@ end
 # RHO HELPERS
 # ============================================================
 
-_get_rhos(ws::ACStateWorkspace) = Dict(
-    :rho_theta => ws.rho_theta[],
-    :rho_v => ws.rho_v[],
+_get_rhos(ws::ACStateWorkspace) = (
+    rho_theta = ws.rho_theta[],
+    rho_v = ws.rho_v[],
 )
 
-_get_rhos(ws::ACPowerWorkspace) = Dict(
-    :rho_p => ws.rho_p[],
-    :rho_q => ws.rho_q[],
+_get_rhos(ws::ACPowerWorkspace) = (
+    rho_p = ws.rho_p[],
+    rho_q = ws.rho_q[],
 )
 
-_get_rhos(ws::ACHybridWorkspace) = Dict(
-    :rho_theta => ws.rho_theta[],
-    :rho_v => ws.rho_v[],
-    :rho_p => ws.rho_p[],
-    :rho_q => ws.rho_q[],
+_get_rhos(ws::ACHybridWorkspace) = (
+    rho_theta = ws.rho_theta[],
+    rho_v = ws.rho_v[],
+    rho_p = ws.rho_p[],
+    rho_q = ws.rho_q[],
 )
 
 # ============================================================
@@ -164,8 +177,7 @@ _get_rhos(ws::ACHybridWorkspace) = Dict(
 function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{State, AC})
     partitions = build_partitions(PartitionAC, sys)
     id = partitions.zones
-
-    consensus_bus_idx_map = build_consensus_bus_idx_map(sys.full_shared_bus_ids)
+    n_zones = length(partitions)
     n_shared = length(sys.full_shared_bus_ids)
 
     init_state_partition!(
@@ -182,17 +194,19 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{State, AC})
     return ACStateWorkspace(;
         partitions = partitions,
         id = id,
-        consensus_bus_idx_map = consensus_bus_idx_map,
         theta_consensus = zeros(n_shared),
         v_mag_consensus = ones(n_shared),
         theta_consensus_prev = zeros(n_shared),
         v_mag_consensus_prev = ones(n_shared),
-        duals_theta = Dict(z => zeros(n_shared) for z in id),
-        duals_v_mag = Dict(z => zeros(n_shared) for z in id),
+        duals_theta = zeros(n_shared, n_zones),
+        duals_v_mag = zeros(n_shared, n_zones),
         rho_theta = rho_theta,
         rho_v = rho_v,
         prev_rho_theta = Ref(rho_theta[]),
         prev_rho_v = Ref(rho_v[]),
+        sin_sum = zeros(n_shared),
+        cos_sum = zeros(n_shared),
+        bus_counts = zeros(Int, n_shared),
     )
 end
 
@@ -202,6 +216,8 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Power, AC})
     partitions = build_partitions(PartitionAC, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
+    n_zones = length(partitions)
+    n_inter = length(inter)
 
     init_power_partition!(
         partitions,
@@ -219,16 +235,18 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Power, AC})
         partitions = partitions,
         id = id,
         interzonal = inter,
-        p_flow_consensus = Dict(e => 0.0 for e in inter),
-        q_flow_consensus = Dict(e => 0.0 for e in inter),
-        p_flow_consensus_prev = Dict(e => 0.0 for e in inter),
-        q_flow_consensus_prev = Dict(e => 0.0 for e in inter),
-        duals_p_flow = Dict(z => Dict{Int, Float64}() for z in id),
-        duals_q_flow = Dict(z => Dict{Int, Float64}() for z in id),
+        p_flow_consensus = zeros(n_inter),
+        q_flow_consensus = zeros(n_inter),
+        p_flow_consensus_prev = zeros(n_inter),
+        q_flow_consensus_prev = zeros(n_inter),
+        duals_p_flow = zeros(n_inter, n_zones),
+        duals_q_flow = zeros(n_inter, n_zones),
         rho_p = rho_p,
         rho_q = rho_q,
         prev_rho_p = Ref(rho_p[]),
         prev_rho_q = Ref(rho_q[]),
+        p_branch_counts = zeros(Int, n_inter),
+        q_branch_counts = zeros(Int, n_inter),
     )
 end
 
@@ -238,9 +256,9 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC}
     partitions = build_partitions(PartitionAC, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
-
-    consensus_bus_idx_map = build_consensus_bus_idx_map(sys.full_shared_bus_ids)
+    n_zones = length(partitions)
     n_shared = length(sys.full_shared_bus_ids)
+    n_inter = length(inter)
 
     init_hybrid_partition!(
         partitions,
@@ -261,20 +279,19 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC}
     return ACHybridWorkspace(;
         partitions = partitions,
         id = id,
-        consensus_bus_idx_map = consensus_bus_idx_map,
         interzonal = inter,
         theta_consensus = zeros(n_shared),
         v_mag_consensus = ones(n_shared),
         theta_consensus_prev = zeros(n_shared),
         v_mag_consensus_prev = ones(n_shared),
-        p_flow_consensus = Dict(e => 0.0 for e in inter),
-        q_flow_consensus = Dict(e => 0.0 for e in inter),
-        p_flow_consensus_prev = Dict(e => 0.0 for e in inter),
-        q_flow_consensus_prev = Dict(e => 0.0 for e in inter),
-        duals_theta = Dict(z => zeros(n_shared) for z in id),
-        duals_v_mag = Dict(z => zeros(n_shared) for z in id),
-        duals_p_flow = Dict(z => Dict{Int, Float64}() for z in id),
-        duals_q_flow = Dict(z => Dict{Int, Float64}() for z in id),
+        p_flow_consensus = zeros(n_inter),
+        q_flow_consensus = zeros(n_inter),
+        p_flow_consensus_prev = zeros(n_inter),
+        q_flow_consensus_prev = zeros(n_inter),
+        duals_theta = zeros(n_shared, n_zones),
+        duals_v_mag = zeros(n_shared, n_zones),
+        duals_p_flow = zeros(n_inter, n_zones),
+        duals_q_flow = zeros(n_inter, n_zones),
         rho_theta = rho_theta,
         rho_v = rho_v,
         rho_p = rho_p,
@@ -283,5 +300,10 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC}
         prev_rho_v = Ref(rho_v[]),
         prev_rho_p = Ref(rho_p[]),
         prev_rho_q = Ref(rho_q[]),
+        sin_sum = zeros(n_shared),
+        cos_sum = zeros(n_shared),
+        bus_counts = zeros(Int, n_shared),
+        p_branch_counts = zeros(Int, n_inter),
+        q_branch_counts = zeros(Int, n_inter),
     )
 end

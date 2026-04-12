@@ -47,16 +47,16 @@ end
 
 function build_linear_bus_term(
     part::PartitionDC,
-    consensus_bus_idx_map::Dict{Int, Int},
     theta_consensus::Vector{Float64},
-    theta_duals::Vector{Float64},
+    theta_duals::AbstractVector{Float64},   # column view over n_shared
     rho_theta::Float64,
 )::JuMP.AffExpr
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     lin = zero(JuMP.AffExpr)
 
-    @inbounds for b in part.zone_shared_bus_ids
-        j = consensus_bus_idx_map[b]
+    @inbounds for i in eachindex(part.zone_shared_bus_ids)
+        b = part.zone_shared_bus_ids[i]
+        j = part.shared_bus_consensus_idx[i]
         lin += (theta_duals[j] - rho_theta * theta_consensus[j]) * theta[b, 1]
     end
     return lin
@@ -65,21 +65,22 @@ end
 function build_linear_branch_term(
     part::PartitionDC,
     zone_edges::Vector{Int},
-    p_flow_consensus::Dict{Int, Float64},
-    duals_p_flow::Dict{Int, Float64},
+    p_flow_consensus::Vector{Float64},
+    duals_p_flow::AbstractVector{Float64},   # column view over n_inter
+    interzonal::Vector{Int},
     rho_p::Float64,
 )::JuMP.AffExpr
     m = part.model::JuMP.Model
     lin = zero(JuMP.AffExpr)
 
-    @inbounds for e in zone_edges
+    # Build a lookup from full-branch index to position in `interzonal`.
+    # We iterate enumerate(interzonal) and check if this zone cuts it.
+    @inbounds for (k, e) in enumerate(interzonal)
         l = part.branch_idx_full_to_zone[e]
         l == 0 && continue
-
         p = m[:p_flow_branches][l, 1]
-        p_cons = get(p_flow_consensus, e, 0.0)
-        p_dual = get(duals_p_flow, e, 0.0)
-
+        p_cons = p_flow_consensus[k]
+        p_dual = duals_p_flow[k]
         lin += (p_dual - rho_p * p_cons) * p
     end
     return lin
@@ -92,9 +93,8 @@ end
 function update_objective!(part::PartitionDC, ws::DCStateWorkspace)
     lin = build_linear_bus_term(
         part,
-        ws.consensus_bus_idx_map,
         ws.theta_consensus,
-        ws.duals_theta[part.id],
+        view(ws.duals_theta, :, part.position),
         ws.rho_theta[],
     )
 
@@ -110,7 +110,8 @@ function update_objective!(part::PartitionDC, ws::DCPowerWorkspace)
         part,
         part.zone_edges,
         ws.p_flow_consensus,
-        ws.duals_p_flow[part.id],
+        view(ws.duals_p_flow, :, part.position),
+        ws.interzonal,
         ws.rho_p[],
     )
 
@@ -124,9 +125,8 @@ end
 function update_objective!(part::PartitionDC, ws::DCHybridWorkspace)
     lin_bus = build_linear_bus_term(
         part,
-        ws.consensus_bus_idx_map,
         ws.theta_consensus,
-        ws.duals_theta[part.id],
+        view(ws.duals_theta, :, part.position),
         ws.rho_theta[],
     )
 
@@ -134,7 +134,8 @@ function update_objective!(part::PartitionDC, ws::DCHybridWorkspace)
         part,
         part.zone_edges,
         ws.p_flow_consensus,
-        ws.duals_p_flow[part.id],
+        view(ws.duals_p_flow, :, part.position),
+        ws.interzonal,
         ws.rho_p[],
     )
 

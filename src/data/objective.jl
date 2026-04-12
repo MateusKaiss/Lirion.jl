@@ -1,7 +1,11 @@
+# ============================================================
+# ObjectiveData
+# ============================================================
+
 struct ObjectiveData
     number_of_generators::Int
     number_of_batteries::Int
-    generator_costs::Dict{Int, Dict{Int, Vector{Float64}}}   # t -> gen_id -> coeffs
+    generator_costs::Vector{Vector{Vector{Float64}}}
     num_polynomial_coefs::Vector{Int}
     curtailment_cost::Vector{Float64}
     plant_type::Vector{String}
@@ -10,6 +14,10 @@ struct ObjectiveData
     prosumer_costs::Vector{Float64}
     has_timeseries::Bool
     sbase::Float64
+end
+
+@inline function _empty_generator_costs(T::Int, ng::Int)::Vector{Vector{Vector{Float64}}}
+    return [[Float64[] for _ in 1:ng] for _ in 1:T]
 end
 
 function get_objective_parameters(
@@ -23,21 +31,23 @@ function get_objective_parameters(
     nbatt = case_raw.storage === nothing ? 0 : length(case_raw.storage.storage_bus)
     npros = case_raw.prosumer === nothing ? 0 : length(case_raw.prosumer.bus)
 
-    generator_costs = Dict{Int, Dict{Int, Vector{Float64}}}()
+    T_eff = max(T, 1)
+    generator_costs = _empty_generator_costs(T_eff, ng)
 
     if has_timeseries && gencost_timeseries !== nothing && !isempty(gencost_timeseries.time)
         ts = gencost_timeseries
         @inbounds for i in eachindex(ts.time)
             t = ts.time[i]
-            g = ts.gen_id[i]                 # MUST be global gen index
-            c = ts.cost_coefficients[i]
-            get!(generator_costs, t, Dict{Int, Vector{Float64}}())[g] = c
+            g = ts.gen_id[i]                 # 1-based global gen index
+            (t < 1 || t > T_eff) && continue
+            (g < 1 || g > ng) && continue
+            generator_costs[t][g] = ts.cost_coefficients[i]
         end
     else
-        generator_costs[1] = Dict{Int, Vector{Float64}}()
         if case_raw.gencost !== nothing
-            @inbounds for g in 1:length(case_raw.gencost.cost_coefficients)
-                generator_costs[1][g] = case_raw.gencost.cost_coefficients[g]
+            coeffs = case_raw.gencost.cost_coefficients
+            @inbounds for g in eachindex(coeffs)
+                generator_costs[1][g] = coeffs[g]
             end
         end
     end

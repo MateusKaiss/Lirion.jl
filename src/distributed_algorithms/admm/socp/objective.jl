@@ -64,16 +64,16 @@ end
 
 function build_linear_bus_term(
     part::PartitionSOCP,
-    consensus_bus_idx_map::Dict{Int, Int},
     v2_consensus::Vector{Float64},
-    v2_duals::Vector{Float64},
+    v2_duals::AbstractVector{Float64},
     rho_v2::Float64,
 )::JuMP.AffExpr
     v2 = part.v2_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
     lin = zero(JuMP.AffExpr)
 
-    @inbounds for b in part.zone_shared_bus_ids
-        j = consensus_bus_idx_map[b]
+    @inbounds for i in eachindex(part.zone_shared_bus_ids)
+        b = part.zone_shared_bus_ids[i]
+        j = part.shared_bus_consensus_idx[i]
         lin += (v2_duals[j] - rho_v2 * v2_consensus[j]) * v2[b, 1]
     end
 
@@ -83,25 +83,26 @@ end
 function build_linear_branch_rt_term(
     part::PartitionSOCP,
     zone_edges::Vector{Int},
-    r_consensus::Dict{Int, Float64},
-    t_consensus::Dict{Int, Float64},
-    duals_r::Dict{Int, Float64},
-    duals_t::Dict{Int, Float64},
+    r_consensus::Vector{Float64},
+    t_consensus::Vector{Float64},
+    duals_r::AbstractVector{Float64},
+    duals_t::AbstractVector{Float64},
+    interzonal::Vector{Int},
     rho_r::Float64,
     rho_t::Float64,
 )::JuMP.AffExpr
     m = part.model::JuMP.Model
     lin = zero(JuMP.AffExpr)
 
-    @inbounds for e in zone_edges
+    @inbounds for (k, e) in enumerate(interzonal)
         l = part.branch_idx_full_to_zone[e]
         l == 0 && continue
         r, t = _rt_from_exprs(m, l)
 
-        r_cons = get(r_consensus, e, 0.0)
-        t_cons = get(t_consensus, e, 0.0)
-        r_dual = get(duals_r, e, 0.0)
-        t_dual = get(duals_t, e, 0.0)
+        r_cons = r_consensus[k]
+        t_cons = t_consensus[k]
+        r_dual = duals_r[k]
+        t_dual = duals_t[k]
 
         lin += (r_dual - rho_r * r_cons) * r + (t_dual - rho_t * t_cons) * t
     end
@@ -112,25 +113,26 @@ end
 function build_linear_branch_pq_term(
     part::PartitionSOCP,
     zone_edges::Vector{Int},
-    p_consensus::Dict{Int, Float64},
-    q_consensus::Dict{Int, Float64},
-    duals_p::Dict{Int, Float64},
-    duals_q::Dict{Int, Float64},
+    p_consensus::Vector{Float64},
+    q_consensus::Vector{Float64},
+    duals_p::AbstractVector{Float64},
+    duals_q::AbstractVector{Float64},
+    interzonal::Vector{Int},
     rho_p::Float64,
     rho_q::Float64,
 )::JuMP.AffExpr
     m = part.model::JuMP.Model
     lin = zero(JuMP.AffExpr)
 
-    @inbounds for e in zone_edges
+    @inbounds for (k, e) in enumerate(interzonal)
         l = part.branch_idx_full_to_zone[e]
         l == 0 && continue
         p, q = _pq_flow_from_exprs(m, l)
 
-        p_cons = get(p_consensus, e, 0.0)
-        q_cons = get(q_consensus, e, 0.0)
-        p_dual = get(duals_p, e, 0.0)
-        q_dual = get(duals_q, e, 0.0)
+        p_cons = p_consensus[k]
+        q_cons = q_consensus[k]
+        p_dual = duals_p[k]
+        q_dual = duals_q[k]
 
         lin += (p_dual - rho_p * p_cons) * p + (q_dual - rho_q * q_cons) * q
     end
@@ -143,13 +145,12 @@ end
 # ------------------------------------------------------------
 
 function update_objective!(part::PartitionSOCP, ws::SOCPStateWorkspace)
-    zone_id = part.id
+    p = part.position
 
     lin_bus = build_linear_bus_term(
         part,
-        ws.consensus_bus_idx_map,
         ws.v2_consensus,
-        ws.duals_v2[zone_id],
+        view(ws.duals_v2, :, p),
         ws.rho_v2[],
     )
 
@@ -158,8 +159,9 @@ function update_objective!(part::PartitionSOCP, ws::SOCPStateWorkspace)
         part.zone_edges,
         ws.r_consensus,
         ws.t_consensus,
-        ws.duals_r[zone_id],
-        ws.duals_t[zone_id],
+        view(ws.duals_r, :, p),
+        view(ws.duals_t, :, p),
+        ws.interzonal,
         ws.rho_r[],
         ws.rho_t[],
     )
@@ -168,15 +170,16 @@ function update_objective!(part::PartitionSOCP, ws::SOCPStateWorkspace)
 end
 
 function update_objective!(part::PartitionSOCP, ws::SOCPPowerWorkspace)
-    zone_id = part.id
+    p = part.position
 
     lin = build_linear_branch_pq_term(
         part,
         part.zone_edges,
         ws.p_flow_consensus,
         ws.q_flow_consensus,
-        ws.duals_p[zone_id],
-        ws.duals_q[zone_id],
+        view(ws.duals_p, :, p),
+        view(ws.duals_q, :, p),
+        ws.interzonal,
         ws.rho_p[],
         ws.rho_q[],
     )
@@ -185,13 +188,12 @@ function update_objective!(part::PartitionSOCP, ws::SOCPPowerWorkspace)
 end
 
 function update_objective!(part::PartitionSOCP, ws::SOCPHybridWorkspace)
-    zone_id = part.id
+    p = part.position
 
     lin_bus = build_linear_bus_term(
         part,
-        ws.consensus_bus_idx_map,
         ws.v2_consensus,
-        ws.duals_v2[zone_id],
+        view(ws.duals_v2, :, p),
         ws.rho_v2[],
     )
 
@@ -200,8 +202,9 @@ function update_objective!(part::PartitionSOCP, ws::SOCPHybridWorkspace)
         part.zone_edges,
         ws.p_flow_consensus,
         ws.q_flow_consensus,
-        ws.duals_p[zone_id],
-        ws.duals_q[zone_id],
+        view(ws.duals_p, :, p),
+        view(ws.duals_q, :, p),
+        ws.interzonal,
         ws.rho_p[],
         ws.rho_q[],
     )
@@ -211,8 +214,9 @@ function update_objective!(part::PartitionSOCP, ws::SOCPHybridWorkspace)
         part.zone_edges,
         ws.r_consensus,
         ws.t_consensus,
-        ws.duals_r[zone_id],
-        ws.duals_t[zone_id],
+        view(ws.duals_r, :, p),
+        view(ws.duals_t, :, p),
+        ws.interzonal,
         ws.rho_r[],
         ws.rho_t[],
     )

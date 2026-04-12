@@ -253,26 +253,24 @@ end
 # -------------------------
 
 mutable struct CaseIndexMaps
-    bus_idx_map::Dict{Int, Int}
+    bus_idx_map::Vector{Int}
     gen_idx_map::Vector{Int}
 
-    bus_to_gens::Dict{Int, Vector{Int}}
-    bus_to_branches_from::Dict{Int, Vector{Int}}
-    bus_to_branches_to::Dict{Int, Vector{Int}}
-    bus_to_neighbors::Dict{Int, Vector{Int}}
-    bus_to_prosumers::Dict{Int, Vector{Int}}
-    bus_to_batteries::Dict{Int, Vector{Int}}
+    bus_to_gens::Vector{Vector{Int}}
+    bus_to_branches_from::Vector{Vector{Int}}
+    bus_to_branches_to::Vector{Vector{Int}}
+    bus_to_prosumers::Vector{Vector{Int}}
+    bus_to_batteries::Vector{Vector{Int}}
 
     function CaseIndexMaps()
         return new(
-            Dict{Int, Int}(),
             Int[],
-            Dict{Int, Vector{Int}}(),
-            Dict{Int, Vector{Int}}(),
-            Dict{Int, Vector{Int}}(),
-            Dict{Int, Vector{Int}}(),
-            Dict{Int, Vector{Int}}(),
-            Dict{Int, Vector{Int}}(),
+            Int[],
+            Vector{Vector{Int}}(),
+            Vector{Vector{Int}}(),
+            Vector{Vector{Int}}(),
+            Vector{Vector{Int}}(),
+            Vector{Vector{Int}}(),
         )
     end
 end

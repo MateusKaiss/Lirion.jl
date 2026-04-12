@@ -1,12 +1,12 @@
 function add_generation_cost!(model::JuMP.Model, obj::ObjectiveData)
     T = get(model.ext, :time_periods, 1)
     active_generators = findall(obj.generator_status .== 1)
+    costs = obj.generator_costs
 
     @expression(model, generation_cost,
         sum(
             begin
-                coefs = obj.generator_costs[t][g]
-
+                coefs = costs[t][g]
                 sum(
                     coefs[i] *
                     (obj.sbase * model[:p_generation][g, t])^(length(coefs) - i)
@@ -14,7 +14,7 @@ function add_generation_cost!(model::JuMP.Model, obj::ObjectiveData)
                 )
             end
             for t in 1:T, g in active_generators
-            if haskey(obj.generator_costs, t) && haskey(obj.generator_costs[t], g)
+            if t <= length(costs) && g <= length(costs[t]) && !isempty(costs[t][g])
         )
     )
 

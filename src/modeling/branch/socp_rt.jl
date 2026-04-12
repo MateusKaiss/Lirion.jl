@@ -64,23 +64,22 @@ function add_rt_variables_with_bounds!(
     vm_start = bus.vm_start
     va_start = bus.va_start
     shf = br.tap_angle
+    id_to_idx = bus.id_to_idx
 
     @inbounds for l in active, t in 1:T
         bus_i = br.from[l]
         bus_j = br.to[l]
 
-        idx_i = bus.id_to_idx[bus_i]
-        idx_j = bus.id_to_idx[bus_j]
+        idx_i = id_to_idx[bus_i]
+        idx_j = id_to_idx[bus_j]
 
         Vm_i = vm_start[idx_i]
         Vm_j = vm_start[idx_j]
         Va_i = va_start[idx_i]
         Va_j = va_start[idx_j]
 
-        if !(
-            Vm_i === nothing || Vm_j === nothing ||
-            Va_i === nothing || Va_j === nothing
-        ) && !any(isnan.((Vm_i, Vm_j, Va_i, Va_j, shf[l])))
+        if isfinite(Vm_i) && isfinite(Vm_j) &&
+           isfinite(Va_i) && isfinite(Va_j) && isfinite(shf[l])
             set_start_value(R[l, t], Vm_i * Vm_j * cos(Va_i - Va_j - shf[l]))
             set_start_value(T_var[l, t], Vm_i * Vm_j * sin(Va_i - Va_j - shf[l]))
         end

@@ -9,7 +9,7 @@ end
     push!(ws.hist.r_dual, ws.r_dual)
     push!(ws.hist.eps_primal, ws.eps_primal)
     push!(ws.hist.eps_dual, ws.eps_dual)
-    for (k, v) in _get_rhos(ws)
+    for (k, v) in pairs(_get_rhos(ws))
         _push_rho!(ws.hist, k, v)
     end
     return nothing

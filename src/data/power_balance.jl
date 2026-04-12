@@ -1,6 +1,6 @@
 struct PowerFlowData
     bus_ids::Vector{Int}
-    bus_idx_map::Dict{Int, Int}
+    bus_idx_map::Vector{Int}
 
     generator_bus_index::Vector{Int}
     battery_bus_index::Vector{Int}
@@ -27,20 +27,6 @@ struct PowerFlowData
     bus_to_inter_out_branches::Vector{Vector{Int}}
 end
 
-function _dict_to_busvec(
-    bus_ids::Vector{Int},
-    bus_idx_map::Dict{Int, Int},
-    mapping::Dict{Int, Vector{Int}},
-)
-    nbus = length(bus_ids)
-    result = [Int[] for _ in 1:nbus]
-    @inbounds for (bus_id, items) in mapping
-        idx = bus_idx_map[Int(bus_id)]
-        result[idx] = Int.(items)
-    end
-    return result
-end
-
 function get_power_flow_parameters(case_raw::CaseRaw)
     @assert case_raw.bus !== nothing && case_raw.branch !== nothing
 
@@ -50,7 +36,6 @@ function get_power_flow_parameters(case_raw::CaseRaw)
     bus_ids = bus.bus_i
     nbus = length(bus_ids)
 
-    # prefer maps from preprocess
     bus_idx_map = case_raw.maps.bus_idx_map
 
     gen_bus = case_raw.gen === nothing ? Int[] : case_raw.gen.gen_bus
@@ -68,28 +53,26 @@ function get_power_flow_parameters(case_raw::CaseRaw)
     is_virtual = bus.is_virtual
     has_timeseries = case_raw.T > 1
 
-    # maps -> busvec
     bus_to_gens =
         isempty(case_raw.maps.bus_to_gens) ? [Int[] for _ in 1:nbus] :
-        _dict_to_busvec(bus_ids, bus_idx_map, case_raw.maps.bus_to_gens)
+        case_raw.maps.bus_to_gens
 
     bus_to_bats =
         isempty(case_raw.maps.bus_to_batteries) ? [Int[] for _ in 1:nbus] :
-        _dict_to_busvec(bus_ids, bus_idx_map, case_raw.maps.bus_to_batteries)
+        case_raw.maps.bus_to_batteries
 
     bus_to_pros =
         isempty(case_raw.maps.bus_to_prosumers) ? [Int[] for _ in 1:nbus] :
-        _dict_to_busvec(bus_ids, bus_idx_map, case_raw.maps.bus_to_prosumers)
+        case_raw.maps.bus_to_prosumers
 
     bus_to_br_from =
         isempty(case_raw.maps.bus_to_branches_from) ? [Int[] for _ in 1:nbus] :
-        _dict_to_busvec(bus_ids, bus_idx_map, case_raw.maps.bus_to_branches_from)
+        case_raw.maps.bus_to_branches_from
 
     bus_to_br_to =
         isempty(case_raw.maps.bus_to_branches_to) ? [Int[] for _ in 1:nbus] :
-        _dict_to_busvec(bus_ids, bus_idx_map, case_raw.maps.bus_to_branches_to)
+        case_raw.maps.bus_to_branches_to
 
-    # these may not exist in your preprocess yet
     bus_to_inter_in = [Int[] for _ in 1:nbus]
     bus_to_inter_out = [Int[] for _ in 1:nbus]
 

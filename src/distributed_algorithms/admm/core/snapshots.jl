@@ -1,36 +1,17 @@
 # ============================================================
 # Hotpath snapshots
 # ------------------------------------------------------------
-# Allocate per-partition buffers for variable values and
-# provide fast snapshot functions that write current (or
-# start) values from the JuMP model into those buffers.
+# Allocate per-partition buffers for variable values and provide fast
+# snapshot functions that write current (or start) values from the JuMP
+# model into those buffers.
+#
+# Shared-bus local indices are read from the precomputed
+# `part.shared_bus_local_idx` (built in `build_partitions`).
 # ============================================================
-
-# ------------------------------------------------------------
-# Buffer allocation
-# ------------------------------------------------------------
-
-@inline function _prepare_bus_maps!(part)
-    ids = part.bus.id
-    n_bus = length(ids)
-
-    part.bus_local_index = Dict{Int, Int}(ids[i] => i for i in 1:n_bus)
-
-    shared_bus_ids = part.zone_shared_bus_ids
-    n_shared = length(shared_bus_ids)
-
-    part.consensus_bus_local_idxs = Vector{Int}(undef, n_shared)
-    @inbounds for i in 1:n_shared
-        part.consensus_bus_local_idxs[i] = part.bus_local_index[shared_bus_ids[i]]
-    end
-
-    return nothing
-end
 
 @inline _bus_dims(part) = (length(part.bus.id), length(part.zone_shared_bus_ids))
 
 function prepare_hotpaths!(part::PartitionDC)
-    _prepare_bus_maps!(part)
     n_bus, n_shared = _bus_dims(part)
     part.theta_buf = zeros(n_bus)
     part.theta_shared_buf = zeros(n_shared)
@@ -38,7 +19,6 @@ function prepare_hotpaths!(part::PartitionDC)
 end
 
 function prepare_hotpaths!(part::PartitionAC)
-    _prepare_bus_maps!(part)
     n_bus, n_shared = _bus_dims(part)
     part.theta_buf = zeros(n_bus)
     part.v_mag_buf = ones(n_bus)
@@ -48,7 +28,6 @@ function prepare_hotpaths!(part::PartitionAC)
 end
 
 function prepare_hotpaths!(part::PartitionSOCP)
-    _prepare_bus_maps!(part)
     n_bus, n_shared = _bus_dims(part)
     part.v2_buf = zeros(n_bus)
     part.v2_shared_buf = zeros(n_shared)
@@ -104,16 +83,16 @@ end
     model::JuMP.Model,
     bus_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2},
     zone_bus_ids::Vector{Int},
-    consensus_bus_local_idxs::Vector{Int},
+    shared_bus_local_idx::Vector{Int},
     default::Float64,
 )
     has_vals = JuMP.has_values(model)
-    @inbounds for i in eachindex(consensus_bus_local_idxs)
-        consensus_bus_local_idx = consensus_bus_local_idxs[i]
+    @inbounds for i in eachindex(shared_bus_local_idx)
+        local_idx = shared_bus_local_idx[i]
         buf[i] = _val_at(
             model,
             bus_var,
-            zone_bus_ids[consensus_bus_local_idx],
+            zone_bus_ids[local_idx],
             1,
             default,
             has_vals,
@@ -145,23 +124,23 @@ end
 @inline snapshot_theta_shared!(part::PartitionDC) =
     _snapshot_shared_var!(
         part.theta_shared_buf, part.model, part.theta_var,
-        part.bus.id, part.consensus_bus_local_idxs, 0.0,
+        part.bus.id, part.shared_bus_local_idx, 0.0,
     )
 
 @inline snapshot_theta_shared!(part::PartitionAC) =
     _snapshot_shared_var!(
         part.theta_shared_buf, part.model, part.theta_var,
-        part.bus.id, part.consensus_bus_local_idxs, 0.0,
+        part.bus.id, part.shared_bus_local_idx, 0.0,
     )
 
 @inline snapshot_v_mag_shared!(part::PartitionAC) =
     _snapshot_shared_var!(
         part.v_mag_shared_buf, part.model, part.v_mag_var,
-        part.bus.id, part.consensus_bus_local_idxs, 1.0,
+        part.bus.id, part.shared_bus_local_idx, 1.0,
     )
 
 @inline snapshot_v2_shared!(part::PartitionSOCP) =
     _snapshot_shared_var!(
         part.v2_shared_buf, part.model, part.v2_var,
-        part.bus.id, part.consensus_bus_local_idxs, 1.0,
+        part.bus.id, part.shared_bus_local_idx, 1.0,
     )

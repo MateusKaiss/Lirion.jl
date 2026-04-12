@@ -1,60 +1,73 @@
-function map_items_by_bus(bus_vec::AbstractVector{<:Integer})
-    mapping = Dict{Int, Vector{Int}}()
-    @inbounds for (i, b) in enumerate(bus_vec)
-        push!(get!(mapping, Int(b), Int[]), i)
+function _build_bus_idx_map(bus_ids::AbstractVector{<:Integer})::Vector{Int}
+    n = length(bus_ids)
+    n == 0 && return Int[]
+    max_id = 0
+    @inbounds for i in 1:n
+        id = Int(bus_ids[i])
+        id > max_id && (max_id = id)
     end
-    return mapping
+    v = zeros(Int, max_id)
+    @inbounds for i in 1:n
+        v[Int(bus_ids[i])] = i
+    end
+    return v
+end
+
+function _group_items_by_bus(
+    item_bus::AbstractVector{<:Integer},
+    bus_idx_map::Vector{Int},
+    nbus::Int,
+)::Vector{Vector{Int}}
+    result = [Int[] for _ in 1:nbus]
+    @inbounds for i in eachindex(item_bus)
+        b = Int(item_bus[i])
+        idx = b > length(bus_idx_map) ? 0 : bus_idx_map[b]
+        idx == 0 && continue
+        push!(result[idx], i)
+    end
+    return result
 end
 
 function add_case_index_maps!(raw_case::CaseRaw)
     m = raw_case.maps
 
-    empty!(m.bus_idx_map)
+    nbus = raw_case.bus === nothing ? 0 : length(raw_case.bus.bus_i)
+
     if raw_case.bus !== nothing
-        bus_ids = raw_case.bus.bus_i
-        @inbounds for (i, b) in enumerate(bus_ids)
-            m.bus_idx_map[Int(b)] = i
-        end
+        m.bus_idx_map = _build_bus_idx_map(raw_case.bus.bus_i)
+    else
+        m.bus_idx_map = Int[]
     end
 
-    empty!(m.bus_to_gens)
-    empty!(m.gen_idx_map)
     if raw_case.gen !== nothing
         gen_bus = raw_case.gen.gen_bus
         resize!(m.gen_idx_map, length(gen_bus))
         @inbounds for (i, b) in enumerate(gen_bus)
             m.gen_idx_map[i] = Int(b)
         end
-        m.bus_to_gens = map_items_by_bus(gen_bus)
+        m.bus_to_gens = _group_items_by_bus(gen_bus, m.bus_idx_map, nbus)
+    else
+        empty!(m.gen_idx_map)
+        m.bus_to_gens = [Int[] for _ in 1:nbus]
     end
 
-    empty!(m.bus_to_branches_from)
-    empty!(m.bus_to_branches_to)
-    empty!(m.bus_to_neighbors)
     if raw_case.branch !== nothing
-        f_bus = raw_case.branch.f_bus
-        t_bus = raw_case.branch.t_bus
-
-        m.bus_to_branches_from = map_items_by_bus(f_bus)
-        m.bus_to_branches_to = map_items_by_bus(t_bus)
-
-        bus_to_neighbors = Dict{Int, Vector{Int}}()
-        @inbounds for (f, t) in zip(f_bus, t_bus)
-            push!(get!(bus_to_neighbors, Int(f), Int[]), Int(t))
-            push!(get!(bus_to_neighbors, Int(t), Int[]), Int(f))
-        end
-        m.bus_to_neighbors = bus_to_neighbors
+        m.bus_to_branches_from =
+            _group_items_by_bus(raw_case.branch.f_bus, m.bus_idx_map, nbus)
+        m.bus_to_branches_to =
+            _group_items_by_bus(raw_case.branch.t_bus, m.bus_idx_map, nbus)
+    else
+        m.bus_to_branches_from = [Int[] for _ in 1:nbus]
+        m.bus_to_branches_to = [Int[] for _ in 1:nbus]
     end
 
-    empty!(m.bus_to_prosumers)
-    if raw_case.prosumer !== nothing
-        m.bus_to_prosumers = map_items_by_bus(raw_case.prosumer.bus)
-    end
+    m.bus_to_prosumers =
+        raw_case.prosumer === nothing ? [Int[] for _ in 1:nbus] :
+        _group_items_by_bus(raw_case.prosumer.bus, m.bus_idx_map, nbus)
 
-    empty!(m.bus_to_batteries)
-    if raw_case.storage !== nothing
-        m.bus_to_batteries = map_items_by_bus(raw_case.storage.storage_bus)
-    end
+    m.bus_to_batteries =
+        raw_case.storage === nothing ? [Int[] for _ in 1:nbus] :
+        _group_items_by_bus(raw_case.storage.storage_bus, m.bus_idx_map, nbus)
 
     return raw_case
 end

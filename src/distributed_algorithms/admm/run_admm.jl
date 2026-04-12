@@ -72,8 +72,8 @@ function run_admm(
     final_rhos = _get_rhos(ws)
 
     rho_lines = [
-        "$(k) inicial: $(initial_rhos[k]) | $(k) final: $(v)"
-        for (k, v) in final_rhos
+        "$(k) inicial: $(initial_rhos[k]) | $(k) final: $(final_rhos[k])"
+        for k in keys(final_rhos)
     ]
     _FAST_USE_LOGS && _print_admm_summary!(
         tag_str,

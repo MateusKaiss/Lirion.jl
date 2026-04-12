@@ -10,7 +10,6 @@ Base.@kwdef mutable struct SOCPStateWorkspace <: AbstractADMMWorkspace
     partitions::Partitions{PartitionSOCP}
     id::Vector{Int}
 
-    consensus_bus_idx_map::Dict{Int, Int}
     interzonal::Vector{Int}
 
     # BUS
@@ -18,17 +17,17 @@ Base.@kwdef mutable struct SOCPStateWorkspace <: AbstractADMMWorkspace
     v2_consensus_prev::Vector{Float64}
 
     # RT
-    r_consensus::Dict{Int, Float64}
-    t_consensus::Dict{Int, Float64}
+    r_consensus::Vector{Float64}
+    t_consensus::Vector{Float64}
 
-    r_consensus_prev::Dict{Int, Float64}
-    t_consensus_prev::Dict{Int, Float64}
+    r_consensus_prev::Vector{Float64}
+    t_consensus_prev::Vector{Float64}
 
     # DUALS
-    duals_v2::Dict{Int, Vector{Float64}}
+    duals_v2::Matrix{Float64}
 
-    duals_r::Dict{Int, Dict{Int, Float64}}
-    duals_t::Dict{Int, Dict{Int, Float64}}
+    duals_r::Matrix{Float64}
+    duals_t::Matrix{Float64}
 
     # RHOS
     rho_v2::Base.RefValue{Float64}
@@ -38,6 +37,9 @@ Base.@kwdef mutable struct SOCPStateWorkspace <: AbstractADMMWorkspace
     prev_rho_v2::Base.RefValue{Float64}
     prev_rho_r::Base.RefValue{Float64}
     prev_rho_t::Base.RefValue{Float64}
+
+    bus_counts::Vector{Int}
+    branch_counts::Vector{Int}
 
     r_primal::Float64 = 0.0
     r_dual::Float64 = 0.0
@@ -66,20 +68,22 @@ Base.@kwdef mutable struct SOCPPowerWorkspace <: AbstractADMMWorkspace
 
     interzonal::Vector{Int}
 
-    p_flow_consensus::Dict{Int, Float64}
-    q_flow_consensus::Dict{Int, Float64}
+    p_flow_consensus::Vector{Float64}
+    q_flow_consensus::Vector{Float64}
 
-    p_flow_consensus_prev::Dict{Int, Float64}
-    q_flow_consensus_prev::Dict{Int, Float64}
+    p_flow_consensus_prev::Vector{Float64}
+    q_flow_consensus_prev::Vector{Float64}
 
-    duals_p::Dict{Int, Dict{Int, Float64}}
-    duals_q::Dict{Int, Dict{Int, Float64}}
+    duals_p::Matrix{Float64}
+    duals_q::Matrix{Float64}
 
     rho_p::Base.RefValue{Float64}
     rho_q::Base.RefValue{Float64}
 
     prev_rho_p::Base.RefValue{Float64}
     prev_rho_q::Base.RefValue{Float64}
+
+    branch_counts::Vector{Int}
 
     r_primal::Float64 = 0.0
     r_dual::Float64 = 0.0
@@ -104,7 +108,6 @@ Base.@kwdef mutable struct SOCPHybridWorkspace <: AbstractADMMWorkspace
     partitions::Partitions{PartitionSOCP}
     id::Vector{Int}
 
-    consensus_bus_idx_map::Dict{Int, Int}
     interzonal::Vector{Int}
 
     # BUS
@@ -112,27 +115,27 @@ Base.@kwdef mutable struct SOCPHybridWorkspace <: AbstractADMMWorkspace
     v2_consensus_prev::Vector{Float64}
 
     # PQ
-    p_flow_consensus::Dict{Int, Float64}
-    q_flow_consensus::Dict{Int, Float64}
+    p_flow_consensus::Vector{Float64}
+    q_flow_consensus::Vector{Float64}
 
-    p_flow_consensus_prev::Dict{Int, Float64}
-    q_flow_consensus_prev::Dict{Int, Float64}
+    p_flow_consensus_prev::Vector{Float64}
+    q_flow_consensus_prev::Vector{Float64}
 
     # RT
-    r_consensus::Dict{Int, Float64}
-    t_consensus::Dict{Int, Float64}
+    r_consensus::Vector{Float64}
+    t_consensus::Vector{Float64}
 
-    r_consensus_prev::Dict{Int, Float64}
-    t_consensus_prev::Dict{Int, Float64}
+    r_consensus_prev::Vector{Float64}
+    t_consensus_prev::Vector{Float64}
 
     # DUALS
-    duals_v2::Dict{Int, Vector{Float64}}
+    duals_v2::Matrix{Float64}
 
-    duals_p::Dict{Int, Dict{Int, Float64}}
-    duals_q::Dict{Int, Dict{Int, Float64}}
+    duals_p::Matrix{Float64}
+    duals_q::Matrix{Float64}
 
-    duals_r::Dict{Int, Dict{Int, Float64}}
-    duals_t::Dict{Int, Dict{Int, Float64}}
+    duals_r::Matrix{Float64}
+    duals_t::Matrix{Float64}
 
     # RHOS
     rho_v2::Base.RefValue{Float64}
@@ -146,6 +149,9 @@ Base.@kwdef mutable struct SOCPHybridWorkspace <: AbstractADMMWorkspace
     prev_rho_q::Base.RefValue{Float64}
     prev_rho_r::Base.RefValue{Float64}
     prev_rho_t::Base.RefValue{Float64}
+
+    bus_counts::Vector{Int}
+    branch_counts::Vector{Int}
 
     r_primal::Float64 = 0.0
     r_dual::Float64 = 0.0
@@ -172,23 +178,23 @@ end
 # RHO HELPERS
 # ============================================================
 
-_get_rhos(ws::SOCPStateWorkspace) = Dict(
-    :rho_v2 => ws.rho_v2[],
-    :rho_r => ws.rho_r[],
-    :rho_t => ws.rho_t[],
+_get_rhos(ws::SOCPStateWorkspace) = (
+    rho_v2 = ws.rho_v2[],
+    rho_r = ws.rho_r[],
+    rho_t = ws.rho_t[],
 )
 
-_get_rhos(ws::SOCPPowerWorkspace) = Dict(
-    :rho_p => ws.rho_p[],
-    :rho_q => ws.rho_q[],
+_get_rhos(ws::SOCPPowerWorkspace) = (
+    rho_p = ws.rho_p[],
+    rho_q = ws.rho_q[],
 )
 
-_get_rhos(ws::SOCPHybridWorkspace) = Dict(
-    :rho_v2 => ws.rho_v2[],
-    :rho_p => ws.rho_p[],
-    :rho_q => ws.rho_q[],
-    :rho_r => ws.rho_r[],
-    :rho_t => ws.rho_t[],
+_get_rhos(ws::SOCPHybridWorkspace) = (
+    rho_v2 = ws.rho_v2[],
+    rho_p = ws.rho_p[],
+    rho_q = ws.rho_q[],
+    rho_r = ws.rho_r[],
+    rho_t = ws.rho_t[],
 )
 
 # ============================================================
@@ -199,9 +205,9 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCP
     partitions = build_partitions(PartitionSOCP, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
-
-    consensus_bus_idx_map = build_consensus_bus_idx_map(sys.full_shared_bus_ids)
+    n_zones = length(partitions)
     n_shared = length(sys.full_shared_bus_ids)
+    n_inter = length(inter)
 
     init_state_partition!(
         partitions,
@@ -220,23 +226,24 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCP
     return SOCPStateWorkspace(;
         partitions = partitions,
         id = id,
-        consensus_bus_idx_map = consensus_bus_idx_map,
         interzonal = inter,
         v2_consensus = ones(n_shared),
-        v2_consensus_prev = zeros(n_shared),
-        r_consensus = Dict(e => 0.0 for e in inter),
-        t_consensus = Dict(e => 0.0 for e in inter),
-        r_consensus_prev = Dict(e => 0.0 for e in inter),
-        t_consensus_prev = Dict(e => 0.0 for e in inter),
-        duals_v2 = Dict(z => zeros(n_shared) for z in id),
-        duals_r = Dict(z => Dict{Int, Float64}() for z in id),
-        duals_t = Dict(z => Dict{Int, Float64}() for z in id),
+        v2_consensus_prev = ones(n_shared),
+        r_consensus = zeros(n_inter),
+        t_consensus = zeros(n_inter),
+        r_consensus_prev = zeros(n_inter),
+        t_consensus_prev = zeros(n_inter),
+        duals_v2 = zeros(n_shared, n_zones),
+        duals_r = zeros(n_inter, n_zones),
+        duals_t = zeros(n_inter, n_zones),
         rho_v2 = rho_v2,
         rho_r = rho_r,
         rho_t = rho_t,
         prev_rho_v2 = Ref(rho_v2[]),
         prev_rho_r = Ref(rho_r[]),
         prev_rho_t = Ref(rho_t[]),
+        bus_counts = zeros(Int, n_shared),
+        branch_counts = zeros(Int, n_inter),
     )
 end
 
@@ -248,6 +255,8 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCP
     partitions = build_partitions(PartitionSOCP, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
+    n_zones = length(partitions)
+    n_inter = length(inter)
 
     init_power_partition!(
         partitions,
@@ -265,16 +274,17 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCP
         partitions = partitions,
         id = id,
         interzonal = inter,
-        p_flow_consensus = Dict(e => 0.0 for e in inter),
-        q_flow_consensus = Dict(e => 0.0 for e in inter),
-        p_flow_consensus_prev = Dict(e => 0.0 for e in inter),
-        q_flow_consensus_prev = Dict(e => 0.0 for e in inter),
-        duals_p = Dict(z => Dict{Int, Float64}() for z in id),
-        duals_q = Dict(z => Dict{Int, Float64}() for z in id),
+        p_flow_consensus = zeros(n_inter),
+        q_flow_consensus = zeros(n_inter),
+        p_flow_consensus_prev = zeros(n_inter),
+        q_flow_consensus_prev = zeros(n_inter),
+        duals_p = zeros(n_inter, n_zones),
+        duals_q = zeros(n_inter, n_zones),
         rho_p = rho_p,
         rho_q = rho_q,
         prev_rho_p = Ref(rho_p[]),
         prev_rho_q = Ref(rho_q[]),
+        branch_counts = zeros(Int, n_inter),
     )
 end
 
@@ -286,9 +296,9 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOC
     partitions = build_partitions(PartitionSOCP, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
-
-    consensus_bus_idx_map = build_consensus_bus_idx_map(sys.full_shared_bus_ids)
+    n_zones = length(partitions)
     n_shared = length(sys.full_shared_bus_ids)
+    n_inter = length(inter)
 
     init_hybrid_partition!(
         partitions,
@@ -311,23 +321,22 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOC
     return SOCPHybridWorkspace(;
         partitions = partitions,
         id = id,
-        consensus_bus_idx_map = consensus_bus_idx_map,
         interzonal = inter,
         v2_consensus = ones(n_shared),
-        v2_consensus_prev = zeros(n_shared),
-        p_flow_consensus = Dict(e => 0.0 for e in inter),
-        q_flow_consensus = Dict(e => 0.0 for e in inter),
-        p_flow_consensus_prev = Dict(e => 0.0 for e in inter),
-        q_flow_consensus_prev = Dict(e => 0.0 for e in inter),
-        r_consensus = Dict(e => 0.0 for e in inter),
-        t_consensus = Dict(e => 0.0 for e in inter),
-        r_consensus_prev = Dict(e => 0.0 for e in inter),
-        t_consensus_prev = Dict(e => 0.0 for e in inter),
-        duals_v2 = Dict(z => zeros(n_shared) for z in id),
-        duals_p = Dict(z => Dict{Int, Float64}() for z in id),
-        duals_q = Dict(z => Dict{Int, Float64}() for z in id),
-        duals_r = Dict(z => Dict{Int, Float64}() for z in id),
-        duals_t = Dict(z => Dict{Int, Float64}() for z in id),
+        v2_consensus_prev = ones(n_shared),
+        p_flow_consensus = zeros(n_inter),
+        q_flow_consensus = zeros(n_inter),
+        p_flow_consensus_prev = zeros(n_inter),
+        q_flow_consensus_prev = zeros(n_inter),
+        r_consensus = zeros(n_inter),
+        t_consensus = zeros(n_inter),
+        r_consensus_prev = zeros(n_inter),
+        t_consensus_prev = zeros(n_inter),
+        duals_v2 = zeros(n_shared, n_zones),
+        duals_p = zeros(n_inter, n_zones),
+        duals_q = zeros(n_inter, n_zones),
+        duals_r = zeros(n_inter, n_zones),
+        duals_t = zeros(n_inter, n_zones),
         rho_v2 = rho_v2,
         rho_p = rho_p,
         rho_q = rho_q,
@@ -338,5 +347,7 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOC
         prev_rho_q = Ref(rho_q[]),
         prev_rho_r = Ref(rho_r[]),
         prev_rho_t = Ref(rho_t[]),
+        bus_counts = zeros(Int, n_shared),
+        branch_counts = zeros(Int, n_inter),
     )
 end

@@ -17,11 +17,28 @@ struct BusData
     zone::Vector{Int}
     v_max::Vector{Float64}
     v_min::Vector{Float64}
-    reference_bus::Union{Nothing, Int}
-    vm_start::Vector{Union{Nothing, Float64}}
-    va_start::Vector{Union{Nothing, Float64}}
+    reference_bus::Int
+    vm_start::Vector{Float64}
+    va_start::Vector{Float64}
 
-    id_to_idx::Dict{Int, Int}
+    id_to_idx::Vector{Int}
+end
+
+@inline has_reference_bus(bus::BusData)::Bool = bus.reference_bus != 0
+
+function _build_id_to_idx(bus_ids::Vector{Int})::Vector{Int}
+    n = length(bus_ids)
+    n == 0 && return Int[]
+    max_id = 0
+    @inbounds for i in 1:n
+        id = bus_ids[i]
+        id > max_id && (max_id = id)
+    end
+    v = zeros(Int, max_id)
+    @inbounds for i in 1:n
+        v[bus_ids[i]] = i
+    end
+    return v
 end
 
 function get_bus_parameters(case_raw::CaseRaw)
@@ -33,29 +50,22 @@ function get_bus_parameters(case_raw::CaseRaw)
     bus_type = bus_raw.bus_type
 
     reference_bus_idx = findfirst(==(3), bus_type)
-    reference_bus = reference_bus_idx === nothing ? nothing : bus_ids[reference_bus_idx]
+    reference_bus = reference_bus_idx === nothing ? 0 : bus_ids[reference_bus_idx]
 
     n = length(bus_ids)
 
     vm = bus_raw.vm
     va = bus_raw.va
 
-    vm_start = Vector{Union{Nothing, Float64}}(undef, n)
-    va_start = Vector{Union{Nothing, Float64}}(undef, n)
+    vm_start = Vector{Float64}(undef, n)
+    va_start = Vector{Float64}(undef, n)
 
     @inbounds for i in 1:n
-        v = vm[i]
-        a = va[i]
-        vm_start[i] = isnan(v) ? nothing : v
-        va_start[i] = isnan(a) ? nothing : a
+        vm_start[i] = vm[i]
+        va_start[i] = va[i]
     end
 
-    id_to_idx = Dict{Int, Int}()
-    sizehint!(id_to_idx, n)
-
-    @inbounds for i in 1:n
-        id_to_idx[bus_ids[i]] = i
-    end
+    id_to_idx = _build_id_to_idx(bus_ids)
 
     return (
         n = n,
