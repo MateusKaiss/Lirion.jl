@@ -113,6 +113,33 @@ function add_rectangular_bus_variables!(model::JuMP.Model, bus::BusData)
     return nothing
 end
 
+function add_lpac_bus_variables!(model::JuMP.Model, bus::BusData)
+    T = get(model.ext, :time_periods, 1)
+    bus_ids = bus.id
+    id_to_idx = bus.id_to_idx
+    v_min = bus.v_min
+    v_max = bus.v_max
+    vm_start = bus.vm_start
+
+    @variable(model, phi[b in bus_ids, t in 1:T])
+
+    @inbounds for b in bus_ids
+        idx = id_to_idx[b]
+        lo = v_min[idx] - 1.0
+        hi = v_max[idx] - 1.0
+        vm0 = isnan(vm_start[idx]) ? 1.0 : vm_start[idx]
+        start_val = vm0 - 1.0
+        for t in 1:T
+            p = phi[b, t]
+            JuMP.set_lower_bound(p, lo)
+            JuMP.set_upper_bound(p, hi)
+            JuMP.set_start_value(p, start_val)
+        end
+    end
+
+    return nothing
+end
+
 function add_socwr_bus_variables!(model::JuMP.Model, bus::BusData)
     T = get(model.ext, :time_periods, 1)
     bus_ids = bus.id

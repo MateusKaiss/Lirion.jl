@@ -100,6 +100,7 @@ include("modeling/bus/dispatch.jl")
 include("modeling/branch/dc.jl")
 include("modeling/branch/ac.jl")
 include("modeling/branch/acr.jl")
+include("modeling/branch/lpac.jl")
 include("modeling/branch/socwr_rt.jl")
 include("modeling/branch/socwr.jl")
 include("modeling/branch/dispatch.jl")
@@ -202,7 +203,8 @@ include("solve.jl")
 # ------------------------------------------------------------------
 # Public exports
 # ------------------------------------------------------------------
-export solve, dc, ac, acr, socwr,
+export solve,
+    dc, ac, acr, lpac, socwr,
     centralized, admm,
     partition_from_case, partition_metis
 

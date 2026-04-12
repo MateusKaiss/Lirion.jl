@@ -1,6 +1,7 @@
 @inline base_model_tag(::Type{DC}) = Val(:dc)
 @inline base_model_tag(::Type{AC}) = Val(:ac)
 @inline base_model_tag(::Type{ACR}) = Val(:acr)
+@inline base_model_tag(::Type{LPAC}) = Val(:lpac)
 @inline base_model_tag(::Type{SOCWR}) = Val(:socwr)
 
 # ============================================================
@@ -152,6 +153,13 @@ end
 # ============================================================
 
 function resolve_optimizer(::Val{:acr}, inputs_optimizer = nothing)
+    if inputs_optimizer !== nothing && inputs_optimizer !== Ipopt.Optimizer
+        return _silent_factory(inputs_optimizer)
+    end
+    return _IPOPT_AC_FACTORY
+end
+
+function resolve_optimizer(::Val{:lpac}, inputs_optimizer = nothing)
     if inputs_optimizer !== nothing && inputs_optimizer !== Ipopt.Optimizer
         return _silent_factory(inputs_optimizer)
     end

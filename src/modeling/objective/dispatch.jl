@@ -27,6 +27,10 @@ function add_objective_expressions!(model::JuMP.Model, obj::ObjectiveData, ::Typ
     return add_generation_cost!(model, obj)
 end
 
+function add_objective_expressions!(model::JuMP.Model, obj::ObjectiveData, ::Type{LPAC})
+    return add_generation_cost!(model, obj)
+end
+
 function add_objective_expressions!(model::JuMP.Model, obj::ObjectiveData, ::Type{SOCWR})
     return add_generation_cost!(model, obj)
 end

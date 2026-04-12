@@ -5,6 +5,7 @@
 @inline _select_default_optimizer(::Type{DC}) = OSQP.Optimizer
 @inline _select_default_optimizer(::Type{<:OPFModel}) = Ipopt.Optimizer
 @inline _select_default_optimizer(::Type{ACR}) = Ipopt.Optimizer
+@inline _select_default_optimizer(::Type{LPAC}) = Ipopt.Optimizer
 
 @inline _select_default_optimizer(::Type{SOCWR}) = Clarabel.Optimizer
 

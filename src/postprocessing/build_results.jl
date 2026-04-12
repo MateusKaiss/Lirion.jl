@@ -20,8 +20,6 @@ function build_result_dict(model::JuMP.Model, sys::SystemData)
             for b in bus_ids, t in 1:T
         ] : nothing
 
-    # Voltage magnitudes: polar exposes `v_magnitude`; ACR recovers from (vr, vi);
-    # SOCWR uses `v_magnitude_sq` (variable).
     vm_matrix =
         haskey(model, :v_magnitude) ?
         [value(model[:v_magnitude][b, t]) for b in bus_ids, t in 1:T] :
@@ -29,7 +27,10 @@ function build_result_dict(model::JuMP.Model, sys::SystemData)
         [
             hypot(value(model[:v_real][b, t]), value(model[:v_imag][b, t]))
             for b in bus_ids, t in 1:T
-        ] : nothing
+        ] :
+        haskey(model, :phi) ?
+        [1.0 + value(model[:phi][b, t]) for b in bus_ids, t in 1:T] :
+        nothing
 
     vm_sq_matrix =
         haskey(model, :v_magnitude_sq) ?

@@ -30,6 +30,12 @@ struct BranchData
     g::Vector{Float64}
     b::Vector{Float64}
 
+    # Pi-model shunts per side (standard matpower: g_fr = g_to = 0, b_fr = b_to = b_sh/2)
+    g_fr::Vector{Float64}
+    b_fr::Vector{Float64}
+    g_to::Vector{Float64}
+    b_to::Vector{Float64}
+
     tap_real::Vector{Float64}
     tap_imag::Vector{Float64}
 end
@@ -87,6 +93,13 @@ function get_branch_parameters(case_raw::CaseRaw)
         status[i] == 1 && push!(active, i)
     end
 
+    # Pi-model shunts: standard matpower has g_fr = g_to = 0, b_fr = b_to = b_sh/2.
+    b_sh = branch_raw.br_b
+    g_fr = zeros(Float64, n)
+    b_fr = b_sh ./ 2
+    g_to = zeros(Float64, n)
+    b_to = b_sh ./ 2
+
     return (
         n = n,
         s_base = case_raw.baseMVA,
@@ -96,7 +109,7 @@ function get_branch_parameters(case_raw::CaseRaw)
         active = active,
         r = r,
         x = x,
-        b_sh = branch_raw.br_b,
+        b_sh = b_sh,
         rate_a = branch_raw.rate_a,
         rate_b = branch_raw.rate_b,
         rate_c = branch_raw.rate_c,
@@ -109,6 +122,10 @@ function get_branch_parameters(case_raw::CaseRaw)
         inv_tap = inv_tap,
         g = g,
         b = b,
+        g_fr = g_fr,
+        b_fr = b_fr,
+        g_to = g_to,
+        b_to = b_to,
         tap_real = tap_real,
         tap_imag = tap_imag,
     )
@@ -139,6 +156,10 @@ function build_branch_data(case_raw::CaseRaw)::BranchData
         params.inv_tap,
         params.g,
         params.b,
+        params.g_fr,
+        params.b_fr,
+        params.g_to,
+        params.b_to,
         params.tap_real,
         params.tap_imag,
     )

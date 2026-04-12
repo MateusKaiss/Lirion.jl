@@ -138,6 +138,8 @@ end
         return Lirion.ac()
     elseif model_type == Lirion.ACR
         return Lirion.acr()
+    elseif model_type == Lirion.LPAC
+        return Lirion.lpac()
     elseif model_type == Lirion.SOCWR
         return Lirion.socwr()
     else
@@ -151,9 +153,10 @@ end
     has_storage = haskey(pm_data, "storage") && !isempty(pm_data["storage"])
 
     # NOTE:
-    # - For DC:  DCPPowerModel
-    # - For AC:  ACPPowerModel (via solve_ac_opf)
-    # - For ACR: ACRPowerModel
+    # - For DC:   DCPPowerModel
+    # - For AC:   ACPPowerModel (via solve_ac_opf)
+    # - For ACR:  ACRPowerModel
+    # - For LPAC: LPACCPowerModel
     # - For SOCWR: SOCWRConicPowerModel (no storage) / SOCWRPowerModel (storage helper)
     if has_storage
         if model_type == Lirion.DC
@@ -167,6 +170,10 @@ end
         elseif model_type == Lirion.ACR
             return Float64(
                 PowerModels._solve_opf_strg(pm_data, ACRPowerModel, optimizer)["objective"],
+            )
+        elseif model_type == Lirion.LPAC
+            return Float64(
+                PowerModels._solve_opf_strg(pm_data, LPACCPowerModel, optimizer)["objective"],
             )
         elseif model_type == Lirion.SOCWR
             return Float64(
@@ -185,6 +192,10 @@ end
         elseif model_type == Lirion.ACR
             return Float64(
                 PowerModels.solve_opf(pm_data, ACRPowerModel, optimizer)["objective"],
+            )
+        elseif model_type == Lirion.LPAC
+            return Float64(
+                PowerModels.solve_opf(pm_data, LPACCPowerModel, optimizer)["objective"],
             )
         elseif model_type == Lirion.SOCWR
             return Float64(
@@ -303,6 +314,14 @@ function run_test_objective()
             case_list = reduced_testlist_ac,
         )
 
+        # LPAC: Ipopt (same case list as AC)
+        run_model_tests(
+            Lirion.LPAC,
+            "LPAC";
+            optimizer = Ipopt.Optimizer,
+            case_list = reduced_testlist_ac,
+        )
+
         socwr_optimizer = Clarabel.Optimizer
         run_model_tests(
             Lirion.SOCWR,
@@ -327,6 +346,12 @@ function run_test_objective()
         run_model_tests(
             Lirion.ACR,
             "ACR com baterias";
+            optimizer = Ipopt.Optimizer,
+            case_list = battery_cases,
+        )
+        run_model_tests(
+            Lirion.LPAC,
+            "LPAC com baterias";
             optimizer = Ipopt.Optimizer,
             case_list = battery_cases,
         )

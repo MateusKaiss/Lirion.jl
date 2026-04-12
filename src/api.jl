@@ -5,6 +5,7 @@
 dc() = DC
 ac() = AC
 acr() = ACR
+lpac() = LPAC
 socwr() = SOCWR
 
 # -----------------------------
