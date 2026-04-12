@@ -7,7 +7,8 @@ abstract type OPFModel end
 struct DC <: OPFModel end
 struct AC <: OPFModel end     # AC polar (V, θ)
 struct ACR <: OPFModel end    # AC rectangular (vr, vi)
-struct LPAC <: OPFModel end   # Linear Power AC
+struct IVR <: OPFModel end    # Current-Voltage rectangular (vr, vi, cr, ci)
+struct LPAC <: OPFModel end   # Linear Power AC (Coffrin & Van Hentenryck 2014)
 struct SOCWR <: OPFModel end  # Jabr SOCP (W-rectangular)
 
 # ============================================================

@@ -100,6 +100,7 @@ include("modeling/bus/dispatch.jl")
 include("modeling/branch/dc.jl")
 include("modeling/branch/ac.jl")
 include("modeling/branch/acr.jl")
+include("modeling/branch/ivr.jl")
 include("modeling/branch/lpac.jl")
 include("modeling/branch/socwr_rt.jl")
 include("modeling/branch/socwr.jl")
@@ -127,6 +128,7 @@ include("modeling/prosumer/dispatch.jl")
 # --- BALANCE
 include("modeling/power_balance/active.jl")
 include("modeling/power_balance/reactive.jl")
+include("modeling/power_balance/ivr_balance.jl")
 include("modeling/power_balance/dispatch.jl")
 
 # --- OBJECTIVE
@@ -204,7 +206,7 @@ include("solve.jl")
 # Public exports
 # ------------------------------------------------------------------
 export solve,
-    dc, ac, acr, lpac, socwr,
+    dc, ac, acr, ivr, lpac, socwr,
     centralized, admm,
     partition_from_case, partition_metis
 

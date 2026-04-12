@@ -25,6 +25,10 @@ function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{ACR})
     return nothing
 end
 
+function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{IVR})
+    return add_ivr_branch_variables!(model, sys.branch)
+end
+
 function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{LPAC})
     return add_lpac_branch_variables!(model, sys.branch)
 end
@@ -49,6 +53,10 @@ function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{ACR}
     return add_acr_branch_expressions!(model, sys.branch)
 end
 
+function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{IVR})
+    return nothing
+end
+
 function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{LPAC})
     return add_lpac_branch_expressions!(model, sys.branch)
 end
@@ -71,6 +79,10 @@ end
 
 function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{ACR})
     return add_acr_branch_constraints!(model, sys.branch)
+end
+
+function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{IVR})
+    return add_ivr_branch_constraints!(model, sys.bus, sys.branch)
 end
 
 function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{LPAC})

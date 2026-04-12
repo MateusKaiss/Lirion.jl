@@ -138,6 +138,8 @@ end
         return Lirion.ac()
     elseif model_type == Lirion.ACR
         return Lirion.acr()
+    elseif model_type == Lirion.IVR
+        return Lirion.ivr()
     elseif model_type == Lirion.LPAC
         return Lirion.lpac()
     elseif model_type == Lirion.SOCWR
@@ -156,8 +158,17 @@ end
     # - For DC:   DCPPowerModel
     # - For AC:   ACPPowerModel (via solve_ac_opf)
     # - For ACR:  ACRPowerModel
+    # - For IVR:  IVRPowerModel (via solve_opf_iv)
     # - For LPAC: LPACCPowerModel
     # - For SOCWR: SOCWRConicPowerModel (no storage) / SOCWRPowerModel (storage helper)
+
+    # IVR uses a different build method (build_opf_iv), handle separately.
+    if model_type == Lirion.IVR
+        return Float64(
+            PowerModels.solve_opf_iv(pm_data, IVRPowerModel, optimizer)["objective"],
+        )
+    end
+
     if has_storage
         if model_type == Lirion.DC
             return Float64(
@@ -310,6 +321,14 @@ function run_test_objective()
         run_model_tests(
             Lirion.ACR,
             "ACR";
+            optimizer = Ipopt.Optimizer,
+            case_list = reduced_testlist_ac,
+        )
+
+        # IVR: Ipopt (same case list as AC)
+        run_model_tests(
+            Lirion.IVR,
+            "IVR";
             optimizer = Ipopt.Optimizer,
             case_list = reduced_testlist_ac,
         )

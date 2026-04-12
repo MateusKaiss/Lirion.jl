@@ -53,3 +53,44 @@ function add_curtailment_variables!(model::JuMP.Model, gen::GenData)
     model[:curtailment] = curtailment
     return nothing
 end
+
+# =====================================================================
+# IVR generator variables: current (crg, cig) + power-current link
+# =====================================================================
+
+function add_ivr_generator_variables!(model::JuMP.Model, gen::GenData, bus::BusData)
+    T = get(model.ext, :time_periods, 1)
+    G = gen.n
+
+    # Generator current variables (rectangular)
+    @variable(model, crg[g in 1:G, t in 1:T; gen.existing[g]])
+    @variable(model, cig[g in 1:G, t in 1:T; gen.existing[g]])
+
+    model[:crg] = crg
+    model[:cig] = cig
+
+    # Power-current link: S = V · I*
+    #   pg = vr · crg + vi · cig
+    #   qg = vi · crg - vr · cig
+    vr = model[:v_real]
+    vi = model[:v_imag]
+    pg = model[:p_generation]
+    qg = model[:q_generation]
+
+    @inbounds for g in 1:G
+        gen.existing[g] || continue
+        bus_id = gen.bus[g]
+        for t in 1:T
+            @constraint(
+                model,
+                pg[g, t] == vr[bus_id, t] * crg[g, t] + vi[bus_id, t] * cig[g, t]
+            )
+            @constraint(
+                model,
+                qg[g, t] == vi[bus_id, t] * crg[g, t] - vr[bus_id, t] * cig[g, t]
+            )
+        end
+    end
+
+    return nothing
+end

@@ -27,6 +27,10 @@ function add_bus_variables!(model::JuMP.Model, bus::BusData, ::Type{ACR})
     return add_rectangular_bus_variables!(model, bus)
 end
 
+function add_bus_variables!(model::JuMP.Model, bus::BusData, ::Type{IVR})
+    return add_rectangular_bus_variables!(model, bus)
+end
+
 function add_bus_variables!(model::JuMP.Model, bus::BusData, ::Type{LPAC})
     add_voltage_angle_variables!(model, bus)
     return add_lpac_bus_variables!(model, bus)

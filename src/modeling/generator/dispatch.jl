@@ -13,6 +13,11 @@ function generators!(
     add_generator_variables!(model, gen, model_type)
     add_generator_constraints!(model, gen, model_type)
 
+    # IVR: add current variables + power-current linking after P/Q vars exist.
+    if model_type === IVR
+        add_ivr_generator_variables!(model, gen, sys.bus)
+    end
+
     return nothing
 end
 
@@ -32,6 +37,12 @@ function add_generator_variables!(model::JuMP.Model, gen::GenData, ::Type{AC})
 end
 
 function add_generator_variables!(model::JuMP.Model, gen::GenData, ::Type{ACR})
+    add_active_generation_variables!(model, gen)
+    add_reactive_generation_variables!(model, gen)
+    return add_curtailment_variables!(model, gen)
+end
+
+function add_generator_variables!(model::JuMP.Model, gen::GenData, ::Type{IVR})
     add_active_generation_variables!(model, gen)
     add_reactive_generation_variables!(model, gen)
     return add_curtailment_variables!(model, gen)
@@ -62,6 +73,10 @@ function add_generator_constraints!(model::JuMP.Model, gen::GenData, ::Type{AC})
 end
 
 function add_generator_constraints!(model::JuMP.Model, gen::GenData, ::Type{ACR})
+    return add_curtailment_constraints!(model, gen)
+end
+
+function add_generator_constraints!(model::JuMP.Model, gen::GenData, ::Type{IVR})
     return add_curtailment_constraints!(model, gen)
 end
 

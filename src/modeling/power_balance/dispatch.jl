@@ -7,12 +7,31 @@ function active_power_balance!(
     return nothing
 end
 
+# IVR: current balance replaces both active AND reactive power balance.
+# Called once from active_power_balance!; reactive is a no-op.
+function active_power_balance!(
+    model::JuMP.Model,
+    sys::SystemData,
+    ::Type{IVR},
+)
+    add_ivr_current_balance_constraints!(model, sys)
+    return nothing
+end
+
 function reactive_power_balance!(
     model::JuMP.Model,
     sys::SystemData,
     model_type::Type{<:OPFModel},
 )
     add_reactive_power_balance_constraints!(model, sys, model_type)
+    return nothing
+end
+
+function reactive_power_balance!(
+    ::JuMP.Model,
+    ::SystemData,
+    ::Type{IVR},
+)
     return nothing
 end
 
