@@ -37,6 +37,10 @@ function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{SOCWR}
     return add_rt_variables_with_bounds!(model, sys.bus, sys.branch)
 end
 
+function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{SOCBF})
+    return add_socbf_branch_variables!(model, sys.bus, sys.branch)
+end
+
 # =======================================================================
 # EXPRESSIONS
 # =======================================================================
@@ -65,6 +69,10 @@ function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{SOCW
     return add_socwr_branch_expressions!(model, sys.branch)
 end
 
+function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{SOCBF})
+    return nothing  # SOCBF: power flows are variables, not expressions
+end
+
 # =======================================================================
 # CONSTRAINTS
 # =======================================================================
@@ -91,4 +99,8 @@ end
 
 function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{SOCWR})
     return add_socwr_branch_constraints!(model, sys.branch)
+end
+
+function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{SOCBF})
+    return add_socbf_branch_constraints!(model, sys.bus, sys.branch)
 end

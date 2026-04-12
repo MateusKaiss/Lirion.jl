@@ -8,6 +8,7 @@ acr() = ACR
 ivr() = IVR
 lpac() = LPAC
 socwr() = SOCWR
+socbf() = SOCBF
 
 # -----------------------------
 # Algorithm builders

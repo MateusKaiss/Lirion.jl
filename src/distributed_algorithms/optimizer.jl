@@ -4,6 +4,7 @@
 @inline base_model_tag(::Type{IVR}) = Val(:ivr)
 @inline base_model_tag(::Type{LPAC}) = Val(:lpac)
 @inline base_model_tag(::Type{SOCWR}) = Val(:socwr)
+@inline base_model_tag(::Type{SOCBF}) = Val(:socbf)
 
 # ============================================================
 # Silent optimizer factories — built once at module load
@@ -206,6 +207,15 @@ function resolve_optimizer(::Val{:socwr}, inputs_optimizer = nothing)
         end
     end
 
+    return _CLARABEL_SILENT_FACTORY
+end
+
+# ============================================================
+# SOCBF — same conic solver as SOCWR
+# ============================================================
+
+function resolve_optimizer(::Val{:socbf}, inputs_optimizer = nothing)
+    inputs_optimizer !== nothing && return _silent_factory(inputs_optimizer)
     return _CLARABEL_SILENT_FACTORY
 end
 

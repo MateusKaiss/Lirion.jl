@@ -144,6 +144,8 @@ end
         return Lirion.lpac()
     elseif model_type == Lirion.SOCWR
         return Lirion.socwr()
+    elseif model_type == Lirion.SOCBF
+        return Lirion.socbf()
     else
         error("Unsupported Lirion model type: $model_type")
     end
@@ -190,6 +192,10 @@ end
             return Float64(
                 PowerModels._solve_opf_strg(pm_data, SOCWRPowerModel, optimizer)["objective"],
             )
+        elseif model_type == Lirion.SOCBF
+            return Float64(
+                PowerModels._solve_opf_strg(pm_data, SOCBFPowerModel, optimizer)["objective"],
+            )
         else
             error("Model type not recognized for storage case.")
         end
@@ -211,6 +217,10 @@ end
         elseif model_type == Lirion.SOCWR
             return Float64(
                 PowerModels.solve_opf(pm_data, SOCWRConicPowerModel, optimizer)["objective"],
+            )
+        elseif model_type == Lirion.SOCBF
+            return Float64(
+                PowerModels.solve_opf_bf(pm_data, SOCBFConicPowerModel, optimizer)["objective"],
             )
         else
             error("Model type not recognized.")
@@ -346,6 +356,14 @@ function run_test_objective()
             Lirion.SOCWR,
             "SOCWR";
             optimizer = socwr_optimizer,
+            case_list = reduced_list,
+        )
+
+        socbf_optimizer = Clarabel.Optimizer
+        run_model_tests(
+            Lirion.SOCBF,
+            "SOCBF";
+            optimizer = socbf_optimizer,
             case_list = reduced_list,
         )
 
