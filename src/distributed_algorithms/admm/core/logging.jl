@@ -1,12 +1,3 @@
-@inline function _pretty_time(sec::Real)
-    if sec < 60
-        return "$(round(sec; digits = 3)) s"
-    elseif sec < 3600
-        return "$(round(sec / 60; digits = 2)) min"
-    else
-        return "$(round(sec / 3600; digits = 2)) h"
-    end
-end
 
 # ------------------------------------------------------------
 # PRINT TAG

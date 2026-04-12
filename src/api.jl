@@ -41,6 +41,19 @@ end
     return ADMMAlgorithm(coupling, _sectioning(sectioning), max_iter, (; kwargs...))
 end
 
+@inline function aladin(;
+    coupling::Symbol = :state,
+    sectioning = :tie_line,
+    max_iter::Int = 100,
+    kwargs...,
+)
+    coupling in (:state, :power, :hybrid) ||
+        throw(ArgumentError("Invalid coupling=$coupling. Allowed: :state, :power, :hybrid"))
+    max_iter > 0 || throw(ArgumentError("max_iter must be > 0"))
+
+    return ALADINAlgorithm(coupling, _sectioning(sectioning), max_iter, (; kwargs...))
+end
+
 # -----------------------------
 # Plot helpers
 # -----------------------------

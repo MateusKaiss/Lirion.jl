@@ -252,7 +252,10 @@ end
 # Entry point
 # ============================================================
 
-@inline function resolve_optimizer(config::DistributedOPFModel, inputs_optimizer = nothing)
+@inline function resolve_optimizer(
+    config::AbstractDistributedConfig,
+    inputs_optimizer = nothing,
+)
     return resolve_optimizer(base_model_tag(config.base_model), inputs_optimizer)
 end
 

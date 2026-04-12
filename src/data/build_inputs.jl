@@ -14,7 +14,7 @@ end
 
 struct DistributedInputs <: AbstractLirionInputs
     database_path::String
-    model_type::DistributedOPFModel
+    model_type::AbstractDistributedConfig
     optimizer::Any
     write_outputs::Bool
     system::DistributedSystem
@@ -82,6 +82,32 @@ function _build_inputs(
     preprocess_case_data!(raw_case, OPFModel)
 
     cfg = DistributedOPFModel(
+        model, algorithm.coupling, algorithm.sectioning, algorithm.max_iter;
+        algorithm.kwargs...,
+    )
+
+    dist_sys = build_distributed_system(raw_case, algorithm.sectioning)
+
+    return DistributedInputs(
+        path,
+        cfg,
+        optimizer,
+        outputs,
+        dist_sys,
+    )
+end
+
+function _build_inputs(
+    path::String,
+    algorithm::ALADINAlgorithm;
+    model::Type{<:OPFModel},
+    optimizer::Any,
+    outputs::Bool,
+)::DistributedInputs
+    raw_case = load_input_data(path)
+    preprocess_case_data!(raw_case, OPFModel)
+
+    cfg = ALADINConfig(
         model, algorithm.coupling, algorithm.sectioning, algorithm.max_iter;
         algorithm.kwargs...,
     )

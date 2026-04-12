@@ -149,9 +149,10 @@ include("postprocessing/build_results.jl")
 include("postprocessing/build_plots.jl")
 
 # ------------------------------------------------------------------
-# Distributed methods — optimizer + core support
+# Distributed methods — optimizer + shared core
 # ------------------------------------------------------------------
 include("distributed_algorithms/optimizer.jl")
+include("distributed_algorithms/core/algorithm_interface.jl")
 include("distributed_algorithms/admm/core/admm_support.jl")
 include("distributed_algorithms/admm/core/history.jl")
 include("distributed_algorithms/admm/core/snapshots.jl")
@@ -190,9 +191,22 @@ include("distributed_algorithms/admm/core/rho_update.jl")
 include("distributed_algorithms/admm/core/logging.jl")
 
 # ------------------------------------------------------------------
-# ADMM loop + distributed OPF runner (after all types are defined)
+# ADMM loop (after all types are defined)
 # ------------------------------------------------------------------
 include("distributed_algorithms/admm/run_admm.jl")
+
+# ------------------------------------------------------------------
+# ALADIN (scaffolding + per-model code)
+# ------------------------------------------------------------------
+include("distributed_algorithms/aladin/core/aladin_support.jl")
+include("distributed_algorithms/aladin/build_aladin_params.jl")
+include("distributed_algorithms/aladin/dc/workspace.jl")
+include("distributed_algorithms/aladin/dc/partition.jl")
+include("distributed_algorithms/aladin/run_aladin.jl")
+
+# ------------------------------------------------------------------
+# Distributed OPF top-level runner (dispatches ADMM vs ALADIN)
+# ------------------------------------------------------------------
 include("distributed_algorithms/distributed_opf.jl")
 
 # ------------------------------------------------------------------
@@ -210,7 +224,7 @@ include("solve.jl")
 # ------------------------------------------------------------------
 export solve,
     dc, ac, acr, ivr, lpac, socwr, socbf, bfa, nfa,
-    centralized, admm,
+    centralized, admm, aladin,
     partition_from_case, partition_metis
 
 end

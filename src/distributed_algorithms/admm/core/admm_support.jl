@@ -1,7 +1,5 @@
 @inline _wrap_angle_diff(Δ::Float64) = atan(sin(Δ), cos(Δ))
 
-@inline _elapsed_s(t0_ns::Integer) = (time_ns() - t0_ns) / 1e9
-
 @inline function _zone_cut_edges(part, interzonal_branches::AbstractVector{Int})
     m = part.branch_idx_full_to_zone
     return [e for e in interzonal_branches if m[e] != 0]

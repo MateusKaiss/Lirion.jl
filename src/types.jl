@@ -29,6 +29,7 @@ struct Hybrid <: ADMMVariant end
 # ============================================================
 
 struct ADMM{V <: ADMMVariant, M <: OPFModel} end
+struct ALADIN{V <: ADMMVariant, M <: OPFModel} end
 
 # ============================================================
 # SECTIONING / DECOMPOSITION STRATEGIES
@@ -44,10 +45,18 @@ struct Metis <: Sectioning end
 # ============================================================
 
 abstract type AbstractAlgorithm end
+abstract type AbstractDistributedAlgorithm <: AbstractAlgorithm end
 
 struct CentralizedAlgorithm <: AbstractAlgorithm end
 
-struct ADMMAlgorithm <: AbstractAlgorithm
+struct ADMMAlgorithm <: AbstractDistributedAlgorithm
+    coupling::Symbol
+    sectioning::Sectioning
+    max_iter::Int
+    kwargs::NamedTuple
+end
+
+struct ALADINAlgorithm <: AbstractDistributedAlgorithm
     coupling::Symbol
     sectioning::Sectioning
     max_iter::Int
@@ -227,7 +236,9 @@ end
 # DISTRIBUTED OPF MODEL CONFIGURATION
 # ============================================================
 
-mutable struct DistributedOPFModel
+abstract type AbstractDistributedConfig end
+
+mutable struct DistributedOPFModel <: AbstractDistributedConfig
     base_model::Type{<:OPFModel}
     coupling::Symbol
     sectioning::Sectioning
@@ -417,11 +428,76 @@ DistributedOPFModel(
 end
 
 # ============================================================
+# ALADIN CONFIGURATION
+# ============================================================
+
+mutable struct ALADINConfig <: AbstractDistributedConfig
+    base_model::Type{<:OPFModel}
+    coupling::Symbol
+    sectioning::Sectioning
+    max_iter::Int
+
+    # Penalty parameters (see Houska-Frasch-Diehl 2016)
+    rho::Float64             # proximal penalty in local subproblems
+    mu::Float64              # consensus slack penalty in coordination QP
+
+    # Convergence tolerances (KKT-style)
+    eps_abs::Float64
+    eps_rel::Float64
+
+    # Active-set identification tolerance
+    active_set_tol::Float64
+
+    function ALADINConfig(
+        base_model::Type{<:OPFModel},
+        coupling::Symbol,
+        sectioning::Sectioning,
+        max_iter::Integer;
+        rho::Real = 1e3,
+        mu::Real = 1e4,
+        eps_abs::Real = 1e-4,
+        eps_rel::Real = 1e-4,
+        active_set_tol::Real = 1e-6,
+    )
+        base_model === DC ||
+            throw(
+                ArgumentError(
+                    "ALADIN is currently implemented only for DC. Got: $(base_model)",
+                ),
+            )
+        coupling in (:state, :power, :hybrid) ||
+            throw(
+                ArgumentError(
+                    "Invalid coupling=$(coupling). Allowed: :state, :power, :hybrid",
+                ),
+            )
+        max_iter > 0 || throw(ArgumentError("max_iter must be > 0"))
+        rho > 0 || throw(ArgumentError("rho must be > 0"))
+        mu > 0 || throw(ArgumentError("mu must be > 0"))
+        eps_abs >= 0 || throw(ArgumentError("eps_abs must be ≥ 0"))
+        eps_rel >= 0 || throw(ArgumentError("eps_rel must be ≥ 0"))
+        active_set_tol > 0 || throw(ArgumentError("active_set_tol must be > 0"))
+
+        return new(
+            base_model,
+            coupling,
+            sectioning,
+            Int(max_iter),
+            Float64(rho),
+            Float64(mu),
+            Float64(eps_abs),
+            Float64(eps_rel),
+            Float64(active_set_tol),
+        )
+    end
+end
+
+# ============================================================
 # MODEL TYPE CHECKS
 # ============================================================
 
 @inline is_distributed_model(::Type{<:OPFModel}) = false
-@inline is_distributed_model(::DistributedOPFModel) = true
+@inline is_distributed_model(::AbstractDistributedConfig) = true
 @inline is_centralized_model(x) = !is_distributed_model(x)
 
 # ============================================================
