@@ -186,7 +186,7 @@ https://your-website-link-here.com
 
 ## Acknowledgments
 
-Lirion.jl originated as part of the undergraduate thesis of its principal developer, in the field of power systems. The package was conceived, designed, and developed by **Mateus Kaiss**, as its principal author and maintainer, with support from:
+Lirion.jl originated from the principal developer’s undergraduate thesis in power systems and has since evolved into an ongoing research line in his Master's program (since March 2026). The package was conceived, designed, and developed by **Mateus Kaiss**, as its principal author and maintainer, with support from:
 
 - **Dr. Daniel Gebbran Cons Bacilla Ferreira** for his supervision of the research involving distributed methodologies and for his significant role in strengthening the scientific contributions of this work.
 
