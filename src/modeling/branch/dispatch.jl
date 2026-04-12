@@ -21,6 +21,10 @@ function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{AC})
     return nothing
 end
 
+function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{ACR})
+    return nothing
+end
+
 function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{SOCP})
     return add_rt_variables_with_bounds!(model, sys.bus, sys.branch)
 end
@@ -37,6 +41,10 @@ function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{AC})
     return add_ac_branch_expressions!(model, sys.branch)
 end
 
+function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{ACR})
+    return add_acr_branch_expressions!(model, sys.branch)
+end
+
 function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{SOCP})
     return add_socp_branch_expressions!(model, sys.branch)
 end
@@ -51,6 +59,10 @@ end
 
 function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{AC})
     return add_ac_branch_constraints!(model, sys.branch)
+end
+
+function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{ACR})
+    return add_acr_branch_constraints!(model, sys.branch)
 end
 
 function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{SOCP})

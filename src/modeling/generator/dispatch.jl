@@ -31,6 +31,12 @@ function add_generator_variables!(model::JuMP.Model, gen::GenData, ::Type{AC})
     return add_curtailment_variables!(model, gen)
 end
 
+function add_generator_variables!(model::JuMP.Model, gen::GenData, ::Type{ACR})
+    add_active_generation_variables!(model, gen)
+    add_reactive_generation_variables!(model, gen)
+    return add_curtailment_variables!(model, gen)
+end
+
 function add_generator_variables!(model::JuMP.Model, gen::GenData, ::Type{SOCP})
     add_active_generation_variables!(model, gen)
     add_reactive_generation_variables!(model, gen)
@@ -46,6 +52,10 @@ function add_generator_constraints!(model::JuMP.Model, gen::GenData, ::Type{DC})
 end
 
 function add_generator_constraints!(model::JuMP.Model, gen::GenData, ::Type{AC})
+    return add_curtailment_constraints!(model, gen)
+end
+
+function add_generator_constraints!(model::JuMP.Model, gen::GenData, ::Type{ACR})
     return add_curtailment_constraints!(model, gen)
 end
 

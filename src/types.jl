@@ -5,7 +5,8 @@
 abstract type OPFModel end
 
 struct DC <: OPFModel end
-struct AC <: OPFModel end
+struct AC <: OPFModel end     # AC polar (V, θ)
+struct ACR <: OPFModel end    # AC rectangular (vr, vi)
 struct SOCP <: OPFModel end
 
 # ============================================================

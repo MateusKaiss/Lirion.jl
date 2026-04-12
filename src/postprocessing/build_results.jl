@@ -8,14 +8,42 @@ function build_result_dict(model::JuMP.Model, sys::SystemData)
     # Bus
     # -------------------------
     bus_ids = sys.bus.id
+
+    # Voltage angles: ACR uses rectangular (vr, vi) and recovers θ = atan2(vi, vr).
+    # Polar/DC/SOCP expose `theta` directly.
+    theta_matrix =
+        haskey(model, :theta) ?
+        [value(model[:theta][b, t]) for b in bus_ids, t in 1:T] :
+        haskey(model, :v_real) && haskey(model, :v_imag) ?
+        [
+            atan(value(model[:v_imag][b, t]), value(model[:v_real][b, t]))
+            for b in bus_ids, t in 1:T
+        ] : nothing
+
+    # Voltage magnitudes: polar exposes `v_magnitude`; ACR recovers from (vr, vi);
+    # SOCP uses `v_magnitude_sq` (variable).
+    vm_matrix =
+        haskey(model, :v_magnitude) ?
+        [value(model[:v_magnitude][b, t]) for b in bus_ids, t in 1:T] :
+        haskey(model, :v_real) && haskey(model, :v_imag) ?
+        [
+            hypot(value(model[:v_real][b, t]), value(model[:v_imag][b, t]))
+            for b in bus_ids, t in 1:T
+        ] : nothing
+
+    vm_sq_matrix =
+        haskey(model, :v_magnitude_sq) ?
+        [value(model[:v_magnitude_sq][b, t]) for b in bus_ids, t in 1:T] :
+        haskey(model, :v_real) && haskey(model, :v_imag) ?
+        [
+            value(model[:v_real][b, t])^2 + value(model[:v_imag][b, t])^2
+            for b in bus_ids, t in 1:T
+        ] : nothing
+
     result["bus"] = Dict(
-        "theta" => [value(model[:theta][b, t]) for b in bus_ids, t in 1:T],
-        "vm" =>
-            haskey(model, :v_magnitude) ?
-            [value(model[:v_magnitude][b, t]) for b in bus_ids, t in 1:T] : nothing,
-        "vm_sq" =>
-            haskey(model, :v_magnitude_sq) ?
-            [value(model[:v_magnitude_sq][b, t]) for b in bus_ids, t in 1:T] : nothing,
+        "theta" => theta_matrix,
+        "vm" => vm_matrix,
+        "vm_sq" => vm_sq_matrix,
     )
 
     # -------------------------

@@ -99,6 +99,7 @@ include("modeling/bus/dispatch.jl")
 # --- BRANCH
 include("modeling/branch/dc.jl")
 include("modeling/branch/ac.jl")
+include("modeling/branch/acr.jl")
 include("modeling/branch/socp_rt.jl")
 include("modeling/branch/socp.jl")
 include("modeling/branch/dispatch.jl")
@@ -113,6 +114,7 @@ include("modeling/battery/variables.jl")
 include("modeling/battery/constraints_common.jl")
 include("modeling/battery/constraints_dc.jl")
 include("modeling/battery/constraints_ac.jl")
+include("modeling/battery/constraints_acr.jl")
 include("modeling/battery/constraints_socp.jl")
 include("modeling/battery/dispatch.jl")
 
@@ -200,7 +202,7 @@ include("solve.jl")
 # ------------------------------------------------------------------
 # Public exports
 # ------------------------------------------------------------------
-export solve, dc, ac, socp,
+export solve, dc, ac, acr, socp,
     centralized, admm,
     partition_from_case, partition_metis
 

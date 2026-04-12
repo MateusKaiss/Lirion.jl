@@ -1,5 +1,6 @@
 @inline base_model_tag(::Type{DC}) = Val(:dc)
 @inline base_model_tag(::Type{AC}) = Val(:ac)
+@inline base_model_tag(::Type{ACR}) = Val(:acr)
 @inline base_model_tag(::Type{SOCP}) = Val(:socp)
 
 # ============================================================
@@ -140,6 +141,17 @@ const _IPOPT_AC_FACTORY = optimizer_with_attributes(
 )
 
 function resolve_optimizer(::Val{:ac}, inputs_optimizer = nothing)
+    if inputs_optimizer !== nothing && inputs_optimizer !== Ipopt.Optimizer
+        return _silent_factory(inputs_optimizer)
+    end
+    return _IPOPT_AC_FACTORY
+end
+
+# ============================================================
+# ACR — shares Ipopt AC factory (same non-convex NLP, different form)
+# ============================================================
+
+function resolve_optimizer(::Val{:acr}, inputs_optimizer = nothing)
     if inputs_optimizer !== nothing && inputs_optimizer !== Ipopt.Optimizer
         return _silent_factory(inputs_optimizer)
     end
