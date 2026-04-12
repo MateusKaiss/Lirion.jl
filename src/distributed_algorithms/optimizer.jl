@@ -5,6 +5,7 @@
 @inline base_model_tag(::Type{LPAC}) = Val(:lpac)
 @inline base_model_tag(::Type{SOCWR}) = Val(:socwr)
 @inline base_model_tag(::Type{SOCBF}) = Val(:socbf)
+@inline base_model_tag(::Type{BFA}) = Val(:bfa)
 
 # ============================================================
 # Silent optimizer factories — built once at module load
@@ -215,6 +216,15 @@ end
 # ============================================================
 
 function resolve_optimizer(::Val{:socbf}, inputs_optimizer = nothing)
+    inputs_optimizer !== nothing && return _silent_factory(inputs_optimizer)
+    return _CLARABEL_SILENT_FACTORY
+end
+
+# ============================================================
+# BFA — conic solver (SOC thermal limits)
+# ============================================================
+
+function resolve_optimizer(::Val{:bfa}, inputs_optimizer = nothing)
     inputs_optimizer !== nothing && return _silent_factory(inputs_optimizer)
     return _CLARABEL_SILENT_FACTORY
 end

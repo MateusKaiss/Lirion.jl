@@ -146,6 +146,8 @@ end
         return Lirion.socwr()
     elseif model_type == Lirion.SOCBF
         return Lirion.socbf()
+    elseif model_type == Lirion.BFA
+        return Lirion.bfa()
     else
         error("Unsupported Lirion model type: $model_type")
     end
@@ -221,6 +223,10 @@ end
         elseif model_type == Lirion.SOCBF
             return Float64(
                 PowerModels.solve_opf_bf(pm_data, SOCBFConicPowerModel, optimizer)["objective"],
+            )
+        elseif model_type == Lirion.BFA
+            return Float64(
+                PowerModels.solve_opf_bf(pm_data, BFAPowerModel, optimizer)["objective"],
             )
         else
             error("Model type not recognized.")
@@ -364,6 +370,14 @@ function run_test_objective()
             Lirion.SOCBF,
             "SOCBF";
             optimizer = socbf_optimizer,
+            case_list = reduced_list,
+        )
+
+        bfa_optimizer = Clarabel.Optimizer
+        run_model_tests(
+            Lirion.BFA,
+            "BFA";
+            optimizer = bfa_optimizer,
             case_list = reduced_list,
         )
 

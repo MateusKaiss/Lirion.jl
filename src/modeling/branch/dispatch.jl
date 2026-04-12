@@ -41,6 +41,10 @@ function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{SOCBF}
     return add_socbf_branch_variables!(model, sys.bus, sys.branch)
 end
 
+function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{BFA})
+    return add_bfa_branch_variables!(model, sys.bus, sys.branch)
+end
+
 # =======================================================================
 # EXPRESSIONS
 # =======================================================================
@@ -73,6 +77,10 @@ function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{SOCB
     return nothing  # SOCBF: power flows are variables, not expressions
 end
 
+function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{BFA})
+    return nothing  # BFA: power flows are variables, not expressions
+end
+
 # =======================================================================
 # CONSTRAINTS
 # =======================================================================
@@ -103,4 +111,8 @@ end
 
 function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{SOCBF})
     return add_socbf_branch_constraints!(model, sys.bus, sys.branch)
+end
+
+function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{BFA})
+    return add_bfa_branch_constraints!(model, sys.bus, sys.branch)
 end

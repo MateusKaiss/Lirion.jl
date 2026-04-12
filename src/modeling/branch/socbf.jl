@@ -25,7 +25,7 @@ function add_socbf_branch_variables!(model::JuMP.Model, bus::BusData, br::Branch
         set_lower_bound(q_reverse_flow_branches[l, t], -ra)
         set_upper_bound(q_reverse_flow_branches[l, t], ra)
 
-        # ccm upper bound: (rate_a * tap / v_min_from)^2  (matches PowerModels)
+        # ccm upper bound: (rate_a * tap / v_min_from)^2
         idx_fr = id_to_idx[br.from[l]]
         v_min_fr = bus.v_min[idx_fr]
         ccm_ub = (ra * br.tap_position[l] / v_min_fr)^2

@@ -9,6 +9,7 @@ ivr() = IVR
 lpac() = LPAC
 socwr() = SOCWR
 socbf() = SOCBF
+bfa() = BFA
 
 # -----------------------------
 # Algorithm builders

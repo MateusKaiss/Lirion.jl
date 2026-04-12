@@ -10,6 +10,7 @@
 
 @inline _select_default_optimizer(::Type{SOCWR}) = Clarabel.Optimizer
 @inline _select_default_optimizer(::Type{SOCBF}) = Clarabel.Optimizer
+@inline _select_default_optimizer(::Type{BFA}) = Clarabel.Optimizer
 
 @inline function _resolve_optimizer(
     user_opt,
