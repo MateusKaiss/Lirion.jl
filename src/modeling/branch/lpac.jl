@@ -1,5 +1,4 @@
 
-
 function add_lpac_branch_variables!(model::JuMP.Model, br::BranchData)
     T = get(model.ext, :time_periods, 1)
     active = br.active

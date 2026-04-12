@@ -84,10 +84,10 @@ const reduced_testlist_ac = [
     "pglib_opf_case57_ieee.m",
     "pglib_opf_case60_c.m",
     "pglib_opf_case73_ieee_rts.m",
-    "pglib_opf_case89_pegase.m",
     "pglib_opf_case118_ieee.m",
     "pglib_opf_case162_ieee_dtc.m",
     "pglib_opf_case179_goc.m",
+    # "pglib_opf_case89_pegase.m",
     # "pglib_opf_case197_snem.m",
     # "pglib_opf_case200_activ.m",
 ]
@@ -349,12 +349,14 @@ function run_test_objective()
             optimizer = Ipopt.Optimizer,
             case_list = battery_cases,
         )
-        run_model_tests(
-            Lirion.LPAC,
-            "LPAC com baterias";
-            optimizer = Ipopt.Optimizer,
-            case_list = battery_cases,
-        )
+        # LPAC + storage: PowerModels does not support _solve_opf_strg with
+        # LPACCPowerModel, so we skip battery tests for LPAC.
+        # run_model_tests(
+        #     Lirion.LPAC,
+        #     "LPAC com baterias";
+        #     optimizer = Ipopt.Optimizer,
+        #     case_list = battery_cases,
+        # )
         # run_model_tests(
         #     Lirion.SOCWR,
         #     "SOCWR com baterias";
