@@ -305,7 +305,10 @@ function _parse_matlab_data(lines, index, start_char, end_char)
         if columns < 0
             columns = length(row_items)
         elseif columns != length(row_items)
-            @error "Matrix parsing error: inconsistent number of items in each row\n$(row_s)"
+            error(
+                "Matlab parser: inconsistent row width in matrix (expected $(columns), " *
+                "got $(length(row_items))): $(row_s)",
+            )
         end
     end
 
@@ -325,7 +328,10 @@ function _parse_matlab_data(lines, index, start_char, end_char)
         colnames = split(col_line)
 
         if !isempty(matrix) && length(matrix[1]) != length(colnames)
-            @error "Column name parsing error: data cols $(length(matrix[1])) vs column names $(length(colnames))"
+            error(
+                "Matlab parser: column name count mismatch — data has " *
+                "$(length(matrix[1])) columns, header has $(length(colnames)).",
+            )
         end
 
         matrix_dict["column_names"] = colnames

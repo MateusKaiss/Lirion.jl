@@ -24,17 +24,6 @@ function add_ivr_current_balance_constraints!(
     @inbounds for b in valid_bus_ids
         bus_idx = bus_idx_map[b]
 
-        # Demand at this bus (static or timeseries snapshot)
-        pd_val = pf.has_bus_ts ? pf.pd_ts[bus_idx, 1] : bus.pd[bus_idx]
-        qd_val = pf.has_bus_ts ? pf.qd_ts[bus_idx, 1] : bus.qd[bus_idx]
-
-        # Consumer demand
-        pd_cons = pf.has_consumer_ts ? pf.consumer_pd_ts[bus_idx, 1] : 0.0
-        qd_cons = pf.has_consumer_ts ? pf.consumer_qd_ts[bus_idx, 1] : 0.0
-
-        pd_total = pd_val + pd_cons
-        qd_total = qd_val + qd_cons
-
         gs_val = gs[bus_idx]
         bs_val = bs[bus_idx]
 
@@ -43,6 +32,16 @@ function add_ivr_current_balance_constraints!(
         br_to = pf.bus_to_branches_to[bus_idx]
 
         for t in 1:T
+            # Demand at this bus (static or timeseries) — must honour t.
+            pd_val = pf.has_bus_ts ? pf.pd_ts[bus_idx, t] : bus.pd[bus_idx]
+            qd_val = pf.has_bus_ts ? pf.qd_ts[bus_idx, t] : bus.qd[bus_idx]
+
+            pd_cons = pf.has_consumer_ts ? pf.consumer_pd_ts[bus_idx, t] : 0.0
+            qd_cons = pf.has_consumer_ts ? pf.consumer_qd_ts[bus_idx, t] : 0.0
+
+            pd_total = pd_val + pd_cons
+            qd_total = qd_val + qd_cons
+
             vr_b = vr[b, t]
             vi_b = vi[b, t]
 

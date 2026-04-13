@@ -58,7 +58,7 @@ function _build_inputs(
     outputs::Bool,
 )::CentralizedInputs
     raw_case = load_input_data(path)
-    preprocess_case_data!(raw_case, OPFModel)
+    preprocess_case_data!(raw_case, model)
 
     full_sys = build_system_data(raw_case)
 
@@ -79,7 +79,7 @@ function _build_inputs(
     outputs::Bool,
 )::DistributedInputs
     raw_case = load_input_data(path)
-    preprocess_case_data!(raw_case, OPFModel)
+    preprocess_case_data!(raw_case, model)
 
     cfg = DistributedOPFModel(
         model, algorithm.coupling, algorithm.sectioning, algorithm.max_iter;
@@ -105,7 +105,7 @@ function _build_inputs(
     outputs::Bool,
 )::DistributedInputs
     raw_case = load_input_data(path)
-    preprocess_case_data!(raw_case, OPFModel)
+    preprocess_case_data!(raw_case, model)
 
     cfg = ALADINConfig(
         model, algorithm.coupling, algorithm.sectioning, algorithm.max_iter;

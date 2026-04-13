@@ -18,26 +18,26 @@ function _parse_case(data_string::String, ::MatpowerM)::CaseRaw
     if haskey(matlab_data, "mpc.bus")
         case.bus = _bus_from_mat(matlab_data["mpc.bus"]::Vector{Vector{String}})
     else
-        @error "No bus table found in matpower file. Missing mpc.bus."
+        error("Matpower parser: missing mandatory mpc.bus table.")
     end
 
     if haskey(matlab_data, "mpc.gen")
         case.gen = _gen_from_mat(matlab_data["mpc.gen"]::Vector{Vector{String}})
     else
-        @error "No gen table found in matpower file. Missing mpc.gen."
+        error("Matpower parser: missing mandatory mpc.gen table.")
     end
 
     if haskey(matlab_data, "mpc.gencost")
         case.gencost =
             _parse_gencost_table_raw(matlab_data["mpc.gencost"]::Vector{Vector{String}})
     else
-        @error "No gencost table found in matpower file. Missing mpc.gencost."
+        error("Matpower parser: missing mandatory mpc.gencost table.")
     end
 
     if haskey(matlab_data, "mpc.branch")
         case.branch = _branch_from_mat(matlab_data["mpc.branch"]::Vector{Vector{String}})
     else
-        @error "No branch table found in matpower file. Missing mpc.branch."
+        error("Matpower parser: missing mandatory mpc.branch table.")
     end
 
     if haskey(matlab_data, "mpc.dcline")
@@ -56,7 +56,10 @@ function _parse_case(data_string::String, ::MatpowerM)::CaseRaw
         case.bus_name =
             _busname_from_mat(matlab_data["mpc.bus_name"]::Vector{Vector{String}})
         if case.bus !== nothing && length(case.bus_name.name) != length(case.bus.bus_i)
-            @error "Incorrect Matpower file: number of bus names != number of buses."
+            error(
+                "Matpower parser: number of bus names ($(length(case.bus_name.name))) " *
+                "does not match number of buses ($(length(case.bus.bus_i))).",
+            )
         end
     end
 

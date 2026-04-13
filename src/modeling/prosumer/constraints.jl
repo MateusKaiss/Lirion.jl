@@ -10,20 +10,20 @@ function add_prosumer_constraints!(model::JuMP.Model, pros::ProsumerData)
     # Active power injection
     @constraint(model, [p in 1:np, t in 1:T],
         model[:p_prosumer_injected][p, t] ==
-        model[:pv_generation_used][p, t] - pros.demand[p]
+        model[:pv_generation_used][p, t] - pros.demand[p, t]
     )
 
     # Reactive power injection
     @constraint(model, [p in 1:np, t in 1:T],
         model[:q_prosumer_injected][p, t] ==
-        pros.q_generation[p] - pros.q_demand[p]
+        pros.q_generation[p, t] - pros.q_demand[p, t]
     )
 
     # PV balance
     @constraint(model, [p in 1:np, t in 1:T],
         model[:pv_generation_used][p, t] +
         model[:pv_curtailment][p, t] ==
-        pros.generation[p]
+        pros.generation[p, t]
     )
 
     # Inverter capacity (SOC constraint)

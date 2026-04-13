@@ -270,6 +270,15 @@ function _gencost_from_df(df::DataFrame)
     ncost    = _icol(df, "ncost",    0)
     coeffs   = Vector{Vector{Float64}}(undef, n)
 
+    # Preload coefficient columns once (O(ncols_max)); each is Union{Vector,Nothing}.
+    max_k = isempty(ncost) ? 0 : maximum(ncost)
+    props = propertynames(df)
+    coef_cols = Vector{Union{Vector{Float64}, Nothing}}(undef, max_k)
+    @inbounds for j in 1:max_k
+        sj = _sym("c$(j)")
+        coef_cols[j] = sj in props ? _fcol(df, "c$(j)", 0.0) : nothing
+    end
+
     @inbounds for i in 1:n
         k = ncost[i]
         if k <= 0
@@ -278,8 +287,8 @@ function _gencost_from_df(df::DataFrame)
         end
         c = Vector{Float64}(undef, k)
         @inbounds for j in 1:k
-            sj = _sym("c$(j)")
-            c[j] = sj in propertynames(df) ? _fcol(df, "c$(j)", 0.0)[i] : 0.0
+            col = coef_cols[j]
+            c[j] = col === nothing ? 0.0 : col[i]
         end
         coeffs[i] = c
     end
@@ -293,6 +302,14 @@ function _gencost_ts_from_df(df::DataFrame)
     ncost  = _icol(df, "ncost", 0)
     coeffs = Vector{Vector{Float64}}(undef, n)
 
+    max_k = isempty(ncost) ? 0 : maximum(ncost)
+    props = propertynames(df)
+    coef_cols = Vector{Union{Vector{Float64}, Nothing}}(undef, max_k)
+    @inbounds for j in 1:max_k
+        sj = _sym("c$(j)")
+        coef_cols[j] = sj in props ? _fcol(df, "c$(j)", 0.0) : nothing
+    end
+
     @inbounds for i in 1:n
         k = ncost[i]
         if k <= 0
@@ -301,8 +318,8 @@ function _gencost_ts_from_df(df::DataFrame)
         end
         c = Vector{Float64}(undef, k)
         @inbounds for j in 1:k
-            sj = _sym("c$(j)")
-            c[j] = sj in propertynames(df) ? _fcol(df, "c$(j)", 0.0)[i] : 0.0
+            col = coef_cols[j]
+            c[j] = col === nothing ? 0.0 : col[i]
         end
         coeffs[i] = c
     end

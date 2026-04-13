@@ -71,14 +71,14 @@ function add_acr_branch_constraints!(model::JuMP.Model, br::BranchData)
 
     @constraint(model,
         branch_angle_lb[l in active, t in 1:T; !isnan(br.ang_min[l])],
-        tan(br.ang_min[l]) * model[:_acr_cos_mix][l, t] <=
+        _tan_clip(br.ang_min[l]) * model[:_acr_cos_mix][l, t] <=
         model[:_acr_sin_mix][l, t]
     )
 
     @constraint(model,
         branch_angle_ub[l in active, t in 1:T; !isnan(br.ang_max[l])],
         model[:_acr_sin_mix][l, t] <=
-        tan(br.ang_max[l]) * model[:_acr_cos_mix][l, t]
+        _tan_clip(br.ang_max[l]) * model[:_acr_cos_mix][l, t]
     )
 
     return nothing

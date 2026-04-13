@@ -23,7 +23,16 @@ function _find_interzonal_branches(full::CaseRaw, ::TieLine)
 
     @inbounds for i in eachindex(f_bus)
         br_status[i] == 1 || continue
-        if bus_to_zone[f_bus[i]] != bus_to_zone[t_bus[i]]
+        fi = f_bus[i]
+        ti = t_bus[i]
+        if fi < 1 || fi > max_bus_id || ti < 1 || ti > max_bus_id ||
+           bus_to_zone[fi] == 0 || bus_to_zone[ti] == 0
+            error(
+                "Partitioning: branch $i references bus id outside bus table " *
+                "(f=$fi, t=$ti, max_bus_id=$max_bus_id). Data inconsistent.",
+            )
+        end
+        if bus_to_zone[fi] != bus_to_zone[ti]
             push!(interzonal_branches, i)
         end
     end
