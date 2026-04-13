@@ -14,9 +14,6 @@
 
 A Julia package for solving Optimal Power Flow (OPF) problems using both centralized and distributed algorithms.
 
-> **Current focus:** Advanced ALADIN implementations and structured experimentation with decomposition and coupling strategies. Additional distributed methods are under active development.
-
-
 ## Why Lirion?
 
 Lirion was built to bridge implementation clarity and theoretical rigor in Optimal Power Flow research.
