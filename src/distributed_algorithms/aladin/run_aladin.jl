@@ -25,12 +25,33 @@ algorithm_tag(::ALADINAlgorithm) = :aladin
     )
 end
 
-# ---------------------------------------------------------------
-# CORE LOOP
-# ---------------------------------------------------------------
-
 function run_aladin!(ws::AbstractALADINWorkspace, params::ALADINParams)
-    return error("run_aladin! not yet implemented (Milestone 1c)")
+    tag = _aladin_print_tag(ws)
+
+    for iter in 1:params.max_iter
+        ws.iter = iter
+        _print_aladin_iter_header!(tag, iter)
+
+        aladin_local_solve!(ws)
+        nu = solve_coordinator_qp!(ws)
+
+        compute_residuals!(ws)
+        compute_tolerances!(ws, params.eps_abs, params.eps_rel)
+
+        _record_iter!(ws)
+        _print_aladin_residuals!(ws)
+
+        if stop_if_converged(ws)
+            _print_aladin_converged!()
+            break
+        end
+
+        primal_update!(ws)
+        dual_update!(ws, nu)
+
+        adapt_rho_mu!(ws, params)
+    end
+    return nothing
 end
 
 # ---------------------------------------------------------------
@@ -47,13 +68,29 @@ function run_aladin(
 
     params = build_aladin_params(config)
     ws = build_aladin_workspace(sys, config, optimizer_factory, tag)
+    initial_rhos = _get_rhos(ws)
     run_aladin!(ws, params)
     result = _finalize_aladin(ws.partitions, t0, ws.iter)
+
+    tag_str = _aladin_print_tag(ws)
+    final_rhos = _get_rhos(ws)
+
+    rho_lines = [
+        "$(k) inicial: $(initial_rhos[k]) | $(k) final: $(final_rhos[k])"
+        for k in keys(final_rhos)
+    ]
+    push!(rho_lines, "mu: $(ws.mu[])")
+
+    _FAST_USE_LOGS && _print_aladin_summary!(
+        tag_str,
+        result;
+        rho_lines = rho_lines,
+    )
 
     return LirionRunResult(;
         result = result,
         model = nothing,
         system = sys,
-        diagnostics = NoDiagnostics(),
+        diagnostics = ws.hist,
     )
 end

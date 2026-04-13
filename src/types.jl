@@ -437,16 +437,30 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
     sectioning::Sectioning
     max_iter::Int
 
-    # Penalty parameters (see Houska-Frasch-Diehl 2016)
     rho::Float64             # proximal penalty in local subproblems
     mu::Float64              # consensus slack penalty in coordination QP
 
-    # Convergence tolerances (KKT-style)
+    alpha1::Float64          # weight for (y_i - x_iᵏ) in primal update
+    alpha2::Float64          # weight for Δy_i        in primal update
+    alpha3::Float64          # weight for (ν - λᵏ)    in dual update
+
+    sigma_theta_shared::Float64
+    sigma_theta_other::Float64
+    sigma_pg::Float64
+    sigma_other::Float64
+
+    # Convergence tolerances (KKT-style: r_primal = ‖consensus‖,
+    # r_progress = ‖y_i - x_iᵏ‖₂ — both components of HFD 2016 Theorem 4.1).
     eps_abs::Float64
     eps_rel::Float64
 
     # Active-set identification tolerance
     active_set_tol::Float64
+    adaptive::Bool
+    rho_growth::Float64
+    mu_growth::Float64
+    rho_upper::Float64
+    mu_upper::Float64
 
     function ALADINConfig(
         base_model::Type{<:OPFModel},
@@ -455,9 +469,21 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
         max_iter::Integer;
         rho::Real = 1e3,
         mu::Real = 1e4,
+        alpha1::Real = 1.0,
+        alpha2::Real = 1.0,
+        alpha3::Real = 1.0,
+        sigma_theta_shared::Real = 10.0,
+        sigma_theta_other::Real = 10.0,
+        sigma_pg::Real = 1.0,
+        sigma_other::Real = 1.0,
         eps_abs::Real = 1e-4,
         eps_rel::Real = 1e-4,
         active_set_tol::Real = 1e-6,
+        adaptive::Bool = true,
+        rho_growth::Real = 1.3,
+        mu_growth::Real = 2.0,
+        rho_upper::Real = 1e6,
+        mu_upper::Real = 1e6,
     )
         base_model === DC ||
             throw(
@@ -474,9 +500,20 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
         max_iter > 0 || throw(ArgumentError("max_iter must be > 0"))
         rho > 0 || throw(ArgumentError("rho must be > 0"))
         mu > 0 || throw(ArgumentError("mu must be > 0"))
+        alpha1 > 0 || throw(ArgumentError("alpha1 must be > 0"))
+        alpha2 > 0 || throw(ArgumentError("alpha2 must be > 0"))
+        alpha3 > 0 || throw(ArgumentError("alpha3 must be > 0"))
         eps_abs >= 0 || throw(ArgumentError("eps_abs must be ≥ 0"))
         eps_rel >= 0 || throw(ArgumentError("eps_rel must be ≥ 0"))
         active_set_tol > 0 || throw(ArgumentError("active_set_tol must be > 0"))
+        rho_growth >= 1.0 ||
+            throw(ArgumentError("rho_growth must be ≥ 1 (monotonic growth)"))
+        mu_growth >= 1.0 ||
+            throw(ArgumentError("mu_growth must be ≥ 1 (monotonic growth)"))
+        rho_upper >= rho ||
+            throw(ArgumentError("rho_upper must be ≥ rho"))
+        mu_upper >= mu ||
+            throw(ArgumentError("mu_upper must be ≥ mu"))
 
         return new(
             base_model,
@@ -485,9 +522,21 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
             Int(max_iter),
             Float64(rho),
             Float64(mu),
+            Float64(alpha1),
+            Float64(alpha2),
+            Float64(alpha3),
+            Float64(sigma_theta_shared),
+            Float64(sigma_theta_other),
+            Float64(sigma_pg),
+            Float64(sigma_other),
             Float64(eps_abs),
             Float64(eps_rel),
             Float64(active_set_tol),
+            adaptive,
+            Float64(rho_growth),
+            Float64(mu_growth),
+            Float64(rho_upper),
+            Float64(mu_upper),
         )
     end
 end

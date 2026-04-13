@@ -10,6 +10,7 @@ for k in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
 end
 
 using LinearAlgebra
+using SparseArrays
 try
     LinearAlgebra.BLAS.set_num_threads(1)
 catch
@@ -196,12 +197,41 @@ include("distributed_algorithms/admm/core/logging.jl")
 include("distributed_algorithms/admm/run_admm.jl")
 
 # ------------------------------------------------------------------
-# ALADIN (scaffolding + per-model code)
+# ALADIN — canonical Houska-Frasch-Diehl (2016)
 # ------------------------------------------------------------------
+# Load order matters:
+#   1. support  (abstract types)
+#   2. history  (ALADINHistory)
+#   3. params   (ALADINParams)
+#   4. sensitivities  (AladinZoneData + helpers)
+#   5. workspace      (concrete workspaces, depend on AladinZoneData)
+#   6. partition      (thin init shims delegating to ADMM)
+#   7. objective      (update_objective! dispatching on workspace types)
+#   8. coordinator_qp (Phase-2 QP builder; needs workspace types)
+#   9. logging        (_aladin_print_tag dispatches on concrete types)
+#  10. phase2 kernels (local_solve, primal_update, dual_update, residuals, tolerances)
+#  11. run_aladin     (main loop)
+# ------------------------------------------------------------------
+
 include("distributed_algorithms/aladin/core/aladin_support.jl")
+include("distributed_algorithms/aladin/core/history.jl")
 include("distributed_algorithms/aladin/build_aladin_params.jl")
+
+include("distributed_algorithms/aladin/dc/sensitivities.jl")
 include("distributed_algorithms/aladin/dc/workspace.jl")
 include("distributed_algorithms/aladin/dc/partition.jl")
+include("distributed_algorithms/aladin/dc/objective.jl")
+include("distributed_algorithms/aladin/dc/coordinator_qp.jl")
+
+include("distributed_algorithms/aladin/core/logging.jl")
+
+include("distributed_algorithms/aladin/phase2/local_solve.jl")
+include("distributed_algorithms/aladin/phase2/primal_update.jl")
+include("distributed_algorithms/aladin/phase2/dual_update.jl")
+include("distributed_algorithms/aladin/phase2/residuals.jl")
+include("distributed_algorithms/aladin/phase2/tolerances.jl")
+include("distributed_algorithms/aladin/phase2/adapt_rho_mu.jl")
+
 include("distributed_algorithms/aladin/run_aladin.jl")
 
 # ------------------------------------------------------------------

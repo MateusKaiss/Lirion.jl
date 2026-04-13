@@ -1,27 +1,40 @@
-# =======================================================================
-# ALADIN-DC — Partition initialization (stub for Milestone 1b)
-# =======================================================================
+# ============================================================
+# ALADIN-DC — Partition initialization
+# ------------------------------------------------------------
+# Phase 1 of canonical ALADIN uses the SAME JuMP model as the ADMM
+# local subproblem (the algorithmic difference is purely in the
+# objective, which is rebuilt every iteration by update_objective!).
+# So we delegate partition setup to the ADMM init helpers and let
+# build_aladin_zone_data extract the post-build sensitivity layout.
+# ============================================================
 
-function init_state_partition_aladin!(
-    part::PartitionDCAladin,
-    sys_zone,
+@inline init_state_partition_aladin!(
+    partitions::Partitions{PartitionDC},
+    sys::DistributedSystem,
     optimizer_factory,
-)
-    return error("init_state_partition_aladin! not yet implemented (Milestone 1c)")
-end
+    rho::Float64,
+) = init_state_partition!(partitions, sys, optimizer_factory, rho)
 
-function init_power_partition_aladin!(
-    part::PartitionDCAladin,
-    sys_zone,
+@inline init_power_partition_aladin!(
+    partitions::Partitions{PartitionDC},
+    sys::DistributedSystem,
     optimizer_factory,
-)
-    return error("init_power_partition_aladin! not yet implemented (Milestone 1d)")
-end
+    rho::Float64,
+    interzonal_branches::Vector{Int},
+) = init_power_partition!(partitions, sys, optimizer_factory, rho, interzonal_branches)
 
-function init_hybrid_partition_aladin!(
-    part::PartitionDCAladin,
-    sys_zone,
+@inline init_hybrid_partition_aladin!(
+    partitions::Partitions{PartitionDC},
+    sys::DistributedSystem,
     optimizer_factory,
+    rho_theta::Float64,
+    rho_p::Float64,
+    interzonal_branches::Vector{Int},
+) = init_hybrid_partition!(
+    partitions,
+    sys,
+    optimizer_factory,
+    rho_theta,
+    rho_p,
+    interzonal_branches,
 )
-    return error("init_hybrid_partition_aladin! not yet implemented (Milestone 1d)")
-end
