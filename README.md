@@ -8,7 +8,12 @@
 
 </h3>
 
-A Julia package for solving Optimal Power Flow (OPF) problems using both centralized and distributed algorithms.  
+<p align="center">
+  <b>Created and maintained by <a href="https://github.com/MateusKaiss">Mateus Kaiss</a></b><br/>
+  <i>Principal author of the Lirion.jl</i>
+</p>
+
+A Julia package for solving Optimal Power Flow (OPF) problems using both centralized and distributed algorithms.
 
 > **Current focus:** Advanced ALADIN implementations and structured experimentation with decomposition and coupling strategies. Additional distributed methods are under active development.
 
@@ -19,11 +24,21 @@ Lirion was built to bridge implementation clarity and theoretical rigor in Optim
 
 It provides:
 
-- Centralized DC, AC, and SOCWR OPF
-- Distributed OPF via ADMM and ALADIN
-- Modular coupling-variable experimentation
-- Flexible partitioning strategies
-- Structured diagnostics for research
+- **Nine centralized OPF formulations**:
+  - **DC** — linear active-power approximation (LP)
+  - **AC** — full nonlinear AC in polar coordinates (NLP)
+  - **ACR** — full nonlinear AC in rectangular coordinates (NLP)
+  - **IVR** — current-voltage rectangular formulation (NLP)
+  - **LPAC** — linear-programming AC approximation (Coffrin & Van Hentenryck, QCQP)
+  - **SOCWR** — Jabr W-rectangular second-order cone relaxation (SOCP)
+  - **SOCBF** — Farivar–Low branch-flow second-order cone relaxation (SOCP)
+  - **BFA** — linearized branch-flow approximation / LinDistFlow (LP)
+  - **NFA** — network-flow approximation, active-power only (LP)
+- **Distributed OPF** via ADMM (DC / AC / SOCWR) and ALADIN
+- Modular **coupling-variable** experimentation: `:state`, `:power`, `:hybrid`
+- Flexible **partitioning/sectioning** strategies: `:tie_line`, `:dummy_bus`, `:metis`
+- **Adaptive penalty (ρ) updates** with per-block residual balancing
+- Structured diagnostics and plots for research
 
 ---
 
@@ -58,31 +73,31 @@ using Lirion
 
 ## Quick Examples
 
-Below are two examples, one **centralized** and one **distributed (ADMM)**, to get started with Lirion: 
+Below are examples showing the **centralized**, **distributed ADMM**, and **distributed ALADIN** workflows in Lirion.
 
 The example cases below are based on the well-known **PGLib-OPF** benchmark library and are included in the repository for convenience.
 
-If no solver is specified, Lirion automatically selects its default solver:
+If no solver is specified, Lirion automatically selects its default solver per formulation:
 
-- **DC → OSQP**
-- **AC → Ipopt**
-- **SOCWR → Clarabel**
+- **LP/QP formulations (DC, BFA, NFA)** → OSQP
+- **NLP formulations (AC, ACR, IVR, LPAC)** → Ipopt
+- **SOCP formulations (SOCWR, SOCBF)** → Clarabel
 
 For detailed installation instructions, solver selection guidance, and a complete list of supported solvers, see the documentation:
 
-**Installation Guide**  
+**Installation Guide**
 https://your-docs-link-here.com/installation
 
 ---
 
-### 🔹 Centralized Example (AC / DC / SOCWR)
+### 🔹 Centralized Example
 
 **Case file:**
 
 [`test/matpower_cases/pglib_opf_case118_ieee.m`](https://github.com/MateusKaiss/Lirion.jl/blob/master/test/matpower_cases/pglib_opf_case118_ieee.m)
 
 
-#### Runing centralized AC OPF
+#### Running centralized AC OPF
 
 The first argument is the path to a MATPOWER case file on your local machine.
 
@@ -100,14 +115,21 @@ out = solve("pglib_opf_case118_ieee.m";
 out.result
 ```
 
-You may also switch the formulation:
+You may switch to any of the nine available formulations by changing the `model` argument:
 
 ```julia
-model = dc()     # DC OPF  → typically uses OSQP.Optimizer
-model = socwr()   # SOCWR OPF → typically uses Clarabel.Optimizer
+model = dc()      # DC linear approximation       (LP,   OSQP)
+model = ac()      # AC polar (V, θ)               (NLP,  Ipopt)
+model = acr()     # AC rectangular (vr, vi)       (NLP,  Ipopt)
+model = ivr()     # Current-voltage rectangular   (NLP,  Ipopt)
+model = lpac()    # Linear-programming AC         (QCQP, Ipopt)
+model = socwr()   # Jabr W-rectangular SOCP       (SOCP, Clarabel)
+model = socbf()   # Farivar–Low branch-flow SOCP  (SOCP, Clarabel)
+model = bfa()     # Linearized branch flow        (LP,   OSQP)
+model = nfa()     # Network-flow approximation    (LP,   OSQP)
 ```
 
-### 🔹 Distributed Example ( ADMM AC / ADMM DC / ADMM SOCWR)
+### 🔹 Distributed Example (ADMM — DC / AC / SOCWR)
 #### Run a Distributed AC OPF with ADMM (Hybrid Coupling)
 
 
@@ -146,8 +168,16 @@ out = solve("pglib_opf_case73_ieee_rts.m";
 out.diagnostics
 ```
 
-Lirion supports **adaptive penalty parameter updates** following residual balancing rules.  
+Lirion supports **adaptive penalty parameter updates** following residual balancing rules.
 The parameters `mu_incr`, `mu_decr`, `tau_incr`, and `tau_decr` control how the ADMM penalty is adjusted based on primal and dual residuals.
+
+The **coupling** argument selects which variables are exchanged between subproblems:
+
+- `:state` — only state variables (θ, V, or W) are coupled
+- `:power` — only branch active/reactive powers are coupled
+- `:hybrid` — both state and power couplings (per-block ρ)
+
+Each coupling has its own required ρ parameters. Passing a single `rho=...` keyword fills all required penalties at once, or they can be set individually (e.g., `rho_theta`, `rho_v`, `rho_p`, `rho_q`, `rho_v2`, `rho_r`, `rho_t`), depending on the formulation.
 
 For a detailed explanation of the update rules and their theoretical motivation, see the documentation:
 
@@ -174,14 +204,30 @@ Lirion is accompanied by a dedicated technical website jointly created by Mateus
 
 The website contains deeper mathematical material underlying Lirion’s design, including:
 
-- OPF formulations (DC, AC, SOCWR)  
-- ADMM derivations and penalty update rules  
-- Coupling-variable design theory  
-- Structural and decomposition analysis  
+- OPF formulations (DC, AC, ACR, IVR, LPAC, SOCWR, SOCBF, BFA, NFA)
+- ADMM and ALADIN derivations and penalty update rules
+- Coupling-variable design theory
+- Structural and decomposition analysis
 
 The material originates from structured research developed during undergraduate studies and is currently being expanded as part of ongoing graduate research.
 
 https://your-website-link-here.com
+
+
+## LirionLab.jl — Experimental Research Companion
+
+**Lirion.jl is intentionally kept stable, minimal, and tightly scoped.** Its core formulations, API, and architecture are maintained by the principal author and evolve under a conservative roadmap to preserve reproducibility and scientific integrity.
+
+To support ongoing research, student projects, and exploratory methodologies without compromising the stability of the core package, a separate companion repository is planned:
+
+**LirionLab.jl** — an open research playground where collaborators, students, and researchers can prototype new decomposition schemes, coupling strategies, solver integrations, and OPF formulations on top of Lirion.jl.
+
+The intended relationship is:
+
+- **Lirion.jl** — stable core; curated formulations and algorithms; minimal external contributions; strict API stability.
+- **LirionLab.jl** — experimental extensions; depends on Lirion.jl as a library; open to broader contributions; no API stability guarantees.
+
+This separation ensures that Lirion.jl remains a dependable scientific tool, while LirionLab.jl provides a structured space for methodological exploration and academic collaboration.
 
 
 ## Acknowledgments
