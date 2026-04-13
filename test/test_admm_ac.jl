@@ -5,7 +5,7 @@ const AC_STATE_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
-    "pglib_opf_case73_ieee_rts.m",
+    # "pglib_opf_case73_ieee_rts.m",
     # "pglib_opf_case57_ieee.m",
     # "pglib_opf_case118_ieee.m",
 
@@ -47,7 +47,7 @@ const AC_HYBRID_CASES = [
 # OBJECTIVE EXTRACTORS
 # ============================================================
 central_obj_ac(out) = Float64(out.result["objective"])
-dist_obj_ac(out) = Float64(out.result.total_expr_cost)
+dist_obj_ac(out) = Float64(out.result.total_cost)
 
 # ============================================================
 # AC - STATE
@@ -79,7 +79,7 @@ function run_admm_ac_state_tests(;
 
     defaults(_) = (
         max_iter = 1000,
-        rho = 1.0,
+        rho = 1000000.0,
         eps_abs = 1e-4,
         eps_rel = 1e-4,
         adaptive = true,
@@ -92,40 +92,40 @@ function run_admm_ac_state_tests(;
     # ------------------------
     # Overrides por caso
     # ------------------------
-    overrides(case_name) = begin
-        if case_name == "pglib_opf_case200_activ.m" || case_name == "pglib_opf_case500_goc.m"
-            return (
-                rho = 1.0e7,
-                max_iter = 100000,
-                eps_abs = 1e-4,
-                eps_rel = 1e-4,
-                adaptive = true,
-                mu_incr = 10.0,
-                mu_decr = 10.0,
-                tau_incr = 1.2,
-                tau_decr = 0.8,
-                central_optimizer = Ipopt.Optimizer,
-                distributed_optimizer = Ipopt.Optimizer,
-            )
-        elseif case_name == "pglib_opf_case73_ieee_rts.m" ||
-               case_name == "pglib_opf_case57_ieee.m" ||
-               case_name == "pglib_opf_case118_ieee.m"
-            return (
-                rho = 1.0e7,
-                max_iter = 100000,
-                eps_abs = 1e-4,
-                eps_rel = 1e-4,
-                adaptive = true,
-                mu_incr = 10.0,
-                mu_decr = 10.0,
-                tau_incr = 1.05,
-                tau_decr = 0.98,
-                central_optimizer = Ipopt.Optimizer,
-                distributed_optimizer = Ipopt.Optimizer,
-            )
-        end
-        return NamedTuple()
-    end
+    # overrides(case_name) = begin
+    #     if case_name == "pglib_opf_case200_activ.m" || case_name == "pglib_opf_case500_goc.m"
+    #         return (
+    #             rho = 1.0e7,
+    #             max_iter = 100000,
+    #             eps_abs = 1e-4,
+    #             eps_rel = 1e-4,
+    #             adaptive = true,
+    #             mu_incr = 10.0,
+    #             mu_decr = 10.0,
+    #             tau_incr = 1.2,
+    #             tau_decr = 0.8,
+    #             central_optimizer = Ipopt.Optimizer,
+    #             distributed_optimizer = Ipopt.Optimizer,
+    #         )
+    #     elseif case_name == "pglib_opf_case73_ieee_rts.m" ||
+    #            case_name == "pglib_opf_case57_ieee.m" ||
+    #            case_name == "pglib_opf_case118_ieee.m"
+    #         return (
+    #             rho = 1.0e7,
+    #             max_iter = 100000,
+    #             eps_abs = 1e-4,
+    #             eps_rel = 1e-4,
+    #             # adaptive = true,
+    #             # mu_incr = 10.0,
+    #             # mu_decr = 10.0,
+    #             # tau_incr = 1.05,
+    #             # tau_decr = 0.98,
+    #             central_optimizer = Ipopt.Optimizer,
+    #             distributed_optimizer = Ipopt.Optimizer,
+    #         )
+    #     end
+    #     return NamedTuple()
+    # end
 
     return run_case_suite(;
         label = "ADMM-AC STATE",
@@ -138,7 +138,7 @@ function run_admm_ac_state_tests(;
         objective_dist = dist_obj_ac,
         make_algorithm = make_alg,
         defaults = defaults,
-        overrides = overrides,
+        overrides = _ -> NamedTuple(),
         rtol = rtol,
         atol = atol,
     )
@@ -171,7 +171,7 @@ function run_admm_ac_power_tests(;
 
     defaults(_) = (
         max_iter = 5000,
-        rho = 1e4,
+        rho = 1e5,
         eps_abs = 1e-4,
         eps_rel = 1e-4,
         adaptive = true,

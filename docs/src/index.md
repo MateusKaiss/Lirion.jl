@@ -1,29 +1,55 @@
-<p align="center">
-  <img src="docs/assets/lirion-sm.png" alt="Lirion.jl" 
-  width="420"/>
-</p>
+```@raw html
+<img src="assets/logo.png" alt="Lirion.jl logo"
+     style="max-width: 520px; width: 100%; margin: 0 auto 1.25rem; display: block;" />
 
-<h3 align="center">
-  Large-scale Integrated Research on Innovative Optimization of Networks
-</h3>
+```
 
 
+```@meta
+# This prevents certain rendering issues in Documenter
+```
 
-# Lirion.jl
+# Introduction
 
-A Julia package for solving Optimal Power Flow (OPF) problems using both centralized and distributed algorithms.  
-Current focus: advanced ADMM (Alternating Direction Method of Multipliers) implementations, with plans to add more distributed methods.
+Lirion is a Julia framework for modeling and solving Optimal Power Flow (OPF) problems under both **centralized** and **distributed** optimization paradigms, providing a practical environment for implementing established formulations and investigating novel decomposition and consensus strategies.
 
+At present, Lirion unifies DC, AC, and SOCWR OPF formulations within a modular architecture that spans centralized models and distributed implementations based on ADMM and ALADIN, enabling systematic experimentation with partitioning strategies and coupling-variable design.
 
-## Overview
+!!! important "Mathematical Foundations and Derivations"
+    Lirion is accompanied by a dedicated technical website maintained by Mateus Kaiss, the principal developer of the framework.
 
-Lirion.jl provides a framework for power system optimization, supporting both traditional centralized OPF solutions and distributed optimization algorithms. The package is built on top of [JuMP.jl](https://github.com/jump-dev/JuMP.jl) and [PowerModels.jl](https://github.com/lanl-ansi/PowerModels.jl) for robust mathematical modeling and optimization.
+    The site consolidates mathematical formulations, derivations, and structural studies developed throughout his academic training and research activities, covering both fundamental optimization concepts and advanced theoretical developments that underpin Lirion’s design.
 
-### Key Features
+    Researchers, students, and practitioners interested in optimization and Optimal Power Flow — as well as anyone passionate about mathematical modeling — are encouraged to explore this resource.
 
-- **Centralized OPF**: DC, AC, and SOCP (Second-Order Cone Programming) formulations
-- **Distributed ADMM**: Multiple ADMM variants with extensive customization options
-- **Advanced Partitioning**: Both spectral and METIS-based network partitioning
-- **Multi-period Support**: Time-series optimization capabilities
-- **Storage Integration**: Battery and prosumer modeling
-- **Comprehensive Testing**: Extensive test suite with PGLib cases
+    [Visit the Lirion Mathematical Foundations Website](https://your-link-here.com)
+
+## How this documentation is structured
+
+This documentation is organized into three complementary layers:
+
+- **Overview and Guides**: high-level explanations of Lirion’s modeling workflow and recommended usage patterns.
+- **Modeling and Algorithms**: centralized formulations, distributed variants (ADMM/ALADIN), and how decomposition choices are expressed in Lirion.
+- **API Reference**: the complete list of functions and types for advanced usage and extension.
+
+## Centralized Models
+
+Lirion implements classical centralized OPF formulations:
+
+- DC OPF
+- AC OPF
+- SOCWR OPF
+
+---
+
+## Distributed Formulations
+
+Beyond centralized models, Lirion provides distributed variants based on the **Alternating Direction Method of Multipliers (ADMM)**.
+
+Distributed formulations are structured along three main dimensions:
+
+- The base model (DC, AC, or SOCWR);
+- The choice of **coupling variables**;
+- The **system partitioning strategy**.
+
+---

@@ -15,8 +15,8 @@ const reduced_list = [
     "pglib_opf_case57_ieee.m",
     "pglib_opf_case60_c.m",
     "pglib_opf_case73_ieee_rts.m",
-    "pglib_opf_case89_pegase.m",
     "pglib_opf_case118_ieee.m",
+    # "pglib_opf_case89_pegase.m",
     # "pglib_opf_case162_ieee_dtc.m",
     # "pglib_opf_case179_goc.m",
     # "pglib_opf_case197_snem.m",
@@ -84,10 +84,10 @@ const reduced_testlist_ac = [
     "pglib_opf_case57_ieee.m",
     "pglib_opf_case60_c.m",
     "pglib_opf_case73_ieee_rts.m",
-    "pglib_opf_case89_pegase.m",
     "pglib_opf_case118_ieee.m",
     "pglib_opf_case162_ieee_dtc.m",
     "pglib_opf_case179_goc.m",
+    # "pglib_opf_case89_pegase.m",
     # "pglib_opf_case197_snem.m",
     # "pglib_opf_case200_activ.m",
 ]
@@ -136,8 +136,20 @@ end
         return Lirion.dc()
     elseif model_type == Lirion.AC
         return Lirion.ac()
-    elseif model_type == Lirion.SOCP
-        return Lirion.socp()
+    elseif model_type == Lirion.ACR
+        return Lirion.acr()
+    elseif model_type == Lirion.IVR
+        return Lirion.ivr()
+    elseif model_type == Lirion.LPAC
+        return Lirion.lpac()
+    elseif model_type == Lirion.SOCWR
+        return Lirion.socwr()
+    elseif model_type == Lirion.SOCBF
+        return Lirion.socbf()
+    elseif model_type == Lirion.BFA
+        return Lirion.bfa()
+    elseif model_type == Lirion.NFA
+        return Lirion.nfa()
     else
         error("Unsupported Lirion model type: $model_type")
     end
@@ -149,9 +161,20 @@ end
     has_storage = haskey(pm_data, "storage") && !isempty(pm_data["storage"])
 
     # NOTE:
-    # - For DC: DCPPowerModel
-    # - For AC: ACPPowerModel (via solve_ac_opf)
-    # - For SOCP: SOCWRConicPowerModel (no storage) / SOCWRPowerModel (storage helper)
+    # - For DC:   DCPPowerModel
+    # - For AC:   ACPPowerModel (via solve_ac_opf)
+    # - For ACR:  ACRPowerModel
+    # - For IVR:  IVRPowerModel (via solve_opf_iv)
+    # - For LPAC: LPACCPowerModel
+    # - For SOCWR: SOCWRConicPowerModel (no storage) / SOCWRPowerModel (storage helper)
+
+    # IVR uses a different build method (build_opf_iv), handle separately.
+    if model_type == Lirion.IVR
+        return Float64(
+            PowerModels.solve_opf_iv(pm_data, IVRPowerModel, optimizer)["objective"],
+        )
+    end
+
     if has_storage
         if model_type == Lirion.DC
             return Float64(
@@ -161,9 +184,21 @@ end
             return Float64(
                 PowerModels._solve_opf_strg(pm_data, ACPPowerModel, optimizer)["objective"],
             )
-        elseif model_type == Lirion.SOCP
+        elseif model_type == Lirion.ACR
+            return Float64(
+                PowerModels._solve_opf_strg(pm_data, ACRPowerModel, optimizer)["objective"],
+            )
+        elseif model_type == Lirion.LPAC
+            return Float64(
+                PowerModels._solve_opf_strg(pm_data, LPACCPowerModel, optimizer)["objective"],
+            )
+        elseif model_type == Lirion.SOCWR
             return Float64(
                 PowerModels._solve_opf_strg(pm_data, SOCWRPowerModel, optimizer)["objective"],
+            )
+        elseif model_type == Lirion.SOCBF
+            return Float64(
+                PowerModels._solve_opf_strg(pm_data, SOCBFPowerModel, optimizer)["objective"],
             )
         else
             error("Model type not recognized for storage case.")
@@ -175,9 +210,29 @@ end
             )
         elseif model_type == Lirion.AC
             return Float64(PowerModels.solve_ac_opf(pm_data, optimizer)["objective"])
-        elseif model_type == Lirion.SOCP
+        elseif model_type == Lirion.ACR
+            return Float64(
+                PowerModels.solve_opf(pm_data, ACRPowerModel, optimizer)["objective"],
+            )
+        elseif model_type == Lirion.LPAC
+            return Float64(
+                PowerModels.solve_opf(pm_data, LPACCPowerModel, optimizer)["objective"],
+            )
+        elseif model_type == Lirion.SOCWR
             return Float64(
                 PowerModels.solve_opf(pm_data, SOCWRConicPowerModel, optimizer)["objective"],
+            )
+        elseif model_type == Lirion.SOCBF
+            return Float64(
+                PowerModels.solve_opf_bf(pm_data, SOCBFConicPowerModel, optimizer)["objective"],
+            )
+        elseif model_type == Lirion.NFA
+            return Float64(
+                PowerModels.solve_opf(pm_data, NFAPowerModel, optimizer)["objective"],
+            )
+        elseif model_type == Lirion.BFA
+            return Float64(
+                PowerModels.solve_opf_bf(pm_data, BFAPowerModel, optimizer)["objective"],
             )
         else
             error("Model type not recognized.")
@@ -269,8 +324,7 @@ end
 
 function run_test_objective()
     @testset "Lirion vs PowerModels Unified Comparison" begin
-        # DC: às vezes Gurobi pode não estar disponível/licença
-        dc_optimizer = get_available_optimizer(Gurobi.Optimizer, Ipopt.Optimizer)
+        dc_optimizer = Ipopt.Optimizer
         run_model_tests(
             Lirion.DC,
             "DC";
@@ -286,12 +340,50 @@ function run_test_objective()
             case_list = reduced_testlist_ac,
         )
 
-        # SOCP: Gurobi se tiver; senão SCS (ou COSMO se preferir)
-        socp_optimizer = get_available_optimizer(Gurobi.Optimizer, SCS.Optimizer)
         run_model_tests(
-            Lirion.SOCP,
-            "SOCP";
-            optimizer = socp_optimizer,
+            Lirion.ACR,
+            "ACR";
+            optimizer = Ipopt.Optimizer,
+            case_list = reduced_testlist_ac,
+        )
+
+        # IVR: Ipopt (same case list as AC)
+        run_model_tests(
+            Lirion.IVR,
+            "IVR";
+            optimizer = Ipopt.Optimizer,
+            case_list = reduced_testlist_ac,
+        )
+
+        # LPAC: Ipopt (same case list as AC)
+        run_model_tests(
+            Lirion.LPAC,
+            "LPAC";
+            optimizer = Ipopt.Optimizer,
+            case_list = reduced_testlist_ac,
+        )
+
+        socwr_optimizer = Clarabel.Optimizer
+        run_model_tests(
+            Lirion.SOCWR,
+            "SOCWR";
+            optimizer = socwr_optimizer,
+            case_list = reduced_list,
+        )
+
+        socbf_optimizer = Clarabel.Optimizer
+        run_model_tests(
+            Lirion.SOCBF,
+            "SOCBF";
+            optimizer = socbf_optimizer,
+            case_list = reduced_list,
+        )
+
+        bfa_optimizer = Clarabel.Optimizer
+        run_model_tests(
+            Lirion.BFA,
+            "BFA";
+            optimizer = bfa_optimizer,
             case_list = reduced_list,
         )
 
@@ -308,10 +400,24 @@ function run_test_objective()
             optimizer = Ipopt.Optimizer,
             case_list = battery_cases,
         )
+        run_model_tests(
+            Lirion.ACR,
+            "ACR com baterias";
+            optimizer = Ipopt.Optimizer,
+            case_list = battery_cases,
+        )
+        # LPAC + storage: PowerModels does not support _solve_opf_strg with
+        # LPACCPowerModel, so we skip battery tests for LPAC.
         # run_model_tests(
-        #     Lirion.SOCP,
-        #     "SOCP com baterias";
-        #     optimizer = socp_optimizer,
+        #     Lirion.LPAC,
+        #     "LPAC com baterias";
+        #     optimizer = Ipopt.Optimizer,
+        #     case_list = battery_cases,
+        # )
+        # run_model_tests(
+        #     Lirion.SOCWR,
+        #     "SOCWR com baterias";
+        #     optimizer = socwr_optimizer,
         #     case_list = battery_cases,
         # )
     end

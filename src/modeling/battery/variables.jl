@@ -1,0 +1,88 @@
+# =======================================================================
+# STORAGE
+# =======================================================================
+
+function add_storage_variables!(model::JuMP.Model, bat::BatteryData)
+    T = get(model.ext, :time_periods, 1)
+    B = bat.n
+
+    @variable(
+        model,
+        storage[b in 1:B, t in 1:T],
+        lower_bound = 0.0,
+        upper_bound = bat.max_storage[b],
+        start = bat.energy_start[b],
+    )
+
+    model[:storage] = storage
+    return nothing
+end
+
+# =======================================================================
+# CHARGE / DISCHARGE
+# =======================================================================
+
+function add_charge_discharge_variables!(model::JuMP.Model, bat::BatteryData)
+    T = get(model.ext, :time_periods, 1)
+    B = bat.n
+
+    @variable(
+        model,
+        charge[b in 1:B, t in 1:T],
+        lower_bound = 0.0,
+        upper_bound = bat.charge_ramp[b],
+        start = 0.0,
+    )
+
+    @variable(
+        model,
+        discharge[b in 1:B, t in 1:T],
+        lower_bound = 0.0,
+        upper_bound = bat.discharge_ramp[b],
+        start = 0.0,
+    )
+
+    model[:charge] = charge
+    model[:discharge] = discharge
+
+    return nothing
+end
+
+# =======================================================================
+# POWER (P/Q)
+# =======================================================================
+
+function add_battery_power_variables!(model::JuMP.Model, bat::BatteryData)
+    T = get(model.ext, :time_periods, 1)
+    B = bat.n
+
+    @variable(
+        model,
+        p_battery_injected[b in 1:B, t in 1:T],
+        lower_bound = -bat.thermal_limit[b],
+        upper_bound = bat.thermal_limit[b],
+        start = 0.0,
+    )
+
+    @variable(
+        model,
+        q_battery_injected[b in 1:B, t in 1:T],
+        lower_bound = bat.qmin[b],
+        upper_bound = bat.qmax[b],
+        start = 0.0,
+    )
+
+    @variable(
+        model,
+        qsc[b in 1:B, t in 1:T],
+        lower_bound = bat.qmin[b],
+        upper_bound = bat.qmax[b],
+        start = 0.0,
+    )
+
+    model[:p_battery_injected] = p_battery_injected
+    model[:q_battery_injected] = q_battery_injected
+    model[:qsc] = qsc
+
+    return nothing
+end

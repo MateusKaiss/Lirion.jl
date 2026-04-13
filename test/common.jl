@@ -63,29 +63,10 @@ function _solve_maybe_optimizer(file::String; optimizer = nothing, kwargs...)
 end
 
 # ============================================================
-# SOCP solver picker
+# SOCWR solver picker
 # ============================================================
 
-const _SOCP_CHAIN_MAP = Dict(
-    :auto => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
-    :gurobi => (Gurobi.Optimizer, COSMO.Optimizer, SCS.Optimizer),
-    :cosmo => (COSMO.Optimizer, Gurobi.Optimizer, SCS.Optimizer),
-    :scs => (SCS.Optimizer, Gurobi.Optimizer, COSMO.Optimizer),
-)
-
-function pick_socp_optimizer(;
-    prefer::Symbol = Symbol(lowercase(get(ENV, "LIRION_SOCP_PREFER", "auto"))),
-)
-    chain = get(_SOCP_CHAIN_MAP, prefer, _SOCP_CHAIN_MAP[:auto])
-    for factory in chain
-        try
-            _ = factory()
-            return factory
-        catch
-        end
-    end
-    return SCS.Optimizer
-end
+pick_socwr_optimizer(; prefer::Symbol = :auto) = Clarabel.Optimizer
 
 # ============================================================
 # GENERIC DISTRIBUTED TEST RUNNER
