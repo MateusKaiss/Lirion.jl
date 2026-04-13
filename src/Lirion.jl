@@ -223,6 +223,13 @@ include("distributed_algorithms/aladin/dc/partition.jl")
 include("distributed_algorithms/aladin/dc/objective.jl")
 include("distributed_algorithms/aladin/dc/coordinator_qp.jl")
 
+include("distributed_algorithms/aladin/ac/sensitivities.jl")
+include("distributed_algorithms/aladin/ac/workspace.jl")
+include("distributed_algorithms/aladin/ac/partition.jl")
+include("distributed_algorithms/aladin/ac/objective.jl")
+include("distributed_algorithms/aladin/ac/coordinator_qp.jl")
+include("distributed_algorithms/aladin/ac/phase2_ac.jl")
+
 include("distributed_algorithms/aladin/core/logging.jl")
 
 include("distributed_algorithms/aladin/phase2/local_solve.jl")

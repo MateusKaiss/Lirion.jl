@@ -46,6 +46,7 @@ include(joinpath(@__DIR__, "test_admm_dc.jl"))
 include(joinpath(@__DIR__, "test_admm_ac.jl"))
 include(joinpath(@__DIR__, "test_admm_socwr.jl"))
 include(joinpath(@__DIR__, "test_aladin_dc.jl"))
+include(joinpath(@__DIR__, "test_aladin_ac.jl"))
 
 @testset "Lirion - All Tests" begin
     # Centralizados
@@ -91,10 +92,27 @@ include(joinpath(@__DIR__, "test_aladin_dc.jl"))
         distributed_optimizer = DEFAULT_SOCWR_SOLVER,
     )
 
-    # Distributed ALADIN (DC only for now)
+    # Distributed ALADIN — DC
     run_aladin_dc_state_tests(; rtol = 0.01)
     run_aladin_dc_power_tests(; rtol = 0.01)
     run_aladin_dc_hybrid_tests(; rtol = 0.01)
+
+    # Distributed ALADIN — AC
+    run_aladin_ac_state_tests(;
+        rtol = 0.01,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
+    run_aladin_ac_power_tests(;
+        rtol = 0.01,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
+    run_aladin_ac_hybrid_tests(;
+        rtol = 0.01,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
 end
 
 print_failures()

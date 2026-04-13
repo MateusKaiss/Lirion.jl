@@ -485,10 +485,10 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
         rho_upper::Real = 1e6,
         mu_upper::Real = 1e6,
     )
-        base_model === DC ||
+        base_model in (DC, AC) ||
             throw(
                 ArgumentError(
-                    "ALADIN is currently implemented only for DC. Got: $(base_model)",
+                    "ALADIN is currently implemented for DC and AC. Got: $(base_model)",
                 ),
             )
         coupling in (:state, :power, :hybrid) ||

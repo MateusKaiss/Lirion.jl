@@ -18,8 +18,19 @@ function aladin_local_solve!(ws::AbstractALADINWorkspace)
         part.generation_cost = JuMP.value(model[:generation_cost])
 
         extract_solve_values!(zone, model)
+
+        if ws.iter == 1
+            copyto!(zone.x_prev, zone.y)
+        end
+
         compute_cost_gradient!(zone)
+        refresh_lagrangian_hessian!(zone, ws)
         detect_active_bounds!(zone)
     end
     return nothing
 end
+
+# Default dispatch: DC zones have a constant Hessian baked into
+# `hess_diag` at build time, so nothing to refresh.
+@inline refresh_lagrangian_hessian!(::AladinZoneData, ::AbstractALADINWorkspace) =
+    nothing

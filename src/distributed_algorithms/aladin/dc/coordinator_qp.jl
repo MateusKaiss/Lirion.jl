@@ -1,31 +1,3 @@
-# ============================================================
-# ALADIN-DC — Phase 2 Coordinator QP (canonical HFD 2016)
-# ------------------------------------------------------------
-# After Phase 1 every zone has produced a local optimum y_i, and we
-# have extracted sensitivities (g_i, B_i, active-bound set) plus the
-# precomputed equality Jacobian C_i. The Phase 2 QP is:
-#
-#   min_{Δy, s}  ∑_i [ g_iᵀ Δy_i + ½ Δy_iᵀ B_i Δy_i ]
-#                 + λᵀ s + (μ/2) ‖s‖²
-#
-#   s.t.  C_eq_i Δy_i        = 0                   ∀ zone i
-#         Δy_i,k              = 0                   ∀ k ∈ active_bounds_i
-#         A_i (y_i + Δy_i)
-#             + A_j (y_j + Δy_j) = s_pair            ∀ consensus pair
-#
-# The consensus rows are what make the zones talk. Their dual multipliers
-# `ν_k` are exactly the new global Lagrangian estimates that feed into the
-# Phase-2 dual update.
-#
-# For State we have one row per SharedBusPair (coupling θ), for Power one
-# row per SharedEdgePair (coupling b·(θ_from-θ_to)), and for Hybrid both.
-# ============================================================
-
-# ------------------------------------------------------------
-# Helper: add zone i's sensitivity-based cost to the QP objective.
-#    g_iᵀ Δy_i + ½ Δy_iᵀ B_i Δy_i
-# with B_i diagonal (only pg columns non-zero in DC).
-# ------------------------------------------------------------
 @inline function _add_zone_cost!(
     qp_obj::JuMP.QuadExpr,
     zone::AladinZoneData,
@@ -45,11 +17,13 @@
 end
 
 # ------------------------------------------------------------
-# Helper: add equality Jacobian constraints C_eq_i Δy_i = 0.
+# Helper: add equality Jacobian constraints C_i Δy_i = 0.
+# Dispatches `build_active_jacobian` on the concrete zone type so it
+# works for DC (analytical C_eq) and AC (MOI autodiff C).
 # ------------------------------------------------------------
 function _add_active_constraints!(
     model::JuMP.Model,
-    zone::AladinZoneData,
+    zone,
     dy::Vector{JuMP.VariableRef},
 )
     C = build_active_jacobian(zone)
@@ -78,7 +52,7 @@ end
 # ------------------------------------------------------------
 function _add_active_bound_constraints!(
     model::JuMP.Model,
-    zone::AladinZoneData,
+    zone,
     dy::Vector{JuMP.VariableRef},
 )
     @inbounds for k in zone.active_bound_cols
