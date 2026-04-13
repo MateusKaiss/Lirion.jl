@@ -1,1 +1,7 @@
+# MATPOWER benchmark case files are external test data (PGLib-OPF),
+test/matpower_cases/*.m linguist-vendored
+test/distributed/*.m    linguist-vendored
+
+# Also tell Linguist to treat them as plain text (not MATLAB).
 test/matpower_cases/*.m linguist-language=Text
+test/distributed/*.m    linguist-language=Text
