@@ -325,7 +325,7 @@ function adapt_rho_mu!(
 end
 
 # ------------------------------------------------------------
-# Sensitivity refresh hook — called from phase2/local_solve.jl
+# Sensitivity refresh hook — called from aladin/core/local_solve.jl
 # ------------------------------------------------------------
 
 @inline function refresh_lagrangian_hessian!(

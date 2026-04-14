@@ -41,11 +41,6 @@ Base.@kwdef mutable struct SOCWRStateWorkspace <: AbstractADMMWorkspace
     bus_counts::Vector{Int}
     branch_counts::Vector{Int}
 
-    r_primal::Float64 = 0.0
-    r_dual::Float64 = 0.0
-    eps_primal::Float64 = 0.0
-    eps_dual::Float64 = 0.0
-
     # Per-component residuals (cached for rho_update! without recomputation)
     r_primal_bus::Float64 = 0.0
     r_dual_bus::Float64 = 0.0
@@ -54,8 +49,8 @@ Base.@kwdef mutable struct SOCWRStateWorkspace <: AbstractADMMWorkspace
     r_dual_r::Float64 = 0.0
     r_dual_t::Float64 = 0.0
 
-    hist::ADMMHistory = ADMMHistory()
-    iter::Int = 0
+    residuals::ResidualMetrics = ResidualMetrics()
+    state::IterationState = IterationState()
 end
 
 # ============================================================
@@ -85,19 +80,14 @@ Base.@kwdef mutable struct SOCWRPowerWorkspace <: AbstractADMMWorkspace
 
     branch_counts::Vector{Int}
 
-    r_primal::Float64 = 0.0
-    r_dual::Float64 = 0.0
-    eps_primal::Float64 = 0.0
-    eps_dual::Float64 = 0.0
-
     # Per-component residuals (cached for rho_update! without recomputation)
     r_primal_p::Float64 = 0.0
     r_primal_q::Float64 = 0.0
     r_dual_p::Float64 = 0.0
     r_dual_q::Float64 = 0.0
 
-    hist::ADMMHistory = ADMMHistory()
-    iter::Int = 0
+    residuals::ResidualMetrics = ResidualMetrics()
+    state::IterationState = IterationState()
 end
 
 # ============================================================
@@ -153,11 +143,6 @@ Base.@kwdef mutable struct SOCWRHybridWorkspace <: AbstractADMMWorkspace
     bus_counts::Vector{Int}
     branch_counts::Vector{Int}
 
-    r_primal::Float64 = 0.0
-    r_dual::Float64 = 0.0
-    eps_primal::Float64 = 0.0
-    eps_dual::Float64 = 0.0
-
     # Per-component residuals (cached for rho_update! without recomputation)
     r_primal_bus::Float64 = 0.0
     r_dual_bus::Float64 = 0.0
@@ -170,8 +155,8 @@ Base.@kwdef mutable struct SOCWRHybridWorkspace <: AbstractADMMWorkspace
     r_dual_r::Float64 = 0.0
     r_dual_t::Float64 = 0.0
 
-    hist::ADMMHistory = ADMMHistory()
-    iter::Int = 0
+    residuals::ResidualMetrics = ResidualMetrics()
+    state::IterationState = IterationState()
 end
 
 # ============================================================

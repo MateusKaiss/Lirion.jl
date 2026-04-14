@@ -158,11 +158,12 @@ include("distributed_algorithms/interface/traits.jl")
 include("distributed_algorithms/interface/workspace.jl")
 include("distributed_algorithms/core/algorithm_interface.jl")
 include("distributed_algorithms/admm/core/admm_support.jl")
+include("distributed_algorithms/admm/core/components.jl")
 include("distributed_algorithms/admm/core/history.jl")
 include("distributed_algorithms/admm/core/snapshots.jl")
 include("distributed_algorithms/admm/core/flow_accessors.jl")
 include("distributed_algorithms/admm/build_admm_params.jl")
-include("distributed_algorithms/admm/local_solve.jl")
+include("distributed_algorithms/admm/core/local_solve.jl")
 
 # ------------------------------------------------------------------
 # ADMM workspaces, partitions, objectives (per-formulation)
@@ -224,12 +225,16 @@ include("distributed_algorithms/aladin/socwr/phase2_socwr.jl")
 
 include("distributed_algorithms/aladin/core/logging.jl")
 
-include("distributed_algorithms/aladin/phase2/local_solve.jl")
-include("distributed_algorithms/aladin/phase2/primal_update.jl")
-include("distributed_algorithms/aladin/phase2/dual_update.jl")
-include("distributed_algorithms/aladin/phase2/residuals.jl")
-include("distributed_algorithms/aladin/phase2/tolerances.jl")
-include("distributed_algorithms/aladin/phase2/adapt_rho_mu.jl")
+include("distributed_algorithms/aladin/core/local_solve.jl")
+include("distributed_algorithms/aladin/core/primal_update.jl")
+include("distributed_algorithms/aladin/core/dual_update.jl")
+include("distributed_algorithms/aladin/core/residuals.jl")
+include("distributed_algorithms/aladin/core/tolerances.jl")
+include("distributed_algorithms/aladin/core/adapt_rho_mu.jl")
+
+# Workspace type traits (must come after all concrete workspace types
+# are declared above).
+include("distributed_algorithms/interface/workspace_traits.jl")
 
 include("distributed_algorithms/aladin/run_aladin.jl")
 

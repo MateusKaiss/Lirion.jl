@@ -25,13 +25,8 @@ Base.@kwdef mutable struct DCStateWorkspace <: AbstractADMMWorkspace
 
     bus_counts::Vector{Int}
 
-    r_primal::Float64 = 0.0
-    r_dual::Float64 = 0.0
-    eps_primal::Float64 = 0.0
-    eps_dual::Float64 = 0.0
-
-    hist::ADMMHistory = ADMMHistory()
-    iter::Int = 0
+    residuals::ResidualMetrics = ResidualMetrics()
+    state::IterationState = IterationState()
 end
 
 Base.@kwdef mutable struct DCPowerWorkspace <: AbstractADMMWorkspace
@@ -50,13 +45,8 @@ Base.@kwdef mutable struct DCPowerWorkspace <: AbstractADMMWorkspace
 
     branch_counts::Vector{Int}
 
-    r_primal::Float64 = 0.0
-    r_dual::Float64 = 0.0
-    eps_primal::Float64 = 0.0
-    eps_dual::Float64 = 0.0
-
-    hist::ADMMHistory = ADMMHistory()
-    iter::Int = 0
+    residuals::ResidualMetrics = ResidualMetrics()
+    state::IterationState = IterationState()
 end
 
 Base.@kwdef mutable struct DCHybridWorkspace <: AbstractADMMWorkspace
@@ -83,19 +73,14 @@ Base.@kwdef mutable struct DCHybridWorkspace <: AbstractADMMWorkspace
     bus_counts::Vector{Int}
     branch_counts::Vector{Int}
 
-    r_primal::Float64 = 0.0
-    r_dual::Float64 = 0.0
-    eps_primal::Float64 = 0.0
-    eps_dual::Float64 = 0.0
-
     # Per-component residuals (cached for rho_update! without recomputation)
     r_primal_bus::Float64 = 0.0
     r_dual_bus::Float64 = 0.0
     r_primal_branch::Float64 = 0.0
     r_dual_branch::Float64 = 0.0
 
-    hist::ADMMHistory = ADMMHistory()
-    iter::Int = 0
+    residuals::ResidualMetrics = ResidualMetrics()
+    state::IterationState = IterationState()
 end
 
 # ============================================================

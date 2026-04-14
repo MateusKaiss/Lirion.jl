@@ -33,6 +33,7 @@ Base.@kwdef mutable struct PartitionDC <: AbstractPartition
     theta_var::Union{Nothing, JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}} = nothing
 
     obj_base::Union{Nothing, Float64, JuMP.AffExpr, JuMP.QuadExpr} = nothing
+    obj_static::JuMP.QuadExpr = zero(JuMP.QuadExpr)
     quad_bus_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
     quad_branch_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
 
@@ -102,7 +103,7 @@ Base.@kwdef mutable struct PartitionSOCWR <: AbstractPartition
 
     obj_base::Union{Nothing, Float64, JuMP.AffExpr, JuMP.QuadExpr, JuMP.NonlinearExpr} =
         nothing
-    obj_static::Union{JuMP.AffExpr, Float64, JuMP.QuadExpr} = 0.0
+    obj_static::JuMP.QuadExpr = zero(JuMP.QuadExpr)
 
     quad_bus_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
     quad_rt_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)

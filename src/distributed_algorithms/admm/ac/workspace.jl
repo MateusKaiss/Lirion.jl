@@ -28,19 +28,14 @@ Base.@kwdef mutable struct ACStateWorkspace <: AbstractADMMWorkspace
     cos_sum::Vector{Float64}
     bus_counts::Vector{Int}
 
-    r_primal::Float64 = 0.0
-    r_dual::Float64 = 0.0
-    eps_primal::Float64 = 0.0
-    eps_dual::Float64 = 0.0
-
     # Per-component residuals (cached for rho_update! without recomputation)
     r_primal_theta::Float64 = 0.0
     r_primal_v_mag::Float64 = 0.0
     r_dual_theta::Float64 = 0.0
     r_dual_v_mag::Float64 = 0.0
 
-    hist::ADMMHistory = ADMMHistory()
-    iter::Int = 0
+    residuals::ResidualMetrics = ResidualMetrics()
+    state::IterationState = IterationState()
 end
 
 # ---------------- POWER ----------------
@@ -70,19 +65,14 @@ Base.@kwdef mutable struct ACPowerWorkspace <: AbstractADMMWorkspace
     p_branch_counts::Vector{Int}
     q_branch_counts::Vector{Int}
 
-    r_primal::Float64 = 0.0
-    r_dual::Float64 = 0.0
-    eps_primal::Float64 = 0.0
-    eps_dual::Float64 = 0.0
-
     # Per-component residuals (cached for rho_update! without recomputation)
     r_primal_p::Float64 = 0.0
     r_primal_q::Float64 = 0.0
     r_dual_p::Float64 = 0.0
     r_dual_q::Float64 = 0.0
 
-    hist::ADMMHistory = ADMMHistory()
-    iter::Int = 0
+    residuals::ResidualMetrics = ResidualMetrics()
+    state::IterationState = IterationState()
 end
 
 # ---------------- HYBRID ----------------
@@ -128,11 +118,6 @@ Base.@kwdef mutable struct ACHybridWorkspace <: AbstractADMMWorkspace
     p_branch_counts::Vector{Int}
     q_branch_counts::Vector{Int}
 
-    r_primal::Float64 = 0.0
-    r_dual::Float64 = 0.0
-    eps_primal::Float64 = 0.0
-    eps_dual::Float64 = 0.0
-
     # Per-component residuals (cached for rho_update! without recomputation)
     r_primal_theta::Float64 = 0.0
     r_primal_v_mag::Float64 = 0.0
@@ -143,8 +128,8 @@ Base.@kwdef mutable struct ACHybridWorkspace <: AbstractADMMWorkspace
     r_dual_p::Float64 = 0.0
     r_dual_q::Float64 = 0.0
 
-    hist::ADMMHistory = ADMMHistory()
-    iter::Int = 0
+    residuals::ResidualMetrics = ResidualMetrics()
+    state::IterationState = IterationState()
 end
 
 # ============================================================

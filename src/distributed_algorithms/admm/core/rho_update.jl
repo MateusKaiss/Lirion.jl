@@ -34,27 +34,26 @@ end
 # ############################################################
 
 # ---- DC bus ----
-function _refresh_rho_bus_dc!(parts::Partitions{PartitionDC}, rho, prev_rho)
+# Returns `true` iff ρ changed (so the caller can rebuild obj_static).
+function _refresh_rho_bus_dc!(parts::Partitions{PartitionDC}, rho, prev_rho)::Bool
     rho_val = rho[]
-    if rho_val != prev_rho[]
-        @inbounds for part in parts.parts
-            build_quad_bus_expr!(part, rho_val)
-        end
-        prev_rho[] = rho_val
+    rho_val == prev_rho[] && return false
+    @inbounds for part in parts.parts
+        build_quad_bus_expr!(part, rho_val)
     end
-    return nothing
+    prev_rho[] = rho_val
+    return true
 end
 
 # ---- DC branch ----
-function _refresh_rho_branch_dc!(parts::Partitions{PartitionDC}, rho, prev_rho)
+function _refresh_rho_branch_dc!(parts::Partitions{PartitionDC}, rho, prev_rho)::Bool
     rho_val = rho[]
-    if rho_val != prev_rho[]
-        @inbounds for part in parts.parts
-            build_quad_branch_expr!(part, rho_val, part.zone_edges)
-        end
-        prev_rho[] = rho_val
+    rho_val == prev_rho[] && return false
+    @inbounds for part in parts.parts
+        build_quad_branch_expr!(part, rho_val, part.zone_edges)
     end
-    return nothing
+    prev_rho[] = rho_val
+    return true
 end
 
 # ---- AC bus ----
@@ -205,15 +204,35 @@ end
 # ############################################################
 
 # ---- DC ----
-refresh_rho!(ws::DCStateWorkspace) =
-    _refresh_rho_bus_dc!(ws.partitions, ws.rho_theta, ws.prev_rho_theta)
+function refresh_rho!(ws::DCStateWorkspace)
+    if _refresh_rho_bus_dc!(ws.partitions, ws.rho_theta, ws.prev_rho_theta)
+        @inbounds for part in ws.partitions.parts
+            part.obj_static = part.obj_base + part.quad_bus_expr
+        end
+    end
+    return nothing
+end
 
-refresh_rho!(ws::DCPowerWorkspace) =
-    _refresh_rho_branch_dc!(ws.partitions, ws.rho_p, ws.prev_rho_p)
+function refresh_rho!(ws::DCPowerWorkspace)
+    if _refresh_rho_branch_dc!(ws.partitions, ws.rho_p, ws.prev_rho_p)
+        @inbounds for part in ws.partitions.parts
+            part.obj_static = part.obj_base + part.quad_branch_expr
+        end
+    end
+    return nothing
+end
 
 function refresh_rho!(ws::DCHybridWorkspace)
-    _refresh_rho_bus_dc!(ws.partitions, ws.rho_theta, ws.prev_rho_theta)
-    _refresh_rho_branch_dc!(ws.partitions, ws.rho_p, ws.prev_rho_p)
+    bus_changed =
+        _refresh_rho_bus_dc!(ws.partitions, ws.rho_theta, ws.prev_rho_theta)
+    branch_changed =
+        _refresh_rho_branch_dc!(ws.partitions, ws.rho_p, ws.prev_rho_p)
+    if bus_changed || branch_changed
+        @inbounds for part in ws.partitions.parts
+            part.obj_static =
+                part.obj_base + part.quad_bus_expr + part.quad_branch_expr
+        end
+    end
     return nothing
 end
 
