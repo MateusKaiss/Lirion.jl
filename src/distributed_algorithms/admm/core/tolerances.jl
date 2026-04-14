@@ -327,7 +327,7 @@ function compute_tolerances!(ws::SOCWRPowerWorkspace, eps_abs::Float64, eps_rel:
         eps_rel,
     )
     eps_s = _eps_dual_branch(
-        (ws.duals_p, ws.duals_q),
+        (ws.duals_p_flow, ws.duals_q_flow),
         ws.partitions,
         ws.interzonal,
         eps_abs,
@@ -372,7 +372,7 @@ function compute_tolerances!(ws::SOCWRHybridWorkspace, eps_abs::Float64, eps_rel
             eps_rel,
         )^2 +
         _eps_dual_branch(
-            (ws.duals_p, ws.duals_q),
+            (ws.duals_p_flow, ws.duals_q_flow),
             ws.partitions,
             ws.interzonal,
             eps_abs,

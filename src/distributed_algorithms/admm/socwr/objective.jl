@@ -14,7 +14,7 @@ function build_quad_bus_expr!(part::PartitionSOCWR, rho_v2::Float64)
         quad += 0.5 * rho_v2 * v2[b, 1]^2
     end
 
-    part.quad_bus_expr_socwr = quad
+    part.quad_bus_expr = quad
     return quad
 end
 
@@ -34,7 +34,7 @@ function build_quad_branch_rt_expr!(
         quad += 0.5 * rho_r * r^2 + 0.5 * rho_t * t^2
     end
 
-    part.quad_rt_expr_socwr = quad
+    part.quad_rt_expr = quad
     return quad
 end
 
@@ -54,7 +54,7 @@ function build_quad_branch_pq_expr!(
         quad += 0.5 * rho_p * p^2 + 0.5 * rho_q * q^2
     end
 
-    part.quad_pq_expr_socwr = quad
+    part.quad_pq_expr = quad
     return quad
 end
 
@@ -177,8 +177,8 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRPowerWorkspace)
         part.zone_edges,
         ws.p_flow_consensus,
         ws.q_flow_consensus,
-        view(ws.duals_p, :, p),
-        view(ws.duals_q, :, p),
+        view(ws.duals_p_flow, :, p),
+        view(ws.duals_q_flow, :, p),
         ws.interzonal,
         ws.rho_p[],
         ws.rho_q[],
@@ -202,8 +202,8 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRHybridWorkspace)
         part.zone_edges,
         ws.p_flow_consensus,
         ws.q_flow_consensus,
-        view(ws.duals_p, :, p),
-        view(ws.duals_q, :, p),
+        view(ws.duals_p_flow, :, p),
+        view(ws.duals_q_flow, :, p),
         ws.interzonal,
         ws.rho_p[],
         ws.rho_q[],

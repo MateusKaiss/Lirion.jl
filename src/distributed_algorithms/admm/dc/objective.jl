@@ -98,11 +98,7 @@ function update_objective!(part::PartitionDC, ws::DCStateWorkspace)
         ws.rho_theta[],
     )
 
-    @objective(
-        part.model,
-        Min,
-        part.obj_base + part.quad_bus_expr + lin,
-    )
+    @objective(part.model, Min, part.obj_base + part.quad_bus_expr + lin)
 end
 
 function update_objective!(part::PartitionDC, ws::DCPowerWorkspace)
@@ -115,11 +111,7 @@ function update_objective!(part::PartitionDC, ws::DCPowerWorkspace)
         ws.rho_p[],
     )
 
-    @objective(
-        part.model,
-        Min,
-        part.obj_base + part.quad_branch_expr + lin,
-    )
+    @objective(part.model, Min, part.obj_base + part.quad_branch_expr + lin)
 end
 
 function update_objective!(part::PartitionDC, ws::DCHybridWorkspace)
@@ -142,10 +134,7 @@ function update_objective!(part::PartitionDC, ws::DCHybridWorkspace)
     @objective(
         part.model,
         Min,
-        part.obj_base +
-        part.quad_bus_expr +
-        part.quad_branch_expr +
-        lin_bus +
-        lin_branch,
+        part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
+        lin_bus + lin_branch,
     )
 end

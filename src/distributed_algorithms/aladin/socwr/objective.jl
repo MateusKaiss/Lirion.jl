@@ -1,7 +1,6 @@
 # ============================================================
 # ALADIN-SOCWR — Local (Phase 1) objective builder
 
-
 const _SOCWRLocalWorkspace = Union{
     SOCWRStateWorkspaceALADIN,
     SOCWRPowerWorkspaceALADIN,

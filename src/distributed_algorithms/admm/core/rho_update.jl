@@ -104,7 +104,7 @@ function _refresh_rho_bus_socwr!(parts::Partitions{PartitionSOCWR}, rho, prev_rh
         @inbounds for part in parts.parts
             build_quad_bus_expr!(part, rho_val)
             part.obj_static =
-                part.obj_base + part.quad_bus_expr_socwr + part.quad_rt_expr_socwr
+                part.obj_base + part.quad_bus_expr + part.quad_rt_expr
         end
         prev_rho[] = rho_val
     end
@@ -125,7 +125,7 @@ function _refresh_rho_branch_rt_socwr!(
         @inbounds for part in parts.parts
             build_quad_branch_rt_expr!(part, rho_r_val, rho_t_val, part.zone_edges)
             part.obj_static =
-                part.obj_base + part.quad_bus_expr_socwr + part.quad_rt_expr_socwr
+                part.obj_base + part.quad_bus_expr + part.quad_rt_expr
         end
         prev_rho_r[] = rho_r_val
         prev_rho_t[] = rho_t_val
@@ -147,7 +147,7 @@ function _refresh_rho_branch_pq_socwr!(
         @inbounds for part in parts.parts
             build_quad_branch_pq_expr!(part, rho_p_val, rho_q_val, part.zone_edges)
             part.obj_static =
-                part.obj_base + part.quad_pq_expr_socwr + part.soft_anchor_expr
+                part.obj_base + part.quad_pq_expr + part.soft_anchor_expr
         end
         prev_rho_p[] = rho_p_val
         prev_rho_q[] = rho_q_val
@@ -188,8 +188,8 @@ function _refresh_rho_hybrid_socwr!(
         (rho_r_val != prev_rho_r[] || rho_t_val != prev_rho_t[]) &&
             build_quad_branch_rt_expr!(part, rho_r_val, rho_t_val, part.zone_edges)
         part.obj_static =
-            part.obj_base + part.quad_bus_expr_socwr + part.quad_pq_expr_socwr +
-            part.quad_rt_expr_socwr
+            part.obj_base + part.quad_bus_expr + part.quad_pq_expr +
+            part.quad_rt_expr
     end
 
     prev_rho_v2[] = rho_v2_val

@@ -22,7 +22,7 @@ function init_state_partition!(
     end
 
     build_quad_bus_expr!(part, rho_theta, rho_v_mag)
-    @objective(model, Min, part.obj_base + part.quad_bus_expr_ac)
+    @objective(model, Min, part.obj_base + part.quad_bus_expr)
 
     return nothing
 end
@@ -49,7 +49,7 @@ function init_power_partition!(
     end
 
     build_quad_branch_expr!(part, rho_p, rho_q, part.zone_edges)
-    @objective(model, Min, part.obj_base + part.quad_branch_expr_ac)
+    @objective(model, Min, part.obj_base + part.quad_branch_expr)
 
     return nothing
 end
@@ -83,7 +83,7 @@ function init_hybrid_partition!(
     @objective(
         model,
         Min,
-        part.obj_base + part.quad_bus_expr_ac + part.quad_branch_expr_ac,
+        part.obj_base + part.quad_bus_expr + part.quad_branch_expr,
     )
 
     return nothing

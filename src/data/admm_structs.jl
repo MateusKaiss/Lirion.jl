@@ -69,8 +69,8 @@ Base.@kwdef mutable struct PartitionAC <: AbstractPartition
 
     obj_base::Union{Nothing, Float64, JuMP.AffExpr, JuMP.QuadExpr, JuMP.NonlinearExpr} =
         nothing
-    quad_bus_expr_ac::Union{Nothing, JuMP.QuadExpr, JuMP.NonlinearExpr} = nothing
-    quad_branch_expr_ac::Union{Nothing, JuMP.QuadExpr, JuMP.NonlinearExpr} = nothing
+    quad_bus_expr::Union{Nothing, JuMP.QuadExpr, JuMP.NonlinearExpr} = nothing
+    quad_branch_expr::Union{Nothing, JuMP.QuadExpr, JuMP.NonlinearExpr} = nothing
 
     objective_params::ObjectiveData
     has_solution::Bool = false
@@ -104,9 +104,9 @@ Base.@kwdef mutable struct PartitionSOCWR <: AbstractPartition
         nothing
     obj_static::Union{JuMP.AffExpr, Float64, JuMP.QuadExpr} = 0.0
 
-    quad_bus_expr_socwr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
-    quad_rt_expr_socwr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
-    quad_pq_expr_socwr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
+    quad_bus_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
+    quad_rt_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
+    quad_pq_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
 
     soft_anchor_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
 

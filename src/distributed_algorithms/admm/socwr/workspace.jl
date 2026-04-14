@@ -74,8 +74,8 @@ Base.@kwdef mutable struct SOCWRPowerWorkspace <: AbstractADMMWorkspace
     p_flow_consensus_prev::Vector{Float64}
     q_flow_consensus_prev::Vector{Float64}
 
-    duals_p::Matrix{Float64}
-    duals_q::Matrix{Float64}
+    duals_p_flow::Matrix{Float64}
+    duals_q_flow::Matrix{Float64}
 
     rho_p::Base.RefValue{Float64}
     rho_q::Base.RefValue{Float64}
@@ -131,8 +131,8 @@ Base.@kwdef mutable struct SOCWRHybridWorkspace <: AbstractADMMWorkspace
     # DUALS
     duals_v2::Matrix{Float64}
 
-    duals_p::Matrix{Float64}
-    duals_q::Matrix{Float64}
+    duals_p_flow::Matrix{Float64}
+    duals_q_flow::Matrix{Float64}
 
     duals_r::Matrix{Float64}
     duals_t::Matrix{Float64}
@@ -278,8 +278,8 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCW
         q_flow_consensus = zeros(n_inter),
         p_flow_consensus_prev = zeros(n_inter),
         q_flow_consensus_prev = zeros(n_inter),
-        duals_p = zeros(n_inter, n_zones),
-        duals_q = zeros(n_inter, n_zones),
+        duals_p_flow = zeros(n_inter, n_zones),
+        duals_q_flow = zeros(n_inter, n_zones),
         rho_p = rho_p,
         rho_q = rho_q,
         prev_rho_p = Ref(rho_p[]),
@@ -333,8 +333,8 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOC
         r_consensus_prev = zeros(n_inter),
         t_consensus_prev = zeros(n_inter),
         duals_v2 = zeros(n_shared, n_zones),
-        duals_p = zeros(n_inter, n_zones),
-        duals_q = zeros(n_inter, n_zones),
+        duals_p_flow = zeros(n_inter, n_zones),
+        duals_q_flow = zeros(n_inter, n_zones),
         duals_r = zeros(n_inter, n_zones),
         duals_t = zeros(n_inter, n_zones),
         rho_v2 = rho_v2,

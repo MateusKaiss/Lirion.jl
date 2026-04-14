@@ -1,7 +1,6 @@
 # ============================================================
 # ALADIN-SOCWR — sensitivities (canonical Houska-Frasch-Diehl 2016)
 
-
 mutable struct AladinZoneDataSOCWR
     # JuMP model reference — used every iteration to walk constraints
     # and extract active-inequality duals.
@@ -147,8 +146,8 @@ function _collect_socwr_cols(
                 Float64[]
             # Matpower convention: descending degrees. For quadratic (len 3)
             # coefs = [c2, c1, c0].
-            c2 = (length(coefs) >= 3) ? coefs[end - 2] : 0.0
-            c1 = (length(coefs) >= 2) ? coefs[end - 1] : 0.0
+            c2 = (length(coefs) >= 3) ? coefs[end-2] : 0.0
+            c1 = (length(coefs) >= 2) ? coefs[end-1] : 0.0
             push!(pg_c2_sbase2, 2.0 * c2 * sbase^2)
             push!(pg_c1_sbase, c1 * sbase)
         end

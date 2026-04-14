@@ -25,11 +25,12 @@ struct Power <: ADMMVariant end
 struct Hybrid <: ADMMVariant end
 
 # ============================================================
-# ADMM TYPE COMBINATOR
+# DISTRIBUTED ALGORITHM HIERARCHY
 # ============================================================
+abstract type DistributedAlgorithm end
 
-struct ADMM{V <: ADMMVariant, M <: OPFModel} end
-struct ALADIN{V <: ADMMVariant, M <: OPFModel} end
+struct ADMM{V <: ADMMVariant, M <: OPFModel} <: DistributedAlgorithm end
+struct ALADIN{V <: ADMMVariant, M <: OPFModel} <: DistributedAlgorithm end
 
 # ============================================================
 # SECTIONING / DECOMPOSITION STRATEGIES

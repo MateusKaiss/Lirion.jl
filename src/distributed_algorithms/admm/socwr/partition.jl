@@ -22,7 +22,7 @@ function init_state_partition!(
     build_quad_bus_expr!(part, rho_v2)
     build_quad_branch_rt_expr!(part, rho_r, rho_t, part.zone_edges)
 
-    part.obj_static = part.obj_base + part.quad_bus_expr_socwr + part.quad_rt_expr_socwr
+    part.obj_static = part.obj_base + part.quad_bus_expr + part.quad_rt_expr
     @objective(model, Min, part.obj_static)
 
     return nothing
@@ -53,7 +53,7 @@ function init_power_partition!(
 
     build_quad_branch_pq_expr!(part, rho_p, rho_q, part.zone_edges)
 
-    part.obj_static = part.obj_base + part.quad_pq_expr_socwr + part.soft_anchor_expr
+    part.obj_static = part.obj_base + part.quad_pq_expr + part.soft_anchor_expr
     @objective(model, Min, part.obj_static)
 
     return nothing
@@ -83,8 +83,8 @@ function init_hybrid_partition!(
     build_quad_branch_rt_expr!(part, rho_r, rho_t, part.zone_edges)
 
     part.obj_static =
-        part.obj_base + part.quad_bus_expr_socwr + part.quad_pq_expr_socwr +
-        part.quad_rt_expr_socwr
+        part.obj_base + part.quad_bus_expr + part.quad_pq_expr +
+        part.quad_rt_expr
 
     @objective(model, Min, part.obj_static)
 

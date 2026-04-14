@@ -2,7 +2,6 @@
 # ALADIN-SOCWR — Phase 2 kernels (dual update, residuals,
 # tolerances, adaptive ρ/μ, logging, Hessian refresh hook)
 
-
 function dual_update!(
     ws::SOCWRStateWorkspaceALADIN,
     nu::@NamedTuple{
@@ -511,8 +510,9 @@ function _socwr_merit(ws::SOCWRHybridWorkspaceALADIN, α::Float64)
         dq = qi_val - qj_val
 
         r_sq += dr * dr + dt * dt + dp * dp + dq * dq
-        λr += ws.lambda_r[k] * dr + ws.lambda_t[k] * dt +
-              ws.lambda_p[k] * dp + ws.lambda_q[k] * dq
+        λr +=
+            ws.lambda_r[k] * dr + ws.lambda_t[k] * dt +
+            ws.lambda_p[k] * dp + ws.lambda_q[k] * dq
     end
 
     mu = ws.mu[]

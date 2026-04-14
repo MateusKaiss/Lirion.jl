@@ -20,7 +20,7 @@ function build_quad_bus_expr!(
                 0.5 * rho_v_mag * v_mag[b, 1]^2
     end
 
-    part.quad_bus_expr_ac = quad
+    part.quad_bus_expr = quad
     return quad
 end
 
@@ -40,7 +40,7 @@ function build_quad_branch_expr!(
         quad += 0.5 * rho_p * p^2 + 0.5 * rho_q * q^2
     end
 
-    part.quad_branch_expr_ac = quad
+    part.quad_branch_expr = quad
     return quad
 end
 
@@ -116,11 +116,7 @@ function update_objective!(part::PartitionAC, ws::ACStateWorkspace)
         ws.rho_v[],
     )
 
-    @objective(
-        part.model,
-        Min,
-        part.obj_base + part.quad_bus_expr_ac + lin,
-    )
+    @objective(part.model, Min, part.obj_base + part.quad_bus_expr + lin)
 end
 
 function update_objective!(part::PartitionAC, ws::ACPowerWorkspace)
@@ -136,11 +132,7 @@ function update_objective!(part::PartitionAC, ws::ACPowerWorkspace)
         ws.rho_q[],
     )
 
-    @objective(
-        part.model,
-        Min,
-        part.obj_base + part.quad_branch_expr_ac + lin,
-    )
+    @objective(part.model, Min, part.obj_base + part.quad_branch_expr + lin)
 end
 
 function update_objective!(part::PartitionAC, ws::ACHybridWorkspace)
@@ -169,10 +161,7 @@ function update_objective!(part::PartitionAC, ws::ACHybridWorkspace)
     @objective(
         part.model,
         Min,
-        part.obj_base +
-        part.quad_bus_expr_ac +
-        part.quad_branch_expr_ac +
-        lin_bus +
-        lin_branch,
+        part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
+        lin_bus + lin_branch,
     )
 end

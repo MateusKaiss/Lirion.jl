@@ -257,8 +257,8 @@ end
 
 function dual_update!(ws::SOCWRPowerWorkspace)
     _update_branch_duals_paired!(
-        ws.duals_p,
-        ws.duals_q,
+        ws.duals_p_flow,
+        ws.duals_q_flow,
         ws.partitions,
         ws.p_flow_consensus,
         ws.q_flow_consensus,
@@ -279,8 +279,8 @@ function dual_update!(ws::SOCWRHybridWorkspace)
         snapshot_v2_shared!,
     )
     _update_branch_duals_paired!(
-        ws.duals_p,
-        ws.duals_q,
+        ws.duals_p_flow,
+        ws.duals_q_flow,
         ws.partitions,
         ws.p_flow_consensus,
         ws.q_flow_consensus,

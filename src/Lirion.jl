@@ -153,6 +153,9 @@ include("postprocessing/build_plots.jl")
 # Distributed methods — optimizer + shared core
 # ------------------------------------------------------------------
 include("distributed_algorithms/optimizer.jl")
+include("distributed_algorithms/interface/algorithms.jl")
+include("distributed_algorithms/interface/traits.jl")
+include("distributed_algorithms/interface/workspace.jl")
 include("distributed_algorithms/core/algorithm_interface.jl")
 include("distributed_algorithms/admm/core/admm_support.jl")
 include("distributed_algorithms/admm/core/history.jl")
@@ -195,7 +198,6 @@ include("distributed_algorithms/admm/core/logging.jl")
 # ADMM loop (after all types are defined)
 # ------------------------------------------------------------------
 include("distributed_algorithms/admm/run_admm.jl")
-
 
 include("distributed_algorithms/aladin/core/aladin_support.jl")
 include("distributed_algorithms/aladin/core/history.jl")
