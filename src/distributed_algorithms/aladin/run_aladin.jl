@@ -46,6 +46,7 @@ function run_aladin!(ws::AbstractALADINWorkspace, params::ALADINParams)
             break
         end
 
+        _line_search_step!(ws)
         primal_update!(ws)
         dual_update!(ws, nu)
 
@@ -53,6 +54,8 @@ function run_aladin!(ws::AbstractALADINWorkspace, params::ALADINParams)
     end
     return nothing
 end
+
+@inline _line_search_step!(::AbstractALADINWorkspace) = nothing
 
 # ---------------------------------------------------------------
 # ENTRY POINT

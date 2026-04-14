@@ -196,22 +196,6 @@ include("distributed_algorithms/admm/core/logging.jl")
 # ------------------------------------------------------------------
 include("distributed_algorithms/admm/run_admm.jl")
 
-# ------------------------------------------------------------------
-# ALADIN — canonical Houska-Frasch-Diehl (2016)
-# ------------------------------------------------------------------
-# Load order matters:
-#   1. support  (abstract types)
-#   2. history  (ALADINHistory)
-#   3. params   (ALADINParams)
-#   4. sensitivities  (AladinZoneData + helpers)
-#   5. workspace      (concrete workspaces, depend on AladinZoneData)
-#   6. partition      (thin init shims delegating to ADMM)
-#   7. objective      (update_objective! dispatching on workspace types)
-#   8. coordinator_qp (Phase-2 QP builder; needs workspace types)
-#   9. logging        (_aladin_print_tag dispatches on concrete types)
-#  10. phase2 kernels (local_solve, primal_update, dual_update, residuals, tolerances)
-#  11. run_aladin     (main loop)
-# ------------------------------------------------------------------
 
 include("distributed_algorithms/aladin/core/aladin_support.jl")
 include("distributed_algorithms/aladin/core/history.jl")
@@ -229,6 +213,12 @@ include("distributed_algorithms/aladin/ac/partition.jl")
 include("distributed_algorithms/aladin/ac/objective.jl")
 include("distributed_algorithms/aladin/ac/coordinator_qp.jl")
 include("distributed_algorithms/aladin/ac/phase2_ac.jl")
+
+include("distributed_algorithms/aladin/socwr/sensitivities.jl")
+include("distributed_algorithms/aladin/socwr/workspace.jl")
+include("distributed_algorithms/aladin/socwr/objective.jl")
+include("distributed_algorithms/aladin/socwr/coordinator_qp.jl")
+include("distributed_algorithms/aladin/socwr/phase2_socwr.jl")
 
 include("distributed_algorithms/aladin/core/logging.jl")
 

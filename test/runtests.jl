@@ -47,6 +47,7 @@ include(joinpath(@__DIR__, "test_admm_ac.jl"))
 include(joinpath(@__DIR__, "test_admm_socwr.jl"))
 include(joinpath(@__DIR__, "test_aladin_dc.jl"))
 include(joinpath(@__DIR__, "test_aladin_ac.jl"))
+include(joinpath(@__DIR__, "test_aladin_socwr.jl"))
 
 @testset "Lirion - All Tests" begin
     # Centralizados
@@ -112,6 +113,23 @@ include(joinpath(@__DIR__, "test_aladin_ac.jl"))
         rtol = 0.01,
         central_optimizer = Ipopt.Optimizer,
         distributed_optimizer = Ipopt.Optimizer,
+    )
+
+    # Distributed ALADIN — SOCWR
+    run_aladin_socwr_state_tests(;
+        rtol = 0.01,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
+    )
+    run_aladin_socwr_power_tests(;
+        rtol = 0.01,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
+    )
+    run_aladin_socwr_hybrid_tests(;
+        rtol = 0.01,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
     )
 end
 
