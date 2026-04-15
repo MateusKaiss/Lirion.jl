@@ -190,22 +190,6 @@ https://your-docs-link-here.com
 
 ---
 
-## Mathematical Foundations Website
-
-Lirion is accompanied by a dedicated technical website jointly created by Mateus Kaiss and Andressa Mathias Pedroso.
-
-The website contains deeper mathematical material underlying Lirion’s design, including:
-
-- OPF formulations (DC, AC, ACR, IVR, LPAC, SOCWR, SOCBF, BFA, NFA)
-- ADMM and ALADIN derivations and penalty update rules
-- Coupling-variable design theory
-- Structural and decomposition analysis
-
-The material originates from structured research developed during undergraduate studies and is currently being expanded as part of ongoing graduate research.
-
-https://your-website-link-here.com
-
-
 ## Acknowledgments
 
 Lirion.jl originated from the undergraduate thesis of **Mateus Kaiss**, its principal developer, and has since evolved into a CNPq-funded research project. The key collaborators of this work are:
@@ -227,6 +211,21 @@ Lirion does not aim to replicate PowerModels, but rather to explore complementar
 **PowerModels.jl**:
 https://github.com/lanl-ansi/PowerModels.jl
 
+
+## Mathematical Foundations Website
+
+Lirion is accompanied by a dedicated technical website jointly created by Mateus Kaiss and Andressa Mathias Pedroso.
+
+The website contains deeper mathematical material underlying Lirion’s design, including:
+
+- OPF formulations (DC, AC, ACR, IVR, LPAC, SOCWR, SOCBF, BFA, NFA)
+- ADMM and ALADIN derivations and penalty update rules
+- Coupling-variable design theory
+- Structural and decomposition analysis
+
+The material originates from structured research developed during undergraduate studies and is currently being expanded as part of ongoing graduate research.
+
+https://your-website-link-here.com
 
 ## License
 
