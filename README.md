@@ -208,13 +208,13 @@ https://your-website-link-here.com
 
 ## Acknowledgments
 
-Lirion.jl originated from the principal developer’s undergraduate thesis in power systems and has since evolved into a CNPq-funded research project, coordinated by **Dr. Daniel Gebbran Cons Bacilla Ferreira** and co-supervised by **Prof. Dr. Kristie Kaminski Küster**. The package was conceived, designed, and developed by **Mateus Kaiss**, as its principal author and maintainer, with support from:
+Lirion.jl originated from the undergraduate thesis of **Mateus Kaiss**, its principal developer, and has since evolved into a CNPq-funded research project. The key collaborators of this work are:
 
-- **Dr. Daniel Gebbran Cons Bacilla Ferreira** for his supervision of the research involving distributed methodologies and for his significant role in strengthening the scientific contributions of this work.
+- **Dr. Daniel Gebbran Cons Bacilla Ferreira**, leader of the CNPq-funded research project, for his supervision of the research involving distributed methodologies and for his significant role in strengthening the scientific contributions of this work.
 
-- **Prof. Dr. Kristie Kaminski Küster** for her supervision and guidance in power systems research, as well as for reviewing the implemented code.
+- **Prof. Dr. Kristie Kaminski Küster**, academic advisor of both the undergraduate thesis and the Master's research that emerged from this project, for her guidance in power systems research and for reviewing the implemented code.
 
-- **Andressa Mathias Pedroso** for leading and implementing the design and development of the official Lirion website.
+- **Andressa Mathias Pedroso**, principal responsible for the design and development of the official Lirion website.
 
 ## Funding
 
