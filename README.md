@@ -196,7 +196,7 @@ Lirion.jl originated from the undergraduate thesis of its principal author and h
 
 - **Mateus Kaiss**, principal author, creator, and maintainer of Lirion.jl.
 
-- **Dr. Daniel Gebbran Cons Bacilla Ferreira**, leader of the CNPq-funded research project, for his ideas involving distributed methodologies and for his significant role in strengthening the scientific contributions of this work.
+- **Dr. Daniel Gebbran Cons Bacilla Ferreira**, leader of the CNPq-funded research project, for his expertise in distributed methodologies and for his significant role in strengthening the scientific contributions of this work.
 
 - **Prof. Dr. Kristie Kaminski Küster**, academic advisor of both the undergraduate thesis and the Master's research that emerged from this project, for developing ideas and assisting within the Lirion research group and its scientific contributions and for her guidance in power systems research and for reviewing the implemented code.
 
