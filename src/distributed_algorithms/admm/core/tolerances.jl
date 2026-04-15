@@ -1,11 +1,5 @@
 # ============================================================
 # ADMM Tolerances (Boyd et al.)
-# ------------------------------------------------------------
-#   eps_pri  = sqrt(n) * eps_abs + eps_rel * max(‖Ax‖, ‖Bz‖)
-#   eps_dual = sqrt(n) * eps_abs + eps_rel * ‖y‖
-#
-# All quantities are summed over expanded (zone, var) pairs to match
-# the expanded form of the residuals (Boyd canonical consensus form).
 # ============================================================
 
 # ------------------------------------------------------------
@@ -40,7 +34,7 @@ function _eps_primal_bus(
 end
 
 function _eps_dual_bus(
-    duals_list,       # tuple of Matrix{Float64} (n_shared × n_zones)
+    duals_list,
     partitions::Partitions,
     eps_abs::Float64,
     eps_rel::Float64,
@@ -67,7 +61,7 @@ end
 
 function _eps_primal_branch(
     partitions::Partitions,
-    consensus_vecs,            # tuple of Vector{Float64}, length n_inter
+    consensus_vecs,
     interzonal::Vector{Int},
     n_vars_per_edge::Int,
     eps_abs::Float64,
@@ -122,13 +116,13 @@ end
 function compute_tolerances!(ws::DCStateWorkspace, eps_abs::Float64, eps_rel::Float64)
     eps_r = _eps_primal_bus(
         ws.partitions,
-        (ws.theta_consensus,),
+        (ws.vars.theta.consensus,),
         (snapshot_theta!,),
         eps_abs,
         eps_rel,
     )
     eps_s = _eps_dual_bus(
-        (ws.duals_theta,),
+        (ws.vars.theta.duals,),
         ws.partitions,
         eps_abs,
         eps_rel,
@@ -141,14 +135,14 @@ end
 function compute_tolerances!(ws::DCPowerWorkspace, eps_abs::Float64, eps_rel::Float64)
     eps_r = _eps_primal_branch(
         ws.partitions,
-        (ws.p_flow_consensus,),
+        (ws.vars.p_flow.consensus,),
         ws.interzonal,
         1,
         eps_abs,
         eps_rel,
     )
     eps_s = _eps_dual_branch(
-        (ws.duals_p_flow,),
+        (ws.vars.p_flow.duals,),
         ws.partitions,
         ws.interzonal,
         eps_abs,
@@ -163,14 +157,14 @@ function compute_tolerances!(ws::DCHybridWorkspace, eps_abs::Float64, eps_rel::F
     eps_r = hypot(
         _eps_primal_bus(
             ws.partitions,
-            (ws.theta_consensus,),
+            (ws.vars.theta.consensus,),
             (snapshot_theta!,),
             eps_abs,
             eps_rel,
         ),
         _eps_primal_branch(
             ws.partitions,
-            (ws.p_flow_consensus,),
+            (ws.vars.p_flow.consensus,),
             ws.interzonal,
             1,
             eps_abs,
@@ -179,13 +173,13 @@ function compute_tolerances!(ws::DCHybridWorkspace, eps_abs::Float64, eps_rel::F
     )
     eps_s = hypot(
         _eps_dual_bus(
-            (ws.duals_theta,),
+            (ws.vars.theta.duals,),
             ws.partitions,
             eps_abs,
             eps_rel,
         ),
         _eps_dual_branch(
-            (ws.duals_p_flow,),
+            (ws.vars.p_flow.duals,),
             ws.partitions,
             ws.interzonal,
             eps_abs,
@@ -202,13 +196,13 @@ end
 function compute_tolerances!(ws::ACStateWorkspace, eps_abs::Float64, eps_rel::Float64)
     eps_r = _eps_primal_bus(
         ws.partitions,
-        (ws.theta_consensus, ws.v_mag_consensus),
+        (ws.vars.theta.consensus, ws.vars.v_mag.consensus),
         (snapshot_theta!, snapshot_v_mag!),
         eps_abs,
         eps_rel,
     )
     eps_s = _eps_dual_bus(
-        (ws.duals_theta, ws.duals_v_mag),
+        (ws.vars.theta.duals, ws.vars.v_mag.duals),
         ws.partitions,
         eps_abs,
         eps_rel,
@@ -221,14 +215,14 @@ end
 function compute_tolerances!(ws::ACPowerWorkspace, eps_abs::Float64, eps_rel::Float64)
     eps_r = _eps_primal_branch(
         ws.partitions,
-        (ws.p_flow_consensus, ws.q_flow_consensus),
+        (ws.vars.p_flow.consensus, ws.vars.q_flow.consensus),
         ws.interzonal,
         2,
         eps_abs,
         eps_rel,
     )
     eps_s = _eps_dual_branch(
-        (ws.duals_p_flow, ws.duals_q_flow),
+        (ws.vars.p_flow.duals, ws.vars.q_flow.duals),
         ws.partitions,
         ws.interzonal,
         eps_abs,
@@ -243,14 +237,14 @@ function compute_tolerances!(ws::ACHybridWorkspace, eps_abs::Float64, eps_rel::F
     eps_r = hypot(
         _eps_primal_bus(
             ws.partitions,
-            (ws.theta_consensus, ws.v_mag_consensus),
+            (ws.vars.theta.consensus, ws.vars.v_mag.consensus),
             (snapshot_theta!, snapshot_v_mag!),
             eps_abs,
             eps_rel,
         ),
         _eps_primal_branch(
             ws.partitions,
-            (ws.p_flow_consensus, ws.q_flow_consensus),
+            (ws.vars.p_flow.consensus, ws.vars.q_flow.consensus),
             ws.interzonal,
             2,
             eps_abs,
@@ -259,13 +253,13 @@ function compute_tolerances!(ws::ACHybridWorkspace, eps_abs::Float64, eps_rel::F
     )
     eps_s = hypot(
         _eps_dual_bus(
-            (ws.duals_theta, ws.duals_v_mag),
+            (ws.vars.theta.duals, ws.vars.v_mag.duals),
             ws.partitions,
             eps_abs,
             eps_rel,
         ),
         _eps_dual_branch(
-            (ws.duals_p_flow, ws.duals_q_flow),
+            (ws.vars.p_flow.duals, ws.vars.q_flow.duals),
             ws.partitions,
             ws.interzonal,
             eps_abs,
@@ -283,14 +277,14 @@ function compute_tolerances!(ws::SOCWRStateWorkspace, eps_abs::Float64, eps_rel:
     eps_r = hypot(
         _eps_primal_bus(
             ws.partitions,
-            (ws.v2_consensus,),
+            (ws.vars.v2.consensus,),
             (snapshot_v2!,),
             eps_abs,
             eps_rel,
         ),
         _eps_primal_branch(
             ws.partitions,
-            (ws.r_consensus, ws.t_consensus),
+            (ws.vars.r.consensus, ws.vars.t.consensus),
             ws.interzonal,
             2,
             eps_abs,
@@ -299,13 +293,13 @@ function compute_tolerances!(ws::SOCWRStateWorkspace, eps_abs::Float64, eps_rel:
     )
     eps_s = hypot(
         _eps_dual_bus(
-            (ws.duals_v2,),
+            (ws.vars.v2.duals,),
             ws.partitions,
             eps_abs,
             eps_rel,
         ),
         _eps_dual_branch(
-            (ws.duals_r, ws.duals_t),
+            (ws.vars.r.duals, ws.vars.t.duals),
             ws.partitions,
             ws.interzonal,
             eps_abs,
@@ -320,14 +314,14 @@ end
 function compute_tolerances!(ws::SOCWRPowerWorkspace, eps_abs::Float64, eps_rel::Float64)
     eps_r = _eps_primal_branch(
         ws.partitions,
-        (ws.p_flow_consensus, ws.q_flow_consensus),
+        (ws.vars.p_flow.consensus, ws.vars.q_flow.consensus),
         ws.interzonal,
         2,
         eps_abs,
         eps_rel,
     )
     eps_s = _eps_dual_branch(
-        (ws.duals_p_flow, ws.duals_q_flow),
+        (ws.vars.p_flow.duals, ws.vars.q_flow.duals),
         ws.partitions,
         ws.interzonal,
         eps_abs,
@@ -342,14 +336,14 @@ function compute_tolerances!(ws::SOCWRHybridWorkspace, eps_abs::Float64, eps_rel
     eps_r = sqrt(
         _eps_primal_bus(
             ws.partitions,
-            (ws.v2_consensus,),
+            (ws.vars.v2.consensus,),
             (snapshot_v2!,),
             eps_abs,
             eps_rel,
         )^2 +
         _eps_primal_branch(
             ws.partitions,
-            (ws.p_flow_consensus, ws.q_flow_consensus),
+            (ws.vars.p_flow.consensus, ws.vars.q_flow.consensus),
             ws.interzonal,
             2,
             eps_abs,
@@ -357,7 +351,7 @@ function compute_tolerances!(ws::SOCWRHybridWorkspace, eps_abs::Float64, eps_rel
         )^2 +
         _eps_primal_branch(
             ws.partitions,
-            (ws.r_consensus, ws.t_consensus),
+            (ws.vars.r.consensus, ws.vars.t.consensus),
             ws.interzonal,
             2,
             eps_abs,
@@ -366,20 +360,20 @@ function compute_tolerances!(ws::SOCWRHybridWorkspace, eps_abs::Float64, eps_rel
     )
     eps_s = sqrt(
         _eps_dual_bus(
-            (ws.duals_v2,),
+            (ws.vars.v2.duals,),
             ws.partitions,
             eps_abs,
             eps_rel,
         )^2 +
         _eps_dual_branch(
-            (ws.duals_p_flow, ws.duals_q_flow),
+            (ws.vars.p_flow.duals, ws.vars.q_flow.duals),
             ws.partitions,
             ws.interzonal,
             eps_abs,
             eps_rel,
         )^2 +
         _eps_dual_branch(
-            (ws.duals_r, ws.duals_t),
+            (ws.vars.r.duals, ws.vars.t.duals),
             ws.partitions,
             ws.interzonal,
             eps_abs,

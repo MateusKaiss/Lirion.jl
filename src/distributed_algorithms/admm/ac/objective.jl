@@ -108,12 +108,12 @@ end
 function update_objective!(part::PartitionAC, ws::ACStateWorkspace)
     lin = build_linear_bus_term(
         part,
-        ws.theta_consensus,
-        ws.v_mag_consensus,
-        view(ws.duals_theta, :, part.position),
-        view(ws.duals_v_mag, :, part.position),
-        ws.rho_theta[],
-        ws.rho_v[],
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        view(ws.vars.theta.duals, :, part.position),
+        view(ws.vars.v_mag.duals, :, part.position),
+        ws.vars.theta.rho[],
+        ws.vars.v_mag.rho[],
     )
 
     @objective(part.model, Min, part.obj_base + part.quad_bus_expr + lin)
@@ -123,13 +123,13 @@ function update_objective!(part::PartitionAC, ws::ACPowerWorkspace)
     lin = build_linear_branch_term(
         part,
         part.zone_edges,
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
-        view(ws.duals_p_flow, :, part.position),
-        view(ws.duals_q_flow, :, part.position),
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        view(ws.vars.p_flow.duals, :, part.position),
+        view(ws.vars.q_flow.duals, :, part.position),
         ws.interzonal,
-        ws.rho_p[],
-        ws.rho_q[],
+        ws.vars.p_flow.rho[],
+        ws.vars.q_flow.rho[],
     )
 
     @objective(part.model, Min, part.obj_base + part.quad_branch_expr + lin)
@@ -138,24 +138,24 @@ end
 function update_objective!(part::PartitionAC, ws::ACHybridWorkspace)
     lin_bus = build_linear_bus_term(
         part,
-        ws.theta_consensus,
-        ws.v_mag_consensus,
-        view(ws.duals_theta, :, part.position),
-        view(ws.duals_v_mag, :, part.position),
-        ws.rho_theta[],
-        ws.rho_v[],
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        view(ws.vars.theta.duals, :, part.position),
+        view(ws.vars.v_mag.duals, :, part.position),
+        ws.vars.theta.rho[],
+        ws.vars.v_mag.rho[],
     )
 
     lin_branch = build_linear_branch_term(
         part,
         part.zone_edges,
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
-        view(ws.duals_p_flow, :, part.position),
-        view(ws.duals_q_flow, :, part.position),
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        view(ws.vars.p_flow.duals, :, part.position),
+        view(ws.vars.q_flow.duals, :, part.position),
         ws.interzonal,
-        ws.rho_p[],
-        ws.rho_q[],
+        ws.vars.p_flow.rho[],
+        ws.vars.q_flow.rho[],
     )
 
     @objective(

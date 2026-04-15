@@ -1,7 +1,3 @@
-# ============================================================
-# ALADIN — Phase 2 primal update
-# ============================================================
-
 function primal_update!(ws::AbstractALADINWorkspace)
     a1 = ws.alpha1
     a2 = ws.alpha2

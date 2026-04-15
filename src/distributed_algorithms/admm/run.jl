@@ -11,7 +11,7 @@ end
 # FINALIZE
 # ------------------------------------------------------------
 @inline function _finalize_admm(partitions, t0_ns::Integer, iter_done::Integer)
-    total_cost = _admm_totals(partitions)
+    total_cost = _total_generation_cost(partitions)
     elapsed_s = _elapsed_s(t0_ns)
     return (;
         total_cost,
@@ -30,7 +30,7 @@ function run_admm!(ws, params::ADMMParams)
     for iter in 1:params.max_iter
         ws.iter = iter
 
-        _print_admm_iter_header!(tag, iter)
+        _print_iter_header!(tag, iter)
 
         local_solve!(ws)
         save_prev!(ws)
@@ -43,7 +43,7 @@ function run_admm!(ws, params::ADMMParams)
         _print_admm_residuals!(ws)
 
         if stop_if_converged(ws)
-            _print_admm_converged!()
+            _print_converged!()
             break
         end
 
@@ -75,8 +75,9 @@ function run_admm(
         "$(k) inicial: $(initial_rhos[k]) | $(k) final: $(final_rhos[k])"
         for k in keys(final_rhos)
     ]
-    _FAST_USE_LOGS && _print_admm_summary!(
+    _FAST_USE_LOGS && _print_summary!(
         tag_str,
+        "ADMM",
         result;
         rho_lines = rho_lines,
     )

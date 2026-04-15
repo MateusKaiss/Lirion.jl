@@ -1,6 +1,4 @@
 mutable struct AladinZoneDataAC
-    # JuMP model reference — used every iteration to walk constraints
-    # and evaluate their current duals.
     model::JuMP.Model
 
     # Flat variable layout.
@@ -15,23 +13,12 @@ mutable struct AladinZoneDataAC
     qg_cols::Vector{Int}
     curt_cols::Vector{Int}
 
-    # Cost-support data on pg (quadratic cost in p_generation).
     pg_c2_sbase2::Vector{Float64}     # 2·c2·sbase²
     pg_c1_sbase::Vector{Float64}      # c1·sbase
 
-    # Shared-bus column mappings (used by the coordinator QP when
-    # assembling State/Hybrid consensus). Aligned with
-    # `part.zone_shared_bus_ids`.
     shared_theta_cols::Vector{Int}
     shared_vm_cols::Vector{Int}
 
-    # Per-interzonal-edge layout for Power/Hybrid couplings.
-    # Each entry k corresponds to one entry in `part.zone_edges`:
-    #   edge_from_theta_col[k] = col of θ[from_bus]
-    #   edge_to_theta_col[k]   = col of θ[to_bus]
-    #   edge_from_vm_col[k]    = col of v_m[from_bus]
-    #   edge_to_vm_col[k]      = col of v_m[to_bus]
-    # And the branch parameters needed to compute ∇p_flow / ∇q_flow
     # analytically at the current y:
     edge_from_theta_col::Vector{Int}
     edge_to_theta_col::Vector{Int}
@@ -340,36 +327,6 @@ function detect_active_bounds!(zone::AladinZoneDataAC; tol::Float64 = 1e-6)
     return nothing
 end
 
-# ------------------------------------------------------------
-# Sensitivity extraction via an auxiliary MOI.Nonlinear.Model
-# ------------------------------------------------------------
-# We build a single aux NLP per zone per outer iteration. It contains:
-#
-#   * every active constraint of the zone's local JuMP model (active
-#     in the strong-complementarity sense — equalities always,
-#     inequalities when |κ_i| > tol),
-#
-#   * the generator quadratic cost as the NLP objective.
-#
-# This is exactly the `(f, g_i)` data HFD 2016 writes in Algorithm 1
-# for the evaluation of g_i, H_i, C_i at y_i:
-#
-#       g_i = ∇f(y_i)
-#       H_i = ∇²f(y_i) + Σ_{j ∈ active} κ_j ∇²g_j(y_i)
-#       C_i = [∇g_j(y_i)ᵀ]_{j ∈ active}
-#
-# MOI's reverse-mode evaluator computes all three via autodiff:
-#     MOI.eval_constraint_jacobian → C_i rows
-#     MOI.eval_hessian_lagrangian  → H_i (lower triangle; we
-#                                          symmetrise below)
-#
-# Inactive constraints are legitimately omitted because their
-# multipliers are zero at a smooth KKT point and therefore contribute
-# nothing to H_i. This is algorithmically equivalent to passing the
-# full constraint list with zero multipliers, while avoiding the
-# autodiff cost of unused derivatives.
-# ============================================================
-
 function refresh_sensitivities_ac!(
     zone::AladinZoneDataAC;
     rho::Float64 = 0.0,
@@ -460,18 +417,6 @@ function refresh_sensitivities_ac!(
         H_lower + SparseArrays.transpose(H_lower) -
         SparseArrays.spdiagm(0 => LinearAlgebra.diag(H_lower))
 
-    # Augmented-Lagrangian curvature (ρ·diag(Σ)). HFD 2016 Theorem 4.1
-    # specifies H_i ≈ ∇²L_i with the explicit "≈" allowing any positive
-    # definite approximation of the local Lagrangian Hessian. For
-    # non-convex AC OPF the raw Hessian ∇²f + Σ κ_j ∇²g_j computed
-    # above is generally indefinite (active power-balance multipliers
-    # can drive whole eigen-blocks negative), so we add the curvature
-    # of the proximal term that the Phase-1 subproblem itself
-    # optimises. The resulting block is exactly the Hessian of the
-    # PENALISED local Lagrangian, which is positive-definite by
-    # construction whenever ρ > 0 and Σ ≻ 0. This is the standard SQP
-    # construction for non-convex NLPs and recovers the canonical
-    # Newton step in the limit ρ → 0 on convex problems.
     if rho > 0.0
         add! = (col_set, σ) -> begin
             s = rho * σ
@@ -487,20 +432,6 @@ function refresh_sensitivities_ac!(
         add!(zone.curt_cols, sigma_other)
     end
 
-    # PSD projection by minimum-eigenvalue shift.
-    #
-    # For non-convex AC OPF the Lagrangian Hessian ∇²f + Σ κ_j ∇²g_j
-    # can be indefinite even after the proximal regularisation. The
-    # standard SQP remedy (used by Ipopt's interior-point algorithm
-    # and by the original ALADIN convergence proofs in HFD 2016
-    # Section 4) is to shift the diagonal of H_i so that
-    #     H_i ≽ δ · I   for some small δ > 0.
-    # We compute the smallest eigenvalue of the dense H_i and add
-    #     τ = max(0, δ − λ_min(H_i))
-    # to every diagonal entry. This is the minimum perturbation that
-    # makes H_i positive definite, preserves the eigen-directions on
-    # which the original Hessian was already curved, and degenerates
-    # to the identity transformation on convex problems.
     if n_vars > 0
         H_dense = Matrix(H_full)
         H_dense = 0.5 * (H_dense + H_dense')   # numerical symmetry
@@ -518,8 +449,6 @@ function refresh_sensitivities_ac!(
     return nothing
 end
 
-# Build the objective `f(x) = Σ (c2·pg² + c1·pg)` as a Julia Expr tree
-# referring to the real model's MOI.VariableIndex literals.
 function _build_ac_cost_expr(zone::AladinZoneDataAC)
     parts = Any[]
     @inbounds for k in eachindex(zone.pg_cols)
@@ -539,8 +468,23 @@ function _build_ac_cost_expr(zone::AladinZoneDataAC)
     return Expr(:call, :+, parts...)
 end
 
-# Hot-path return used by coordinator_qp's `_add_active_constraints!`.
 @inline build_active_jacobian(
     zone::AladinZoneDataAC;
     kwargs...,
 )::SparseArrays.SparseMatrixCSC{Float64, Int} = zone.jac_cache
+
+@inline function refresh_lagrangian_hessian!(
+    zone::AladinZoneDataAC,
+    ws::AbstractALADINWorkspace,
+)
+    refresh_sensitivities_ac!(
+        zone;
+        rho = ws.rho[],
+        sigma_theta = ws.sigma_theta,
+        sigma_vm = ws.sigma_vm,
+        sigma_pg = ws.sigma_pg,
+        sigma_qg = ws.sigma_qg,
+        sigma_other = ws.sigma_other,
+    )
+    return nothing
+end

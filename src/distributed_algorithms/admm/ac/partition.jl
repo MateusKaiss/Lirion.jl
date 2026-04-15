@@ -1,5 +1,7 @@
 # ============================================================
-# AC PARTITION INITIALIZATION
+# AC PARTITION INITIALIZATION — ADMM
+# ------------------------------------------------------------
+# See admm/dc/partition.jl header.
 # ============================================================
 
 function init_state_partition!(
@@ -9,21 +11,9 @@ function init_state_partition!(
     rho_theta::Float64,
     rho_v_mag::Float64,
 )
-    model = _setup_partition_model!(part, sys_zone, AC, optimizer_factory)
-
-    part.theta_var = model[:theta]
-    part.v_mag_var = model[:v_magnitude]
-
-    for I in keys(part.theta_var)
-        set_start_value(part.theta_var[I], 0.0)
-    end
-    for I in keys(part.v_mag_var)
-        set_start_value(part.v_mag_var[I], 1.0)
-    end
-
+    build_local_model!(part, sys_zone, State, optimizer_factory)
     build_quad_bus_expr!(part, rho_theta, rho_v_mag)
-    @objective(model, Min, part.obj_base + part.quad_bus_expr)
-
+    @objective(part.model, Min, part.obj_base + part.quad_bus_expr)
     return nothing
 end
 
@@ -35,22 +25,9 @@ function init_power_partition!(
     rho_q::Float64,
     interzonal_branches,
 )
-    part.zone_edges = _zone_cut_edges(part, interzonal_branches)
-    model = _setup_partition_model!(part, sys_zone, AC, optimizer_factory)
-
-    part.theta_var = model[:theta]
-    part.v_mag_var = model[:v_magnitude]
-
-    for I in keys(part.theta_var)
-        set_start_value(part.theta_var[I], 0.0)
-    end
-    for I in keys(part.v_mag_var)
-        set_start_value(part.v_mag_var[I], 1.0)
-    end
-
+    build_local_model!(part, sys_zone, Power, optimizer_factory, interzonal_branches)
     build_quad_branch_expr!(part, rho_p, rho_q, part.zone_edges)
-    @objective(model, Min, part.obj_base + part.quad_branch_expr)
-
+    @objective(part.model, Min, part.obj_base + part.quad_branch_expr)
     return nothing
 end
 
@@ -64,28 +41,14 @@ function init_hybrid_partition!(
     rho_q::Float64,
     interzonal_branches,
 )
-    part.zone_edges = _zone_cut_edges(part, interzonal_branches)
-    model = _setup_partition_model!(part, sys_zone, AC, optimizer_factory)
-
-    part.theta_var = model[:theta]
-    part.v_mag_var = model[:v_magnitude]
-
-    for I in keys(part.theta_var)
-        set_start_value(part.theta_var[I], 0.0)
-    end
-    for I in keys(part.v_mag_var)
-        set_start_value(part.v_mag_var[I], 1.0)
-    end
-
+    build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
     build_quad_bus_expr!(part, rho_theta, rho_v_mag)
     build_quad_branch_expr!(part, rho_p, rho_q, part.zone_edges)
-
     @objective(
-        model,
+        part.model,
         Min,
         part.obj_base + part.quad_bus_expr + part.quad_branch_expr,
     )
-
     return nothing
 end
 
@@ -101,15 +64,11 @@ function init_state_partition!(
     rho_v_mag::Float64,
 )
     n = length(partitions.parts)
-    @assert length(sys.parts) == n "DistributedSystem.parts must be aligned with partitions.parts"
-
+    @assert length(sys.parts) == n
     @inbounds for i in 1:n
         init_state_partition!(
-            partitions.parts[i],
-            sys.parts[i],
-            optimizer_factory,
-            rho_theta,
-            rho_v_mag,
+            partitions.parts[i], sys.parts[i], optimizer_factory,
+            rho_theta, rho_v_mag,
         )
     end
     return nothing
@@ -124,16 +83,11 @@ function init_power_partition!(
     interzonal_branches,
 )
     n = length(partitions.parts)
-    @assert length(sys.parts) == n "DistributedSystem.parts must be aligned with partitions.parts"
-
+    @assert length(sys.parts) == n
     @inbounds for i in 1:n
         init_power_partition!(
-            partitions.parts[i],
-            sys.parts[i],
-            optimizer_factory,
-            rho_p,
-            rho_q,
-            interzonal_branches,
+            partitions.parts[i], sys.parts[i], optimizer_factory,
+            rho_p, rho_q, interzonal_branches,
         )
     end
     return nothing
@@ -150,18 +104,11 @@ function init_hybrid_partition!(
     interzonal_branches,
 )
     n = length(partitions.parts)
-    @assert length(sys.parts) == n "DistributedSystem.parts must be aligned with partitions.parts"
-
+    @assert length(sys.parts) == n
     @inbounds for i in 1:n
         init_hybrid_partition!(
-            partitions.parts[i],
-            sys.parts[i],
-            optimizer_factory,
-            rho_theta,
-            rho_v_mag,
-            rho_p,
-            rho_q,
-            interzonal_branches,
+            partitions.parts[i], sys.parts[i], optimizer_factory,
+            rho_theta, rho_v_mag, rho_p, rho_q, interzonal_branches,
         )
     end
     return nothing

@@ -149,21 +149,21 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRStateWorkspace)
 
     lin_bus = build_linear_bus_term(
         part,
-        ws.v2_consensus,
-        view(ws.duals_v2, :, p),
-        ws.rho_v2[],
+        ws.vars.v2.consensus,
+        view(ws.vars.v2.duals, :, p),
+        ws.vars.v2.rho[],
     )
 
     lin_rt = build_linear_branch_rt_term(
         part,
         part.zone_edges,
-        ws.r_consensus,
-        ws.t_consensus,
-        view(ws.duals_r, :, p),
-        view(ws.duals_t, :, p),
+        ws.vars.r.consensus,
+        ws.vars.t.consensus,
+        view(ws.vars.r.duals, :, p),
+        view(ws.vars.t.duals, :, p),
         ws.interzonal,
-        ws.rho_r[],
-        ws.rho_t[],
+        ws.vars.r.rho[],
+        ws.vars.t.rho[],
     )
 
     @objective(part.model, Min, part.obj_static + lin_bus + lin_rt)
@@ -175,13 +175,13 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRPowerWorkspace)
     lin = build_linear_branch_pq_term(
         part,
         part.zone_edges,
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
-        view(ws.duals_p_flow, :, p),
-        view(ws.duals_q_flow, :, p),
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        view(ws.vars.p_flow.duals, :, p),
+        view(ws.vars.q_flow.duals, :, p),
         ws.interzonal,
-        ws.rho_p[],
-        ws.rho_q[],
+        ws.vars.p_flow.rho[],
+        ws.vars.q_flow.rho[],
     )
 
     @objective(part.model, Min, part.obj_static + lin)
@@ -192,33 +192,33 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRHybridWorkspace)
 
     lin_bus = build_linear_bus_term(
         part,
-        ws.v2_consensus,
-        view(ws.duals_v2, :, p),
-        ws.rho_v2[],
+        ws.vars.v2.consensus,
+        view(ws.vars.v2.duals, :, p),
+        ws.vars.v2.rho[],
     )
 
     lin_pq = build_linear_branch_pq_term(
         part,
         part.zone_edges,
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
-        view(ws.duals_p_flow, :, p),
-        view(ws.duals_q_flow, :, p),
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        view(ws.vars.p_flow.duals, :, p),
+        view(ws.vars.q_flow.duals, :, p),
         ws.interzonal,
-        ws.rho_p[],
-        ws.rho_q[],
+        ws.vars.p_flow.rho[],
+        ws.vars.q_flow.rho[],
     )
 
     lin_rt = build_linear_branch_rt_term(
         part,
         part.zone_edges,
-        ws.r_consensus,
-        ws.t_consensus,
-        view(ws.duals_r, :, p),
-        view(ws.duals_t, :, p),
+        ws.vars.r.consensus,
+        ws.vars.t.consensus,
+        view(ws.vars.r.duals, :, p),
+        view(ws.vars.t.duals, :, p),
         ws.interzonal,
-        ws.rho_r[],
-        ws.rho_t[],
+        ws.vars.r.rho[],
+        ws.vars.t.rho[],
     )
 
     @objective(part.model, Min, part.obj_static + lin_bus + lin_pq + lin_rt)

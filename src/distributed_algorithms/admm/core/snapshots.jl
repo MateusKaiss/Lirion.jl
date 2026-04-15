@@ -1,12 +1,5 @@
 # ============================================================
 # Hotpath snapshots
-# ------------------------------------------------------------
-# Allocate per-partition buffers for variable values and provide fast
-# snapshot functions that write current (or start) values from the JuMP
-# model into those buffers.
-#
-# Shared-bus local indices are read from the precomputed
-# `part.shared_bus_local_idx` (built in `build_partitions`).
 # ============================================================
 
 @inline _bus_dims(part) = (length(part.bus.id), length(part.zone_shared_bus_ids))

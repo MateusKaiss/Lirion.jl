@@ -2,10 +2,6 @@
 # ADMM Rho Adaptation & Refresh — unified for DC · AC · SOCWR
 # ============================================================
 
-# ############################################################
-#  CORE: adaptive penalty parameter
-# ############################################################
-
 # Boyd et al. adaptive scheme:
 #   if r > mu_incr * s  →  rho *= tau_incr
 #   if s > mu_decr * r  →  rho *= tau_decr
@@ -29,12 +25,7 @@ end
     )
 end
 
-# ############################################################
-#  REFRESH: rebuild quadratic terms when rho changes
-# ############################################################
-
 # ---- DC bus ----
-# Returns `true` iff ρ changed (so the caller can rebuild obj_static).
 function _refresh_rho_bus_dc!(parts::Partitions{PartitionDC}, rho, prev_rho)::Bool
     rho_val = rho[]
     rho_val == prev_rho[] && return false
@@ -155,9 +146,6 @@ function _refresh_rho_branch_pq_socwr!(
 end
 
 # ---- SOCWR Hybrid (all groups) ----
-# NOTE: unified refresh (instead of calling 3 separate helpers like DC/AC Hybrid)
-# because obj_static depends on v2, pq, AND rt — doing it in one pass avoids
-# rebuilding obj_static up to 3 times.
 function _refresh_rho_hybrid_socwr!(
     parts,
     rho_v2, prev_rho_v2,
@@ -199,13 +187,9 @@ function _refresh_rho_hybrid_socwr!(
     return nothing
 end
 
-# ############################################################
-#  DISPATCH: refresh_rho!(ws)
-# ############################################################
-
 # ---- DC ----
 function refresh_rho!(ws::DCStateWorkspace)
-    if _refresh_rho_bus_dc!(ws.partitions, ws.rho_theta, ws.prev_rho_theta)
+    if _refresh_rho_bus_dc!(ws.partitions, ws.vars.theta.rho, ws.vars.theta.prev_rho)
         @inbounds for part in ws.partitions.parts
             part.obj_static = part.obj_base + part.quad_bus_expr
         end
@@ -214,7 +198,7 @@ function refresh_rho!(ws::DCStateWorkspace)
 end
 
 function refresh_rho!(ws::DCPowerWorkspace)
-    if _refresh_rho_branch_dc!(ws.partitions, ws.rho_p, ws.prev_rho_p)
+    if _refresh_rho_branch_dc!(ws.partitions, ws.vars.p_flow.rho, ws.vars.p_flow.prev_rho)
         @inbounds for part in ws.partitions.parts
             part.obj_static = part.obj_base + part.quad_branch_expr
         end
@@ -224,9 +208,9 @@ end
 
 function refresh_rho!(ws::DCHybridWorkspace)
     bus_changed =
-        _refresh_rho_bus_dc!(ws.partitions, ws.rho_theta, ws.prev_rho_theta)
+        _refresh_rho_bus_dc!(ws.partitions, ws.vars.theta.rho, ws.vars.theta.prev_rho)
     branch_changed =
-        _refresh_rho_branch_dc!(ws.partitions, ws.rho_p, ws.prev_rho_p)
+        _refresh_rho_branch_dc!(ws.partitions, ws.vars.p_flow.rho, ws.vars.p_flow.prev_rho)
     if bus_changed || branch_changed
         @inbounds for part in ws.partitions.parts
             part.obj_static =
@@ -239,76 +223,71 @@ end
 # ---- AC ----
 refresh_rho!(ws::ACStateWorkspace) = _refresh_rho_bus_ac!(
     ws.partitions,
-    ws.rho_theta, ws.prev_rho_theta,
-    ws.rho_v, ws.prev_rho_v,
+    ws.vars.theta.rho, ws.vars.theta.prev_rho,
+    ws.vars.v_mag.rho, ws.vars.v_mag.prev_rho,
 )
 
 refresh_rho!(ws::ACPowerWorkspace) = _refresh_rho_branch_ac!(
     ws.partitions,
-    ws.rho_p, ws.prev_rho_p,
-    ws.rho_q, ws.prev_rho_q,
+    ws.vars.p_flow.rho, ws.vars.p_flow.prev_rho,
+    ws.vars.q_flow.rho, ws.vars.q_flow.prev_rho,
 )
 
 function refresh_rho!(ws::ACHybridWorkspace)
     _refresh_rho_bus_ac!(
         ws.partitions,
-        ws.rho_theta, ws.prev_rho_theta,
-        ws.rho_v, ws.prev_rho_v,
+        ws.vars.theta.rho, ws.vars.theta.prev_rho,
+        ws.vars.v_mag.rho, ws.vars.v_mag.prev_rho,
     )
     _refresh_rho_branch_ac!(
         ws.partitions,
-        ws.rho_p, ws.prev_rho_p,
-        ws.rho_q, ws.prev_rho_q,
+        ws.vars.p_flow.rho, ws.vars.p_flow.prev_rho,
+        ws.vars.q_flow.rho, ws.vars.q_flow.prev_rho,
     )
     return nothing
 end
 
 # ---- SOCWR ----
 function refresh_rho!(ws::SOCWRStateWorkspace)
-    _refresh_rho_bus_socwr!(ws.partitions, ws.rho_v2, ws.prev_rho_v2)
+    _refresh_rho_bus_socwr!(ws.partitions, ws.vars.v2.rho, ws.vars.v2.prev_rho)
     _refresh_rho_branch_rt_socwr!(
         ws.partitions,
-        ws.rho_r, ws.prev_rho_r,
-        ws.rho_t, ws.prev_rho_t,
+        ws.vars.r.rho, ws.vars.r.prev_rho,
+        ws.vars.t.rho, ws.vars.t.prev_rho,
     )
     return nothing
 end
 
 refresh_rho!(ws::SOCWRPowerWorkspace) = _refresh_rho_branch_pq_socwr!(
     ws.partitions,
-    ws.rho_p, ws.prev_rho_p,
-    ws.rho_q, ws.prev_rho_q,
+    ws.vars.p_flow.rho, ws.vars.p_flow.prev_rho,
+    ws.vars.q_flow.rho, ws.vars.q_flow.prev_rho,
 )
 
 function refresh_rho!(ws::SOCWRHybridWorkspace)
     return _refresh_rho_hybrid_socwr!(
         ws.partitions,
-        ws.rho_v2, ws.prev_rho_v2,
-        ws.rho_p, ws.prev_rho_p,
-        ws.rho_q, ws.prev_rho_q,
-        ws.rho_r, ws.prev_rho_r,
-        ws.rho_t, ws.prev_rho_t,
+        ws.vars.v2.rho, ws.vars.v2.prev_rho,
+        ws.vars.p_flow.rho, ws.vars.p_flow.prev_rho,
+        ws.vars.q_flow.rho, ws.vars.q_flow.prev_rho,
+        ws.vars.r.rho, ws.vars.r.prev_rho,
+        ws.vars.t.rho, ws.vars.t.prev_rho,
     )
 end
 
-# Fallback for any workspace type not explicitly handled
 refresh_rho!(::AbstractADMMWorkspace) = nothing
-
-# ############################################################
-#  DISPATCH: rho_update!(ws, params)
-# ############################################################
 
 # ---- DC State ----
 function rho_update!(ws::DCStateWorkspace, params::ADMMParams)
     params.adaptive || return nothing
-    _adapt!(ws.rho_theta, ws.r_primal, ws.r_dual, params)
+    _adapt!(ws.vars.theta.rho, ws.r_primal, ws.r_dual, params)
     return nothing
 end
 
 # ---- DC Power ----
 function rho_update!(ws::DCPowerWorkspace, params::ADMMParams)
     params.adaptive || return nothing
-    _adapt!(ws.rho_p, ws.r_primal, ws.r_dual, params)
+    _adapt!(ws.vars.p_flow.rho, ws.r_primal, ws.r_dual, params)
     return nothing
 end
 
@@ -316,8 +295,8 @@ end
 function rho_update!(ws::DCHybridWorkspace, params::ADMMParams)
     params.adaptive || return nothing
 
-    _adapt!(ws.rho_theta, ws.r_primal_bus, ws.r_dual_bus, params)
-    _adapt!(ws.rho_p, ws.r_primal_branch, ws.r_dual_branch, params)
+    _adapt!(ws.vars.theta.rho, ws.r_primal_bus, ws.r_dual_bus, params)
+    _adapt!(ws.vars.p_flow.rho, ws.r_primal_branch, ws.r_dual_branch, params)
     return nothing
 end
 
@@ -325,8 +304,8 @@ end
 function rho_update!(ws::ACStateWorkspace, params::ADMMParams)
     params.adaptive || return nothing
 
-    _adapt!(ws.rho_theta, ws.r_primal_theta, ws.r_dual_theta, params)
-    _adapt!(ws.rho_v, ws.r_primal_v_mag, ws.r_dual_v_mag, params)
+    _adapt!(ws.vars.theta.rho, ws.r_primal_theta, ws.r_dual_theta, params)
+    _adapt!(ws.vars.v_mag.rho, ws.r_primal_v_mag, ws.r_dual_v_mag, params)
     return nothing
 end
 
@@ -334,8 +313,8 @@ end
 function rho_update!(ws::ACPowerWorkspace, params::ADMMParams)
     params.adaptive || return nothing
 
-    _adapt!(ws.rho_p, ws.r_primal_p, ws.r_dual_p, params)
-    _adapt!(ws.rho_q, ws.r_primal_q, ws.r_dual_q, params)
+    _adapt!(ws.vars.p_flow.rho, ws.r_primal_p, ws.r_dual_p, params)
+    _adapt!(ws.vars.q_flow.rho, ws.r_primal_q, ws.r_dual_q, params)
     return nothing
 end
 
@@ -343,10 +322,10 @@ end
 function rho_update!(ws::ACHybridWorkspace, params::ADMMParams)
     params.adaptive || return nothing
 
-    _adapt!(ws.rho_theta, ws.r_primal_theta, ws.r_dual_theta, params)
-    _adapt!(ws.rho_v, ws.r_primal_v_mag, ws.r_dual_v_mag, params)
-    _adapt!(ws.rho_p, ws.r_primal_p, ws.r_dual_p, params)
-    _adapt!(ws.rho_q, ws.r_primal_q, ws.r_dual_q, params)
+    _adapt!(ws.vars.theta.rho, ws.r_primal_theta, ws.r_dual_theta, params)
+    _adapt!(ws.vars.v_mag.rho, ws.r_primal_v_mag, ws.r_dual_v_mag, params)
+    _adapt!(ws.vars.p_flow.rho, ws.r_primal_p, ws.r_dual_p, params)
+    _adapt!(ws.vars.q_flow.rho, ws.r_primal_q, ws.r_dual_q, params)
     return nothing
 end
 
@@ -354,9 +333,9 @@ end
 function rho_update!(ws::SOCWRStateWorkspace, params::ADMMParams)
     params.adaptive || return nothing
 
-    _adapt!(ws.rho_v2, ws.r_primal_bus, ws.r_dual_bus, params)
-    _adapt!(ws.rho_r, ws.r_primal_r, ws.r_dual_r, params)
-    _adapt!(ws.rho_t, ws.r_primal_t, ws.r_dual_t, params)
+    _adapt!(ws.vars.v2.rho, ws.r_primal_bus, ws.r_dual_bus, params)
+    _adapt!(ws.vars.r.rho, ws.r_primal_r, ws.r_dual_r, params)
+    _adapt!(ws.vars.t.rho, ws.r_primal_t, ws.r_dual_t, params)
     return nothing
 end
 
@@ -364,8 +343,8 @@ end
 function rho_update!(ws::SOCWRPowerWorkspace, params::ADMMParams)
     params.adaptive || return nothing
 
-    _adapt!(ws.rho_p, ws.r_primal_p, ws.r_dual_p, params)
-    _adapt!(ws.rho_q, ws.r_primal_q, ws.r_dual_q, params)
+    _adapt!(ws.vars.p_flow.rho, ws.r_primal_p, ws.r_dual_p, params)
+    _adapt!(ws.vars.q_flow.rho, ws.r_primal_q, ws.r_dual_q, params)
     return nothing
 end
 
@@ -373,10 +352,10 @@ end
 function rho_update!(ws::SOCWRHybridWorkspace, params::ADMMParams)
     params.adaptive || return nothing
 
-    _adapt!(ws.rho_v2, ws.r_primal_bus, ws.r_dual_bus, params)
-    _adapt!(ws.rho_p, ws.r_primal_p, ws.r_dual_p, params)
-    _adapt!(ws.rho_q, ws.r_primal_q, ws.r_dual_q, params)
-    _adapt!(ws.rho_r, ws.r_primal_r, ws.r_dual_r, params)
-    _adapt!(ws.rho_t, ws.r_primal_t, ws.r_dual_t, params)
+    _adapt!(ws.vars.v2.rho, ws.r_primal_bus, ws.r_dual_bus, params)
+    _adapt!(ws.vars.p_flow.rho, ws.r_primal_p, ws.r_dual_p, params)
+    _adapt!(ws.vars.q_flow.rho, ws.r_primal_q, ws.r_dual_q, params)
+    _adapt!(ws.vars.r.rho, ws.r_primal_r, ws.r_dual_r, params)
+    _adapt!(ws.vars.t.rho, ws.r_primal_t, ws.r_dual_t, params)
     return nothing
 end

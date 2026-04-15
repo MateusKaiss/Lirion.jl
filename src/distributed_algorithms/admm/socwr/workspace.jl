@@ -1,9 +1,6 @@
 # ============================================================
 # SOCWR WORKSPACES
 # ============================================================
-# Phase 4b: per-consensus-variable data lives in `vars::NamedTuple`
-# of `VarState` objects.
-# ============================================================
 
 # ============================================================
 # STATE (V² + R/T)
@@ -28,8 +25,12 @@ Base.@kwdef mutable struct SOCWRStateWorkspace <: AbstractADMMWorkspace
     r_dual_r::Float64 = 0.0
     r_dual_t::Float64 = 0.0
 
-    residuals::ResidualMetrics = ResidualMetrics()
-    state::IterationState = IterationState()
+    r_primal::Float64 = 0.0
+    r_dual::Float64 = 0.0
+    eps_primal::Float64 = 0.0
+    eps_dual::Float64 = 0.0
+    iter::Int = 0
+    hist::ADMMHistory = ADMMHistory()
 end
 
 # ============================================================
@@ -52,8 +53,12 @@ Base.@kwdef mutable struct SOCWRPowerWorkspace <: AbstractADMMWorkspace
     r_dual_p::Float64 = 0.0
     r_dual_q::Float64 = 0.0
 
-    residuals::ResidualMetrics = ResidualMetrics()
-    state::IterationState = IterationState()
+    r_primal::Float64 = 0.0
+    r_dual::Float64 = 0.0
+    eps_primal::Float64 = 0.0
+    eps_dual::Float64 = 0.0
+    iter::Int = 0
+    hist::ADMMHistory = ADMMHistory()
 end
 
 # ============================================================
@@ -86,8 +91,12 @@ Base.@kwdef mutable struct SOCWRHybridWorkspace <: AbstractADMMWorkspace
     r_dual_r::Float64 = 0.0
     r_dual_t::Float64 = 0.0
 
-    residuals::ResidualMetrics = ResidualMetrics()
-    state::IterationState = IterationState()
+    r_primal::Float64 = 0.0
+    r_dual::Float64 = 0.0
+    eps_primal::Float64 = 0.0
+    eps_dual::Float64 = 0.0
+    iter::Int = 0
+    hist::ADMMHistory = ADMMHistory()
 end
 
 # ============================================================
@@ -95,22 +104,22 @@ end
 # ============================================================
 
 _get_rhos(ws::SOCWRStateWorkspace) = (
-    rho_v2 = ws.rho_v2[],
-    rho_r = ws.rho_r[],
-    rho_t = ws.rho_t[],
+    rho_v2 = ws.vars.v2.rho[],
+    rho_r = ws.vars.r.rho[],
+    rho_t = ws.vars.t.rho[],
 )
 
 _get_rhos(ws::SOCWRPowerWorkspace) = (
-    rho_p = ws.rho_p[],
-    rho_q = ws.rho_q[],
+    rho_p = ws.vars.p_flow.rho[],
+    rho_q = ws.vars.q_flow.rho[],
 )
 
 _get_rhos(ws::SOCWRHybridWorkspace) = (
-    rho_v2 = ws.rho_v2[],
-    rho_p = ws.rho_p[],
-    rho_q = ws.rho_q[],
-    rho_r = ws.rho_r[],
-    rho_t = ws.rho_t[],
+    rho_v2 = ws.vars.v2.rho[],
+    rho_p = ws.vars.p_flow.rho[],
+    rho_q = ws.vars.q_flow.rho[],
+    rho_r = ws.vars.r.rho[],
+    rho_t = ws.vars.t.rho[],
 )
 
 # ============================================================
@@ -137,8 +146,8 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCW
 
     vars = (
         v2 = VarState(n_shared, n_zones, config.rho_v2; init_value = 1.0),
-        r  = VarState(n_inter,  n_zones, config.rho_r),
-        t  = VarState(n_inter,  n_zones, config.rho_t),
+        r = VarState(n_inter, n_zones, config.rho_r),
+        t = VarState(n_inter, n_zones, config.rho_t),
     )
 
     return SOCWRStateWorkspace(;
@@ -210,11 +219,11 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOC
     )
 
     vars = (
-        v2     = VarState(n_shared, n_zones, config.rho_v2; init_value = 1.0),
-        p_flow = VarState(n_inter,  n_zones, config.rho_p),
-        q_flow = VarState(n_inter,  n_zones, config.rho_q),
-        r      = VarState(n_inter,  n_zones, config.rho_r),
-        t      = VarState(n_inter,  n_zones, config.rho_t),
+        v2 = VarState(n_shared, n_zones, config.rho_v2; init_value = 1.0),
+        p_flow = VarState(n_inter, n_zones, config.rho_p),
+        q_flow = VarState(n_inter, n_zones, config.rho_q),
+        r = VarState(n_inter, n_zones, config.rho_r),
+        t = VarState(n_inter, n_zones, config.rho_t),
     )
 
     return SOCWRHybridWorkspace(;

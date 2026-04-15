@@ -9,7 +9,7 @@ function _consensus_bus_single!(
     consensus::Vector{Float64},
     counts::Vector{Int},
     partitions::Partitions,
-    snapshot_fn,    # (part) -> Vector{Float64}: shared-bus values
+    snapshot_fn,
 )
     fill!(consensus, 0.0)
     fill!(counts, 0)
@@ -136,8 +136,6 @@ end
 # ------------------------------------------------------------
 # Branch consensus: AC P/Q (with isfinite checks for NLP)
 # ------------------------------------------------------------
-# Uses independent P/Q counters: NLP flows can be NaN, and we don't want
-# a bad P to poison Q (or vice versa).
 function _consensus_branch_ac!(
     p_consensus::Vector{Float64},
     q_consensus::Vector{Float64},
@@ -186,7 +184,7 @@ end
 
 consensus!(ws::DCStateWorkspace) =
     _consensus_bus_single!(
-        ws.theta_consensus,
+        ws.vars.theta.consensus,
         ws.bus_counts,
         ws.partitions,
         snapshot_theta_shared!,
@@ -194,7 +192,7 @@ consensus!(ws::DCStateWorkspace) =
 
 consensus!(ws::DCPowerWorkspace) =
     _consensus_branch_single!(
-        ws.p_flow_consensus,
+        ws.vars.p_flow.consensus,
         ws.branch_counts,
         ws.partitions,
         ws.interzonal,
@@ -203,13 +201,13 @@ consensus!(ws::DCPowerWorkspace) =
 
 function consensus!(ws::DCHybridWorkspace)
     _consensus_bus_single!(
-        ws.theta_consensus,
+        ws.vars.theta.consensus,
         ws.bus_counts,
         ws.partitions,
         snapshot_theta_shared!,
     )
     _consensus_branch_single!(
-        ws.p_flow_consensus,
+        ws.vars.p_flow.consensus,
         ws.branch_counts,
         ws.partitions,
         ws.interzonal,
@@ -222,8 +220,8 @@ end
 
 consensus!(ws::ACStateWorkspace) =
     _consensus_bus_ac!(
-        ws.theta_consensus,
-        ws.v_mag_consensus,
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
         ws.sin_sum,
         ws.cos_sum,
         ws.bus_counts,
@@ -232,8 +230,8 @@ consensus!(ws::ACStateWorkspace) =
 
 consensus!(ws::ACPowerWorkspace) =
     _consensus_branch_ac!(
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
         ws.p_branch_counts,
         ws.q_branch_counts,
         ws.partitions,
@@ -242,16 +240,16 @@ consensus!(ws::ACPowerWorkspace) =
 
 function consensus!(ws::ACHybridWorkspace)
     _consensus_bus_ac!(
-        ws.theta_consensus,
-        ws.v_mag_consensus,
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
         ws.sin_sum,
         ws.cos_sum,
         ws.bus_counts,
         ws.partitions,
     )
     _consensus_branch_ac!(
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
         ws.p_branch_counts,
         ws.q_branch_counts,
         ws.partitions,
@@ -264,14 +262,14 @@ end
 
 function consensus!(ws::SOCWRStateWorkspace)
     _consensus_bus_single!(
-        ws.v2_consensus,
+        ws.vars.v2.consensus,
         ws.bus_counts,
         ws.partitions,
         snapshot_v2_shared!,
     )
     _consensus_branch_paired!(
-        ws.r_consensus,
-        ws.t_consensus,
+        ws.vars.r.consensus,
+        ws.vars.t.consensus,
         ws.branch_counts,
         ws.partitions,
         ws.interzonal,
@@ -282,8 +280,8 @@ end
 
 consensus!(ws::SOCWRPowerWorkspace) =
     _consensus_branch_paired!(
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
         ws.branch_counts,
         ws.partitions,
         ws.interzonal,
@@ -292,22 +290,22 @@ consensus!(ws::SOCWRPowerWorkspace) =
 
 function consensus!(ws::SOCWRHybridWorkspace)
     _consensus_bus_single!(
-        ws.v2_consensus,
+        ws.vars.v2.consensus,
         ws.bus_counts,
         ws.partitions,
         snapshot_v2_shared!,
     )
     _consensus_branch_paired!(
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
         ws.branch_counts,
         ws.partitions,
         ws.interzonal,
         _socwr_pq_values,
     )
     _consensus_branch_paired!(
-        ws.r_consensus,
-        ws.t_consensus,
+        ws.vars.r.consensus,
+        ws.vars.t.consensus,
         ws.branch_counts,
         ws.partitions,
         ws.interzonal,

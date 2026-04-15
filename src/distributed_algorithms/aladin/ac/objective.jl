@@ -62,8 +62,8 @@ end
         else
             continue
         end
-        JuMP.add_to_expression!(lin, sign * ws.lambda_theta[k], zdata.all_vars[θ_col])
-        JuMP.add_to_expression!(lin, sign * ws.lambda_vm[k], zdata.all_vars[vm_col])
+        JuMP.add_to_expression!(lin, sign * ws.vars.theta.lambda[k], zdata.all_vars[θ_col])
+        JuMP.add_to_expression!(lin, sign * ws.vars.v_mag.lambda[k], zdata.all_vars[vm_col])
     end
     return lin
 end
@@ -97,8 +97,8 @@ function _lambda_edge_pq_ac!(
         edge_global = pair.edge_global
         l = branch_map[edge_global]
         l == 0 && continue
-        lp = sign * ws.lambda_p[k]
-        lq = sign * ws.lambda_q[k]
+        lp = sign * ws.vars.p_flow.lambda[k]
+        lq = sign * ws.vars.q_flow.lambda[k]
         obj_expr += lp * part_pf[l, 1] + lq * part_qf[l, 1]
     end
     return obj_expr
@@ -144,10 +144,6 @@ function update_objective!(part::PartitionAC, ws::ACPowerWorkspaceALADIN)
         sigma_other = ws.sigma_other,
     )
 
-    # Power coupling: λ_p·pf + λ_q·qf on interzonal branches. Because
-    # pf/qf are JuMP @expression objects, we build the full objective
-    # using `@objective` with them referenced directly rather than
-    # accumulating into an AffExpr (which would lose the nonlinearity).
     obj_expr = part.obj_base + quad
     obj_expr = _lambda_edge_pq_ac!(model, obj_expr, ws, zone_pos)
     @objective(model, Min, obj_expr)

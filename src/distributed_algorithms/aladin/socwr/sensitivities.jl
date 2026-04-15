@@ -26,20 +26,8 @@ mutable struct AladinZoneDataSOCWR
 
     # Shared-bus v² column mapping (one entry per part.zone_shared_bus_ids).
     shared_v2_cols::Vector{Int}
-
-    # Per-interzonal-edge column mapping on R and T. Aligned with
-    # `part.zone_edges`; entry k gives the local columns of R[l,1]
-    # and T_var[l,1] where l = branch_idx_full_to_zone[zone_edges[k]].
     edge_r_cols::Vector{Int}
     edge_t_cols::Vector{Int}
-
-    # Per-interzonal-edge affine expansion of p_flow_branches[l,1] and
-    # q_flow_branches[l,1]. SOCWR flows are linear in (v², R, T), so
-    # for each edge k we store the sparse (col, coef) pairs of the
-    # expansion plus the constant term. The gradient w.r.t. the zone's
-    # variables is CONSTANT (independent of y) — a significant
-    # simplification over AC, where the flow linearisation must be
-    # recomputed at every Phase-1 solution.
     edge_flow_cols::Vector{Vector{Int}}
     edge_pflow_coefs::Vector{Vector{Float64}}
     edge_qflow_coefs::Vector{Vector{Float64}}
@@ -672,4 +660,26 @@ function build_active_jacobian(
     end
 
     return _delete_dependent_rows(C_stacked; tol = dep_tol)
+end
+
+# ------------------------------------------------------------
+# Sensitivity refresh hook (called from aladin/core/local_solve.jl)
+# ------------------------------------------------------------
+
+@inline function refresh_lagrangian_hessian!(
+    zone::AladinZoneDataSOCWR,
+    ws::AbstractALADINWorkspace,
+)
+    _refresh_hess_diag!(
+        zone,
+        ws.rho[];
+        sigma_theta = ws.sigma_theta,
+        sigma_v2 = ws.sigma_v2,
+        sigma_r = ws.sigma_r,
+        sigma_t = ws.sigma_t,
+        sigma_pg = ws.sigma_pg,
+        sigma_qg = ws.sigma_qg,
+        sigma_other = ws.sigma_other,
+    )
+    return nothing
 end

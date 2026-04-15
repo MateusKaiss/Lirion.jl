@@ -1,6 +1,5 @@
 # ============================================================
-# ALADIN-SOCWR — Phase 2 Coordinator QP (canonical HFD 2016)
-# ------------------------------------------------------------
+# ALADIN-SOCWR — Phase 2 Coordinator QP
 # ============================================================
 
 @inline function _add_zone_cost!(
@@ -20,11 +19,6 @@
     end
     return nothing
 end
-
-# ------------------------------------------------------------
-# Consensus row helpers
-#   (y_i + Δy_i) - (y_j + Δy_j) = s
-# ------------------------------------------------------------
 
 @inline function _bus_v2_expr_socwr!(
     expr::JuMP.AffExpr,
@@ -76,31 +70,6 @@ end
     JuMP.add_to_expression!(expr, 1.0, dy_all[pair.zone_i][ti_col])
     JuMP.add_to_expression!(expr, -1.0, dy_all[pair.zone_j][tj_col])
     return expr
-end
-
-# ------------------------------------------------------------
-# Flow value / affine linearisation helpers (p and q)
-# ------------------------------------------------------------
-#
-# SOCWR flow = Σ coef_k · x_k + const. At the current y this is a
-# scalar; adding `coef_k · Δx_k` gives the flow at y + Δy, which the
-# coordinator QP uses as the linearised consensus row. Because the
-# flow is already affine, the linearisation is exact.
-
-@inline function _socwr_flow_value_at_y(
-    zone::AladinZoneDataSOCWR,
-    le::Int,
-    which::Symbol,
-)::Float64
-    cols = zone.edge_flow_cols[le]
-    coefs = which === :p ? zone.edge_pflow_coefs[le] : zone.edge_qflow_coefs[le]
-    const_val = which === :p ? zone.edge_pflow_const[le] : zone.edge_qflow_const[le]
-    acc = const_val
-    y = zone.y
-    @inbounds for i in eachindex(cols)
-        acc += coefs[i] * y[cols[i]]
-    end
-    return acc
 end
 
 @inline function _add_socwr_flow_grad!(
@@ -198,13 +167,13 @@ function solve_coordinator_qp!(ws::SOCWRStateWorkspaceALADIN)
 
     mu = ws.mu[]
     @inbounds for k in 1:n_bus
-        JuMP.add_to_expression!(qp_obj, ws.lambda_v2[k], s_v2[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.v2.lambda[k], s_v2[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_v2[k], s_v2[k])
     end
     @inbounds for k in 1:n_edge
-        JuMP.add_to_expression!(qp_obj, ws.lambda_r[k], s_r[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.r.lambda[k], s_r[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_r[k], s_r[k])
-        JuMP.add_to_expression!(qp_obj, ws.lambda_t[k], s_t[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.t.lambda[k], s_t[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_t[k], s_t[k])
     end
     JuMP.@objective(model, Min, qp_obj)
@@ -233,9 +202,9 @@ function solve_coordinator_qp!(ws::SOCWRStateWorkspaceALADIN)
 
     _extract_delta_socwr!(ws, dy_all)
 
-    nu_v2 = Vector{Float64}(undef, n_bus)
-    nu_r = Vector{Float64}(undef, n_edge)
-    nu_t = Vector{Float64}(undef, n_edge)
+    nu_v2 = ws.vars.v2.nu
+    nu_r = ws.vars.r.nu
+    nu_t = ws.vars.t.nu
     @inbounds for k in 1:n_bus
         nu_v2[k] = -JuMP.dual(cons_v2[k])
     end
@@ -243,7 +212,7 @@ function solve_coordinator_qp!(ws::SOCWRStateWorkspaceALADIN)
         nu_r[k] = -JuMP.dual(cons_r[k])
         nu_t[k] = -JuMP.dual(cons_t[k])
     end
-    return (nu_v2 = nu_v2, nu_r = nu_r, nu_t = nu_t)
+    return nothing
 end
 
 # ------------------------------------------------------------
@@ -260,9 +229,9 @@ function solve_coordinator_qp!(ws::SOCWRPowerWorkspaceALADIN)
 
     mu = ws.mu[]
     @inbounds for k in 1:n_edge
-        JuMP.add_to_expression!(qp_obj, ws.lambda_p[k], s_p[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.p_flow.lambda[k], s_p[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_p[k], s_p[k])
-        JuMP.add_to_expression!(qp_obj, ws.lambda_q[k], s_q[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.q_flow.lambda[k], s_q[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_q[k], s_q[k])
     end
     JuMP.@objective(model, Min, qp_obj)
@@ -284,13 +253,13 @@ function solve_coordinator_qp!(ws::SOCWRPowerWorkspaceALADIN)
 
     _extract_delta_socwr!(ws, dy_all)
 
-    nu_p = Vector{Float64}(undef, n_edge)
-    nu_q = Vector{Float64}(undef, n_edge)
+    nu_p = ws.vars.p_flow.nu
+    nu_q = ws.vars.q_flow.nu
     @inbounds for k in 1:n_edge
         nu_p[k] = -JuMP.dual(cons_p[k])
         nu_q[k] = -JuMP.dual(cons_q[k])
     end
-    return (nu_p = nu_p, nu_q = nu_q)
+    return nothing
 end
 
 # ------------------------------------------------------------
@@ -311,17 +280,17 @@ function solve_coordinator_qp!(ws::SOCWRHybridWorkspaceALADIN)
 
     mu = ws.mu[]
     @inbounds for k in 1:n_bus
-        JuMP.add_to_expression!(qp_obj, ws.lambda_v2[k], s_v2[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.v2.lambda[k], s_v2[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_v2[k], s_v2[k])
     end
     @inbounds for k in 1:n_edge
-        JuMP.add_to_expression!(qp_obj, ws.lambda_r[k], s_r[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.r.lambda[k], s_r[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_r[k], s_r[k])
-        JuMP.add_to_expression!(qp_obj, ws.lambda_t[k], s_t[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.t.lambda[k], s_t[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_t[k], s_t[k])
-        JuMP.add_to_expression!(qp_obj, ws.lambda_p[k], s_p[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.p_flow.lambda[k], s_p[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_p[k], s_p[k])
-        JuMP.add_to_expression!(qp_obj, ws.lambda_q[k], s_q[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.q_flow.lambda[k], s_q[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_q[k], s_q[k])
     end
     JuMP.@objective(model, Min, qp_obj)
@@ -360,11 +329,11 @@ function solve_coordinator_qp!(ws::SOCWRHybridWorkspaceALADIN)
 
     _extract_delta_socwr!(ws, dy_all)
 
-    nu_v2 = Vector{Float64}(undef, n_bus)
-    nu_r = Vector{Float64}(undef, n_edge)
-    nu_t = Vector{Float64}(undef, n_edge)
-    nu_p = Vector{Float64}(undef, n_edge)
-    nu_q = Vector{Float64}(undef, n_edge)
+    nu_v2 = ws.vars.v2.nu
+    nu_r = ws.vars.r.nu
+    nu_t = ws.vars.t.nu
+    nu_p = ws.vars.p_flow.nu
+    nu_q = ws.vars.q_flow.nu
     @inbounds for k in 1:n_bus
         nu_v2[k] = -JuMP.dual(cons_v2[k])
     end
@@ -374,11 +343,5 @@ function solve_coordinator_qp!(ws::SOCWRHybridWorkspaceALADIN)
         nu_p[k] = -JuMP.dual(cons_p[k])
         nu_q[k] = -JuMP.dual(cons_q[k])
     end
-    return (
-        nu_v2 = nu_v2,
-        nu_r = nu_r,
-        nu_t = nu_t,
-        nu_p = nu_p,
-        nu_q = nu_q,
-    )
+    return nothing
 end

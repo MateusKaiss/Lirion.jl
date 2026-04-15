@@ -33,25 +33,6 @@
     return nothing
 end
 
-# ------------------------------------------------------------
-# Closed-form branch flow values + gradients for the coupling rows
-# ------------------------------------------------------------
-#
-# Lirion's AC forward flows (see src/modeling/branch/ac.jl):
-#
-#   p_f = g · (inv_tap · v_f)²
-#        − inv_tap · v_f · v_t · ( g·cos(Δθ) + b·sin(Δθ) )
-#
-#   q_f = −(b + b_sh/2) · (inv_tap · v_f)²
-#        − inv_tap · v_f · v_t · (−b·cos(Δθ) + g·sin(Δθ) )
-#
-# where Δθ = θ_f − θ_t − tap_angle.
-#
-# We need p_f(y), q_f(y) and their gradients w.r.t. the four
-# variables (v_f, v_t, θ_f, θ_t) to assemble the Phase-2 consensus
-# rows. All derivatives are obtained by hand from the formulas above
-# — no autodiff is needed for this linearisation step.
-
 struct _ACFlowLin
     pf::Float64
     qf::Float64
@@ -242,9 +223,9 @@ function solve_coordinator_qp!(ws::ACStateWorkspaceALADIN)
 
     mu = ws.mu[]
     @inbounds for k in 1:n_bus
-        JuMP.add_to_expression!(qp_obj, ws.lambda_theta[k], s_theta[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.theta.lambda[k], s_theta[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_theta[k], s_theta[k])
-        JuMP.add_to_expression!(qp_obj, ws.lambda_vm[k], s_vm[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.v_mag.lambda[k], s_vm[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_vm[k], s_vm[k])
     end
     JuMP.@objective(model, Min, qp_obj)
@@ -266,13 +247,13 @@ function solve_coordinator_qp!(ws::ACStateWorkspaceALADIN)
 
     _extract_delta!(ws, dy_all)
 
-    nu_theta = Vector{Float64}(undef, n_bus)
-    nu_vm = Vector{Float64}(undef, n_bus)
+    nu_theta = ws.vars.theta.nu
+    nu_vm = ws.vars.v_mag.nu
     @inbounds for k in 1:n_bus
         nu_theta[k] = -JuMP.dual(cons_theta[k])
         nu_vm[k] = -JuMP.dual(cons_vm[k])
     end
-    return (nu_theta = nu_theta, nu_vm = nu_vm)
+    return nothing
 end
 
 # ------------------------------------------------------------
@@ -288,9 +269,9 @@ function solve_coordinator_qp!(ws::ACPowerWorkspaceALADIN)
 
     mu = ws.mu[]
     @inbounds for k in 1:n_edge
-        JuMP.add_to_expression!(qp_obj, ws.lambda_p[k], s_p[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.p_flow.lambda[k], s_p[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_p[k], s_p[k])
-        JuMP.add_to_expression!(qp_obj, ws.lambda_q[k], s_q[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.q_flow.lambda[k], s_q[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_q[k], s_q[k])
     end
     JuMP.@objective(model, Min, qp_obj)
@@ -312,13 +293,13 @@ function solve_coordinator_qp!(ws::ACPowerWorkspaceALADIN)
 
     _extract_delta!(ws, dy_all)
 
-    nu_p = Vector{Float64}(undef, n_edge)
-    nu_q = Vector{Float64}(undef, n_edge)
+    nu_p = ws.vars.p_flow.nu
+    nu_q = ws.vars.q_flow.nu
     @inbounds for k in 1:n_edge
         nu_p[k] = -JuMP.dual(cons_p[k])
         nu_q[k] = -JuMP.dual(cons_q[k])
     end
-    return (nu_p = nu_p, nu_q = nu_q)
+    return nothing
 end
 
 # ------------------------------------------------------------
@@ -338,15 +319,15 @@ function solve_coordinator_qp!(ws::ACHybridWorkspaceALADIN)
 
     mu = ws.mu[]
     @inbounds for k in 1:n_bus
-        JuMP.add_to_expression!(qp_obj, ws.lambda_theta[k], s_theta[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.theta.lambda[k], s_theta[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_theta[k], s_theta[k])
-        JuMP.add_to_expression!(qp_obj, ws.lambda_vm[k], s_vm[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.v_mag.lambda[k], s_vm[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_vm[k], s_vm[k])
     end
     @inbounds for k in 1:n_edge
-        JuMP.add_to_expression!(qp_obj, ws.lambda_p[k], s_p[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.p_flow.lambda[k], s_p[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_p[k], s_p[k])
-        JuMP.add_to_expression!(qp_obj, ws.lambda_q[k], s_q[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.q_flow.lambda[k], s_q[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_q[k], s_q[k])
     end
     JuMP.@objective(model, Min, qp_obj)
@@ -380,10 +361,10 @@ function solve_coordinator_qp!(ws::ACHybridWorkspaceALADIN)
 
     _extract_delta!(ws, dy_all)
 
-    nu_theta = Vector{Float64}(undef, n_bus)
-    nu_vm = Vector{Float64}(undef, n_bus)
-    nu_p = Vector{Float64}(undef, n_edge)
-    nu_q = Vector{Float64}(undef, n_edge)
+    nu_theta = ws.vars.theta.nu
+    nu_vm = ws.vars.v_mag.nu
+    nu_p = ws.vars.p_flow.nu
+    nu_q = ws.vars.q_flow.nu
     @inbounds for k in 1:n_bus
         nu_theta[k] = -JuMP.dual(cons_theta[k])
         nu_vm[k] = -JuMP.dual(cons_vm[k])
@@ -392,10 +373,5 @@ function solve_coordinator_qp!(ws::ACHybridWorkspaceALADIN)
         nu_p[k] = -JuMP.dual(cons_p[k])
         nu_q[k] = -JuMP.dual(cons_q[k])
     end
-    return (
-        nu_theta = nu_theta,
-        nu_vm = nu_vm,
-        nu_p = nu_p,
-        nu_q = nu_q,
-    )
+    return nothing
 end

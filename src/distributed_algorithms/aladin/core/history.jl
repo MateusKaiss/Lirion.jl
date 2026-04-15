@@ -1,17 +1,3 @@
-# ============================================================
-# ALADIN — Diagnostics history (canonical HFD 2016 metrics)
-# ------------------------------------------------------------
-# Fields tracked per iteration:
-#
-#   r_primal        ‖∑_i A_i y_i‖₂          (consensus residual)
-#   r_progress      ‖y_i - x_iᵏ‖₂           (Phase-1 progress / KKT proxy)
-#   eps_primal      Boyd-style tolerance for r_primal
-#   eps_progress    Boyd-style tolerance for r_progress
-#   lambda_step     ‖λᵏ⁺¹ - λᵏ‖₂            (dual movement, diagnostic only)
-#   rhos            adaptive ρ trajectory (one entry per rho key, e.g. :rho_bus)
-#   mus             adaptive μ trajectory
-# ============================================================
-
 Base.@kwdef struct ALADINHistory <: AbstractRunDiagnostics
     r_primal::Vector{Float64} = Float64[]
     r_progress::Vector{Float64} = Float64[]

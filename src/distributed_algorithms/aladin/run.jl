@@ -15,7 +15,7 @@ algorithm_tag(::ALADINAlgorithm) = :aladin
 # ---------------------------------------------------------------
 
 @inline function _finalize_aladin(partitions, t0_ns::Integer, iter_done::Integer)
-    total_cost = _aladin_totals(partitions)
+    total_cost = _total_generation_cost(partitions)
     elapsed_s = _elapsed_s(t0_ns)
     return (;
         total_cost,
@@ -30,10 +30,10 @@ function run_aladin!(ws::AbstractALADINWorkspace, params::ALADINParams)
 
     for iter in 1:params.max_iter
         ws.iter = iter
-        _print_aladin_iter_header!(tag, iter)
+        _print_iter_header!(tag, iter)
 
-        aladin_local_solve!(ws)
-        nu = solve_coordinator_qp!(ws)
+        local_solve!(ws)
+        solve_coordinator_qp!(ws)
 
         compute_residuals!(ws)
         compute_tolerances!(ws, params.eps_abs, params.eps_rel)
@@ -42,20 +42,18 @@ function run_aladin!(ws::AbstractALADINWorkspace, params::ALADINParams)
         _print_aladin_residuals!(ws)
 
         if stop_if_converged(ws)
-            _print_aladin_converged!()
+            _print_converged!()
             break
         end
 
         _line_search_step!(ws)
         primal_update!(ws)
-        dual_update!(ws, nu)
+        dual_update!(ws)
 
         adapt_rho_mu!(ws, params)
     end
     return nothing
 end
-
-@inline _line_search_step!(::AbstractALADINWorkspace) = nothing
 
 # ---------------------------------------------------------------
 # ENTRY POINT
@@ -84,8 +82,9 @@ function run_aladin(
     ]
     push!(rho_lines, "mu: $(ws.mu[])")
 
-    _FAST_USE_LOGS && _print_aladin_summary!(
+    _FAST_USE_LOGS && _print_summary!(
         tag_str,
+        "ALADIN",
         result;
         rho_lines = rho_lines,
     )

@@ -1,6 +1,4 @@
 mutable struct AladinZoneData
-    # JuMP model reference — needed to walk constraints for active-set
-    # detection on inequalities each iteration.
     model::JuMP.Model
 
     # Flat variable layout (all JuMP variables of this zone's local model).
@@ -8,8 +6,6 @@ mutable struct AladinZoneData
     n_vars::Int
     var_to_col::Dict{JuMP.VariableRef, Int}
 
-    # Generation-cost support: which columns hold p_generation vars, and the
-    # per-generator quadratic/linear cost coefficients in base SI (not pu).
     pg_cols::Vector{Int}
     pg_c2_sbase2::Vector{Float64}   # 2·c2·sbase² (diagonal of Hessian on pg)
     pg_c1_sbase::Vector{Float64}    # c1·sbase    (linear term in gradient)
@@ -17,10 +13,6 @@ mutable struct AladinZoneData
     # Shared-bus θ columns, aligned with part.zone_shared_bus_ids.
     shared_theta_cols::Vector{Int}
 
-    # Interzonal-branch-flow sensitivities for Power/Hybrid coupling.
-    # For each entry in part.zone_edges: the coefficients to compute
-    # p_flow = b·(θ_from - θ_to) as a linear combination of θ variables.
-    # (empty for State-only workspaces)
     edge_from_cols::Vector{Int}
     edge_to_cols::Vector{Int}
     edge_b::Vector{Float64}
@@ -33,14 +25,8 @@ mutable struct AladinZoneData
     x_prev::Vector{Float64}
     y::Vector{Float64}
 
-    # g_i = ∇f_i(y_i) — cost gradient at y_i, updated every iteration by
-    # `compute_cost_gradient!`. Zero outside pg columns in DC.
     g::Vector{Float64}
 
-    # H_i = ∇²L_i(y_i, κ_i) — Hessian of the local Lagrangian. For DC with
-    # linear constraints this collapses to ∇²f_i, which is diagonal with
-    # 2·c2·sbase² on pg columns and zero elsewhere. Constant through the
-    # whole run, so precomputed at build time.
     hess_diag::Vector{Float64}
 
     # Equality-constraint Jacobian (constant for linear DC equalities).
@@ -127,9 +113,6 @@ function _collect_edge_layout(
     var_to_col::Dict{JuMP.VariableRef, Int},
     part::PartitionDC,
 )
-    # part.zone_edges holds the global branch indices of interzonal branches
-    # that have at least one endpoint in this zone. For each such edge we
-    # record the local θ columns at its from/to buses and the branch b.
     zone_edges = part.zone_edges
     n = length(zone_edges)
 
@@ -169,13 +152,6 @@ function _collect_bounds(all_vars::Vector{JuMP.VariableRef})
     return lb, ub
 end
 
-# ------------------------------------------------------------
-# Equality Jacobian extraction via MOI introspection
-# ------------------------------------------------------------
-# All DC equality constraints are ScalarAffineFunction == 0 (or == rhs),
-# so we extract their linear terms directly and assemble a sparse matrix.
-# This works for any linear-equality JuMP model, no autodiff.
-
 function _extract_equality_jacobian(
     model::JuMP.Model,
     var_to_col::Dict{JuMP.VariableRef, Int},
@@ -187,8 +163,6 @@ function _extract_equality_jacobian(
     nrows = 0
 
     for (F, S) in JuMP.list_of_constraint_types(model)
-        # Skip variable-reference bound constraints (F <: VariableRef); we
-        # handle those via the box-bound arrays.
         F <: JuMP.VariableRef && continue
         S === MOI.EqualTo{Float64} || continue
 
@@ -237,7 +211,7 @@ end
 end
 
 # ------------------------------------------------------------
-# Build AladinZoneData from a PartitionDC (post-init_state_partition!)
+# Build AladinZoneData from a PartitionDC (post-build_local_model!)
 # ------------------------------------------------------------
 
 function build_aladin_zone_data(
@@ -270,11 +244,6 @@ function build_aladin_zone_data(
     @inbounds for (k, col) in enumerate(pg_cols)
         hess_diag[col] = pg_c2_sbase2[k]
     end
-
-    # Precompute the equality-constraint Jacobian (structurally constant).
-    # Active inequality rows are extracted dynamically per iteration, so C_eq
-    # here only holds the always-active equality rows (reference bus, balance,
-    # curtailment link). Inequalities are appended in build_active_jacobian.
     C_eq = _extract_equality_jacobian(model, var_to_col, n_vars)
 
     return AladinZoneData(
@@ -341,18 +310,6 @@ function detect_active_bounds!(zone::AladinZoneData; tol::Float64 = 1e-6)
     return nothing
 end
 
-# ------------------------------------------------------------
-# Active-constraint Jacobian assembly
-# ------------------------------------------------------------
-# C_active = [ C_eq ; C_ineq_active ] where:
-#   * C_eq       is the precomputed constant equality Jacobian
-#   * C_ineq_active holds rows for inequality constraints whose dual is
-#     non-trivial at the current Phase-1 solution (|dual| > tol).
-#
-# Including the active inequalities ensures the Phase-2 QP preserves
-# the current active set — essential for canonical ALADIN convergence
-# when inequalities are binding (thermal limits, angle limits, etc.).
-
 function build_active_jacobian(
     zone::AladinZoneData;
     dual_tol::Float64 = 1e-6,
@@ -410,20 +367,6 @@ function build_active_jacobian(
     return _delete_dependent_rows(C_stacked; tol = dep_tol)
 end
 
-# ------------------------------------------------------------
-# Linearly-dependent row elimination
-# ------------------------------------------------------------
-# The active-set Jacobian assembled from equality + active-inequality rows
-# can contain linearly dependent constraints — for example, when a bus has
-# both a balance equation and an active thermal limit whose combination is
-# already enforced by neighbouring rows. Passing a rank-deficient equality
-# block to the coordinator QP makes OSQP slow or numerically unstable, so
-# we strip dependent rows before assembling the QP.
-#
-# Implementation: rank-revealing QR with column pivoting on Cᵀ (so rows of C
-# become columns). The pivot permutation of the first `rank` columns gives
-# a maximally linearly independent subset of rows.
-
 function _delete_dependent_rows(
     C::SparseArrays.SparseMatrixCSC{Float64, Int};
     tol::Float64 = 1e-10,
@@ -449,10 +392,6 @@ function _delete_dependent_rows(
     end
 
     rnk == n_rows && return C
-
-    # F.p holds the column permutation; first `rnk` entries index the
-    # linearly independent rows of C. Sort to preserve original ordering
-    # when possible (makes the resulting QP constraint list deterministic).
     keep = sort(F.p[1:rnk])
     return C[keep, :]
 end
@@ -483,3 +422,6 @@ end
     ::Any,
     ::Dict,
 ) = nothing
+
+@inline refresh_lagrangian_hessian!(::AladinZoneData, ::AbstractALADINWorkspace) =
+    nothing

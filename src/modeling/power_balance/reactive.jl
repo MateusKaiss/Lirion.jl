@@ -53,10 +53,8 @@ function compute_reactive_power_balance(
             init = 0.0,
         ) : 0.0
 
-    # O(1) dense-snapshot lookups; fall back to static demand when no
-    # timeseries was provided for this case.
     qd = pf.has_bus_ts ? pf.qd_ts[bus_idx, t] : bus.qd[bus_idx]
     q_cons = pf.has_consumer_ts ? pf.consumer_qd_ts[bus_idx, t] : 0.0
 
-    return q_gen - q_bat + q_pros - qd - q_cons - q_out - q_in
+    return q_gen - q_bat - q_pros - qd - q_cons - q_out - q_in
 end

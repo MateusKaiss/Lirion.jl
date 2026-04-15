@@ -1,14 +1,5 @@
 # ============================================================
 # ALADIN — Convergence tolerances (Boyd-style, HFD-aligned)
-# ------------------------------------------------------------
-# Primal (consensus feasibility):
-#     eps_primal = √n_pri · eps_abs
-#                  + eps_rel · max(‖coupling_i‖₂, ‖coupling_j‖₂)
-#
-# Progress (Phase-1 KKT proxy, HFD 2016 Thm 4.1):
-#     eps_progress = √n_prog · eps_abs
-#                    + eps_rel · max(‖y‖₂, ‖x_prev‖₂)
-# where n_prog = ∑_i n_vars_i (total primal dimension across zones).
 # ============================================================
 
 @inline function _norm_sq(v::Vector{Float64})::Float64
@@ -125,6 +116,194 @@ function compute_tolerances!(
         eps_rel * max(sqrt(norm_i_edge), sqrt(norm_j_edge))
 
     ws.eps_primal = hypot(eps_pri_bus, eps_pri_edge)
+    ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
+    return nothing
+end
+
+# ------------------------------------------------------------
+# AC tolerances
+# ------------------------------------------------------------
+
+function compute_tolerances!(
+    ws::ACStateWorkspaceALADIN,
+    eps_abs::Float64,
+    eps_rel::Float64,
+)
+    n = 2 * length(ws.bus_pairs)
+    norm_i = 0.0
+    norm_j = 0.0
+    @inbounds for pair in ws.bus_pairs
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        θi = zi.y[pair.theta_col_i]
+        θj = zj.y[pair.theta_col_j]
+        vi = zi.y[pair.vm_col_i]
+        vj = zj.y[pair.vm_col_j]
+        norm_i += θi * θi + vi * vi
+        norm_j += θj * θj + vj * vj
+    end
+    ws.eps_primal =
+        sqrt(max(n, 1)) * eps_abs +
+        eps_rel * max(sqrt(norm_i), sqrt(norm_j))
+    ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
+    return nothing
+end
+
+function compute_tolerances!(
+    ws::ACPowerWorkspaceALADIN,
+    eps_abs::Float64,
+    eps_rel::Float64,
+)
+    n = 2 * length(ws.edge_pairs)
+    norm_i = 0.0
+    norm_j = 0.0
+    @inbounds for pair in ws.edge_pairs
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        pfi = _ac_pf_at(zi, pair.edge_local_i)
+        pfj = _ac_pf_at(zj, pair.edge_local_j)
+        qfi = _ac_qf_at(zi, pair.edge_local_i)
+        qfj = _ac_qf_at(zj, pair.edge_local_j)
+        norm_i += pfi * pfi + qfi * qfi
+        norm_j += pfj * pfj + qfj * qfj
+    end
+    ws.eps_primal =
+        sqrt(max(n, 1)) * eps_abs +
+        eps_rel * max(sqrt(norm_i), sqrt(norm_j))
+    ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
+    return nothing
+end
+
+function compute_tolerances!(
+    ws::ACHybridWorkspaceALADIN,
+    eps_abs::Float64,
+    eps_rel::Float64,
+)
+    n = 2 * length(ws.bus_pairs) + 2 * length(ws.edge_pairs)
+    norm_i = 0.0
+    norm_j = 0.0
+    @inbounds for pair in ws.bus_pairs
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        θi = zi.y[pair.theta_col_i]
+        θj = zj.y[pair.theta_col_j]
+        vi = zi.y[pair.vm_col_i]
+        vj = zj.y[pair.vm_col_j]
+        norm_i += θi * θi + vi * vi
+        norm_j += θj * θj + vj * vj
+    end
+    @inbounds for pair in ws.edge_pairs
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        pfi = _ac_pf_at(zi, pair.edge_local_i)
+        pfj = _ac_pf_at(zj, pair.edge_local_j)
+        qfi = _ac_qf_at(zi, pair.edge_local_i)
+        qfj = _ac_qf_at(zj, pair.edge_local_j)
+        norm_i += pfi * pfi + qfi * qfi
+        norm_j += pfj * pfj + qfj * qfj
+    end
+    ws.eps_primal =
+        sqrt(max(n, 1)) * eps_abs +
+        eps_rel * max(sqrt(norm_i), sqrt(norm_j))
+    ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
+    return nothing
+end
+
+# ------------------------------------------------------------
+# SOCWR tolerances
+# ------------------------------------------------------------
+
+@inline function _norms_bus_v2_socwr(ws)
+    ni = 0.0
+    nj = 0.0
+    @inbounds for pair in ws.bus_pairs
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        vi = zi.y[pair.v2_col_i]
+        vj = zj.y[pair.v2_col_j]
+        ni += vi * vi
+        nj += vj * vj
+    end
+    return ni, nj
+end
+
+@inline function _norms_edge_rt_socwr(ws)
+    ni = 0.0
+    nj = 0.0
+    @inbounds for pair in ws.edge_pairs
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        ri = zi.y[zi.edge_r_cols[pair.edge_local_i]]
+        rj = zj.y[zj.edge_r_cols[pair.edge_local_j]]
+        ti = zi.y[zi.edge_t_cols[pair.edge_local_i]]
+        tj = zj.y[zj.edge_t_cols[pair.edge_local_j]]
+        ni += ri * ri + ti * ti
+        nj += rj * rj + tj * tj
+    end
+    return ni, nj
+end
+
+@inline function _norms_edge_pq_socwr(ws)
+    ni = 0.0
+    nj = 0.0
+    @inbounds for pair in ws.edge_pairs
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        pi_val = _socwr_flow_value_at_y(zi, pair.edge_local_i, :p)
+        pj_val = _socwr_flow_value_at_y(zj, pair.edge_local_j, :p)
+        qi_val = _socwr_flow_value_at_y(zi, pair.edge_local_i, :q)
+        qj_val = _socwr_flow_value_at_y(zj, pair.edge_local_j, :q)
+        ni += pi_val * pi_val + qi_val * qi_val
+        nj += pj_val * pj_val + qj_val * qj_val
+    end
+    return ni, nj
+end
+
+function compute_tolerances!(
+    ws::SOCWRStateWorkspaceALADIN,
+    eps_abs::Float64,
+    eps_rel::Float64,
+)
+    n = length(ws.bus_pairs) + 2 * length(ws.edge_pairs)
+    ni_b, nj_b = _norms_bus_v2_socwr(ws)
+    ni_rt, nj_rt = _norms_edge_rt_socwr(ws)
+    ni = ni_b + ni_rt
+    nj = nj_b + nj_rt
+    ws.eps_primal =
+        sqrt(max(n, 1)) * eps_abs +
+        eps_rel * max(sqrt(ni), sqrt(nj))
+    ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
+    return nothing
+end
+
+function compute_tolerances!(
+    ws::SOCWRPowerWorkspaceALADIN,
+    eps_abs::Float64,
+    eps_rel::Float64,
+)
+    n = 2 * length(ws.edge_pairs)
+    ni, nj = _norms_edge_pq_socwr(ws)
+    ws.eps_primal =
+        sqrt(max(n, 1)) * eps_abs +
+        eps_rel * max(sqrt(ni), sqrt(nj))
+    ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
+    return nothing
+end
+
+function compute_tolerances!(
+    ws::SOCWRHybridWorkspaceALADIN,
+    eps_abs::Float64,
+    eps_rel::Float64,
+)
+    n = length(ws.bus_pairs) + 4 * length(ws.edge_pairs)
+    ni_b, nj_b = _norms_bus_v2_socwr(ws)
+    ni_rt, nj_rt = _norms_edge_rt_socwr(ws)
+    ni_pq, nj_pq = _norms_edge_pq_socwr(ws)
+    ni = ni_b + ni_rt + ni_pq
+    nj = nj_b + nj_rt + nj_pq
+    ws.eps_primal =
+        sqrt(max(n, 1)) * eps_abs +
+        eps_rel * max(sqrt(ni), sqrt(nj))
     ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
     return nothing
 end

@@ -1,43 +1,72 @@
-# ============================================================
-# ALADIN — Phase 2 dual update (line search, HFD Eq. 13b)
-# ------------------------------------------------------------
-#
-#   λᵏ⁺¹ = λᵏ + α₃ (ν - λᵏ)
-#
-# where ν is the Lagrange multiplier of the consensus row in the
-# coordinator QP. With α₃ = 1 this collapses to λ ← ν.
-# ============================================================
-
-function dual_update!(ws::DCStateWorkspaceALADIN, nu::Vector{Float64})
-    copyto!(ws.lambda_bus_prev, ws.lambda_bus)
-    a3 = ws.alpha3
-    @inbounds for k in eachindex(ws.lambda_bus)
-        ws.lambda_bus[k] = ws.lambda_bus[k] + a3 * (nu[k] - ws.lambda_bus[k])
+@inline function _apply_dual_step!(state::LambdaState, a3::Float64)
+    copyto!(state.lambda_prev, state.lambda)
+    @inbounds for k in eachindex(state.lambda)
+        state.lambda[k] += a3 * (state.nu[k] - state.lambda[k])
     end
     return nothing
 end
 
-function dual_update!(ws::DCPowerWorkspaceALADIN, nu::Vector{Float64})
-    copyto!(ws.lambda_edge_prev, ws.lambda_edge)
-    a3 = ws.alpha3
-    @inbounds for k in eachindex(ws.lambda_edge)
-        ws.lambda_edge[k] = ws.lambda_edge[k] + a3 * (nu[k] - ws.lambda_edge[k])
-    end
+function dual_update!(ws::DCStateWorkspaceALADIN)
+    _apply_dual_step!(ws.vars.theta, ws.alpha3)
     return nothing
 end
 
-function dual_update!(
-    ws::DCHybridWorkspaceALADIN,
-    nu::@NamedTuple{nu_bus::Vector{Float64}, nu_edge::Vector{Float64}}
-)
-    copyto!(ws.lambda_bus_prev, ws.lambda_bus)
-    copyto!(ws.lambda_edge_prev, ws.lambda_edge)
+function dual_update!(ws::DCPowerWorkspaceALADIN)
+    _apply_dual_step!(ws.vars.p_flow, ws.alpha3)
+    return nothing
+end
+
+function dual_update!(ws::DCHybridWorkspaceALADIN)
     a3 = ws.alpha3
-    @inbounds for k in eachindex(ws.lambda_bus)
-        ws.lambda_bus[k] = ws.lambda_bus[k] + a3 * (nu.nu_bus[k] - ws.lambda_bus[k])
-    end
-    @inbounds for k in eachindex(ws.lambda_edge)
-        ws.lambda_edge[k] = ws.lambda_edge[k] + a3 * (nu.nu_edge[k] - ws.lambda_edge[k])
-    end
+    _apply_dual_step!(ws.vars.theta, a3)
+    _apply_dual_step!(ws.vars.p_flow, a3)
+    return nothing
+end
+
+function dual_update!(ws::ACStateWorkspaceALADIN)
+    a3 = ws.alpha3
+    _apply_dual_step!(ws.vars.theta, a3)
+    _apply_dual_step!(ws.vars.v_mag, a3)
+    return nothing
+end
+
+function dual_update!(ws::ACPowerWorkspaceALADIN)
+    a3 = ws.alpha3
+    _apply_dual_step!(ws.vars.p_flow, a3)
+    _apply_dual_step!(ws.vars.q_flow, a3)
+    return nothing
+end
+
+function dual_update!(ws::ACHybridWorkspaceALADIN)
+    a3 = ws.alpha3
+    _apply_dual_step!(ws.vars.theta, a3)
+    _apply_dual_step!(ws.vars.v_mag, a3)
+    _apply_dual_step!(ws.vars.p_flow, a3)
+    _apply_dual_step!(ws.vars.q_flow, a3)
+    return nothing
+end
+
+function dual_update!(ws::SOCWRStateWorkspaceALADIN)
+    a3 = ws.alpha3
+    _apply_dual_step!(ws.vars.v2, a3)
+    _apply_dual_step!(ws.vars.r, a3)
+    _apply_dual_step!(ws.vars.t, a3)
+    return nothing
+end
+
+function dual_update!(ws::SOCWRPowerWorkspaceALADIN)
+    a3 = ws.alpha3
+    _apply_dual_step!(ws.vars.p_flow, a3)
+    _apply_dual_step!(ws.vars.q_flow, a3)
+    return nothing
+end
+
+function dual_update!(ws::SOCWRHybridWorkspaceALADIN)
+    a3 = ws.alpha3
+    _apply_dual_step!(ws.vars.v2, a3)
+    _apply_dual_step!(ws.vars.r, a3)
+    _apply_dual_step!(ws.vars.t, a3)
+    _apply_dual_step!(ws.vars.p_flow, a3)
+    _apply_dual_step!(ws.vars.q_flow, a3)
     return nothing
 end

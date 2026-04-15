@@ -16,11 +16,6 @@
     return nothing
 end
 
-# ------------------------------------------------------------
-# Helper: add equality Jacobian constraints C_i Δy_i = 0.
-# Dispatches `build_active_jacobian` on the concrete zone type so it
-# works for DC (analytical C_eq) and AC (MOI autodiff C).
-# ------------------------------------------------------------
 function _add_active_constraints!(
     model::JuMP.Model,
     zone,
@@ -61,11 +56,6 @@ function _add_active_bound_constraints!(
     return nothing
 end
 
-# ------------------------------------------------------------
-# Expression helpers for the coupling residual
-#   A_i (y_i + Δy_i) ± A_j (y_j + Δy_j) = s
-# (sign comes from the pair convention: + for zone_i, − for zone_j).
-# ------------------------------------------------------------
 @inline function _bus_coupling_expr!(
     expr::JuMP.AffExpr,
     zones::Vector{AladinZoneData},
@@ -108,12 +98,6 @@ end
     return expr
 end
 
-# ============================================================
-# DISPATCH — solve_coordinator_qp!(ws) builds and solves the QP,
-# writing Δy into zones[i].delta and updating ws.lambda_* with the
-# consensus-row duals ν.
-# ============================================================
-
 function solve_coordinator_qp!(ws::DCStateWorkspaceALADIN)
     model = JuMP.Model(ws.qp_optimizer)
     n_zones = length(ws.zones)
@@ -135,7 +119,7 @@ function solve_coordinator_qp!(ws::DCStateWorkspaceALADIN)
     end
     mu = ws.mu[]
     @inbounds for k in 1:n_pairs
-        JuMP.add_to_expression!(qp_obj, ws.lambda_bus[k], s[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.theta.lambda[k], s[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s[k], s[k])
     end
     JuMP.@objective(model, Min, qp_obj)
@@ -166,12 +150,12 @@ function solve_coordinator_qp!(ws::DCStateWorkspaceALADIN)
         end
     end
 
-    # Extract QP duals of the consensus rows.
-    nu = Vector{Float64}(undef, n_pairs)
+    # Store QP duals of the consensus rows back into ws.vars.theta.nu.
+    nu = ws.vars.theta.nu
     @inbounds for k in 1:n_pairs
         nu[k] = -JuMP.dual(cons_refs[k])
     end
-    return nu
+    return nothing
 end
 
 function solve_coordinator_qp!(ws::DCPowerWorkspaceALADIN)
@@ -192,7 +176,7 @@ function solve_coordinator_qp!(ws::DCPowerWorkspaceALADIN)
     end
     mu = ws.mu[]
     @inbounds for k in 1:n_pairs
-        JuMP.add_to_expression!(qp_obj, ws.lambda_edge[k], s[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.p_flow.lambda[k], s[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s[k], s[k])
     end
     JuMP.@objective(model, Min, qp_obj)
@@ -220,11 +204,11 @@ function solve_coordinator_qp!(ws::DCPowerWorkspaceALADIN)
         end
     end
 
-    nu = Vector{Float64}(undef, n_pairs)
+    nu = ws.vars.p_flow.nu
     @inbounds for k in 1:n_pairs
         nu[k] = -JuMP.dual(cons_refs[k])
     end
-    return nu
+    return nothing
 end
 
 function solve_coordinator_qp!(ws::DCHybridWorkspaceALADIN)
@@ -247,11 +231,11 @@ function solve_coordinator_qp!(ws::DCHybridWorkspaceALADIN)
     end
     mu = ws.mu[]
     @inbounds for k in 1:n_bus
-        JuMP.add_to_expression!(qp_obj, ws.lambda_bus[k], s_bus[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.theta.lambda[k], s_bus[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_bus[k], s_bus[k])
     end
     @inbounds for k in 1:n_edge
-        JuMP.add_to_expression!(qp_obj, ws.lambda_edge[k], s_edge[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.p_flow.lambda[k], s_edge[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_edge[k], s_edge[k])
     end
     JuMP.@objective(model, Min, qp_obj)
@@ -286,15 +270,15 @@ function solve_coordinator_qp!(ws::DCHybridWorkspaceALADIN)
         end
     end
 
-    nu_bus = Vector{Float64}(undef, n_bus)
+    nu_bus = ws.vars.theta.nu
     @inbounds for k in 1:n_bus
         nu_bus[k] = -JuMP.dual(cons_bus_refs[k])
     end
-    nu_edge = Vector{Float64}(undef, n_edge)
+    nu_edge = ws.vars.p_flow.nu
     @inbounds for k in 1:n_edge
         nu_edge[k] = -JuMP.dual(cons_edge_refs[k])
     end
-    return (nu_bus = nu_bus, nu_edge = nu_edge)
+    return nothing
 end
 
 # ------------------------------------------------------------

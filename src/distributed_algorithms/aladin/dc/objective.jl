@@ -1,25 +1,5 @@
 # ============================================================
 # ALADIN-DC — Local (Phase 1) objective builder
-# ------------------------------------------------------------
-# Canonical HFD 2016 local subproblem:
-#
-#   min_{x_i}  f_i(x_i) + λᵀ (A_i x_i) + (ρ/2) ‖x_i - x_iᵏ‖²_{Σ}
-#   s.t.      local equality + inequality constraints
-#
-# where:
-#   * A_i x_i extracts the coupling variables (θ at shared buses for State,
-#                                               p_flow_branches on interzonal
-#                                               edges for Power, both for
-#                                               Hybrid)
-#   * x_iᵏ  is this zone's previous iterate (NOT a global consensus z)
-#   * Σ    is the per-variable proximal weight (identity in our implementation)
-#
-# Expanded algebra:
-#   (ρ/2) ‖x - x_prev‖² = (ρ/2) ‖x‖² - ρ x_prevᵀ x + const
-#
-# so the full objective becomes a base cost plus a per-variable affine/quad
-# penalty. We rebuild this from scratch every iteration because x_prev and λ
-# change.
 # ============================================================
 
 @inline function _prox_quadexpr_cols!(
@@ -70,30 +50,19 @@ end
     return quad
 end
 
-# Canonical HFD proximal is a weighted ‖x_i - x_iᵏ‖²_{Σ_i} on ALL local
-# variables, independent of which sub-space is being coupled via A_i. So
-# the proximal term is the same across State, Power and Hybrid — only the
-# linear coupling term λᵀ(A_i x) differs. There is no extra edge-flow
-# proximal; any penalisation on the branch-flow quantities is expressed
-# through the linear λ term and through the consensus constraint in the
-# Phase-2 QP.
-
 @inline function _lambda_bus_affexpr!(
     lin::JuMP.AffExpr,
     ws::DCStateWorkspaceALADIN,
     zone_pos::Int,
 )
-    # ∑ λ_k · (sign_k · θ_i[bus]) for each shared-bus pair touching zone `zone_pos`.
-    # We adopt the sign convention: + for zone_i, - for zone_j (zone_i < zone_j
-    # because pairs are emitted in position order, see _build_shared_bus_pairs).
     zdata = ws.zones[zone_pos]
     for (k, pair) in enumerate(ws.bus_pairs)
         if pair.zone_i == zone_pos
             col = pair.col_i
-            JuMP.add_to_expression!(lin, ws.lambda_bus[k], zdata.all_vars[col])
+            JuMP.add_to_expression!(lin, ws.vars.theta.lambda[k], zdata.all_vars[col])
         elseif pair.zone_j == zone_pos
             col = pair.col_j
-            JuMP.add_to_expression!(lin, -ws.lambda_bus[k], zdata.all_vars[col])
+            JuMP.add_to_expression!(lin, -ws.vars.theta.lambda[k], zdata.all_vars[col])
         end
     end
     return lin
@@ -128,10 +97,6 @@ end
     return lin
 end
 
-# ============================================================
-# DISPATCH — update_objective!(part, ws) rebuilds the JuMP objective.
-# ============================================================
-
 function update_objective!(part::PartitionDC, ws::DCStateWorkspaceALADIN)
     zone_pos = part.position
     zdata = ws.zones[zone_pos]
@@ -157,7 +122,7 @@ function update_objective!(part::PartitionDC, ws::DCPowerWorkspaceALADIN)
     zdata = ws.zones[zone_pos]
 
     lin = zero(JuMP.AffExpr)
-    _lambda_edge_affexpr!(lin, ws.zones, ws.edge_pairs, ws.lambda_edge, zone_pos)
+    _lambda_edge_affexpr!(lin, ws.zones, ws.edge_pairs, ws.vars.p_flow.lambda, zone_pos)
 
     quad = zero(JuMP.QuadExpr)
     _prox_all_quadexpr!(
@@ -180,16 +145,14 @@ function update_objective!(part::PartitionDC, ws::DCHybridWorkspaceALADIN)
     for (k, pair) in enumerate(ws.bus_pairs)
         if pair.zone_i == zone_pos
             col = pair.col_i
-            JuMP.add_to_expression!(lin, ws.lambda_bus[k], zdata.all_vars[col])
+            JuMP.add_to_expression!(lin, ws.vars.theta.lambda[k], zdata.all_vars[col])
         elseif pair.zone_j == zone_pos
             col = pair.col_j
-            JuMP.add_to_expression!(lin, -ws.lambda_bus[k], zdata.all_vars[col])
+            JuMP.add_to_expression!(lin, -ws.vars.theta.lambda[k], zdata.all_vars[col])
         end
     end
-    _lambda_edge_affexpr!(lin, ws.zones, ws.edge_pairs, ws.lambda_edge, zone_pos)
+    _lambda_edge_affexpr!(lin, ws.zones, ws.edge_pairs, ws.vars.p_flow.lambda, zone_pos)
 
-    # Single proximal on all local vars. For Hybrid we use rho_bus as the
-    # scalar — the Σ weights handle variable-class scaling.
     quad = zero(JuMP.QuadExpr)
     _prox_all_quadexpr!(
         quad, zdata, ws.rho_bus[];

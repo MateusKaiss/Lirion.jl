@@ -1,19 +1,6 @@
 # ============================================================
 # ADMM Residuals — unified for DC · AC · SOCWR
-# ------------------------------------------------------------
-# Forms (Boyd §5.2, expanded consensus ADMM):
-#
-#   ‖r‖² = Σ_zone Σ_{i ∈ shared/cut} (x_i^z - z_i)²
-#   ‖s‖² = Σ_zone Σ_{i ∈ shared/cut} (ρ·(z_i^k - z_i^{k-1}))²
-#
-# All shared-bus accesses use precomputed `part.shared_bus_local_idx`
-# and `part.shared_bus_consensus_idx`; all branch accesses iterate
-# `enumerate(interzonal)` to get the row index.
 # ============================================================
-
-# ############################################################
-#  PRIMAL RESIDUALS
-# ############################################################
 
 # ------------------------------------------------------------
 # Bus primal residual: single variable (DC theta, SOCWR V²)
@@ -127,10 +114,6 @@ function _primal_residual_branch_ac_components(
     return sqrt(acc_p), sqrt(acc_q)
 end
 
-# ############################################################
-#  DUAL RESIDUALS (Boyd canonical — expanded consensus form)
-# ############################################################
-
 # ------------------------------------------------------------
 # Bus dual residual: single vector (DC theta, SOCWR V²)
 # ------------------------------------------------------------
@@ -224,23 +207,19 @@ function _dual_residual_branch_paired_components(
     return rho_a * sqrt(s_a), rho_b * sqrt(s_b)
 end
 
-# ############################################################
-#  DISPATCH: compute_residuals!(ws)
-# ############################################################
-
 # ---- DC ----
 
 function compute_residuals!(ws::DCStateWorkspace)
     r = _primal_residual_bus_single(
         ws.partitions,
-        ws.theta_consensus,
+        ws.vars.theta.consensus,
         snapshot_theta!,
     )
     s = _dual_residual_bus_single(
         ws.partitions,
-        ws.theta_consensus,
-        ws.theta_consensus_prev,
-        ws.rho_theta[],
+        ws.vars.theta.consensus,
+        ws.vars.theta.consensus_prev,
+        ws.vars.theta.rho[],
     )
     ws.r_primal = r
     ws.r_dual = s
@@ -250,16 +229,16 @@ end
 function compute_residuals!(ws::DCPowerWorkspace)
     r = _primal_residual_branch_single(
         ws.partitions,
-        ws.p_flow_consensus,
+        ws.vars.p_flow.consensus,
         ws.interzonal,
         _dc_flow_value,
     )
     s = _dual_residual_branch_single(
         ws.partitions,
-        ws.p_flow_consensus,
-        ws.p_flow_consensus_prev,
+        ws.vars.p_flow.consensus,
+        ws.vars.p_flow.consensus_prev,
         ws.interzonal,
-        ws.rho_p[],
+        ws.vars.p_flow.rho[],
     )
     ws.r_primal = r
     ws.r_dual = s
@@ -269,27 +248,27 @@ end
 function compute_residuals!(ws::DCHybridWorkspace)
     ws.r_primal_bus = _primal_residual_bus_single(
         ws.partitions,
-        ws.theta_consensus,
+        ws.vars.theta.consensus,
         snapshot_theta!,
     )
     ws.r_dual_bus = _dual_residual_bus_single(
         ws.partitions,
-        ws.theta_consensus,
-        ws.theta_consensus_prev,
-        ws.rho_theta[],
+        ws.vars.theta.consensus,
+        ws.vars.theta.consensus_prev,
+        ws.vars.theta.rho[],
     )
     ws.r_primal_branch = _primal_residual_branch_single(
         ws.partitions,
-        ws.p_flow_consensus,
+        ws.vars.p_flow.consensus,
         ws.interzonal,
         _dc_flow_value,
     )
     ws.r_dual_branch = _dual_residual_branch_single(
         ws.partitions,
-        ws.p_flow_consensus,
-        ws.p_flow_consensus_prev,
+        ws.vars.p_flow.consensus,
+        ws.vars.p_flow.consensus_prev,
         ws.interzonal,
-        ws.rho_p[],
+        ws.vars.p_flow.rho[],
     )
 
     ws.r_primal = hypot(ws.r_primal_bus, ws.r_primal_branch)
@@ -302,14 +281,14 @@ end
 function compute_residuals!(ws::ACStateWorkspace)
     ws.r_primal_theta, ws.r_primal_v_mag = _primal_residual_bus_ac_components(
         ws.partitions,
-        ws.theta_consensus,
-        ws.v_mag_consensus,
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
     )
     ws.r_dual_theta, ws.r_dual_v_mag = _dual_residual_bus_ac_components(
         ws.partitions,
-        ws.theta_consensus, ws.v_mag_consensus,
-        ws.theta_consensus_prev, ws.v_mag_consensus_prev,
-        ws.rho_theta[], ws.rho_v[],
+        ws.vars.theta.consensus, ws.vars.v_mag.consensus,
+        ws.vars.theta.consensus_prev, ws.vars.v_mag.consensus_prev,
+        ws.vars.theta.rho[], ws.vars.v_mag.rho[],
     )
 
     ws.r_primal = hypot(ws.r_primal_theta, ws.r_primal_v_mag)
@@ -320,15 +299,15 @@ end
 function compute_residuals!(ws::ACPowerWorkspace)
     ws.r_primal_p, ws.r_primal_q = _primal_residual_branch_ac_components(
         ws.partitions,
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
         ws.interzonal,
     )
     ws.r_dual_p, ws.r_dual_q = _dual_residual_branch_paired_components(
         ws.partitions,
-        ws.p_flow_consensus, ws.q_flow_consensus,
-        ws.p_flow_consensus_prev, ws.q_flow_consensus_prev,
-        ws.interzonal, ws.rho_p[], ws.rho_q[],
+        ws.vars.p_flow.consensus, ws.vars.q_flow.consensus,
+        ws.vars.p_flow.consensus_prev, ws.vars.q_flow.consensus_prev,
+        ws.interzonal, ws.vars.p_flow.rho[], ws.vars.q_flow.rho[],
     )
 
     ws.r_primal = hypot(ws.r_primal_p, ws.r_primal_q)
@@ -339,27 +318,27 @@ end
 function compute_residuals!(ws::ACHybridWorkspace)
     ws.r_primal_theta, ws.r_primal_v_mag = _primal_residual_bus_ac_components(
         ws.partitions,
-        ws.theta_consensus,
-        ws.v_mag_consensus,
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
     )
     ws.r_dual_theta, ws.r_dual_v_mag = _dual_residual_bus_ac_components(
         ws.partitions,
-        ws.theta_consensus, ws.v_mag_consensus,
-        ws.theta_consensus_prev, ws.v_mag_consensus_prev,
-        ws.rho_theta[], ws.rho_v[],
+        ws.vars.theta.consensus, ws.vars.v_mag.consensus,
+        ws.vars.theta.consensus_prev, ws.vars.v_mag.consensus_prev,
+        ws.vars.theta.rho[], ws.vars.v_mag.rho[],
     )
 
     ws.r_primal_p, ws.r_primal_q = _primal_residual_branch_ac_components(
         ws.partitions,
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
         ws.interzonal,
     )
     ws.r_dual_p, ws.r_dual_q = _dual_residual_branch_paired_components(
         ws.partitions,
-        ws.p_flow_consensus, ws.q_flow_consensus,
-        ws.p_flow_consensus_prev, ws.q_flow_consensus_prev,
-        ws.interzonal, ws.rho_p[], ws.rho_q[],
+        ws.vars.p_flow.consensus, ws.vars.q_flow.consensus,
+        ws.vars.p_flow.consensus_prev, ws.vars.q_flow.consensus_prev,
+        ws.interzonal, ws.vars.p_flow.rho[], ws.vars.q_flow.rho[],
     )
 
     ws.r_primal = sqrt(
@@ -378,27 +357,27 @@ end
 function compute_residuals!(ws::SOCWRStateWorkspace)
     ws.r_primal_bus = _primal_residual_bus_single(
         ws.partitions,
-        ws.v2_consensus,
+        ws.vars.v2.consensus,
         snapshot_v2!,
     )
     ws.r_dual_bus = _dual_residual_bus_single(
         ws.partitions,
-        ws.v2_consensus,
-        ws.v2_consensus_prev,
-        ws.rho_v2[],
+        ws.vars.v2.consensus,
+        ws.vars.v2.consensus_prev,
+        ws.vars.v2.rho[],
     )
     ws.r_primal_r, ws.r_primal_t = _primal_residual_branch_paired_components(
         ws.partitions,
-        ws.r_consensus,
-        ws.t_consensus,
+        ws.vars.r.consensus,
+        ws.vars.t.consensus,
         ws.interzonal,
         _socwr_rt_values,
     )
     ws.r_dual_r, ws.r_dual_t = _dual_residual_branch_paired_components(
         ws.partitions,
-        ws.r_consensus, ws.t_consensus,
-        ws.r_consensus_prev, ws.t_consensus_prev,
-        ws.interzonal, ws.rho_r[], ws.rho_t[],
+        ws.vars.r.consensus, ws.vars.t.consensus,
+        ws.vars.r.consensus_prev, ws.vars.t.consensus_prev,
+        ws.interzonal, ws.vars.r.rho[], ws.vars.t.rho[],
     )
 
     ws.r_primal = sqrt(ws.r_primal_bus^2 + ws.r_primal_r^2 + ws.r_primal_t^2)
@@ -409,16 +388,16 @@ end
 function compute_residuals!(ws::SOCWRPowerWorkspace)
     ws.r_primal_p, ws.r_primal_q = _primal_residual_branch_paired_components(
         ws.partitions,
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
         ws.interzonal,
         _socwr_pq_values,
     )
     ws.r_dual_p, ws.r_dual_q = _dual_residual_branch_paired_components(
         ws.partitions,
-        ws.p_flow_consensus, ws.q_flow_consensus,
-        ws.p_flow_consensus_prev, ws.q_flow_consensus_prev,
-        ws.interzonal, ws.rho_p[], ws.rho_q[],
+        ws.vars.p_flow.consensus, ws.vars.q_flow.consensus,
+        ws.vars.p_flow.consensus_prev, ws.vars.q_flow.consensus_prev,
+        ws.interzonal, ws.vars.p_flow.rho[], ws.vars.q_flow.rho[],
     )
 
     ws.r_primal = hypot(ws.r_primal_p, ws.r_primal_q)
@@ -429,40 +408,40 @@ end
 function compute_residuals!(ws::SOCWRHybridWorkspace)
     ws.r_primal_bus = _primal_residual_bus_single(
         ws.partitions,
-        ws.v2_consensus,
+        ws.vars.v2.consensus,
         snapshot_v2!,
     )
     ws.r_dual_bus = _dual_residual_bus_single(
         ws.partitions,
-        ws.v2_consensus,
-        ws.v2_consensus_prev,
-        ws.rho_v2[],
+        ws.vars.v2.consensus,
+        ws.vars.v2.consensus_prev,
+        ws.vars.v2.rho[],
     )
     ws.r_primal_p, ws.r_primal_q = _primal_residual_branch_paired_components(
         ws.partitions,
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
         ws.interzonal,
         _socwr_pq_values,
     )
     ws.r_dual_p, ws.r_dual_q = _dual_residual_branch_paired_components(
         ws.partitions,
-        ws.p_flow_consensus, ws.q_flow_consensus,
-        ws.p_flow_consensus_prev, ws.q_flow_consensus_prev,
-        ws.interzonal, ws.rho_p[], ws.rho_q[],
+        ws.vars.p_flow.consensus, ws.vars.q_flow.consensus,
+        ws.vars.p_flow.consensus_prev, ws.vars.q_flow.consensus_prev,
+        ws.interzonal, ws.vars.p_flow.rho[], ws.vars.q_flow.rho[],
     )
     ws.r_primal_r, ws.r_primal_t = _primal_residual_branch_paired_components(
         ws.partitions,
-        ws.r_consensus,
-        ws.t_consensus,
+        ws.vars.r.consensus,
+        ws.vars.t.consensus,
         ws.interzonal,
         _socwr_rt_values,
     )
     ws.r_dual_r, ws.r_dual_t = _dual_residual_branch_paired_components(
         ws.partitions,
-        ws.r_consensus, ws.t_consensus,
-        ws.r_consensus_prev, ws.t_consensus_prev,
-        ws.interzonal, ws.rho_r[], ws.rho_t[],
+        ws.vars.r.consensus, ws.vars.t.consensus,
+        ws.vars.r.consensus_prev, ws.vars.t.consensus_prev,
+        ws.interzonal, ws.vars.r.rho[], ws.vars.t.rho[],
     )
 
     ws.r_primal = sqrt(

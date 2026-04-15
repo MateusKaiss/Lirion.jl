@@ -48,7 +48,7 @@ end
 function build_linear_bus_term(
     part::PartitionDC,
     theta_consensus::Vector{Float64},
-    theta_duals::AbstractVector{Float64},   # column view over n_shared
+    theta_duals::AbstractVector{Float64},
     rho_theta::Float64,
 )::JuMP.AffExpr
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
@@ -66,15 +66,12 @@ function build_linear_branch_term(
     part::PartitionDC,
     zone_edges::Vector{Int},
     p_flow_consensus::Vector{Float64},
-    duals_p_flow::AbstractVector{Float64},   # column view over n_inter
+    duals_p_flow::AbstractVector{Float64},
     interzonal::Vector{Int},
     rho_p::Float64,
 )::JuMP.AffExpr
     m = part.model::JuMP.Model
     lin = zero(JuMP.AffExpr)
-
-    # Build a lookup from full-branch index to position in `interzonal`.
-    # We iterate enumerate(interzonal) and check if this zone cuts it.
     @inbounds for (k, e) in enumerate(interzonal)
         l = part.branch_idx_full_to_zone[e]
         l == 0 && continue
@@ -93,9 +90,9 @@ end
 function update_objective!(part::PartitionDC, ws::DCStateWorkspace)
     lin = build_linear_bus_term(
         part,
-        ws.theta_consensus,
-        view(ws.duals_theta, :, part.position),
-        ws.rho_theta[],
+        ws.vars.theta.consensus,
+        view(ws.vars.theta.duals, :, part.position),
+        ws.vars.theta.rho[],
     )
 
     @objective(part.model, Min, part.obj_static + lin)
@@ -105,10 +102,10 @@ function update_objective!(part::PartitionDC, ws::DCPowerWorkspace)
     lin = build_linear_branch_term(
         part,
         part.zone_edges,
-        ws.p_flow_consensus,
-        view(ws.duals_p_flow, :, part.position),
+        ws.vars.p_flow.consensus,
+        view(ws.vars.p_flow.duals, :, part.position),
         ws.interzonal,
-        ws.rho_p[],
+        ws.vars.p_flow.rho[],
     )
 
     @objective(part.model, Min, part.obj_static + lin)
@@ -117,18 +114,18 @@ end
 function update_objective!(part::PartitionDC, ws::DCHybridWorkspace)
     lin_bus = build_linear_bus_term(
         part,
-        ws.theta_consensus,
-        view(ws.duals_theta, :, part.position),
-        ws.rho_theta[],
+        ws.vars.theta.consensus,
+        view(ws.vars.theta.duals, :, part.position),
+        ws.vars.theta.rho[],
     )
 
     lin_branch = build_linear_branch_term(
         part,
         part.zone_edges,
-        ws.p_flow_consensus,
-        view(ws.duals_p_flow, :, part.position),
+        ws.vars.p_flow.consensus,
+        view(ws.vars.p_flow.duals, :, part.position),
         ws.interzonal,
-        ws.rho_p[],
+        ws.vars.p_flow.rho[],
     )
 
     @objective(part.model, Min, part.obj_static + lin_bus + lin_branch)

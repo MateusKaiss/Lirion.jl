@@ -1,9 +1,6 @@
 # =======================================================================
 # ALADIN — Parameter container (canonical HFD 2016)
 # =======================================================================
-# Derived from ALADINConfig at run time. Holds every knob required by
-# run_aladin! so that the workspace and the main loop stay thin.
-# =======================================================================
 
 struct ALADINParams
     max_iter::Int

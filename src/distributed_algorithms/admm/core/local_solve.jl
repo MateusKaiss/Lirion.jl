@@ -1,20 +1,4 @@
-function local_solve!(ws)
-    parts = ws.partitions.parts
+@inline _admm_post_solve!(::AbstractADMMWorkspace, ::Integer, ::Any) = nothing
 
-    Threads.@threads for i in eachindex(parts)
-        part = parts[i]
-        model = part.model
-
-        update_objective!(part, ws)
-
-        optimize!(model)
-
-        _require_optimal!(model; iter = ws.iter, zone_id = part.id)
-
-        part.has_solution = true
-
-        part.generation_cost = value(model[:generation_cost])
-    end
-
-    return nothing
-end
+local_solve!(ws::AbstractADMMWorkspace) =
+    _solve_zones_parallel!(ws, _admm_post_solve!)

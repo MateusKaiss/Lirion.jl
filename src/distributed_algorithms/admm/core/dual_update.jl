@@ -10,7 +10,7 @@ function _update_bus_duals_single!(
     partitions::Partitions,
     consensus::Vector{Float64},
     rho::Float64,
-    snapshot_fn,    # (part) -> Vector{Float64}: shared-bus values
+    snapshot_fn,
 )
     for part in partitions
         x_local = snapshot_fn(part)
@@ -139,10 +139,10 @@ end
 
 function dual_update!(ws::DCStateWorkspace)
     _update_bus_duals_single!(
-        ws.duals_theta,
+        ws.vars.theta.duals,
         ws.partitions,
-        ws.theta_consensus,
-        ws.rho_theta[],
+        ws.vars.theta.consensus,
+        ws.vars.theta.rho[],
         snapshot_theta_shared!,
     )
     return nothing
@@ -150,10 +150,10 @@ end
 
 function dual_update!(ws::DCPowerWorkspace)
     _update_branch_duals_single!(
-        ws.duals_p_flow,
+        ws.vars.p_flow.duals,
         ws.partitions,
-        ws.p_flow_consensus,
-        ws.rho_p[],
+        ws.vars.p_flow.consensus,
+        ws.vars.p_flow.rho[],
         ws.interzonal,
         _dc_flow_value,
     )
@@ -162,17 +162,17 @@ end
 
 function dual_update!(ws::DCHybridWorkspace)
     _update_bus_duals_single!(
-        ws.duals_theta,
+        ws.vars.theta.duals,
         ws.partitions,
-        ws.theta_consensus,
-        ws.rho_theta[],
+        ws.vars.theta.consensus,
+        ws.vars.theta.rho[],
         snapshot_theta_shared!,
     )
     _update_branch_duals_single!(
-        ws.duals_p_flow,
+        ws.vars.p_flow.duals,
         ws.partitions,
-        ws.p_flow_consensus,
-        ws.rho_p[],
+        ws.vars.p_flow.consensus,
+        ws.vars.p_flow.rho[],
         ws.interzonal,
         _dc_flow_value,
     )
@@ -183,26 +183,26 @@ end
 
 function dual_update!(ws::ACStateWorkspace)
     _update_bus_duals_ac!(
-        ws.duals_theta,
-        ws.duals_v_mag,
+        ws.vars.theta.duals,
+        ws.vars.v_mag.duals,
         ws.partitions,
-        ws.theta_consensus,
-        ws.v_mag_consensus,
-        ws.rho_theta[],
-        ws.rho_v[],
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        ws.vars.theta.rho[],
+        ws.vars.v_mag.rho[],
     )
     return nothing
 end
 
 function dual_update!(ws::ACPowerWorkspace)
     _update_branch_duals_ac!(
-        ws.duals_p_flow,
-        ws.duals_q_flow,
+        ws.vars.p_flow.duals,
+        ws.vars.q_flow.duals,
         ws.partitions,
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
-        ws.rho_p[],
-        ws.rho_q[],
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        ws.vars.p_flow.rho[],
+        ws.vars.q_flow.rho[],
         ws.interzonal,
     )
     return nothing
@@ -210,22 +210,22 @@ end
 
 function dual_update!(ws::ACHybridWorkspace)
     _update_bus_duals_ac!(
-        ws.duals_theta,
-        ws.duals_v_mag,
+        ws.vars.theta.duals,
+        ws.vars.v_mag.duals,
         ws.partitions,
-        ws.theta_consensus,
-        ws.v_mag_consensus,
-        ws.rho_theta[],
-        ws.rho_v[],
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        ws.vars.theta.rho[],
+        ws.vars.v_mag.rho[],
     )
     _update_branch_duals_ac!(
-        ws.duals_p_flow,
-        ws.duals_q_flow,
+        ws.vars.p_flow.duals,
+        ws.vars.q_flow.duals,
         ws.partitions,
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
-        ws.rho_p[],
-        ws.rho_q[],
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        ws.vars.p_flow.rho[],
+        ws.vars.q_flow.rho[],
         ws.interzonal,
     )
     return nothing
@@ -235,20 +235,20 @@ end
 
 function dual_update!(ws::SOCWRStateWorkspace)
     _update_bus_duals_single!(
-        ws.duals_v2,
+        ws.vars.v2.duals,
         ws.partitions,
-        ws.v2_consensus,
-        ws.rho_v2[],
+        ws.vars.v2.consensus,
+        ws.vars.v2.rho[],
         snapshot_v2_shared!,
     )
     _update_branch_duals_paired!(
-        ws.duals_r,
-        ws.duals_t,
+        ws.vars.r.duals,
+        ws.vars.t.duals,
         ws.partitions,
-        ws.r_consensus,
-        ws.t_consensus,
-        ws.rho_r[],
-        ws.rho_t[],
+        ws.vars.r.consensus,
+        ws.vars.t.consensus,
+        ws.vars.r.rho[],
+        ws.vars.t.rho[],
         ws.interzonal,
         _socwr_rt_values,
     )
@@ -257,13 +257,13 @@ end
 
 function dual_update!(ws::SOCWRPowerWorkspace)
     _update_branch_duals_paired!(
-        ws.duals_p_flow,
-        ws.duals_q_flow,
+        ws.vars.p_flow.duals,
+        ws.vars.q_flow.duals,
         ws.partitions,
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
-        ws.rho_p[],
-        ws.rho_q[],
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        ws.vars.p_flow.rho[],
+        ws.vars.q_flow.rho[],
         ws.interzonal,
         _socwr_pq_values,
     )
@@ -272,31 +272,31 @@ end
 
 function dual_update!(ws::SOCWRHybridWorkspace)
     _update_bus_duals_single!(
-        ws.duals_v2,
+        ws.vars.v2.duals,
         ws.partitions,
-        ws.v2_consensus,
-        ws.rho_v2[],
+        ws.vars.v2.consensus,
+        ws.vars.v2.rho[],
         snapshot_v2_shared!,
     )
     _update_branch_duals_paired!(
-        ws.duals_p_flow,
-        ws.duals_q_flow,
+        ws.vars.p_flow.duals,
+        ws.vars.q_flow.duals,
         ws.partitions,
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
-        ws.rho_p[],
-        ws.rho_q[],
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        ws.vars.p_flow.rho[],
+        ws.vars.q_flow.rho[],
         ws.interzonal,
         _socwr_pq_values,
     )
     _update_branch_duals_paired!(
-        ws.duals_r,
-        ws.duals_t,
+        ws.vars.r.duals,
+        ws.vars.t.duals,
         ws.partitions,
-        ws.r_consensus,
-        ws.t_consensus,
-        ws.rho_r[],
-        ws.rho_t[],
+        ws.vars.r.consensus,
+        ws.vars.t.consensus,
+        ws.vars.r.rho[],
+        ws.vars.t.rho[],
         ws.interzonal,
         _socwr_rt_values,
     )

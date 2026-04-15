@@ -1,12 +1,6 @@
 # ============================================================
 # AC WORKSPACES
 # ============================================================
-# Phase 4b: per-consensus-variable data lives in `vars::NamedTuple`
-# of `VarState` objects. Legacy flat names (`ws.theta_consensus`,
-# `ws.rho_v`, …) continue to work through the `getproperty`
-# forwarding in `admm/core/components.jl`.
-# ============================================================
-
 # ---------------- STATE ----------------
 
 Base.@kwdef mutable struct ACStateWorkspace <: AbstractADMMWorkspace
@@ -26,8 +20,12 @@ Base.@kwdef mutable struct ACStateWorkspace <: AbstractADMMWorkspace
     r_dual_theta::Float64 = 0.0
     r_dual_v_mag::Float64 = 0.0
 
-    residuals::ResidualMetrics = ResidualMetrics()
-    state::IterationState = IterationState()
+    r_primal::Float64 = 0.0
+    r_dual::Float64 = 0.0
+    eps_primal::Float64 = 0.0
+    eps_dual::Float64 = 0.0
+    iter::Int = 0
+    hist::ADMMHistory = ADMMHistory()
 end
 
 # ---------------- POWER ----------------
@@ -50,8 +48,12 @@ Base.@kwdef mutable struct ACPowerWorkspace <: AbstractADMMWorkspace
     r_dual_p::Float64 = 0.0
     r_dual_q::Float64 = 0.0
 
-    residuals::ResidualMetrics = ResidualMetrics()
-    state::IterationState = IterationState()
+    r_primal::Float64 = 0.0
+    r_dual::Float64 = 0.0
+    eps_primal::Float64 = 0.0
+    eps_dual::Float64 = 0.0
+    iter::Int = 0
+    hist::ADMMHistory = ADMMHistory()
 end
 
 # ---------------- HYBRID ----------------
@@ -84,8 +86,12 @@ Base.@kwdef mutable struct ACHybridWorkspace <: AbstractADMMWorkspace
     r_dual_p::Float64 = 0.0
     r_dual_q::Float64 = 0.0
 
-    residuals::ResidualMetrics = ResidualMetrics()
-    state::IterationState = IterationState()
+    r_primal::Float64 = 0.0
+    r_dual::Float64 = 0.0
+    eps_primal::Float64 = 0.0
+    eps_dual::Float64 = 0.0
+    iter::Int = 0
+    hist::ADMMHistory = ADMMHistory()
 end
 
 # ============================================================
@@ -93,20 +99,20 @@ end
 # ============================================================
 
 _get_rhos(ws::ACStateWorkspace) = (
-    rho_theta = ws.rho_theta[],
-    rho_v = ws.rho_v[],
+    rho_theta = ws.vars.theta.rho[],
+    rho_v = ws.vars.v_mag.rho[],
 )
 
 _get_rhos(ws::ACPowerWorkspace) = (
-    rho_p = ws.rho_p[],
-    rho_q = ws.rho_q[],
+    rho_p = ws.vars.p_flow.rho[],
+    rho_q = ws.vars.q_flow.rho[],
 )
 
 _get_rhos(ws::ACHybridWorkspace) = (
-    rho_theta = ws.rho_theta[],
-    rho_v = ws.rho_v[],
-    rho_p = ws.rho_p[],
-    rho_q = ws.rho_q[],
+    rho_theta = ws.vars.theta.rho[],
+    rho_v = ws.vars.v_mag.rho[],
+    rho_p = ws.vars.p_flow.rho[],
+    rho_q = ws.vars.q_flow.rho[],
 )
 
 # ============================================================
@@ -199,10 +205,10 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC}
     )
 
     vars = (
-        theta  = VarState(n_shared, n_zones, config.rho_theta),
-        v_mag  = VarState(n_shared, n_zones, config.rho_v; init_value = 1.0),
-        p_flow = VarState(n_inter,  n_zones, config.rho_p),
-        q_flow = VarState(n_inter,  n_zones, config.rho_q),
+        theta = VarState(n_shared, n_zones, config.rho_theta),
+        v_mag = VarState(n_shared, n_zones, config.rho_v; init_value = 1.0),
+        p_flow = VarState(n_inter, n_zones, config.rho_p),
+        q_flow = VarState(n_inter, n_zones, config.rho_q),
     )
 
     return ACHybridWorkspace(;

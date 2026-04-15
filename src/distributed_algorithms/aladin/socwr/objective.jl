@@ -78,7 +78,7 @@ end
         else
             continue
         end
-        JuMP.add_to_expression!(lin, sign * ws.lambda_v2[k], zdata.all_vars[col])
+        JuMP.add_to_expression!(lin, sign * ws.vars.v2.lambda[k], zdata.all_vars[col])
     end
     return lin
 end
@@ -101,8 +101,8 @@ end
         end
         r_col = zdata.edge_r_cols[le]
         t_col = zdata.edge_t_cols[le]
-        JuMP.add_to_expression!(lin, sign * ws.lambda_r[k], zdata.all_vars[r_col])
-        JuMP.add_to_expression!(lin, sign * ws.lambda_t[k], zdata.all_vars[t_col])
+        JuMP.add_to_expression!(lin, sign * ws.vars.r.lambda[k], zdata.all_vars[r_col])
+        JuMP.add_to_expression!(lin, sign * ws.vars.t.lambda[k], zdata.all_vars[t_col])
     end
     return lin
 end
@@ -126,8 +126,8 @@ end
         else
             continue
         end
-        lp = sign * ws.lambda_p[k]
-        lq = sign * ws.lambda_q[k]
+        lp = sign * ws.vars.p_flow.lambda[k]
+        lq = sign * ws.vars.q_flow.lambda[k]
         cols = zdata.edge_flow_cols[le]
         cp = zdata.edge_pflow_coefs[le]
         cq = zdata.edge_qflow_coefs[le]

@@ -1,22 +1,6 @@
 # ============================================================
 # DC WORKSPACES
 # ------------------------------------------------------------
-# Layout conventions:
-#   * Shared-bus quantities (theta) live in `Vector{Float64}` /
-#     `Matrix{Float64}` of shape `(n_shared, n_zones)`, column-major,
-#     indexed by `part.shared_bus_consensus_idx[i]` × `part.position`.
-#   * Interzonal-branch quantities live in `Vector{Float64}` of length
-#     `n_inter` and `Matrix{Float64}` of shape `(n_inter, n_zones)`,
-#     indexed by position in `interzonal` × `part.position`.
-#   * Scratch integer counters are preallocated once.
-#
-# Phase 4b: per-consensus-variable data (consensus vector, duals
-# matrix, rho refs) lives inside a typed `NamedTuple` of `VarState`
-# objects, keyed by the canonical variable symbols declared in
-# `consensus_vars(F, C)`. Legacy flat names (`ws.theta_consensus`,
-# `ws.duals_theta`, `ws.rho_theta`, …) keep working via the
-# `getproperty` forwarding layer in `admm/core/components.jl`.
-# ============================================================
 
 Base.@kwdef mutable struct DCStateWorkspace <: AbstractADMMWorkspace
     partitions::Partitions{PartitionDC}
@@ -26,8 +10,12 @@ Base.@kwdef mutable struct DCStateWorkspace <: AbstractADMMWorkspace
 
     bus_counts::Vector{Int}
 
-    residuals::ResidualMetrics = ResidualMetrics()
-    state::IterationState = IterationState()
+    r_primal::Float64 = 0.0
+    r_dual::Float64 = 0.0
+    eps_primal::Float64 = 0.0
+    eps_dual::Float64 = 0.0
+    iter::Int = 0
+    hist::ADMMHistory = ADMMHistory()
 end
 
 Base.@kwdef mutable struct DCPowerWorkspace <: AbstractADMMWorkspace
@@ -40,8 +28,12 @@ Base.@kwdef mutable struct DCPowerWorkspace <: AbstractADMMWorkspace
 
     branch_counts::Vector{Int}
 
-    residuals::ResidualMetrics = ResidualMetrics()
-    state::IterationState = IterationState()
+    r_primal::Float64 = 0.0
+    r_dual::Float64 = 0.0
+    eps_primal::Float64 = 0.0
+    eps_dual::Float64 = 0.0
+    iter::Int = 0
+    hist::ADMMHistory = ADMMHistory()
 end
 
 Base.@kwdef mutable struct DCHybridWorkspace <: AbstractADMMWorkspace
@@ -55,25 +47,28 @@ Base.@kwdef mutable struct DCHybridWorkspace <: AbstractADMMWorkspace
     bus_counts::Vector{Int}
     branch_counts::Vector{Int}
 
-    # Per-component residuals (cached for rho_update! without recomputation)
     r_primal_bus::Float64 = 0.0
     r_dual_bus::Float64 = 0.0
     r_primal_branch::Float64 = 0.0
     r_dual_branch::Float64 = 0.0
 
-    residuals::ResidualMetrics = ResidualMetrics()
-    state::IterationState = IterationState()
+    r_primal::Float64 = 0.0
+    r_dual::Float64 = 0.0
+    eps_primal::Float64 = 0.0
+    eps_dual::Float64 = 0.0
+    iter::Int = 0
+    hist::ADMMHistory = ADMMHistory()
 end
 
 # ============================================================
 # RHO HELPERS
 # ============================================================
 
-_get_rhos(ws::DCStateWorkspace) = (rho_theta = ws.rho_theta[],)
-_get_rhos(ws::DCPowerWorkspace) = (rho_p = ws.rho_p[],)
+_get_rhos(ws::DCStateWorkspace) = (rho_theta = ws.vars.theta.rho[],)
+_get_rhos(ws::DCPowerWorkspace) = (rho_p = ws.vars.p_flow.rho[],)
 _get_rhos(ws::DCHybridWorkspace) = (
-    rho_theta = ws.rho_theta[],
-    rho_p = ws.rho_p[],
+    rho_theta = ws.vars.theta.rho[],
+    rho_p = ws.vars.p_flow.rho[],
 )
 
 # ============================================================
@@ -140,8 +135,8 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC}
     )
 
     vars = (
-        theta  = VarState(n_shared, n_zones, config.rho_theta),
-        p_flow = VarState(n_inter,  n_zones, config.rho_p),
+        theta = VarState(n_shared, n_zones, config.rho_theta),
+        p_flow = VarState(n_inter, n_zones, config.rho_p),
     )
 
     return DCHybridWorkspace(;

@@ -1,6 +1,6 @@
 # ============================================================
-# DC PARTITION INITIALIZATION
-# ============================================================
+# DC PARTITION INITIALIZATION — ADMM
+# ------------------------------------------------------------
 
 function init_state_partition!(
     part::PartitionDC,
@@ -8,17 +8,10 @@ function init_state_partition!(
     optimizer_factory,
     rho_theta::Float64,
 )
-    model = _setup_partition_model!(part, sys_zone, DC, optimizer_factory)
-
-    part.theta_var = model[:theta]
-    for I in keys(part.theta_var)
-        set_start_value(part.theta_var[I], 0.0)
-    end
-
+    build_local_model!(part, sys_zone, State, optimizer_factory)
     build_quad_bus_expr!(part, rho_theta)
     part.obj_static = part.obj_base + part.quad_bus_expr
-    @objective(model, Min, part.obj_static)
-
+    @objective(part.model, Min, part.obj_static)
     return nothing
 end
 
@@ -29,18 +22,10 @@ function init_power_partition!(
     rho::Float64,
     interzonal_branches::Vector{Int},
 )
-    part.zone_edges = _zone_cut_edges(part, interzonal_branches)
-    model = _setup_partition_model!(part, sys_zone, DC, optimizer_factory)
-
-    part.theta_var = model[:theta]
-    for I in keys(part.theta_var)
-        set_start_value(part.theta_var[I], 0.0)
-    end
-
+    build_local_model!(part, sys_zone, Power, optimizer_factory, interzonal_branches)
     build_quad_branch_expr!(part, rho, part.zone_edges)
     part.obj_static = part.obj_base + part.quad_branch_expr
-    @objective(model, Min, part.obj_static)
-
+    @objective(part.model, Min, part.obj_static)
     return nothing
 end
 
@@ -52,19 +37,11 @@ function init_hybrid_partition!(
     rho::Float64,
     interzonal_branches::Vector{Int},
 )
-    part.zone_edges = _zone_cut_edges(part, interzonal_branches)
-    model = _setup_partition_model!(part, sys_zone, DC, optimizer_factory)
-
-    part.theta_var = model[:theta]
-    for I in keys(part.theta_var)
-        set_start_value(part.theta_var[I], 0.0)
-    end
-
+    build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
     build_quad_bus_expr!(part, rho_theta)
     build_quad_branch_expr!(part, rho, part.zone_edges)
     part.obj_static = part.obj_base + part.quad_bus_expr + part.quad_branch_expr
-    @objective(model, Min, part.obj_static)
-
+    @objective(part.model, Min, part.obj_static)
     return nothing
 end
 
@@ -79,14 +56,10 @@ function init_state_partition!(
     rho_theta::Float64,
 )
     n = length(partitions.parts)
-    @assert length(sys.parts) == n "DistributedSystem.parts must be aligned with partitions.parts"
-
+    @assert length(sys.parts) == n
     @inbounds for i in 1:n
         init_state_partition!(
-            partitions.parts[i],
-            sys.parts[i],
-            optimizer_factory,
-            rho_theta,
+            partitions.parts[i], sys.parts[i], optimizer_factory, rho_theta,
         )
     end
     return nothing
@@ -100,15 +73,11 @@ function init_power_partition!(
     interzonal_branches::Vector{Int},
 )
     n = length(partitions.parts)
-    @assert length(sys.parts) == n "DistributedSystem.parts must be aligned with partitions.parts"
-
+    @assert length(sys.parts) == n
     @inbounds for i in 1:n
         init_power_partition!(
-            partitions.parts[i],
-            sys.parts[i],
-            optimizer_factory,
-            rho,
-            interzonal_branches,
+            partitions.parts[i], sys.parts[i], optimizer_factory,
+            rho, interzonal_branches,
         )
     end
     return nothing
@@ -123,16 +92,11 @@ function init_hybrid_partition!(
     interzonal_branches::Vector{Int},
 )
     n = length(partitions.parts)
-    @assert length(sys.parts) == n "DistributedSystem.parts must be aligned with partitions.parts"
-
+    @assert length(sys.parts) == n
     @inbounds for i in 1:n
         init_hybrid_partition!(
-            partitions.parts[i],
-            sys.parts[i],
-            optimizer_factory,
-            rho_theta,
-            rho,
-            interzonal_branches,
+            partitions.parts[i], sys.parts[i], optimizer_factory,
+            rho_theta, rho, interzonal_branches,
         )
     end
     return nothing
