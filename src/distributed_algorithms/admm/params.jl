@@ -9,7 +9,7 @@ Base.@kwdef struct ADMMParams
     tau_decr::Float64
 end
 
-function build_admm_params(config::DistributedOPFModel)
+function build_params(config::ADMMConfig)
     return ADMMParams(;
         max_iter = config.max_iter,
         eps_abs = config.eps_abs,

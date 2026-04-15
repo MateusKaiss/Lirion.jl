@@ -68,7 +68,7 @@ end
 end
 
 @inline function _plots_stem(model_type)::String
-    if model_type isa DistributedOPFModel
+    if model_type isa ADMMConfig
         return "admm_" *
                lowercase(string(nameof(model_type.base_model))) * "_" *
                string(model_type.coupling) * "_" *

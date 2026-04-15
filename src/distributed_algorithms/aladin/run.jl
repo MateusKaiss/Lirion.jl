@@ -1,32 +1,7 @@
-# =======================================================================
-# ALADIN — Top-level runner
-# =======================================================================
-
-@inline function aladin_tag(cfg::ALADINConfig)
-    V = _variant_type(Val(cfg.coupling))
-    M = cfg.base_model
-    return ALADIN{V, M}()
-end
-
 algorithm_tag(::ALADINAlgorithm) = :aladin
 
-# ---------------------------------------------------------------
-# FINALIZE
-# ---------------------------------------------------------------
-
-@inline function _finalize_aladin(partitions, t0_ns::Integer, iter_done::Integer)
-    total_cost = _total_generation_cost(partitions)
-    elapsed_s = _elapsed_s(t0_ns)
-    return (;
-        total_cost,
-        partitions,
-        iter_done = Int(iter_done),
-        elapsed_s,
-    )
-end
-
-function run_aladin!(ws::AbstractALADINWorkspace, params::ALADINParams)
-    tag = _aladin_print_tag(ws)
+function run_algorithm!(ws::AbstractALADINWorkspace, params::ALADINParams)
+    tag = _print_tag(ws)
 
     for iter in 1:params.max_iter
         ws.iter = iter
@@ -59,21 +34,21 @@ end
 # ENTRY POINT
 # ---------------------------------------------------------------
 
-function run_aladin(
+function run_algorithm(
     sys::DistributedSystem,
-    config::ALADINConfig,
-    tag::ALADIN;
+    config::ALADINConfig;
     optimizer_factory = nothing,
 )::LirionRunResult
     t0 = time_ns()
+    tag = ALADIN{_variant_type(Val(config.coupling)), config.base_model}()
 
-    params = build_aladin_params(config)
-    ws = build_aladin_workspace(sys, config, optimizer_factory, tag)
+    params = build_params(config)
+    ws = build_workspace(sys, config, optimizer_factory, tag)
     initial_rhos = _get_rhos(ws)
-    run_aladin!(ws, params)
-    result = _finalize_aladin(ws.partitions, t0, ws.iter)
+    run_algorithm!(ws, params)
+    result = _finalize(ws.partitions, t0, ws.iter)
 
-    tag_str = _aladin_print_tag(ws)
+    tag_str = _print_tag(ws)
     final_rhos = _get_rhos(ws)
 
     rho_lines = [

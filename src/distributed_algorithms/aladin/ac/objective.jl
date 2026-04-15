@@ -1,6 +1,3 @@
-# ============================================================
-# ALADIN-AC — Local (Phase 1) objective builder
-
 @inline function _ac_prox_quadexpr!(
     quad::JuMP.QuadExpr,
     zone::AladinZoneDataAC,
@@ -11,7 +8,7 @@
     sigma_qg::Float64,
     sigma_other::Float64,
 )
-    class = zeros(UInt8, zone.n_vars)  # 0=other, 1=θ, 2=vm, 3=pg, 4=qg
+    class = zeros(UInt8, zone.n_vars)
     @inbounds for c in zone.theta_cols
         class[c] = 1
     end
@@ -68,10 +65,6 @@ end
     return lin
 end
 
-# Coupling term for p_flow and q_flow on interzonal branches. The
-# branch flows are nonlinear in (θ_f, θ_t, v_f, v_t), so the local
-# objective carries them symbolically via the JuMP expressions stored
-# in `part.model` and re-references them here.
 function _lambda_edge_pq_ac!(
     model::JuMP.Model,
     obj_expr,

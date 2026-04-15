@@ -197,19 +197,16 @@ include("distributed_algorithms/aladin/core/local_solve.jl")
 
 include("distributed_algorithms/aladin/dc/sensitivities.jl")
 include("distributed_algorithms/aladin/dc/workspace.jl")
-include("distributed_algorithms/aladin/dc/partition.jl")
 include("distributed_algorithms/aladin/dc/objective.jl")
 include("distributed_algorithms/aladin/dc/coordinator_qp.jl")
 
 include("distributed_algorithms/aladin/ac/sensitivities.jl")
 include("distributed_algorithms/aladin/ac/workspace.jl")
-include("distributed_algorithms/aladin/ac/partition.jl")
 include("distributed_algorithms/aladin/ac/objective.jl")
 include("distributed_algorithms/aladin/ac/coordinator_qp.jl")
 
 include("distributed_algorithms/aladin/socwr/sensitivities.jl")
 include("distributed_algorithms/aladin/socwr/workspace.jl")
-include("distributed_algorithms/aladin/socwr/partition.jl")
 include("distributed_algorithms/aladin/socwr/objective.jl")
 include("distributed_algorithms/aladin/socwr/coordinator_qp.jl")
 include("distributed_algorithms/aladin/socwr/line_search.jl")
@@ -253,7 +250,7 @@ for T in (
     ACStateWorkspace, ACPowerWorkspace, ACHybridWorkspace,
     SOCWRStateWorkspace, SOCWRPowerWorkspace, SOCWRHybridWorkspace,
 )
-    precompile(run_admm!, (T, ADMMParams))
+    precompile(run_algorithm!, (T, ADMMParams))
 end
 
 for T in (
@@ -261,7 +258,7 @@ for T in (
     ACStateWorkspaceALADIN, ACPowerWorkspaceALADIN, ACHybridWorkspaceALADIN,
     SOCWRStateWorkspaceALADIN, SOCWRPowerWorkspaceALADIN, SOCWRHybridWorkspaceALADIN,
 )
-    precompile(run_aladin!, (T, ALADINParams))
+    precompile(run_algorithm!, (T, ALADINParams))
 end
 
 # ------------------------------------------------------------------

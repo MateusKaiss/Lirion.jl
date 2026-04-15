@@ -239,7 +239,7 @@ end
 
 abstract type AbstractDistributedConfig end
 
-mutable struct DistributedOPFModel <: AbstractDistributedConfig
+mutable struct ADMMConfig <: AbstractDistributedConfig
     base_model::Type{<:OPFModel}
     coupling::Symbol
     sectioning::Sectioning
@@ -261,7 +261,7 @@ mutable struct DistributedOPFModel <: AbstractDistributedConfig
     tau_incr::Float64
     tau_decr::Float64
 
-    function DistributedOPFModel(
+    function ADMMConfig(
         base_model::Type{<:OPFModel},
         coupling::Symbol,
         sectioning::Sectioning,
@@ -333,7 +333,7 @@ end
 # DISTRIBUTED OPF MODEL CONVENIENCE CONSTRUCTORS
 # ============================================================
 
-DistributedOPFModel(
+ADMMConfig(
     base_model::Type{<:OPFModel},
     coupling::Symbol,
     sectioning::Union{Sectioning, Symbol},
@@ -350,7 +350,7 @@ DistributedOPFModel(
     sec = _sectioning(sectioning)
     rhos = _normalize_rhos_strict(base_model, coupling; rho = rho)
 
-    DistributedOPFModel(
+    ADMMConfig(
         base_model,
         coupling,
         sec,
@@ -371,7 +371,7 @@ DistributedOPFModel(
     )
 end
 
-DistributedOPFModel(
+ADMMConfig(
     base_model::Type{<:OPFModel},
     coupling::Symbol,
     sectioning::Union{Sectioning, Symbol},
@@ -407,7 +407,7 @@ DistributedOPFModel(
         rho_t = rho_t,
     )
 
-    DistributedOPFModel(
+    ADMMConfig(
         base_model,
         coupling,
         sec,
@@ -438,24 +438,19 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
     sectioning::Sectioning
     max_iter::Int
 
-    rho::Float64             # proximal penalty in local subproblems
-    mu::Float64              # consensus slack penalty in coordination QP
+    rho::Float64
+    mu::Float64
 
-    alpha1::Float64          # weight for (y_i - x_iᵏ) in primal update
-    alpha2::Float64          # weight for Δy_i        in primal update
-    alpha3::Float64          # weight for (ν - λᵏ)    in dual update
+    alpha1::Float64
+    alpha2::Float64
+    alpha3::Float64
 
     sigma_theta_shared::Float64
     sigma_theta_other::Float64
     sigma_pg::Float64
     sigma_other::Float64
-
-    # Convergence tolerances (KKT-style: r_primal = ‖consensus‖,
-    # r_progress = ‖y_i - x_iᵏ‖₂ — both components of HFD 2016 Theorem 4.1).
     eps_abs::Float64
     eps_rel::Float64
-
-    # Active-set identification tolerance
     active_set_tol::Float64
     adaptive::Bool
     rho_growth::Float64
@@ -554,14 +549,14 @@ end
 # Shims
 # ============================================================
 
-rho(c::DistributedOPFModel) = c.rho_theta
+rho(c::ADMMConfig) = c.rho_theta
 
-Base.getproperty(c::DistributedOPFModel, s::Symbol) =
+Base.getproperty(c::ADMMConfig, s::Symbol) =
     s === :rho ? c.rho_theta :
     s === :rho_v2 ? c.rho_v :
     getfield(c, s)
 
-function Base.setproperty!(c::DistributedOPFModel, s::Symbol, v)
+function Base.setproperty!(c::ADMMConfig, s::Symbol, v)
     if s === :rho
         v isa Real || throw(ArgumentError("rho must be Real, got $(typeof(v))"))
         vf = Float64(v)
@@ -591,7 +586,7 @@ function Base.setproperty!(c::DistributedOPFModel, s::Symbol, v)
     end
 end
 
-Base.propertynames(c::DistributedOPFModel, private::Bool = false) =
+Base.propertynames(c::ADMMConfig, private::Bool = false) =
     (propertynames(typeof(c), private)..., :rho, :rho_v2)
 
 # ============================================================

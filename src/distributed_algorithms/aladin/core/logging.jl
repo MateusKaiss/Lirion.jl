@@ -1,16 +1,16 @@
-_aladin_print_tag(::DCStateWorkspaceALADIN) = "[ALADIN-state/DC]"
-_aladin_print_tag(::DCPowerWorkspaceALADIN) = "[ALADIN-power/DC]"
-_aladin_print_tag(::DCHybridWorkspaceALADIN) = "[ALADIN-hybrid/DC]"
+_print_tag(::DCStateWorkspaceALADIN) = "[ALADIN-state/DC]"
+_print_tag(::DCPowerWorkspaceALADIN) = "[ALADIN-power/DC]"
+_print_tag(::DCHybridWorkspaceALADIN) = "[ALADIN-hybrid/DC]"
 
-_aladin_print_tag(::ACStateWorkspaceALADIN) = "[ALADIN-state/AC]"
-_aladin_print_tag(::ACPowerWorkspaceALADIN) = "[ALADIN-power/AC]"
-_aladin_print_tag(::ACHybridWorkspaceALADIN) = "[ALADIN-hybrid/AC]"
+_print_tag(::ACStateWorkspaceALADIN) = "[ALADIN-state/AC]"
+_print_tag(::ACPowerWorkspaceALADIN) = "[ALADIN-power/AC]"
+_print_tag(::ACHybridWorkspaceALADIN) = "[ALADIN-hybrid/AC]"
 
-_aladin_print_tag(::SOCWRStateWorkspaceALADIN) = "[ALADIN-state/SOCWR]"
-_aladin_print_tag(::SOCWRPowerWorkspaceALADIN) = "[ALADIN-power/SOCWR]"
-_aladin_print_tag(::SOCWRHybridWorkspaceALADIN) = "[ALADIN-hybrid/SOCWR]"
+_print_tag(::SOCWRStateWorkspaceALADIN) = "[ALADIN-state/SOCWR]"
+_print_tag(::SOCWRPowerWorkspaceALADIN) = "[ALADIN-power/SOCWR]"
+_print_tag(::SOCWRHybridWorkspaceALADIN) = "[ALADIN-hybrid/SOCWR]"
 
-_aladin_print_tag(::AbstractALADINWorkspace) = "[ALADIN]"
+_print_tag(::AbstractALADINWorkspace) = "[ALADIN]"
 
 @inline function _print_aladin_residuals!(ws::AbstractALADINWorkspace)
     _FAST_USE_LOGS && println(

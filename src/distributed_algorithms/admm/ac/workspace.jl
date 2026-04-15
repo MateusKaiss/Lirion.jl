@@ -121,7 +121,7 @@ _get_rhos(ws::ACHybridWorkspace) = (
 
 # ---------------- STATE ----------------
 
-function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{State, AC})
+function build_workspace(sys, config, optimizer_factory, ::ADMM{State, AC})
     partitions = build_partitions(PartitionAC, sys)
     id = partitions.zones
     n_zones = length(partitions)
@@ -152,7 +152,7 @@ end
 
 # ---------------- POWER ----------------
 
-function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Power, AC})
+function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, AC})
     partitions = build_partitions(PartitionAC, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
@@ -185,7 +185,7 @@ end
 
 # ---------------- HYBRID ----------------
 
-function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC})
+function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC})
     partitions = build_partitions(PartitionAC, sys)
     id = partitions.zones
     inter = sys.interzonal_branches

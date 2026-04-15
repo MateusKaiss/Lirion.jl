@@ -126,7 +126,7 @@ _get_rhos(ws::SOCWRHybridWorkspace) = (
 # BUILDERS — STATE
 # ============================================================
 
-function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCWR})
+function build_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCWR})
     partitions = build_partitions(PartitionSOCWR, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
@@ -164,7 +164,7 @@ end
 # BUILDERS — POWER
 # ============================================================
 
-function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWR})
+function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWR})
     partitions = build_partitions(PartitionSOCWR, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
@@ -198,7 +198,7 @@ end
 # BUILDERS — HYBRID
 # ============================================================
 
-function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
+function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
     partitions = build_partitions(PartitionSOCWR, sys)
     id = partitions.zones
     inter = sys.interzonal_branches

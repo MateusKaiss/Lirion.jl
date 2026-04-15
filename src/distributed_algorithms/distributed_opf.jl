@@ -9,19 +9,19 @@
 end
 
 # ------------------------------------------------------------
-# Distributed runner — top-level dispatch on config type
+# Algorithm display name 
+# ------------------------------------------------------------
+_algo_name(::ADMMConfig) = "ADMM"
+_algo_name(::ALADINConfig) = "ALADIN"
+
+# ------------------------------------------------------------
+# Distributed runner — single generic entry point
 # ------------------------------------------------------------
 function run_distributed(inputs::DistributedInputs)::LirionRunResult
-    return run_distributed(inputs, inputs.model_type)
-end
-
-function run_distributed(
-    inputs::DistributedInputs,
-    cfg::DistributedOPFModel,
-)::LirionRunResult
+    cfg = inputs.model_type
     sys = inputs.system
 
-    @info "Running distributed OPF (ADMM)"
+    @info "Running distributed OPF ($(_algo_name(cfg)))"
     @info "  coupling   = $(cfg.coupling)"
     @info "  sectioning = $(cfg.sectioning)"
     @info "  base_model = $(cfg.base_model)"
@@ -29,40 +29,7 @@ function run_distributed(
 
     optimizer_factory = resolve_optimizer(cfg, inputs.optimizer)
 
-    output = run_admm(sys, cfg, admm_tag(cfg); optimizer_factory = optimizer_factory)
-
-    r = output.result
-    base_nt = r isa NamedTuple ? r : (result = r,)
-
-    meta_nt = (
-        config = cfg,
-        system = sys,
-        database = inputs.database_path,
-    )
-
-    return LirionRunResult(;
-        result = merge(base_nt, meta_nt),
-        model = output.model,
-        system = output.system,
-        diagnostics = output.diagnostics,
-    )
-end
-
-function run_distributed(
-    inputs::DistributedInputs,
-    cfg::ALADINConfig,
-)::LirionRunResult
-    sys = inputs.system
-
-    @info "Running distributed OPF (ALADIN)"
-    @info "  coupling   = $(cfg.coupling)"
-    @info "  sectioning = $(cfg.sectioning)"
-    @info "  base_model = $(cfg.base_model)"
-    @info "  optimizer  = $(inputs.optimizer)"
-
-    optimizer_factory = resolve_optimizer(cfg, inputs.optimizer)
-
-    output = run_aladin(sys, cfg, aladin_tag(cfg); optimizer_factory = optimizer_factory)
+    output = run_algorithm(sys, cfg; optimizer_factory = optimizer_factory)
 
     r = output.result
     base_nt = r isa NamedTuple ? r : (result = r,)

@@ -1,21 +1,3 @@
-# ======================================================================
-# Distributed Algorithm Accessors
-# ======================================================================
-#
-# The abstract type `DistributedAlgorithm` and the tag structs
-# `ADMM{C,F}` / `ALADIN{C,F}` are declared in src/types.jl (the
-# canonical location for all top-level types). This file adds the
-# accessor + utility layer used by the rest of the
-# distributed_algorithms/ subtree so no call site needs to remember the
-# (V, M) parameter order or re-implement trivial timing helpers.
-#
-# Canonical reading:
-#
-#   F <: OPFModel      — formulation (DC, AC, SOCWR, …)
-#   C <: ADMMVariant   — coupling strategy (State, Power, Hybrid)
-#
-# ======================================================================
-
 # ----------------------------------------------------------------------
 # Type-level accessors — extract (F, C) from any distributed tag
 # ----------------------------------------------------------------------
@@ -32,13 +14,13 @@
 # Short diagnostic tags used by logging and history modules
 # ----------------------------------------------------------------------
 # `algorithm_tag(::ALADINAlgorithm) = :aladin` is added in
-# aladin/run_aladin.jl so this file doesn't need to know about the
+# aladin/run.jl so this file doesn't need to know about the
 # ALADIN subtree types.
 
 algorithm_tag(::ADMMAlgorithm) = :admm
 
 # ----------------------------------------------------------------------
-# Timing utilities shared by both run_admm and run_aladin
+# Timing utilities shared by both ADMM and ALADIN run_algorithm methods
 # ----------------------------------------------------------------------
 
 @inline _elapsed_s(t0_ns::Integer) = (time_ns() - t0_ns) / 1e9

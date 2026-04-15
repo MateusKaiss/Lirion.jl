@@ -81,7 +81,7 @@ function _build_inputs(
     raw_case = load_input_data(path)
     preprocess_case_data!(raw_case, model)
 
-    cfg = DistributedOPFModel(
+    cfg = ADMMConfig(
         model, algorithm.coupling, algorithm.sectioning, algorithm.max_iter;
         algorithm.kwargs...,
     )

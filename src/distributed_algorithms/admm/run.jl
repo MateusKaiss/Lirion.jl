@@ -1,31 +1,8 @@
 # ------------------------------------------------------------
-# ADMM type-level tag used by run_admm dispatch
-# ------------------------------------------------------------
-@inline function admm_tag(cfg::DistributedOPFModel)
-    V = _variant_type(Val(cfg.coupling))
-    M = cfg.base_model
-    return ADMM{V, M}()
-end
-
-# ------------------------------------------------------------
-# FINALIZE
-# ------------------------------------------------------------
-@inline function _finalize_admm(partitions, t0_ns::Integer, iter_done::Integer)
-    total_cost = _total_generation_cost(partitions)
-    elapsed_s = _elapsed_s(t0_ns)
-    return (;
-        total_cost,
-        partitions,
-        iter_done = Int(iter_done),
-        elapsed_s,
-    )
-end
-
-# ------------------------------------------------------------
 # CORE LOOP
 # ------------------------------------------------------------
-function run_admm!(ws, params::ADMMParams)
-    tag = _admm_print_tag(ws)
+function run_algorithm!(ws, params::ADMMParams)
+    tag = _print_tag(ws)
 
     for iter in 1:params.max_iter
         ws.iter = iter
@@ -54,21 +31,21 @@ function run_admm!(ws, params::ADMMParams)
     return nothing
 end
 
-function run_admm(
+function run_algorithm(
     sys::DistributedSystem,
-    config::DistributedOPFModel,
-    tag::ADMM;
+    config::ADMMConfig;
     optimizer_factory = nothing,
 )::LirionRunResult
     t0 = time_ns()
+    tag = ADMM{_variant_type(Val(config.coupling)), config.base_model}()
 
-    params = build_admm_params(config)
-    ws = build_admm_workspace(sys, config, optimizer_factory, tag)
+    params = build_params(config)
+    ws = build_workspace(sys, config, optimizer_factory, tag)
     initial_rhos = _get_rhos(ws)
-    run_admm!(ws, params)
-    result = _finalize_admm(ws.partitions, t0, ws.iter)
+    run_algorithm!(ws, params)
+    result = _finalize(ws.partitions, t0, ws.iter)
 
-    tag_str = _admm_print_tag(ws)
+    tag_str = _print_tag(ws)
     final_rhos = _get_rhos(ws)
 
     rho_lines = [
