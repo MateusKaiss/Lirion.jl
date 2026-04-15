@@ -204,6 +204,9 @@ Lirion.jl originated from the undergraduate thesis of **Mateus Kaiss**, its prin
 
 The authors gratefully acknowledge CNPq for its support, which has been essential in enabling the continued development, scientific expansion, and open-source release of this work.
 
+
+## Julia community
+
 Lirion was developed with deep respect for the Julia open-source optimization ecosystem. In particular, **PowerModels.jl** has been an important source of inspiration throughout all the developer’s academic formation.
 
 Lirion does not aim to replicate PowerModels, but rather to explore complementary research directions, especially in distributed optimization and new methods for OPF in electrical power systems — driven by the creator’s strong interest in applied mathematics, optimization theory, and scientific programming.
