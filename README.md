@@ -192,7 +192,7 @@ https://your-docs-link-here.com
 
 ## Mathematical Foundations Website
 
-Lirion is accompanied by a dedicated technical website jointly created by Mateus Kaiss, creator of Lirion.jl, and Andressa Mathias Pedroso, Founder of Creatum.
+Lirion is accompanied by a dedicated technical website jointly created by Mateus Kaiss and Andressa Mathias Pedroso.
 
 The website contains deeper mathematical material underlying Lirion’s design, including:
 
@@ -208,7 +208,7 @@ https://your-website-link-here.com
 
 ## Acknowledgments
 
-Lirion.jl originated from the principal developer’s undergraduate thesis in power systems and has since evolved into an ongoing research line in his Master's program (since March 2026). The package was conceived, designed, and developed by **Mateus Kaiss**, as its principal author and maintainer, with support from:
+Lirion.jl originated from the principal developer’s undergraduate thesis in power systems and has since evolved into a CNPq-funded research project, coordinated by **Dr. Daniel Gebbran Cons Bacilla Ferreira** and co-supervised by **Prof. Dr. Kristie Kaminski Küster**. The package was conceived, designed, and developed by **Mateus Kaiss**, as its principal author and maintainer, with support from:
 
 - **Dr. Daniel Gebbran Cons Bacilla Ferreira** for his supervision of the research involving distributed methodologies and for his significant role in strengthening the scientific contributions of this work.
 
@@ -216,6 +216,9 @@ Lirion.jl originated from the principal developer’s undergraduate thesis in po
 
 - **Andressa Mathias Pedroso** for leading and implementing the design and development of the official Lirion website.
 
+## Funding
+
+The authors gratefully acknowledge CNPq for its support, which has been essential in enabling the continued development, scientific expansion, and open-source release of this work.
 
 Lirion was developed with deep respect for the Julia open-source optimization ecosystem. In particular, **PowerModels.jl** has been an important source of inspiration throughout all the developer’s academic formation.
 
