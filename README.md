@@ -198,7 +198,7 @@ Lirion.jl originated from the undergraduate thesis of its principal author and h
 
 - **Dr. Daniel Gebbran Cons Bacilla Ferreira**, leader of the CNPq-funded research project, for his ideas involving distributed methodologies and for his significant role in strengthening the scientific contributions of this work.
 
-- **Prof. Dr. Kristie Kaminski Küster**, academic advisor of both the undergraduate thesis and the Master's research that emerged from this project, for developing ideas and assisting within the Lirion research group and its scientific contributions, for her guidance in power systems research and for reviewing the implemented code.
+- **Prof. Dr. Kristie Kaminski Küster**, academic advisor of both the undergraduate thesis and the Master's research that emerged from this project, for developing ideas and assisting within the Lirion research group and its scientific contributions and for her guidance in power systems research and for reviewing the implemented code.
 
 - **Andressa Mathias Pedroso**, principal responsible for the design and development of the official Lirion website.
 
