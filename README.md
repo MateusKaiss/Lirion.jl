@@ -206,22 +206,6 @@ The material originates from structured research developed during undergraduate 
 https://your-website-link-here.com
 
 
-## LirionLab.jl — Experimental Research Companion
-
-**Lirion.jl is intentionally kept stable, minimal, and tightly scoped.** Its core formulations, API, and architecture are maintained by the principal author and evolve under a conservative roadmap to preserve reproducibility and scientific integrity.
-
-To support ongoing research, student projects, and exploratory methodologies without compromising the stability of the core package, a separate companion repository is planned:
-
-**LirionLab.jl** — an open research playground where collaborators, students, and researchers can prototype new decomposition schemes, coupling strategies, solver integrations, and OPF formulations on top of Lirion.jl.
-
-The intended relationship is:
-
-- **Lirion.jl** — stable core; curated formulations and algorithms; minimal external contributions; strict API stability.
-- **LirionLab.jl** — experimental extensions; depends on Lirion.jl as a library; open to broader contributions; no API stability guarantees.
-
-This separation ensures that Lirion.jl remains a dependable scientific tool, while LirionLab.jl provides a structured space for methodological exploration and academic collaboration.
-
-
 ## Acknowledgments
 
 Lirion.jl originated from the principal developer’s undergraduate thesis in power systems and has since evolved into an ongoing research line in his Master's program (since March 2026). The package was conceived, designed, and developed by **Mateus Kaiss**, as its principal author and maintainer, with support from:
