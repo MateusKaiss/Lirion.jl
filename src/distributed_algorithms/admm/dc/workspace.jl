@@ -9,19 +9,20 @@
 #     `n_inter` and `Matrix{Float64}` of shape `(n_inter, n_zones)`,
 #     indexed by position in `interzonal` × `part.position`.
 #   * Scratch integer counters are preallocated once.
+#
+# Phase 4b: per-consensus-variable data (consensus vector, duals
+# matrix, rho refs) lives inside a typed `NamedTuple` of `VarState`
+# objects, keyed by the canonical variable symbols declared in
+# `consensus_vars(F, C)`. Legacy flat names (`ws.theta_consensus`,
+# `ws.duals_theta`, `ws.rho_theta`, …) keep working via the
+# `getproperty` forwarding layer in `admm/core/components.jl`.
 # ============================================================
 
 Base.@kwdef mutable struct DCStateWorkspace <: AbstractADMMWorkspace
     partitions::Partitions{PartitionDC}
     id::Vector{Int}
 
-    theta_consensus::Vector{Float64}
-    theta_consensus_prev::Vector{Float64}
-
-    duals_theta::Matrix{Float64}
-
-    rho_theta::Base.RefValue{Float64}
-    prev_rho_theta::Base.RefValue{Float64}
+    vars::NamedTuple{(:theta,), Tuple{VarState}}
 
     bus_counts::Vector{Int}
 
@@ -35,13 +36,7 @@ Base.@kwdef mutable struct DCPowerWorkspace <: AbstractADMMWorkspace
 
     interzonal::Vector{Int}
 
-    p_flow_consensus::Vector{Float64}
-    p_flow_consensus_prev::Vector{Float64}
-
-    duals_p_flow::Matrix{Float64}
-
-    rho_p::Base.RefValue{Float64}
-    prev_rho_p::Base.RefValue{Float64}
+    vars::NamedTuple{(:p_flow,), Tuple{VarState}}
 
     branch_counts::Vector{Int}
 
@@ -55,20 +50,7 @@ Base.@kwdef mutable struct DCHybridWorkspace <: AbstractADMMWorkspace
 
     interzonal::Vector{Int}
 
-    theta_consensus::Vector{Float64}
-    theta_consensus_prev::Vector{Float64}
-
-    p_flow_consensus::Vector{Float64}
-    p_flow_consensus_prev::Vector{Float64}
-
-    duals_theta::Matrix{Float64}
-    duals_p_flow::Matrix{Float64}
-
-    rho_theta::Base.RefValue{Float64}
-    rho_p::Base.RefValue{Float64}
-
-    prev_rho_theta::Base.RefValue{Float64}
-    prev_rho_p::Base.RefValue{Float64}
+    vars::NamedTuple{(:theta, :p_flow), Tuple{VarState, VarState}}
 
     bus_counts::Vector{Int}
     branch_counts::Vector{Int}
@@ -106,16 +88,14 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{State, DC})
 
     init_state_partition!(partitions, sys, optimizer_factory, config.rho_theta)
 
-    rho_theta = Ref(config.rho_theta)
+    vars = (
+        theta = VarState(n_shared, n_zones, config.rho_theta),
+    )
 
     return DCStateWorkspace(;
         partitions = partitions,
         id = id,
-        theta_consensus = zeros(n_shared),
-        theta_consensus_prev = zeros(n_shared),
-        duals_theta = zeros(n_shared, n_zones),
-        rho_theta = rho_theta,
-        prev_rho_theta = Ref(rho_theta[]),
+        vars = vars,
         bus_counts = zeros(Int, n_shared),
     )
 end
@@ -129,17 +109,15 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Power, DC})
 
     init_power_partition!(partitions, sys, optimizer_factory, config.rho_p, inter)
 
-    rho_p = Ref(config.rho_p)
+    vars = (
+        p_flow = VarState(n_inter, n_zones, config.rho_p),
+    )
 
     return DCPowerWorkspace(;
         partitions = partitions,
         id = id,
         interzonal = inter,
-        p_flow_consensus = zeros(n_inter),
-        p_flow_consensus_prev = zeros(n_inter),
-        duals_p_flow = zeros(n_inter, n_zones),
-        rho_p = rho_p,
-        prev_rho_p = Ref(rho_p[]),
+        vars = vars,
         branch_counts = zeros(Int, n_inter),
     )
 end
@@ -161,23 +139,16 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC}
         inter,
     )
 
-    rho_theta = Ref(config.rho_theta)
-    rho_p = Ref(config.rho_p)
+    vars = (
+        theta  = VarState(n_shared, n_zones, config.rho_theta),
+        p_flow = VarState(n_inter,  n_zones, config.rho_p),
+    )
 
     return DCHybridWorkspace(;
         partitions = partitions,
         id = id,
         interzonal = inter,
-        theta_consensus = zeros(n_shared),
-        theta_consensus_prev = zeros(n_shared),
-        p_flow_consensus = zeros(n_inter),
-        p_flow_consensus_prev = zeros(n_inter),
-        duals_theta = zeros(n_shared, n_zones),
-        duals_p_flow = zeros(n_inter, n_zones),
-        rho_theta = rho_theta,
-        rho_p = rho_p,
-        prev_rho_theta = Ref(rho_theta[]),
-        prev_rho_p = Ref(rho_p[]),
+        vars = vars,
         bus_counts = zeros(Int, n_shared),
         branch_counts = zeros(Int, n_inter),
     )

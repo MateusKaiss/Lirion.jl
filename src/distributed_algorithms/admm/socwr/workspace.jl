@@ -1,6 +1,9 @@
 # ============================================================
 # SOCWR WORKSPACES
 # ============================================================
+# Phase 4b: per-consensus-variable data lives in `vars::NamedTuple`
+# of `VarState` objects.
+# ============================================================
 
 # ============================================================
 # STATE (V² + R/T)
@@ -12,31 +15,7 @@ Base.@kwdef mutable struct SOCWRStateWorkspace <: AbstractADMMWorkspace
 
     interzonal::Vector{Int}
 
-    # BUS
-    v2_consensus::Vector{Float64}
-    v2_consensus_prev::Vector{Float64}
-
-    # RT
-    r_consensus::Vector{Float64}
-    t_consensus::Vector{Float64}
-
-    r_consensus_prev::Vector{Float64}
-    t_consensus_prev::Vector{Float64}
-
-    # DUALS
-    duals_v2::Matrix{Float64}
-
-    duals_r::Matrix{Float64}
-    duals_t::Matrix{Float64}
-
-    # RHOS
-    rho_v2::Base.RefValue{Float64}
-    rho_r::Base.RefValue{Float64}
-    rho_t::Base.RefValue{Float64}
-
-    prev_rho_v2::Base.RefValue{Float64}
-    prev_rho_r::Base.RefValue{Float64}
-    prev_rho_t::Base.RefValue{Float64}
+    vars::NamedTuple{(:v2, :r, :t), Tuple{VarState, VarState, VarState}}
 
     bus_counts::Vector{Int}
     branch_counts::Vector{Int}
@@ -63,20 +42,7 @@ Base.@kwdef mutable struct SOCWRPowerWorkspace <: AbstractADMMWorkspace
 
     interzonal::Vector{Int}
 
-    p_flow_consensus::Vector{Float64}
-    q_flow_consensus::Vector{Float64}
-
-    p_flow_consensus_prev::Vector{Float64}
-    q_flow_consensus_prev::Vector{Float64}
-
-    duals_p_flow::Matrix{Float64}
-    duals_q_flow::Matrix{Float64}
-
-    rho_p::Base.RefValue{Float64}
-    rho_q::Base.RefValue{Float64}
-
-    prev_rho_p::Base.RefValue{Float64}
-    prev_rho_q::Base.RefValue{Float64}
+    vars::NamedTuple{(:p_flow, :q_flow), Tuple{VarState, VarState}}
 
     branch_counts::Vector{Int}
 
@@ -100,45 +66,10 @@ Base.@kwdef mutable struct SOCWRHybridWorkspace <: AbstractADMMWorkspace
 
     interzonal::Vector{Int}
 
-    # BUS
-    v2_consensus::Vector{Float64}
-    v2_consensus_prev::Vector{Float64}
-
-    # PQ
-    p_flow_consensus::Vector{Float64}
-    q_flow_consensus::Vector{Float64}
-
-    p_flow_consensus_prev::Vector{Float64}
-    q_flow_consensus_prev::Vector{Float64}
-
-    # RT
-    r_consensus::Vector{Float64}
-    t_consensus::Vector{Float64}
-
-    r_consensus_prev::Vector{Float64}
-    t_consensus_prev::Vector{Float64}
-
-    # DUALS
-    duals_v2::Matrix{Float64}
-
-    duals_p_flow::Matrix{Float64}
-    duals_q_flow::Matrix{Float64}
-
-    duals_r::Matrix{Float64}
-    duals_t::Matrix{Float64}
-
-    # RHOS
-    rho_v2::Base.RefValue{Float64}
-    rho_p::Base.RefValue{Float64}
-    rho_q::Base.RefValue{Float64}
-    rho_r::Base.RefValue{Float64}
-    rho_t::Base.RefValue{Float64}
-
-    prev_rho_v2::Base.RefValue{Float64}
-    prev_rho_p::Base.RefValue{Float64}
-    prev_rho_q::Base.RefValue{Float64}
-    prev_rho_r::Base.RefValue{Float64}
-    prev_rho_t::Base.RefValue{Float64}
+    vars::NamedTuple{
+        (:v2, :p_flow, :q_flow, :r, :t),
+        Tuple{VarState, VarState, VarState, VarState, VarState},
+    }
 
     bus_counts::Vector{Int}
     branch_counts::Vector{Int}
@@ -204,29 +135,17 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCW
         inter,
     )
 
-    rho_v2 = Ref(config.rho_v2)
-    rho_r = Ref(config.rho_r)
-    rho_t = Ref(config.rho_t)
+    vars = (
+        v2 = VarState(n_shared, n_zones, config.rho_v2; init_value = 1.0),
+        r  = VarState(n_inter,  n_zones, config.rho_r),
+        t  = VarState(n_inter,  n_zones, config.rho_t),
+    )
 
     return SOCWRStateWorkspace(;
         partitions = partitions,
         id = id,
         interzonal = inter,
-        v2_consensus = ones(n_shared),
-        v2_consensus_prev = ones(n_shared),
-        r_consensus = zeros(n_inter),
-        t_consensus = zeros(n_inter),
-        r_consensus_prev = zeros(n_inter),
-        t_consensus_prev = zeros(n_inter),
-        duals_v2 = zeros(n_shared, n_zones),
-        duals_r = zeros(n_inter, n_zones),
-        duals_t = zeros(n_inter, n_zones),
-        rho_v2 = rho_v2,
-        rho_r = rho_r,
-        rho_t = rho_t,
-        prev_rho_v2 = Ref(rho_v2[]),
-        prev_rho_r = Ref(rho_r[]),
-        prev_rho_t = Ref(rho_t[]),
+        vars = vars,
         bus_counts = zeros(Int, n_shared),
         branch_counts = zeros(Int, n_inter),
     )
@@ -252,23 +171,16 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCW
         inter,
     )
 
-    rho_p = Ref(config.rho_p)
-    rho_q = Ref(config.rho_q)
+    vars = (
+        p_flow = VarState(n_inter, n_zones, config.rho_p),
+        q_flow = VarState(n_inter, n_zones, config.rho_q),
+    )
 
     return SOCWRPowerWorkspace(;
         partitions = partitions,
         id = id,
         interzonal = inter,
-        p_flow_consensus = zeros(n_inter),
-        q_flow_consensus = zeros(n_inter),
-        p_flow_consensus_prev = zeros(n_inter),
-        q_flow_consensus_prev = zeros(n_inter),
-        duals_p_flow = zeros(n_inter, n_zones),
-        duals_q_flow = zeros(n_inter, n_zones),
-        rho_p = rho_p,
-        rho_q = rho_q,
-        prev_rho_p = Ref(rho_p[]),
-        prev_rho_q = Ref(rho_q[]),
+        vars = vars,
         branch_counts = zeros(Int, n_inter),
     )
 end
@@ -297,41 +209,19 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOC
         inter,
     )
 
-    rho_v2 = Ref(config.rho_v2)
-    rho_p = Ref(config.rho_p)
-    rho_q = Ref(config.rho_q)
-    rho_r = Ref(config.rho_r)
-    rho_t = Ref(config.rho_t)
+    vars = (
+        v2     = VarState(n_shared, n_zones, config.rho_v2; init_value = 1.0),
+        p_flow = VarState(n_inter,  n_zones, config.rho_p),
+        q_flow = VarState(n_inter,  n_zones, config.rho_q),
+        r      = VarState(n_inter,  n_zones, config.rho_r),
+        t      = VarState(n_inter,  n_zones, config.rho_t),
+    )
 
     return SOCWRHybridWorkspace(;
         partitions = partitions,
         id = id,
         interzonal = inter,
-        v2_consensus = ones(n_shared),
-        v2_consensus_prev = ones(n_shared),
-        p_flow_consensus = zeros(n_inter),
-        q_flow_consensus = zeros(n_inter),
-        p_flow_consensus_prev = zeros(n_inter),
-        q_flow_consensus_prev = zeros(n_inter),
-        r_consensus = zeros(n_inter),
-        t_consensus = zeros(n_inter),
-        r_consensus_prev = zeros(n_inter),
-        t_consensus_prev = zeros(n_inter),
-        duals_v2 = zeros(n_shared, n_zones),
-        duals_p_flow = zeros(n_inter, n_zones),
-        duals_q_flow = zeros(n_inter, n_zones),
-        duals_r = zeros(n_inter, n_zones),
-        duals_t = zeros(n_inter, n_zones),
-        rho_v2 = rho_v2,
-        rho_p = rho_p,
-        rho_q = rho_q,
-        rho_r = rho_r,
-        rho_t = rho_t,
-        prev_rho_v2 = Ref(rho_v2[]),
-        prev_rho_p = Ref(rho_p[]),
-        prev_rho_q = Ref(rho_q[]),
-        prev_rho_r = Ref(rho_r[]),
-        prev_rho_t = Ref(rho_t[]),
+        vars = vars,
         bus_counts = zeros(Int, n_shared),
         branch_counts = zeros(Int, n_inter),
     )

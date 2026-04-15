@@ -601,7 +601,13 @@ Base.propertynames(c::DistributedOPFModel, private::Bool = false) =
 abstract type AbstractRunDiagnostics end
 struct NoDiagnostics <: AbstractRunDiagnostics end
 
-abstract type AbstractADMMWorkspace end
+# Root of the distributed-workspace hierarchy. Both ADMM and ALADIN
+# workspaces descend from this type so that generic code can dispatch
+# on a single "distributed workspace" concept without having to list
+# the two families separately.
+abstract type AbstractDistributedWorkspace end
+
+abstract type AbstractADMMWorkspace <: AbstractDistributedWorkspace end
 
 Base.@kwdef struct ADMMHistory <: AbstractRunDiagnostics
     r_primal::Vector{Float64} = Float64[]

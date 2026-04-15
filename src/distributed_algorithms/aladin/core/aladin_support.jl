@@ -9,7 +9,7 @@
 # Both components must fall below their Boyd-style tolerances.
 # =======================================================================
 
-abstract type AbstractALADINWorkspace end
+abstract type AbstractALADINWorkspace <: AbstractDistributedWorkspace end
 
 @inline stop_if_converged(ws::AbstractALADINWorkspace) =
     (ws.r_primal < ws.eps_primal) && (ws.r_progress < ws.eps_progress)

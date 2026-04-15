@@ -202,6 +202,7 @@ include("distributed_algorithms/admm/run_admm.jl")
 
 include("distributed_algorithms/aladin/core/aladin_support.jl")
 include("distributed_algorithms/aladin/core/history.jl")
+include("distributed_algorithms/aladin/core/components.jl")
 include("distributed_algorithms/aladin/build_aladin_params.jl")
 
 include("distributed_algorithms/aladin/dc/sensitivities.jl")
@@ -252,6 +253,28 @@ include("api.jl")
 # New function-based API
 # ------------------------------------------------------------------
 include("solve.jl")
+
+# ------------------------------------------------------------------
+# Precompile hints — compile the ADMM / ALADIN main loops for every
+# workspace type at module-load time so the first call of each
+# `{algorithm, formulation, coupling}` combination doesn't pay JIT
+# overhead. Native Julia `precompile` directive, no extra dependency.
+# ------------------------------------------------------------------
+for T in (
+    DCStateWorkspace,  DCPowerWorkspace,  DCHybridWorkspace,
+    ACStateWorkspace,  ACPowerWorkspace,  ACHybridWorkspace,
+    SOCWRStateWorkspace, SOCWRPowerWorkspace, SOCWRHybridWorkspace,
+)
+    precompile(run_admm!, (T, ADMMParams))
+end
+
+for T in (
+    DCStateWorkspaceALADIN,  DCPowerWorkspaceALADIN,  DCHybridWorkspaceALADIN,
+    ACStateWorkspaceALADIN,  ACPowerWorkspaceALADIN,  ACHybridWorkspaceALADIN,
+    SOCWRStateWorkspaceALADIN, SOCWRPowerWorkspaceALADIN, SOCWRHybridWorkspaceALADIN,
+)
+    precompile(run_aladin!, (T, ALADINParams))
+end
 
 # ------------------------------------------------------------------
 # Public exports

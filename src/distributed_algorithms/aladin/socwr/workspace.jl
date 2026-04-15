@@ -35,17 +35,12 @@ Base.@kwdef mutable struct SOCWRStateWorkspaceALADIN <: AbstractALADINWorkspace
     zones::Vector{AladinZoneDataSOCWR}
 
     # State consensus on v² at shared buses and on R/T at interzonal
-    # branches. One scalar dual per consensus row.
+    # branches.
     bus_pairs::Vector{SharedBusPairSOCWR}
     edge_pairs::Vector{SharedEdgePairSOCWR}
 
-    lambda_v2::Vector{Float64}
-    lambda_r::Vector{Float64}
-    lambda_t::Vector{Float64}
-
-    lambda_v2_prev::Vector{Float64}
-    lambda_r_prev::Vector{Float64}
-    lambda_t_prev::Vector{Float64}
+    # Duals keyed on canonical variable symbol.
+    vars::NamedTuple{(:v2, :r, :t), Tuple{LambdaState, LambdaState, LambdaState}}
 
     qp_optimizer::Any
 
@@ -74,14 +69,8 @@ Base.@kwdef mutable struct SOCWRStateWorkspaceALADIN <: AbstractALADINWorkspace
     sigma_qg::Float64 = 1.0
     sigma_other::Float64 = 1.0
 
-    r_primal::Float64 = 0.0
-    r_progress::Float64 = 0.0
-    lambda_step::Float64 = 0.0
-    eps_primal::Float64 = 0.0
-    eps_progress::Float64 = 0.0
-
-    hist::ALADINHistory = ALADINHistory()
-    iter::Int = 0
+    residuals::ALADINResidualMetrics = ALADINResidualMetrics()
+    state::ALADINIterationState = ALADINIterationState()
 end
 
 # ------------------------------------------------------------
@@ -97,10 +86,7 @@ Base.@kwdef mutable struct SOCWRPowerWorkspaceALADIN <: AbstractALADINWorkspace
 
     edge_pairs::Vector{SharedEdgePairSOCWR}
 
-    lambda_p::Vector{Float64}
-    lambda_q::Vector{Float64}
-    lambda_p_prev::Vector{Float64}
-    lambda_q_prev::Vector{Float64}
+    vars::NamedTuple{(:p_flow, :q_flow), Tuple{LambdaState, LambdaState}}
 
     qp_optimizer::Any
 
@@ -126,14 +112,8 @@ Base.@kwdef mutable struct SOCWRPowerWorkspaceALADIN <: AbstractALADINWorkspace
     sigma_qg::Float64 = 1.0
     sigma_other::Float64 = 1.0
 
-    r_primal::Float64 = 0.0
-    r_progress::Float64 = 0.0
-    lambda_step::Float64 = 0.0
-    eps_primal::Float64 = 0.0
-    eps_progress::Float64 = 0.0
-
-    hist::ALADINHistory = ALADINHistory()
-    iter::Int = 0
+    residuals::ALADINResidualMetrics = ALADINResidualMetrics()
+    state::ALADINIterationState = ALADINIterationState()
 end
 
 # ------------------------------------------------------------
@@ -150,17 +130,10 @@ Base.@kwdef mutable struct SOCWRHybridWorkspaceALADIN <: AbstractALADINWorkspace
     bus_pairs::Vector{SharedBusPairSOCWR}
     edge_pairs::Vector{SharedEdgePairSOCWR}
 
-    lambda_v2::Vector{Float64}
-    lambda_r::Vector{Float64}
-    lambda_t::Vector{Float64}
-    lambda_p::Vector{Float64}
-    lambda_q::Vector{Float64}
-
-    lambda_v2_prev::Vector{Float64}
-    lambda_r_prev::Vector{Float64}
-    lambda_t_prev::Vector{Float64}
-    lambda_p_prev::Vector{Float64}
-    lambda_q_prev::Vector{Float64}
+    vars::NamedTuple{
+        (:v2, :p_flow, :q_flow, :r, :t),
+        Tuple{LambdaState, LambdaState, LambdaState, LambdaState, LambdaState},
+    }
 
     qp_optimizer::Any
 
@@ -186,14 +159,8 @@ Base.@kwdef mutable struct SOCWRHybridWorkspaceALADIN <: AbstractALADINWorkspace
     sigma_qg::Float64 = 1.0
     sigma_other::Float64 = 1.0
 
-    r_primal::Float64 = 0.0
-    r_progress::Float64 = 0.0
-    lambda_step::Float64 = 0.0
-    eps_primal::Float64 = 0.0
-    eps_progress::Float64 = 0.0
-
-    hist::ALADINHistory = ALADINHistory()
-    iter::Int = 0
+    residuals::ALADINResidualMetrics = ALADINResidualMetrics()
+    state::ALADINIterationState = ALADINIterationState()
 end
 
 # ------------------------------------------------------------
@@ -312,12 +279,11 @@ function build_aladin_workspace(
         zones = zones,
         bus_pairs = bus_pairs,
         edge_pairs = edge_pairs,
-        lambda_v2 = zeros(n_bus),
-        lambda_r = zeros(n_edge),
-        lambda_t = zeros(n_edge),
-        lambda_v2_prev = zeros(n_bus),
-        lambda_r_prev = zeros(n_edge),
-        lambda_t_prev = zeros(n_edge),
+        vars = (
+            v2 = LambdaState(n_bus),
+            r  = LambdaState(n_edge),
+            t  = LambdaState(n_edge),
+        ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
         rho = Ref(cfg.rho),
         mu = Ref(cfg.mu),
@@ -358,10 +324,10 @@ function build_aladin_workspace(
         interzonal = inter,
         zones = zones,
         edge_pairs = edge_pairs,
-        lambda_p = zeros(n_edge),
-        lambda_q = zeros(n_edge),
-        lambda_p_prev = zeros(n_edge),
-        lambda_q_prev = zeros(n_edge),
+        vars = (
+            p_flow = LambdaState(n_edge),
+            q_flow = LambdaState(n_edge),
+        ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
         rho = Ref(cfg.rho),
         mu = Ref(cfg.mu),
@@ -406,16 +372,13 @@ function build_aladin_workspace(
         zones = zones,
         bus_pairs = bus_pairs,
         edge_pairs = edge_pairs,
-        lambda_v2 = zeros(n_bus),
-        lambda_r = zeros(n_edge),
-        lambda_t = zeros(n_edge),
-        lambda_p = zeros(n_edge),
-        lambda_q = zeros(n_edge),
-        lambda_v2_prev = zeros(n_bus),
-        lambda_r_prev = zeros(n_edge),
-        lambda_t_prev = zeros(n_edge),
-        lambda_p_prev = zeros(n_edge),
-        lambda_q_prev = zeros(n_edge),
+        vars = (
+            v2     = LambdaState(n_bus),
+            p_flow = LambdaState(n_edge),
+            q_flow = LambdaState(n_edge),
+            r      = LambdaState(n_edge),
+            t      = LambdaState(n_edge),
+        ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
         rho = Ref(cfg.rho),
         mu = Ref(cfg.mu),

@@ -35,12 +35,10 @@ Base.@kwdef mutable struct ACStateWorkspaceALADIN <: AbstractALADINWorkspace
 
     bus_pairs::Vector{SharedBusPairAC}
 
-    # Duals: one scalar per consensus row. State has two rows per shared
-    # bus (θ consensus and v_m consensus).
-    lambda_theta::Vector{Float64}
-    lambda_vm::Vector{Float64}
-    lambda_theta_prev::Vector{Float64}
-    lambda_vm_prev::Vector{Float64}
+    # Duals keyed on canonical variable symbol. Legacy accessors
+    # `ws.lambda_theta`, `ws.lambda_vm` forward to `vars.theta.lambda`
+    # and `vars.v_mag.lambda`.
+    vars::NamedTuple{(:theta, :v_mag), Tuple{LambdaState, LambdaState}}
 
     qp_optimizer::Any
 
@@ -62,14 +60,8 @@ Base.@kwdef mutable struct ACStateWorkspaceALADIN <: AbstractALADINWorkspace
     sigma_qg::Float64 = 1.0
     sigma_other::Float64 = 1.0
 
-    r_primal::Float64 = 0.0
-    r_progress::Float64 = 0.0
-    lambda_step::Float64 = 0.0
-    eps_primal::Float64 = 0.0
-    eps_progress::Float64 = 0.0
-
-    hist::ALADINHistory = ALADINHistory()
-    iter::Int = 0
+    residuals::ALADINResidualMetrics = ALADINResidualMetrics()
+    state::ALADINIterationState = ALADINIterationState()
 end
 
 # ------------------------------------------------------------
@@ -85,10 +77,8 @@ Base.@kwdef mutable struct ACPowerWorkspaceALADIN <: AbstractALADINWorkspace
 
     edge_pairs::Vector{SharedEdgePairAC}
 
-    lambda_p::Vector{Float64}
-    lambda_q::Vector{Float64}
-    lambda_p_prev::Vector{Float64}
-    lambda_q_prev::Vector{Float64}
+    # Duals: branch p_flow + q_flow. Legacy aliases lambda_p/lambda_q.
+    vars::NamedTuple{(:p_flow, :q_flow), Tuple{LambdaState, LambdaState}}
 
     qp_optimizer::Any
 
@@ -105,14 +95,8 @@ Base.@kwdef mutable struct ACPowerWorkspaceALADIN <: AbstractALADINWorkspace
     sigma_qg::Float64 = 1.0
     sigma_other::Float64 = 1.0
 
-    r_primal::Float64 = 0.0
-    r_progress::Float64 = 0.0
-    lambda_step::Float64 = 0.0
-    eps_primal::Float64 = 0.0
-    eps_progress::Float64 = 0.0
-
-    hist::ALADINHistory = ALADINHistory()
-    iter::Int = 0
+    residuals::ALADINResidualMetrics = ALADINResidualMetrics()
+    state::ALADINIterationState = ALADINIterationState()
 end
 
 # ------------------------------------------------------------
@@ -129,15 +113,12 @@ Base.@kwdef mutable struct ACHybridWorkspaceALADIN <: AbstractALADINWorkspace
     bus_pairs::Vector{SharedBusPairAC}
     edge_pairs::Vector{SharedEdgePairAC}
 
-    lambda_theta::Vector{Float64}
-    lambda_vm::Vector{Float64}
-    lambda_p::Vector{Float64}
-    lambda_q::Vector{Float64}
-
-    lambda_theta_prev::Vector{Float64}
-    lambda_vm_prev::Vector{Float64}
-    lambda_p_prev::Vector{Float64}
-    lambda_q_prev::Vector{Float64}
+    # Duals: bus (θ, |V|) + branch (p, q). Legacy accessors
+    # `ws.lambda_theta`, `ws.lambda_vm`, `ws.lambda_p`, `ws.lambda_q`.
+    vars::NamedTuple{
+        (:theta, :v_mag, :p_flow, :q_flow),
+        Tuple{LambdaState, LambdaState, LambdaState, LambdaState},
+    }
 
     qp_optimizer::Any
 
@@ -154,14 +135,8 @@ Base.@kwdef mutable struct ACHybridWorkspaceALADIN <: AbstractALADINWorkspace
     sigma_qg::Float64 = 1.0
     sigma_other::Float64 = 1.0
 
-    r_primal::Float64 = 0.0
-    r_progress::Float64 = 0.0
-    lambda_step::Float64 = 0.0
-    eps_primal::Float64 = 0.0
-    eps_progress::Float64 = 0.0
-
-    hist::ALADINHistory = ALADINHistory()
-    iter::Int = 0
+    residuals::ALADINResidualMetrics = ALADINResidualMetrics()
+    state::ALADINIterationState = ALADINIterationState()
 end
 
 # ------------------------------------------------------------
@@ -270,10 +245,10 @@ function build_aladin_workspace(
         interzonal = inter,
         zones = zones,
         bus_pairs = bus_pairs,
-        lambda_theta = zeros(n_bus),
-        lambda_vm = zeros(n_bus),
-        lambda_theta_prev = zeros(n_bus),
-        lambda_vm_prev = zeros(n_bus),
+        vars = (
+            theta = LambdaState(n_bus),
+            v_mag = LambdaState(n_bus),
+        ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
         rho = Ref(cfg.rho),
         mu = Ref(cfg.mu),
@@ -307,10 +282,10 @@ function build_aladin_workspace(
         interzonal = inter,
         zones = zones,
         edge_pairs = edge_pairs,
-        lambda_p = zeros(n_edge),
-        lambda_q = zeros(n_edge),
-        lambda_p_prev = zeros(n_edge),
-        lambda_q_prev = zeros(n_edge),
+        vars = (
+            p_flow = LambdaState(n_edge),
+            q_flow = LambdaState(n_edge),
+        ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
         rho = Ref(cfg.rho),
         mu = Ref(cfg.mu),
@@ -349,14 +324,12 @@ function build_aladin_workspace(
         zones = zones,
         bus_pairs = bus_pairs,
         edge_pairs = edge_pairs,
-        lambda_theta = zeros(n_bus),
-        lambda_vm = zeros(n_bus),
-        lambda_p = zeros(n_edge),
-        lambda_q = zeros(n_edge),
-        lambda_theta_prev = zeros(n_bus),
-        lambda_vm_prev = zeros(n_bus),
-        lambda_p_prev = zeros(n_edge),
-        lambda_q_prev = zeros(n_edge),
+        vars = (
+            theta  = LambdaState(n_bus),
+            v_mag  = LambdaState(n_bus),
+            p_flow = LambdaState(n_edge),
+            q_flow = LambdaState(n_edge),
+        ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
         rho = Ref(cfg.rho),
         mu = Ref(cfg.mu),

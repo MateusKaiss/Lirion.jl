@@ -1,6 +1,11 @@
 # ============================================================
 # AC WORKSPACES
 # ============================================================
+# Phase 4b: per-consensus-variable data lives in `vars::NamedTuple`
+# of `VarState` objects. Legacy flat names (`ws.theta_consensus`,
+# `ws.rho_v`, …) continue to work through the `getproperty`
+# forwarding in `admm/core/components.jl`.
+# ============================================================
 
 # ---------------- STATE ----------------
 
@@ -8,20 +13,7 @@ Base.@kwdef mutable struct ACStateWorkspace <: AbstractADMMWorkspace
     partitions::Partitions{PartitionAC}
     id::Vector{Int}
 
-    theta_consensus::Vector{Float64}
-    v_mag_consensus::Vector{Float64}
-
-    theta_consensus_prev::Vector{Float64}
-    v_mag_consensus_prev::Vector{Float64}
-
-    duals_theta::Matrix{Float64}
-    duals_v_mag::Matrix{Float64}
-
-    rho_theta::Base.RefValue{Float64}
-    rho_v::Base.RefValue{Float64}
-
-    prev_rho_theta::Base.RefValue{Float64}
-    prev_rho_v::Base.RefValue{Float64}
+    vars::NamedTuple{(:theta, :v_mag), Tuple{VarState, VarState}}
 
     # Scratch vectors for circular mean (reused per iter)
     sin_sum::Vector{Float64}
@@ -46,20 +38,7 @@ Base.@kwdef mutable struct ACPowerWorkspace <: AbstractADMMWorkspace
 
     interzonal::Vector{Int}
 
-    p_flow_consensus::Vector{Float64}
-    q_flow_consensus::Vector{Float64}
-
-    p_flow_consensus_prev::Vector{Float64}
-    q_flow_consensus_prev::Vector{Float64}
-
-    duals_p_flow::Matrix{Float64}
-    duals_q_flow::Matrix{Float64}
-
-    rho_p::Base.RefValue{Float64}
-    rho_q::Base.RefValue{Float64}
-
-    prev_rho_p::Base.RefValue{Float64}
-    prev_rho_q::Base.RefValue{Float64}
+    vars::NamedTuple{(:p_flow, :q_flow), Tuple{VarState, VarState}}
 
     # Scratch counters for NaN-safe AC branch consensus (per-iter).
     p_branch_counts::Vector{Int}
@@ -83,33 +62,10 @@ Base.@kwdef mutable struct ACHybridWorkspace <: AbstractADMMWorkspace
 
     interzonal::Vector{Int}
 
-    theta_consensus::Vector{Float64}
-    v_mag_consensus::Vector{Float64}
-
-    theta_consensus_prev::Vector{Float64}
-    v_mag_consensus_prev::Vector{Float64}
-
-    p_flow_consensus::Vector{Float64}
-    q_flow_consensus::Vector{Float64}
-
-    p_flow_consensus_prev::Vector{Float64}
-    q_flow_consensus_prev::Vector{Float64}
-
-    duals_theta::Matrix{Float64}
-    duals_v_mag::Matrix{Float64}
-
-    duals_p_flow::Matrix{Float64}
-    duals_q_flow::Matrix{Float64}
-
-    rho_theta::Base.RefValue{Float64}
-    rho_v::Base.RefValue{Float64}
-    rho_p::Base.RefValue{Float64}
-    rho_q::Base.RefValue{Float64}
-
-    prev_rho_theta::Base.RefValue{Float64}
-    prev_rho_v::Base.RefValue{Float64}
-    prev_rho_p::Base.RefValue{Float64}
-    prev_rho_q::Base.RefValue{Float64}
+    vars::NamedTuple{
+        (:theta, :v_mag, :p_flow, :q_flow),
+        Tuple{VarState, VarState, VarState, VarState},
+    }
 
     # Scratch buffers
     sin_sum::Vector{Float64}
@@ -173,22 +129,15 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{State, AC})
         config.rho_v,
     )
 
-    rho_theta = Ref(config.rho_theta)
-    rho_v = Ref(config.rho_v)
+    vars = (
+        theta = VarState(n_shared, n_zones, config.rho_theta),
+        v_mag = VarState(n_shared, n_zones, config.rho_v; init_value = 1.0),
+    )
 
     return ACStateWorkspace(;
         partitions = partitions,
         id = id,
-        theta_consensus = zeros(n_shared),
-        v_mag_consensus = ones(n_shared),
-        theta_consensus_prev = zeros(n_shared),
-        v_mag_consensus_prev = ones(n_shared),
-        duals_theta = zeros(n_shared, n_zones),
-        duals_v_mag = zeros(n_shared, n_zones),
-        rho_theta = rho_theta,
-        rho_v = rho_v,
-        prev_rho_theta = Ref(rho_theta[]),
-        prev_rho_v = Ref(rho_v[]),
+        vars = vars,
         sin_sum = zeros(n_shared),
         cos_sum = zeros(n_shared),
         bus_counts = zeros(Int, n_shared),
@@ -213,23 +162,16 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Power, AC})
         inter,
     )
 
-    rho_p = Ref(config.rho_p)
-    rho_q = Ref(config.rho_q)
+    vars = (
+        p_flow = VarState(n_inter, n_zones, config.rho_p),
+        q_flow = VarState(n_inter, n_zones, config.rho_q),
+    )
 
     return ACPowerWorkspace(;
         partitions = partitions,
         id = id,
         interzonal = inter,
-        p_flow_consensus = zeros(n_inter),
-        q_flow_consensus = zeros(n_inter),
-        p_flow_consensus_prev = zeros(n_inter),
-        q_flow_consensus_prev = zeros(n_inter),
-        duals_p_flow = zeros(n_inter, n_zones),
-        duals_q_flow = zeros(n_inter, n_zones),
-        rho_p = rho_p,
-        rho_q = rho_q,
-        prev_rho_p = Ref(rho_p[]),
-        prev_rho_q = Ref(rho_q[]),
+        vars = vars,
         p_branch_counts = zeros(Int, n_inter),
         q_branch_counts = zeros(Int, n_inter),
     )
@@ -256,35 +198,18 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC}
         inter,
     )
 
-    rho_theta = Ref(config.rho_theta)
-    rho_v = Ref(config.rho_v)
-    rho_p = Ref(config.rho_p)
-    rho_q = Ref(config.rho_q)
+    vars = (
+        theta  = VarState(n_shared, n_zones, config.rho_theta),
+        v_mag  = VarState(n_shared, n_zones, config.rho_v; init_value = 1.0),
+        p_flow = VarState(n_inter,  n_zones, config.rho_p),
+        q_flow = VarState(n_inter,  n_zones, config.rho_q),
+    )
 
     return ACHybridWorkspace(;
         partitions = partitions,
         id = id,
         interzonal = inter,
-        theta_consensus = zeros(n_shared),
-        v_mag_consensus = ones(n_shared),
-        theta_consensus_prev = zeros(n_shared),
-        v_mag_consensus_prev = ones(n_shared),
-        p_flow_consensus = zeros(n_inter),
-        q_flow_consensus = zeros(n_inter),
-        p_flow_consensus_prev = zeros(n_inter),
-        q_flow_consensus_prev = zeros(n_inter),
-        duals_theta = zeros(n_shared, n_zones),
-        duals_v_mag = zeros(n_shared, n_zones),
-        duals_p_flow = zeros(n_inter, n_zones),
-        duals_q_flow = zeros(n_inter, n_zones),
-        rho_theta = rho_theta,
-        rho_v = rho_v,
-        rho_p = rho_p,
-        rho_q = rho_q,
-        prev_rho_theta = Ref(rho_theta[]),
-        prev_rho_v = Ref(rho_v[]),
-        prev_rho_p = Ref(rho_p[]),
-        prev_rho_q = Ref(rho_q[]),
+        vars = vars,
         sin_sum = zeros(n_shared),
         cos_sum = zeros(n_shared),
         bus_counts = zeros(Int, n_shared),
