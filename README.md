@@ -192,11 +192,13 @@ https://your-docs-link-here.com
 
 ## Acknowledgments
 
-Lirion.jl originated from the undergraduate thesis of **Mateus Kaiss**, its principal developer, and has since evolved into a CNPq-funded research project. The key collaborators of this work are:
+Lirion.jl originated from the undergraduate thesis of its principal author and has since evolved into a CNPq-funded research project. The key collaborators of this work are:
 
-- **Dr. Daniel Gebbran Cons Bacilla Ferreira**, leader of the CNPq-funded research project, for his supervision of the research involving distributed methodologies and for his significant role in strengthening the scientific contributions of this work.
+- **Mateus Kaiss**, principal author, creator, and maintainer of Lirion.jl.
 
-- **Prof. Dr. Kristie Kaminski Küster**, academic advisor of both the undergraduate thesis and the Master's research that emerged from this project, for her guidance in power systems research and for reviewing the implemented code.
+- **Dr. Daniel Gebbran Cons Bacilla Ferreira**, leader of the CNPq-funded research project, for his ideas involving distributed methodologies and for his significant role in strengthening the scientific contributions of this work.
+
+- **Prof. Dr. Kristie Kaminski Küster**, academic advisor of both the undergraduate thesis and the Master's research that emerged from this project, for developing ideas and assisting within the Lirion research group and its scientific contributions, for her guidance in power systems research and for reviewing the implemented code.
 
 - **Andressa Mathias Pedroso**, principal responsible for the design and development of the official Lirion website.
 
