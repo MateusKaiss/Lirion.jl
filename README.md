@@ -8,10 +8,6 @@
 
 </h3>
 
-<p align="center">
-  <b>Created and maintained by <a href="https://github.com/MateusKaiss">Mateus Kaiss</a></b><br/>
-</p>
-
 A Julia package for solving Optimal Power Flow (OPF) problems using both centralized and distributed algorithms.
 
 ## Why Lirion?
