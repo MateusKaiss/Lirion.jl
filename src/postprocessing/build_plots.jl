@@ -1,6 +1,5 @@
 # ============================================================
 # build_plots.jl — stubs
-# Real implementation lives in ext/PlotlyLightExt.jl
 # ============================================================
 
 const _PLOTLYLIGHT_ERROR = """
@@ -9,8 +8,6 @@ Plotting requires PlotlyLight.jl. Load it first:
     using PlotlyLight
 """
 
-# Extension hook: PlotlyLightExt defines
-#   build_plots(hist::ADMMHistory; outdir, stem)
 function build_plots end
 
 function build_plots(hist::ADMMHistory; outdir::String = ".", stem::String = "admm")

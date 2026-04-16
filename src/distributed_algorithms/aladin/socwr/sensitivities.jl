@@ -357,7 +357,7 @@ function build_aladin_zone_data_socwr(
         edge_qflow_const,
         lb,
         ub,
-        zeros(Float64, n_vars),     # x_prev
+        _init_from_start_values(all_vars),  # x_prev
         zeros(Float64, n_vars),     # y
         zeros(Float64, n_vars),     # g
         copy(base_hess_diag),       # hess_diag (will be refreshed each iter)

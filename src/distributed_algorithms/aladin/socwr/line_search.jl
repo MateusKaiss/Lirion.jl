@@ -39,6 +39,32 @@ end
     return acc
 end
 
+@inline function _socwr_flow_dir_deriv(
+    zone::AladinZoneDataSOCWR,
+    le::Int,
+    which::Symbol,
+)::Float64
+    cols = zone.edge_flow_cols[le]
+    coefs = which === :p ? zone.edge_pflow_coefs[le] : zone.edge_qflow_coefs[le]
+    acc = 0.0
+    delta = zone.delta
+    @inbounds for i in eachindex(cols)
+        acc += coefs[i] * delta[cols[i]]
+    end
+    return acc
+end
+
+@inline function _socwr_cost_dir_deriv_0(zone::AladinZoneDataSOCWR)
+    acc = 0.0
+    y = zone.y
+    delta = zone.delta
+    @inbounds for k in eachindex(zone.pg_cols)
+        col = zone.pg_cols[k]
+        acc += (zone.pg_c2_sbase2[k] * y[col] + zone.pg_c1_sbase[k]) * delta[col]
+    end
+    return acc
+end
+
 function _socwr_merit(ws::SOCWRStateWorkspaceALADIN, α::Float64)
     Φ = 0.0
     for zone in ws.zones
@@ -146,18 +172,138 @@ function _socwr_merit(ws::SOCWRHybridWorkspaceALADIN, α::Float64)
     return Φ + λr + 0.5 * mu * r_sq
 end
 
+# ------------------------------------------------------------
+# Analytical directional derivative dΦ/dα at α = 0.
+# Φ(α) = Σ cost_i(y + αδ) + λᵀ·r(α) + (μ/2)‖r(α)‖² is polynomial in α:
+# cost is quadratic (derivative ∇cost·δ), consensus residuals r(α) are
+# affine (r(α) = r₀ + α·Δr). So
+#   dΦ/dα|_{α=0} = Σ ∇cost_i(y)·δ + (λ + μ·r₀)ᵀ·Δr.
+# ------------------------------------------------------------
+
+function _socwr_dΦ0(ws::SOCWRStateWorkspaceALADIN)
+    dΦ = 0.0
+    for zone in ws.zones
+        dΦ += _socwr_cost_dir_deriv_0(zone)
+    end
+    mu = ws.mu[]
+
+    @inbounds for (k, pair) in enumerate(ws.bus_pairs)
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        r0 = zi.y[pair.v2_col_i] - zj.y[pair.v2_col_j]
+        Δr = zi.delta[pair.v2_col_i] - zj.delta[pair.v2_col_j]
+        dΦ += (ws.vars.v2.lambda[k] + mu * r0) * Δr
+    end
+    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        ri_col = zi.edge_r_cols[pair.edge_local_i]
+        rj_col = zj.edge_r_cols[pair.edge_local_j]
+        ti_col = zi.edge_t_cols[pair.edge_local_i]
+        tj_col = zj.edge_t_cols[pair.edge_local_j]
+
+        r0_r = zi.y[ri_col] - zj.y[rj_col]
+        Δr_r = zi.delta[ri_col] - zj.delta[rj_col]
+        r0_t = zi.y[ti_col] - zj.y[tj_col]
+        Δr_t = zi.delta[ti_col] - zj.delta[tj_col]
+
+        dΦ += (ws.vars.r.lambda[k] + mu * r0_r) * Δr_r
+        dΦ += (ws.vars.t.lambda[k] + mu * r0_t) * Δr_t
+    end
+    return dΦ
+end
+
+function _socwr_dΦ0(ws::SOCWRPowerWorkspaceALADIN)
+    dΦ = 0.0
+    for zone in ws.zones
+        dΦ += _socwr_cost_dir_deriv_0(zone)
+    end
+    mu = ws.mu[]
+
+    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+
+        pi_val = _socwr_flow_at_trial(zi, pair.edge_local_i, 0.0, :p)
+        pj_val = _socwr_flow_at_trial(zj, pair.edge_local_j, 0.0, :p)
+        qi_val = _socwr_flow_at_trial(zi, pair.edge_local_i, 0.0, :q)
+        qj_val = _socwr_flow_at_trial(zj, pair.edge_local_j, 0.0, :q)
+        dpi = _socwr_flow_dir_deriv(zi, pair.edge_local_i, :p)
+        dpj = _socwr_flow_dir_deriv(zj, pair.edge_local_j, :p)
+        dqi = _socwr_flow_dir_deriv(zi, pair.edge_local_i, :q)
+        dqj = _socwr_flow_dir_deriv(zj, pair.edge_local_j, :q)
+
+        r0_p = pi_val - pj_val
+        Δr_p = dpi - dpj
+        r0_q = qi_val - qj_val
+        Δr_q = dqi - dqj
+
+        dΦ += (ws.vars.p_flow.lambda[k] + mu * r0_p) * Δr_p
+        dΦ += (ws.vars.q_flow.lambda[k] + mu * r0_q) * Δr_q
+    end
+    return dΦ
+end
+
+function _socwr_dΦ0(ws::SOCWRHybridWorkspaceALADIN)
+    dΦ = 0.0
+    for zone in ws.zones
+        dΦ += _socwr_cost_dir_deriv_0(zone)
+    end
+    mu = ws.mu[]
+
+    @inbounds for (k, pair) in enumerate(ws.bus_pairs)
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        r0 = zi.y[pair.v2_col_i] - zj.y[pair.v2_col_j]
+        Δr = zi.delta[pair.v2_col_i] - zj.delta[pair.v2_col_j]
+        dΦ += (ws.vars.v2.lambda[k] + mu * r0) * Δr
+    end
+
+    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        ri_col = zi.edge_r_cols[pair.edge_local_i]
+        rj_col = zj.edge_r_cols[pair.edge_local_j]
+        ti_col = zi.edge_t_cols[pair.edge_local_i]
+        tj_col = zj.edge_t_cols[pair.edge_local_j]
+
+        r0_r = zi.y[ri_col] - zj.y[rj_col]
+        Δr_r = zi.delta[ri_col] - zj.delta[rj_col]
+        r0_t = zi.y[ti_col] - zj.y[tj_col]
+        Δr_t = zi.delta[ti_col] - zj.delta[tj_col]
+
+        pi_val = _socwr_flow_at_trial(zi, pair.edge_local_i, 0.0, :p)
+        pj_val = _socwr_flow_at_trial(zj, pair.edge_local_j, 0.0, :p)
+        qi_val = _socwr_flow_at_trial(zi, pair.edge_local_i, 0.0, :q)
+        qj_val = _socwr_flow_at_trial(zj, pair.edge_local_j, 0.0, :q)
+        dpi = _socwr_flow_dir_deriv(zi, pair.edge_local_i, :p)
+        dpj = _socwr_flow_dir_deriv(zj, pair.edge_local_j, :p)
+        dqi = _socwr_flow_dir_deriv(zi, pair.edge_local_i, :q)
+        dqj = _socwr_flow_dir_deriv(zj, pair.edge_local_j, :q)
+
+        r0_p = pi_val - pj_val
+        Δr_p = dpi - dpj
+        r0_q = qi_val - qj_val
+        Δr_q = dqi - dqj
+
+        dΦ += (ws.vars.r.lambda[k] + mu * r0_r) * Δr_r
+        dΦ += (ws.vars.t.lambda[k] + mu * r0_t) * Δr_t
+        dΦ += (ws.vars.p_flow.lambda[k] + mu * r0_p) * Δr_p
+        dΦ += (ws.vars.q_flow.lambda[k] + mu * r0_q) * Δr_q
+    end
+    return dΦ
+end
+
 function _line_search_step!(
     ws::_SOCWRPhase2Workspace;
     c1::Float64 = 1e-4,
-    ε_fd::Float64 = 1e-6,
     max_backtrack::Int = 25,
     α_min::Float64 = 1e-3,
 )
     ws.line_search || return nothing
 
     Φ_0 = _socwr_merit(ws, 0.0)
-    Φ_ε = _socwr_merit(ws, ε_fd)
-    dΦ_0 = (Φ_ε - Φ_0) / ε_fd
+    dΦ_0 = _socwr_dΦ0(ws)
 
     # If the QP direction is not descent, fall back to α_min to keep
     # the iteration making progress via the strong prox pull.

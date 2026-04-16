@@ -277,13 +277,13 @@ function build_aladin_zone_data_ac(
         edata.edge_tap_angle,
         lb,
         ub,
-        zeros(Float64, n_vars),
-        zeros(Float64, n_vars),
-        zeros(Float64, n_vars),
+        _init_from_start_values(all_vars),  # x_prev ← JuMP warm-start
+        zeros(Float64, n_vars),             # y
+        zeros(Float64, n_vars),             # g
         hess_initial,
         jac_initial,
-        zeros(Float64, n_vars),
-        Int[],
+        zeros(Float64, n_vars),             # delta
+        Int[],                              # active_bound_cols
     )
 end
 

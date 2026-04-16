@@ -62,25 +62,33 @@ end
 function _eps_primal_branch(
     partitions::Partitions,
     consensus_vecs,
+    var_symbols::NTuple{N, Symbol} where N,
     interzonal::Vector{Int},
-    n_vars_per_edge::Int,
     eps_abs::Float64,
     eps_rel::Float64,
 )
     dim = 0
+    norm_x_sq = 0.0
     norm_z_sq = 0.0
     for part in partitions
+        m = part.model
+        has_vals = JuMP.has_values(m)
         @inbounds for (k, e) in enumerate(interzonal)
             l = part.branch_idx_full_to_zone[e]
             l == 0 && continue
-            dim += n_vars_per_edge
-            for z in consensus_vecs
-                norm_z_sq += z[k]^2
+            for (vi, sym) in enumerate(var_symbols)
+                dim += 1
+                if has_vals
+                    xv = JuMP.value(m[sym][l, 1])
+                    isfinite(xv) && (norm_x_sq += xv * xv)
+                end
+                norm_z_sq += consensus_vecs[vi][k]^2
             end
         end
     end
 
-    return sqrt(max(1, dim)) * eps_abs + eps_rel * max(sqrt(norm_z_sq), 1e-12)
+    return sqrt(max(1, dim)) * eps_abs +
+           eps_rel * max(sqrt(norm_x_sq), sqrt(norm_z_sq), 1e-12)
 end
 
 function _eps_dual_branch(
@@ -136,8 +144,8 @@ function compute_tolerances!(ws::DCPowerWorkspace, eps_abs::Float64, eps_rel::Fl
     eps_r = _eps_primal_branch(
         ws.partitions,
         (ws.vars.p_flow.consensus,),
+        (:p_flow_branches,),
         ws.interzonal,
-        1,
         eps_abs,
         eps_rel,
     )
@@ -165,8 +173,8 @@ function compute_tolerances!(ws::DCHybridWorkspace, eps_abs::Float64, eps_rel::F
         _eps_primal_branch(
             ws.partitions,
             (ws.vars.p_flow.consensus,),
+            (:p_flow_branches,),
             ws.interzonal,
-            1,
             eps_abs,
             eps_rel,
         ),
@@ -216,8 +224,8 @@ function compute_tolerances!(ws::ACPowerWorkspace, eps_abs::Float64, eps_rel::Fl
     eps_r = _eps_primal_branch(
         ws.partitions,
         (ws.vars.p_flow.consensus, ws.vars.q_flow.consensus),
+        (:p_flow_branches, :q_flow_branches),
         ws.interzonal,
-        2,
         eps_abs,
         eps_rel,
     )
@@ -245,8 +253,8 @@ function compute_tolerances!(ws::ACHybridWorkspace, eps_abs::Float64, eps_rel::F
         _eps_primal_branch(
             ws.partitions,
             (ws.vars.p_flow.consensus, ws.vars.q_flow.consensus),
+            (:p_flow_branches, :q_flow_branches),
             ws.interzonal,
-            2,
             eps_abs,
             eps_rel,
         ),
@@ -285,8 +293,8 @@ function compute_tolerances!(ws::SOCWRStateWorkspace, eps_abs::Float64, eps_rel:
         _eps_primal_branch(
             ws.partitions,
             (ws.vars.r.consensus, ws.vars.t.consensus),
+            (:R, :T_var),
             ws.interzonal,
-            2,
             eps_abs,
             eps_rel,
         ),
@@ -315,8 +323,8 @@ function compute_tolerances!(ws::SOCWRPowerWorkspace, eps_abs::Float64, eps_rel:
     eps_r = _eps_primal_branch(
         ws.partitions,
         (ws.vars.p_flow.consensus, ws.vars.q_flow.consensus),
+        (:p_flow_branches, :q_flow_branches),
         ws.interzonal,
-        2,
         eps_abs,
         eps_rel,
     )
@@ -344,16 +352,16 @@ function compute_tolerances!(ws::SOCWRHybridWorkspace, eps_abs::Float64, eps_rel
         _eps_primal_branch(
             ws.partitions,
             (ws.vars.p_flow.consensus, ws.vars.q_flow.consensus),
+            (:p_flow_branches, :q_flow_branches),
             ws.interzonal,
-            2,
             eps_abs,
             eps_rel,
         )^2 +
         _eps_primal_branch(
             ws.partitions,
             (ws.vars.r.consensus, ws.vars.t.consensus),
+            (:R, :T_var),
             ws.interzonal,
-            2,
             eps_abs,
             eps_rel,
         )^2,

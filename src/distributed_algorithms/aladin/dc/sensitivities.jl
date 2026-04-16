@@ -260,7 +260,7 @@ function build_aladin_zone_data(
         edge_b,
         lb,
         ub,
-        zeros(Float64, n_vars),  # x_prev
+        _init_from_start_values(all_vars),  # x_prev
         zeros(Float64, n_vars),  # y
         zeros(Float64, n_vars),  # g
         hess_diag,

@@ -13,6 +13,16 @@ LambdaState(n::Int) = LambdaState(zeros(n), zeros(n), zeros(n))
 
 @inline _line_search_step!(::AbstractALADINWorkspace) = nothing
 
+function _init_from_start_values(all_vars::Vector{JuMP.VariableRef})
+    n = length(all_vars)
+    v = Vector{Float64}(undef, n)
+    @inbounds for k in 1:n
+        sv = JuMP.start_value(all_vars[k])
+        v[k] = sv === nothing ? 0.0 : Float64(sv)
+    end
+    return v
+end
+
 function _resolve_qp_optimizer(user_opt)
     user_opt === nothing || return user_opt
     return JuMP.optimizer_with_attributes(
