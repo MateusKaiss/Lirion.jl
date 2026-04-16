@@ -339,17 +339,14 @@ end
 # Main entry point (overrides the stub in Lirion)
 # ============================================================
 
-function Lirion.create_partition(
-    path::AbstractString;
-    k::Union{Int, Nothing} = nothing,
-    save_path::Union{AbstractString, Nothing} = nothing,
-    refine::Bool = true,
-    max_refine_passes::Int = 50,
-    seed::Int = 42,
+function _do_partition!(
+    case::Lirion.CaseRaw;
+    k::Union{Int, Nothing},
+    refine::Bool,
+    max_refine_passes::Int,
+    seed::Int,
 )
-    case = Lirion.load_input_data(path)
     n_bus = length(case.bus.bus_i)
-
     kval = k === nothing ? _auto_k(n_bus) : k
     kval = clamp(kval, 2, n_bus)
 
@@ -357,7 +354,6 @@ function Lirion.create_partition(
 
     g, id_to_idx = _build_impedance_graph(case)
     zone = _metis_partition(g, kval)
-
     adj = _build_adjacency(case, id_to_idx)
 
     _fix_connectivity!(zone, adj)
@@ -377,6 +373,35 @@ function Lirion.create_partition(
     end
 
     k_actual = maximum(zone)
+    n_shared = _count_shared_buses(zone, adj)
+    n_ties = _count_tie_lines(zone, adj)
+    @info "Partition created" zones=k_actual buses=n_bus shared_buses=n_shared tie_lines=n_ties
+
+    return case
+end
+
+function Lirion.create_partition(
+    case::Lirion.CaseRaw;
+    k::Union{Int, Nothing} = nothing,
+    refine::Bool = true,
+    max_refine_passes::Int = 50,
+    seed::Int = 42,
+)
+    return _do_partition!(case; k, refine, max_refine_passes, seed)
+end
+
+function Lirion.create_partition(
+    path::AbstractString;
+    k::Union{Int, Nothing} = nothing,
+    save_path::Union{AbstractString, Nothing} = nothing,
+    refine::Bool = true,
+    max_refine_passes::Int = 50,
+    seed::Int = 42,
+)
+    case = Lirion.load_input_data(path)
+    _do_partition!(case; k, refine, max_refine_passes, seed)
+
+    k_actual = maximum(case.bus.zone)
     if save_path === nothing
         base = replace(basename(path), r"\.m$" => "")
         dir = dirname(abspath(path))
@@ -386,11 +411,6 @@ function Lirion.create_partition(
     end
 
     Lirion.write_matpower(case, out)
-
-    n_shared = _count_shared_buses(zone, adj)
-    n_ties = _count_tie_lines(zone, adj)
-    @info "Partition created" path=out zones=k_actual buses=n_bus shared_buses=n_shared tie_lines=n_ties
-
     return out
 end
 

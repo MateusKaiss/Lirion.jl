@@ -66,3 +66,20 @@ function solve(
     _maybe_build_plots!(plots, path_str, inputs.model_type, out)
     return out
 end
+
+function solve(
+    case::CaseRaw;
+    model::Type{<:OPFModel},
+    algorithm::AbstractAlgorithm = centralized(),
+    optimizer = nothing,
+    outputs::Bool = false,
+)::LirionRunResult
+    inputs = _build_inputs(
+        case,
+        algorithm;
+        model = model,
+        optimizer = optimizer,
+        outputs = outputs,
+    )
+    return run_lirion(inputs)
+end

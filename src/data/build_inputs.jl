@@ -46,6 +46,8 @@ function load_input_data(path::AbstractString)::CaseRaw
     return _load(params, detect_input(params))
 end
 
+const load = load_input_data
+
 # ============================================================
 # Inputs builder
 # ============================================================
@@ -58,17 +60,19 @@ function _build_inputs(
     outputs::Bool,
 )::CentralizedInputs
     raw_case = load_input_data(path)
+    return _build_inputs(raw_case, algorithm; model, optimizer, outputs, label = path)
+end
+
+function _build_inputs(
+    raw_case::CaseRaw,
+    ::CentralizedAlgorithm;
+    model::Type{<:OPFModel},
+    optimizer::Any,
+    outputs::Bool,
+    label::String = raw_case.name,
+)::CentralizedInputs
     preprocess_case_data!(raw_case, model)
-
-    full_sys = build_system_data(raw_case)
-
-    return CentralizedInputs(
-        path,
-        model,
-        optimizer,
-        outputs,
-        full_sys,
-    )
+    return CentralizedInputs(label, model, optimizer, outputs, build_system_data(raw_case))
 end
 
 function _build_inputs(
@@ -79,22 +83,24 @@ function _build_inputs(
     outputs::Bool,
 )::DistributedInputs
     raw_case = load_input_data(path)
-    preprocess_case_data!(raw_case, model)
+    return _build_inputs(raw_case, algorithm; model, optimizer, outputs, label = path)
+end
 
+function _build_inputs(
+    raw_case::CaseRaw,
+    algorithm::ADMMAlgorithm;
+    model::Type{<:OPFModel},
+    optimizer::Any,
+    outputs::Bool,
+    label::String = raw_case.name,
+)::DistributedInputs
+    preprocess_case_data!(raw_case, model)
     cfg = ADMMConfig(
         model, algorithm.coupling, algorithm.sectioning, algorithm.max_iter;
         algorithm.kwargs...,
     )
-
     dist_sys = build_distributed_system(raw_case, algorithm.sectioning)
-
-    return DistributedInputs(
-        path,
-        cfg,
-        optimizer,
-        outputs,
-        dist_sys,
-    )
+    return DistributedInputs(label, cfg, optimizer, outputs, dist_sys)
 end
 
 function _build_inputs(
@@ -105,20 +111,22 @@ function _build_inputs(
     outputs::Bool,
 )::DistributedInputs
     raw_case = load_input_data(path)
-    preprocess_case_data!(raw_case, model)
+    return _build_inputs(raw_case, algorithm; model, optimizer, outputs, label = path)
+end
 
+function _build_inputs(
+    raw_case::CaseRaw,
+    algorithm::ALADINAlgorithm;
+    model::Type{<:OPFModel},
+    optimizer::Any,
+    outputs::Bool,
+    label::String = raw_case.name,
+)::DistributedInputs
+    preprocess_case_data!(raw_case, model)
     cfg = ALADINConfig(
         model, algorithm.coupling, algorithm.sectioning, algorithm.max_iter;
         algorithm.kwargs...,
     )
-
     dist_sys = build_distributed_system(raw_case, algorithm.sectioning)
-
-    return DistributedInputs(
-        path,
-        cfg,
-        optimizer,
-        outputs,
-        dist_sys,
-    )
+    return DistributedInputs(label, cfg, optimizer, outputs, dist_sys)
 end

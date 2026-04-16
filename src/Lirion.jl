@@ -257,10 +257,9 @@ end
 # ------------------------------------------------------------------
 # Public exports
 # ------------------------------------------------------------------
-export solve,
+export solve, load,
     dc, ac, acr, ivr, lpac, socwr, socbf, bfa, nfa,
     centralized, admm, aladin,
-    create_partition, write_matpower,
-    partition_from_case, partition_metis
+    create_partition, write_matpower
 
 end

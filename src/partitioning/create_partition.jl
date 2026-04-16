@@ -2,7 +2,15 @@
 # create_partition — auto-zone assignment for distributed OPF
 # ============================================================
 
-function create_partition(path::AbstractString; kwargs...)
+function create_partition(::AbstractString; kwargs...)
+    _metis_not_loaded_error()
+end
+
+function create_partition(::CaseRaw; kwargs...)
+    _metis_not_loaded_error()
+end
+
+function _metis_not_loaded_error()
     return error(
         "create_partition requires Metis.jl, Graphs.jl and SimpleWeightedGraphs.jl.\n" *
         "Install with:  using Pkg; Pkg.add([\"Metis\", \"Graphs\", \"SimpleWeightedGraphs\"])\n" *
