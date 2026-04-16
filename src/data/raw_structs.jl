@@ -143,22 +143,6 @@ struct GencostRaw{T <: Real} <: AbstractRawTable
     cost_coefficients::Vector{Vector{T}}
 end
 
-struct ConsumerRaw{T <: Real} <: AbstractRawTable
-    bus::Vector{Int}
-    demand::Vector{T}
-    q_demand::Vector{T}
-end
-
-struct ProsumerRaw{T <: Real} <: AbstractRawTable
-    bus::Vector{Int}
-    generation::Vector{T}
-    demand::Vector{T}
-    q_generation::Vector{T}
-    q_demand::Vector{T}
-    cost_injection::Vector{T}
-    inverter_capacity::Vector{T}
-end
-
 # -------------------------
 # Timeseries case_raw tables
 # -------------------------
@@ -170,21 +154,6 @@ struct BusTimeseriesRaw{T <: Real} <: AbstractRawTable
     qd::Vector{T}
     gs::Vector{T}
     bs::Vector{T}
-end
-
-struct ConsumerTimeseriesRaw{T <: Real} <: AbstractRawTable
-    time::Vector{Int}
-    bus::Vector{Int}
-    demand::Vector{T}
-    q_demand::Vector{T}
-end
-
-struct ProsumerTimeseriesRaw{T <: Real} <: AbstractRawTable
-    time::Vector{Int}
-    bus::Vector{Int}
-    p_pv::Vector{T}
-    p_load::Vector{T}
-    p_curtail::Vector{T}
 end
 
 struct GencostTimeseriesRaw{T <: Real} <: AbstractRawTable
@@ -259,14 +228,12 @@ mutable struct CaseIndexMaps
     bus_to_gens::Vector{Vector{Int}}
     bus_to_branches_from::Vector{Vector{Int}}
     bus_to_branches_to::Vector{Vector{Int}}
-    bus_to_prosumers::Vector{Vector{Int}}
     bus_to_batteries::Vector{Vector{Int}}
 
     function CaseIndexMaps()
         return new(
             Int[],
             Int[],
-            Vector{Vector{Int}}(),
             Vector{Vector{Int}}(),
             Vector{Vector{Int}}(),
             Vector{Vector{Int}}(),
@@ -313,13 +280,9 @@ mutable struct CaseRaw
     bus_name::Union{Nothing, BusNameRaw}
     storage::Union{Nothing, StorageRaw{Float64}}
     switch::Union{Nothing, SwitchRaw{Float64}}
-    prosumer::Union{Nothing, ProsumerRaw{Float64}}
-    consumer::Union{Nothing, ConsumerRaw{Float64}}
 
     # timeseries
     bus_timeseries::Union{Nothing, BusTimeseriesRaw{Float64}}
-    prosumer_timeseries::Union{Nothing, ProsumerTimeseriesRaw{Float64}}
-    consumer_timeseries::Union{Nothing, ConsumerTimeseriesRaw{Float64}}
     gencost_timeseries::Union{Nothing, GencostTimeseriesRaw{Float64}}
 
     # maps/meta
@@ -339,8 +302,8 @@ mutable struct CaseRaw
             empty_gen_raw(Float64),
             empty_branch_raw(Float64),
             empty_gencost_raw(Float64),
-            nothing, nothing, nothing, nothing, nothing, nothing,
             nothing, nothing, nothing, nothing,
+            nothing, nothing,
             CaseIndexMaps(),
             DistributedRawMeta(),
         )
@@ -359,23 +322,6 @@ slice_bus_ts(ts::BusTimeseriesRaw{T}, order::Vector{Int}) where {T} =
         _slice_vec(ts.qd, order),
         _slice_vec(ts.gs, order),
         _slice_vec(ts.bs, order),
-    )
-
-slice_consumer_ts(ts::ConsumerTimeseriesRaw{T}, order::Vector{Int}) where {T} =
-    ConsumerTimeseriesRaw{T}(
-        _slice_vec(ts.time, order),
-        _slice_vec(ts.bus, order),
-        _slice_vec(ts.demand, order),
-        _slice_vec(ts.q_demand, order),
-    )
-
-slice_prosumer_ts(ts::ProsumerTimeseriesRaw{T}, order::Vector{Int}) where {T} =
-    ProsumerTimeseriesRaw{T}(
-        _slice_vec(ts.time, order),
-        _slice_vec(ts.bus, order),
-        _slice_vec(ts.p_pv, order),
-        _slice_vec(ts.p_load, order),
-        _slice_vec(ts.p_curtail, order),
     )
 
 slice_gencost_ts(ts::GencostTimeseriesRaw{T}, order::Vector{Int}) where {T} =

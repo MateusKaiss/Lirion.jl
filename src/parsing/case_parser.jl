@@ -63,31 +63,9 @@ function _parse_case(data_string::String, ::MatpowerM)::CaseRaw
         end
     end
 
-    if haskey(matlab_data, "mpc.prosumer")
-        case.prosumer =
-            _prosumer_from_mat(matlab_data["mpc.prosumer"]::Vector{Vector{String}})
-    end
-
-    if haskey(matlab_data, "mpc.consumer")
-        case.consumer =
-            _consumer_from_mat(matlab_data["mpc.consumer"]::Vector{Vector{String}})
-    end
-
     if haskey(matlab_data, "mpc.bus_timeseries")
         case.bus_timeseries =
             _bus_ts_from_mat(matlab_data["mpc.bus_timeseries"]::Vector{Vector{String}})
-    end
-
-    if haskey(matlab_data, "mpc.prosumer_timeseries")
-        case.prosumer_timeseries = _prosumer_ts_from_mat(
-            matlab_data["mpc.prosumer_timeseries"]::Vector{Vector{String}},
-        )
-    end
-
-    if haskey(matlab_data, "mpc.consumer_timeseries")
-        case.consumer_timeseries = _consumer_ts_from_mat(
-            matlab_data["mpc.consumer_timeseries"]::Vector{Vector{String}},
-        )
     end
 
     if haskey(matlab_data, "mpc.gencost_timeseries")

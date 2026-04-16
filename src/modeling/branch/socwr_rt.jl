@@ -34,7 +34,7 @@
         if amax <= 0
             R_max[l] = min(R_max[l], vm_fr_max * vm_to_max * cos(amax))
             R_min[l] = max(R_min[l], vm_fr_min * vm_to_min * cos(amin))
-            T_max[l] = min(T_max[l], vm_fr_min * vm_to_max * sin(amax))
+            T_max[l] = min(T_max[l], vm_fr_min * vm_to_min * sin(amax))
             T_min[l] = max(T_min[l], vm_fr_max * vm_to_max * sin(amin))
         end
 

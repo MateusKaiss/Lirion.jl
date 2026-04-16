@@ -68,18 +68,6 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
         )
         zone_case.branch = _slice_branch(full.branch, zone_branch_idx_in_full)
 
-        if full.prosumer !== nothing
-            zone_prosumer_idx =
-                _filter_by_zone_bus(full.prosumer.bus, zone_internal_membership)
-            zone_case.prosumer = _slice_prosumer(full.prosumer, zone_prosumer_idx)
-        end
-
-        if full.consumer !== nothing
-            zone_consumer_idx =
-                _filter_by_zone_bus(full.consumer.bus, zone_internal_membership)
-            zone_case.consumer = _slice_consumer(full.consumer, zone_consumer_idx)
-        end
-
         if full.storage !== nothing
             zone_storage_idx =
                 _filter_by_zone_bus(full.storage.storage_bus, zone_internal_membership)

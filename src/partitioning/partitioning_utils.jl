@@ -289,32 +289,6 @@ end
     )
 end
 
-@inline function _slice_prosumer(
-    full_prosumer::ProsumerRaw{Float64},
-    keep::Vector{Int},
-)
-    return ProsumerRaw{Float64}(
-        full_prosumer.bus[keep],
-        full_prosumer.generation[keep],
-        full_prosumer.demand[keep],
-        full_prosumer.q_generation[keep],
-        full_prosumer.q_demand[keep],
-        full_prosumer.cost_injection[keep],
-        full_prosumer.inverter_capacity[keep],
-    )
-end
-
-@inline function _slice_consumer(
-    full_consumer::ConsumerRaw{Float64},
-    keep::Vector{Int},
-)
-    return ConsumerRaw{Float64}(
-        full_consumer.bus[keep],
-        full_consumer.demand[keep],
-        full_consumer.q_demand[keep],
-    )
-end
-
 @inline function _filter_timeseries!(
     zone_case::CaseRaw,
     full::CaseRaw,
@@ -332,31 +306,6 @@ end
             ts.qd[zone_ts_idx],
             ts.gs[zone_ts_idx],
             ts.bs[zone_ts_idx],
-        )
-    end
-
-    if full.prosumer_timeseries !== nothing
-        ts = full.prosumer_timeseries
-        zone_ts_idx = _filter_by_zone_bus(ts.bus, zone_internal_membership)
-
-        zone_case.prosumer_timeseries = ProsumerTimeseriesRaw{Float64}(
-            ts.time[zone_ts_idx],
-            ts.bus[zone_ts_idx],
-            ts.p_pv[zone_ts_idx],
-            ts.p_load[zone_ts_idx],
-            ts.p_curtail[zone_ts_idx],
-        )
-    end
-
-    if full.consumer_timeseries !== nothing
-        ts = full.consumer_timeseries
-        zone_ts_idx = _filter_by_zone_bus(ts.bus, zone_internal_membership)
-
-        zone_case.consumer_timeseries = ConsumerTimeseriesRaw{Float64}(
-            ts.time[zone_ts_idx],
-            ts.bus[zone_ts_idx],
-            ts.demand[zone_ts_idx],
-            ts.q_demand[zone_ts_idx],
         )
     end
 

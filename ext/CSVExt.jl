@@ -221,26 +221,6 @@ function _switch_from_df(df::DataFrame)
     )
 end
 
-function _prosumer_from_df(df::DataFrame)
-    return Lirion.ProsumerRaw{Float64}(
-        _icol(df, "bus",               0),
-        _fcol(df, "generation",        0.0),
-        _fcol(df, "demand",            0.0),
-        _fcol(df, "q_generation",      0.0),
-        _fcol(df, "q_demand",          0.0),
-        _fcol(df, "cost_injection",    0.0),
-        _fcol(df, "inverter_capacity", 0.0),
-    )
-end
-
-function _consumer_from_df(df::DataFrame)
-    return Lirion.ConsumerRaw{Float64}(
-        _icol(df, "bus",      0),
-        _fcol(df, "demand",   0.0),
-        _fcol(df, "q_demand", 0.0),
-    )
-end
-
 function _bus_ts_from_df(df::DataFrame)
     return Lirion.BusTimeseriesRaw{Float64}(
         _icol(df, "time", 1),
@@ -249,15 +229,6 @@ function _bus_ts_from_df(df::DataFrame)
         _fcol(df, "qd",   0.0),
         _fcol(df, "gs",   0.0),
         _fcol(df, "bs",   0.0),
-    )
-end
-
-function _consumer_ts_from_df(df::DataFrame)
-    return Lirion.ConsumerTimeseriesRaw{Float64}(
-        _icol(df, "time",     1),
-        _icol(df, "bus",      0),
-        _fcol(df, "demand",   0.0),
-        _fcol(df, "q_demand", 0.0),
     )
 end
 
@@ -339,33 +310,6 @@ function _gencost_ts_from_df(df::DataFrame)
     )
 end
 
-function _prosumer_ts_from_df(df::DataFrame)
-    n = nrow(df)
-    time = _icol(df, "time", 1)
-    bus  = _icol(df, "bus",  0)
-
-    if _hascol(df, "p_pv") || _hascol(df, "p_load") || _hascol(df, "p_curtail")
-        return Lirion.ProsumerTimeseriesRaw{Float64}(
-            time, bus,
-            _fcol(df, "p_pv",      0.0),
-            _fcol(df, "p_load",    0.0),
-            _fcol(df, "p_curtail", 0.0),
-        )
-    end
-
-    if _hascol(df, "generation") && _hascol(df, "demand")
-        return Lirion.ProsumerTimeseriesRaw{Float64}(
-            time, bus,
-            _fcol(df, "generation", 0.0),
-            _fcol(df, "demand",     0.0),
-            zeros(n),
-        )
-    end
-
-    @warn "prosumer_timeseries.csv: missing expected columns. Filling zeros."
-    return Lirion.ProsumerTimeseriesRaw{Float64}(time, bus, zeros(n), zeros(n), zeros(n))
-end
-
 # ============================================================
 # _csv_parse_case — extension hook registered in case_parser.jl
 # ============================================================
@@ -419,14 +363,6 @@ function Lirion._csv_parse_case(dir::String)::Lirion.CaseRaw
         isfile(p) && (case.switch = _switch_from_df(_read_csv(p)))
     end
 
-    let p = joinpath(d, "prosumer.csv")
-        isfile(p) && (case.prosumer = _prosumer_from_df(_read_csv(p)))
-    end
-
-    let p = joinpath(d, "consumer.csv")
-        isfile(p) && (case.consumer = _consumer_from_df(_read_csv(p)))
-    end
-
     let p = joinpath(d, "bus_name.csv")
         if isfile(p)
             df = _read_csv(p)
@@ -448,22 +384,6 @@ function Lirion._csv_parse_case(dir::String)::Lirion.CaseRaw
                 case.bus_timeseries = _bus_ts_from_df(_read_csv(p))
                 !isempty(case.bus_timeseries.time) &&
                     (case.T = maximum(case.bus_timeseries.time))
-            end
-        end
-
-        let p = joinpath(tdir, "consumer_timeseries.csv")
-            if isfile(p)
-                case.consumer_timeseries = _consumer_ts_from_df(_read_csv(p))
-                !isempty(case.consumer_timeseries.time) &&
-                    (case.T = max(case.T, maximum(case.consumer_timeseries.time)))
-            end
-        end
-
-        let p = joinpath(tdir, "prosumer_timeseries.csv")
-            if isfile(p)
-                case.prosumer_timeseries = _prosumer_ts_from_df(_read_csv(p))
-                !isempty(case.prosumer_timeseries.time) &&
-                    (case.T = max(case.T, maximum(case.prosumer_timeseries.time)))
             end
         end
 

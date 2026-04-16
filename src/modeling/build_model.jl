@@ -29,8 +29,6 @@ function get_model_times(sys::SystemData)
     time_vecs = Vector{Vector{Int}}()
 
     !isempty(sys.bus_ts.time) && push!(time_vecs, sys.bus_ts.time)
-    !isempty(sys.prosumer_ts.time) && push!(time_vecs, sys.prosumer_ts.time)
-    !isempty(sys.consumer_ts.time) && push!(time_vecs, sys.consumer_ts.time)
     !isempty(sys.gencost_ts.time) && push!(time_vecs, sys.gencost_ts.time)
 
     if isempty(time_vecs)
@@ -55,7 +53,6 @@ end
     branches!(model, sys, model_type)
     generators!(model, sys, model_type)
     batteries!(model, sys, model_type)
-    prosumers!(model, sys, model_type)
     active_power_balance!(model, sys, model_type)
     reactive_power_balance!(model, sys, model_type)
     objective!(model, sys, model_type)

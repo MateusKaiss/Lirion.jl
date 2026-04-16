@@ -10,26 +10,26 @@ function add_socwr_branch_expressions!(model::JuMP.Model, br::BranchData)
     tap_imag = br.tap_imag
 
     @expression(model, p_flow_branches[l in active, t in 1:T],
-        br.g[l] * inv_tap[l]^2 * model[:v_magnitude_sq][br.from[l], t] +
+        (br.g[l] + br.g_fr[l]) * inv_tap[l]^2 * model[:v_magnitude_sq][br.from[l], t] +
         (-br.g[l] * tap_real[l] + br.b[l] * tap_imag[l]) * inv_tap[l]^2 * R[l, t] +
         (-br.b[l] * tap_real[l] - br.g[l] * tap_imag[l]) * inv_tap[l]^2 * Tv[l, t]
     )
 
     @expression(model, q_flow_branches[l in active, t in 1:T],
-        -(br.b[l] + br.b_sh[l] / 2) * inv_tap[l]^2 *
+        -(br.b[l] + br.b_fr[l]) * inv_tap[l]^2 *
         model[:v_magnitude_sq][br.from[l], t] -
         (-br.b[l] * tap_real[l] - br.g[l] * tap_imag[l]) * inv_tap[l]^2 * R[l, t] +
         (-br.g[l] * tap_real[l] + br.b[l] * tap_imag[l]) * inv_tap[l]^2 * Tv[l, t]
     )
 
     @expression(model, p_reverse_flow_branches[l in active, t in 1:T],
-        br.g[l] * model[:v_magnitude_sq][br.to[l], t] +
+        (br.g[l] + br.g_to[l]) * model[:v_magnitude_sq][br.to[l], t] +
         (-br.g[l] * tap_real[l] - br.b[l] * tap_imag[l]) * inv_tap[l]^2 * R[l, t] +
         (-br.b[l] * tap_real[l] + br.g[l] * tap_imag[l]) * inv_tap[l]^2 * (-Tv[l, t])
     )
 
     @expression(model, q_reverse_flow_branches[l in active, t in 1:T],
-        -(br.b[l] + br.b_sh[l] / 2) *
+        -(br.b[l] + br.b_to[l]) *
         model[:v_magnitude_sq][br.to[l], t] -
         (-br.b[l] * tap_real[l] + br.g[l] * tap_imag[l]) * inv_tap[l]^2 * R[l, t] +
         (-br.g[l] * tap_real[l] - br.b[l] * tap_imag[l]) * inv_tap[l]^2 * (-Tv[l, t])

@@ -21,7 +21,7 @@ function add_acr_branch_expressions!(model::JuMP.Model, br::BranchData)
     )
 
     @expression(model, p_flow_branches[l in active, t in 1:T],
-        br.g[l] * br.inv_tap[l]^2 * _acr_v_sq_fr[l, t] +
+        (br.g[l] + br.g_fr[l]) * br.inv_tap[l]^2 * _acr_v_sq_fr[l, t] +
         (-br.g[l] * br.tap_real[l] + br.b[l] * br.tap_imag[l]) *
         br.inv_tap[l]^2 * _acr_cos_mix[l, t] +
         (-br.b[l] * br.tap_real[l] - br.g[l] * br.tap_imag[l]) *
@@ -29,7 +29,7 @@ function add_acr_branch_expressions!(model::JuMP.Model, br::BranchData)
     )
 
     @expression(model, q_flow_branches[l in active, t in 1:T],
-        -(br.b[l] + br.b_sh[l] / 2) * br.inv_tap[l]^2 * _acr_v_sq_fr[l, t] -
+        -(br.b[l] + br.b_fr[l]) * br.inv_tap[l]^2 * _acr_v_sq_fr[l, t] -
         (-br.b[l] * br.tap_real[l] - br.g[l] * br.tap_imag[l]) *
         br.inv_tap[l]^2 * _acr_cos_mix[l, t] +
         (-br.g[l] * br.tap_real[l] + br.b[l] * br.tap_imag[l]) *
@@ -37,7 +37,7 @@ function add_acr_branch_expressions!(model::JuMP.Model, br::BranchData)
     )
 
     @expression(model, p_reverse_flow_branches[l in active, t in 1:T],
-        br.g[l] * _acr_v_sq_to[l, t] +
+        (br.g[l] + br.g_to[l]) * _acr_v_sq_to[l, t] +
         (-br.g[l] * br.tap_real[l] - br.b[l] * br.tap_imag[l]) *
         br.inv_tap[l]^2 * _acr_cos_mix[l, t] -
         (-br.b[l] * br.tap_real[l] + br.g[l] * br.tap_imag[l]) *
@@ -45,7 +45,7 @@ function add_acr_branch_expressions!(model::JuMP.Model, br::BranchData)
     )
 
     @expression(model, q_reverse_flow_branches[l in active, t in 1:T],
-        -(br.b[l] + br.b_sh[l] / 2) * _acr_v_sq_to[l, t] -
+        -(br.b[l] + br.b_to[l]) * _acr_v_sq_to[l, t] -
         (-br.b[l] * br.tap_real[l] + br.g[l] * br.tap_imag[l]) *
         br.inv_tap[l]^2 * _acr_cos_mix[l, t] -
         (-br.g[l] * br.tap_real[l] - br.b[l] * br.tap_imag[l]) *

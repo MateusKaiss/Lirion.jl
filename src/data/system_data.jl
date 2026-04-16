@@ -10,11 +10,8 @@ struct SystemData
     branch::BranchData
     gen::GenData
     battery::BatteryData
-    prosumer::ProsumerData
 
     bus_ts::BusTimeseriesData
-    prosumer_ts::ProsumerTimeseriesData
-    consumer_ts::ConsumerTimeseriesData
     gencost_ts::GencostTimeseriesData
 
     powerflow::PowerFlowData
@@ -61,11 +58,8 @@ function build_system_data(case_raw::CaseRaw)::SystemData
     branch_data = build_branch_data(case_raw)
     gen_data = build_gen_data(case_raw)
     battery_data = build_battery_data(case_raw)
-    prosumer_data = build_prosumer_data(case_raw)
 
     bus_ts_data = build_bus_timeseries_data(case_raw)
-    prosumer_ts_data = build_prosumer_timeseries_data(case_raw)
-    consumer_ts_data = build_consumer_timeseries_data(case_raw)
     gencost_ts_data = build_gencost_timeseries_data(case_raw)
 
     powerflow_data = build_power_flow_data(case_raw)
@@ -78,10 +72,7 @@ function build_system_data(case_raw::CaseRaw)::SystemData
         branch_data,
         gen_data,
         battery_data,
-        prosumer_data,
         bus_ts_data,
-        prosumer_ts_data,
-        consumer_ts_data,
         gencost_ts_data,
         powerflow_data,
         objective_data,

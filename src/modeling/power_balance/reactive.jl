@@ -27,14 +27,6 @@ function compute_reactive_power_balance(
             init = 0.0,
         ) : 0.0
 
-    q_pros =
-        haskey(model, :q_prosumer_injected) ?
-        sum(
-            model[:q_prosumer_injected][p, t]
-            for p in pf.bus_to_prosumers[bus_idx];
-            init = 0.0,
-        ) : 0.0
-
     q_out =
         haskey(model, :q_flow_branches) ?
         sum(
@@ -54,7 +46,6 @@ function compute_reactive_power_balance(
         ) : 0.0
 
     qd = pf.has_bus_ts ? pf.qd_ts[bus_idx, t] : bus.qd[bus_idx]
-    q_cons = pf.has_consumer_ts ? pf.consumer_qd_ts[bus_idx, t] : 0.0
 
-    return q_gen - q_bat - q_pros - qd - q_cons - q_out - q_in
+    return q_gen - q_bat - qd - q_out - q_in
 end

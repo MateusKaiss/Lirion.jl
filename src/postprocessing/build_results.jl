@@ -125,22 +125,5 @@ function build_result_dict(model::JuMP.Model, sys::SystemData)
         )
     end
 
-    # -------------------------
-    # Prosumer
-    # -------------------------
-    if haskey(model, :p_prosumer_injected) && sys.prosumer.number_of_prosumers > 0
-        np = sys.prosumer.number_of_prosumers
-        result["prosumer"] = Dict(
-            "p_injected" =>
-                [value(model[:p_prosumer_injected][p, t]) for p in 1:np, t in 1:T],
-            "q_injected" =>
-                [value(model[:q_prosumer_injected][p, t]) for p in 1:np, t in 1:T],
-            "pv_used" =>
-                [value(model[:pv_generation_used][p, t]) for p in 1:np, t in 1:T],
-            "curtailment" =>
-                [value(model[:pv_curtailment][p, t]) for p in 1:np, t in 1:T],
-        )
-    end
-
     return result
 end

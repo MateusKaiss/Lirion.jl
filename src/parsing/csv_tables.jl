@@ -212,39 +212,6 @@ function _parse_gencost_timeseries_csv(path::String)::GencostTimeseriesRaw{Float
     )
 end
 
-function _prosumer_ts_from_tbl_csv(tbl::Dict{String, Any})
-    n = length(tbl["time"])
-
-    if haskey(tbl, "p_pv") && haskey(tbl, "p_load") && haskey(tbl, "p_curtail")
-        return ProsumerTimeseriesRaw{Float64}(
-            tbl["time"]::Vector{Int},
-            tbl["bus"]::Vector{Int},
-            tbl["p_pv"]::Vector{Float64},
-            tbl["p_load"]::Vector{Float64},
-            tbl["p_curtail"]::Vector{Float64},
-        )
-    end
-
-    if haskey(tbl, "generation") && haskey(tbl, "demand")
-        return ProsumerTimeseriesRaw{Float64}(
-            tbl["time"]::Vector{Int},
-            tbl["bus"]::Vector{Int},
-            tbl["generation"]::Vector{Float64},
-            tbl["demand"]::Vector{Float64},
-            fill(0.0, n),
-        )
-    end
-
-    @warn "prosumer_timeseries: missing expected columns. Filling zeros."
-    return ProsumerTimeseriesRaw{Float64}(
-        tbl["time"]::Vector{Int},
-        tbl["bus"]::Vector{Int},
-        fill(0.0, n),
-        fill(0.0, n),
-        fill(0.0, n),
-    )
-end
-
 function _parse_csv_table_dict(path::String, columns::Vector{Tuple{String, Type}})
     df = _read_csv(path)
     tbl = Dict{String, Any}()

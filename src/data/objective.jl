@@ -10,8 +10,6 @@ struct ObjectiveData
     curtailment_cost::Vector{Float64}
     plant_type::Vector{String}
     generator_status::Vector{Int}
-    number_of_prosumers::Int
-    prosumer_costs::Vector{Float64}
     has_timeseries::Bool
     sbase::Float64
 end
@@ -29,7 +27,6 @@ function get_objective_parameters(
 
     ng = case_raw.gen === nothing ? 0 : length(case_raw.gen.gen_bus)
     nbatt = case_raw.storage === nothing ? 0 : length(case_raw.storage.storage_bus)
-    npros = case_raw.prosumer === nothing ? 0 : length(case_raw.prosumer.bus)
 
     T_eff = max(T, 1)
     generator_costs = _empty_generator_costs(T_eff, ng)
@@ -56,7 +53,6 @@ function get_objective_parameters(
     curt = case_raw.gen === nothing ? Float64[] : case_raw.gen.curtailment_cost
     ptype = case_raw.gen === nothing ? String[] : case_raw.gen.plant_type
     gstat = case_raw.gen === nothing ? Int[] : case_raw.gen.gen_status
-    pcost = case_raw.prosumer === nothing ? Float64[] : case_raw.prosumer.cost_injection
 
     return (
         number_of_generators = ng,
@@ -66,8 +62,6 @@ function get_objective_parameters(
         curtailment_cost = curt,
         plant_type = ptype,
         generator_status = gstat,
-        number_of_prosumers = npros,
-        prosumer_costs = pcost,
         has_timeseries = has_timeseries,
     )
 end
@@ -82,8 +76,6 @@ function build_objective_data(case_raw::CaseRaw)::ObjectiveData
         params.curtailment_cost,
         params.plant_type,
         params.generator_status,
-        params.number_of_prosumers,
-        params.prosumer_costs,
         params.has_timeseries,
         case_raw.baseMVA,
     )

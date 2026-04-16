@@ -49,31 +49,4 @@ mpc.branch = [
 	1	 2	 0.042	 0.9	 0.3	 9000.0	 9000.0	 9000.0	 0.0	 0.0	 1	 -30.0	 30.0;
 ];
 
-%% prosumer data
-%   bus   generation   demand   q_generation   q_demand   cost_injection   inverter_capacity
-mpc.prosumer = [
-    1     100.0         50.0       0.0            0.0           20.0              150.0;
-    2     50.0          20.0       0.0            0.0           25.0              100.0;
-];
-
-%% prosumer timeseries data
-%   time  bus  generation  demand  q_generation  q_demand
-mpc.prosumer_timeseries = [
-    1   1   100.0   50.0   0.0   0.0;
-    1   2   50.0    20.0   0.0   0.0;
-];
-
-%% consumer data
-%   bus   demand   q_demand
-mpc.consumer = [
-    3     80.0       10.0;
-];
-
-%% consumer timeseries data
-%   time  bus  demand  q_demand
-mpc.consumer_timeseries = [
-    1   3   80.0   10.0;
-    2   3   85.0   12.0;
-];
-
 

@@ -64,15 +64,12 @@ include("parsing/case_parser.jl")
 # ------------------------------------------------------------------
 include("data/timeseries_utils.jl")
 include("data/timeseries/bus_timeseries.jl")
-include("data/timeseries/prosumers_timeseries.jl")
-include("data/timeseries/consumer_timeseries.jl")
 include("data/timeseries/gencost_timeseries.jl")
 
 include("data/bus.jl")
 include("data/branch.jl")
 include("data/generator.jl")
 include("data/battery.jl")
-include("data/prosumers.jl")
 include("data/objective.jl")
 include("data/power_balance.jl")
 include("data/system_data.jl")
@@ -124,11 +121,6 @@ include("modeling/battery/constraints_ac.jl")
 include("modeling/battery/constraints_acr.jl")
 include("modeling/battery/constraints_socwr.jl")
 include("modeling/battery/dispatch.jl")
-
-# --- PROSUMER
-include("modeling/prosumer/variables.jl")
-include("modeling/prosumer/constraints.jl")
-include("modeling/prosumer/dispatch.jl")
 
 # --- BALANCE
 include("modeling/power_balance/active.jl")

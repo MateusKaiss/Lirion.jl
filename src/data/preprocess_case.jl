@@ -61,10 +61,6 @@ function add_case_index_maps!(raw_case::CaseRaw)
         m.bus_to_branches_to = [Int[] for _ in 1:nbus]
     end
 
-    m.bus_to_prosumers =
-        raw_case.prosumer === nothing ? [Int[] for _ in 1:nbus] :
-        _group_items_by_bus(raw_case.prosumer.bus, m.bus_idx_map, nbus)
-
     m.bus_to_batteries =
         raw_case.storage === nothing ? [Int[] for _ in 1:nbus] :
         _group_items_by_bus(raw_case.storage.storage_bus, m.bus_idx_map, nbus)
@@ -159,19 +155,6 @@ function convert_timeseries_to_pu!(raw_case::CaseRaw)
         ts.bs ./= Sbase
     end
 
-    if raw_case.prosumer_timeseries !== nothing
-        ts = raw_case.prosumer_timeseries
-        ts.p_load ./= Sbase
-        ts.p_pv ./= Sbase
-        ts.p_curtail ./= Sbase
-    end
-
-    if raw_case.consumer_timeseries !== nothing
-        ts = raw_case.consumer_timeseries
-        ts.demand ./= Sbase
-        ts.q_demand ./= Sbase
-    end
-
     return raw_case
 end
 
@@ -197,13 +180,9 @@ function preprocess_case_data!(
 
     ensure_bus_timeseries!(raw_case, time_horizon)
     ensure_gencost_timeseries!(raw_case, time_horizon)
-    ensure_prosumer_timeseries!(raw_case, time_horizon)
-    ensure_consumer_timeseries!(raw_case, time_horizon)
 
     extend_bus_timeseries!(raw_case, time_horizon)
     extend_gencost_timeseries!(raw_case, time_horizon)
-    extend_prosumer_timeseries!(raw_case, time_horizon)
-    extend_consumer_timeseries!(raw_case, time_horizon)
 
     sort_timeseries_by_time_and_id!(raw_case)
 

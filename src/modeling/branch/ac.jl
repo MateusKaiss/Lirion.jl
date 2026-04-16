@@ -13,26 +13,26 @@ function add_ac_branch_expressions!(model::JuMP.Model, br::BranchData)
     @expression(model, _ac_sin_dtheta[l in active, t in 1:T], sin(_ac_dtheta[l, t]))
 
     @expression(model, p_flow_branches[l in active, t in 1:T],
-        br.g[l] * (br.inv_tap[l] * v_magnitude[br.from[l], t])^2 -
+        (br.g[l] + br.g_fr[l]) * (br.inv_tap[l] * v_magnitude[br.from[l], t])^2 -
         br.inv_tap[l] * v_magnitude[br.from[l], t] * v_magnitude[br.to[l], t] *
         (br.g[l] * _ac_cos_dtheta[l, t] + br.b[l] * _ac_sin_dtheta[l, t])
     )
 
     @expression(model, p_reverse_flow_branches[l in active, t in 1:T],
-        br.g[l] * v_magnitude[br.to[l], t]^2 -
+        (br.g[l] + br.g_to[l]) * v_magnitude[br.to[l], t]^2 -
         br.inv_tap[l] * v_magnitude[br.to[l], t] * v_magnitude[br.from[l], t] *
         (br.g[l] * _ac_cos_dtheta[l, t] - br.b[l] * _ac_sin_dtheta[l, t])
     )
 
     @expression(model, q_flow_branches[l in active, t in 1:T],
-        -(br.b[l] + br.b_sh[l] / 2) *
+        -(br.b[l] + br.b_fr[l]) *
         (br.inv_tap[l] * v_magnitude[br.from[l], t])^2 -
         br.inv_tap[l] * v_magnitude[br.from[l], t] * v_magnitude[br.to[l], t] *
         (-br.b[l] * _ac_cos_dtheta[l, t] + br.g[l] * _ac_sin_dtheta[l, t])
     )
 
     @expression(model, q_reverse_flow_branches[l in active, t in 1:T],
-        -(br.b[l] + br.b_sh[l] / 2) * v_magnitude[br.to[l], t]^2 -
+        -(br.b[l] + br.b_to[l]) * v_magnitude[br.to[l], t]^2 -
         br.inv_tap[l] * v_magnitude[br.to[l], t] * v_magnitude[br.from[l], t] *
         (-br.b[l] * _ac_cos_dtheta[l, t] - br.g[l] * _ac_sin_dtheta[l, t])
     )

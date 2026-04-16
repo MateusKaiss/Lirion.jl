@@ -33,14 +33,8 @@ function add_ivr_current_balance_constraints!(
 
         for t in 1:T
             # Demand at this bus (static or timeseries) — must honour t.
-            pd_val = pf.has_bus_ts ? pf.pd_ts[bus_idx, t] : bus.pd[bus_idx]
-            qd_val = pf.has_bus_ts ? pf.qd_ts[bus_idx, t] : bus.qd[bus_idx]
-
-            pd_cons = pf.has_consumer_ts ? pf.consumer_pd_ts[bus_idx, t] : 0.0
-            qd_cons = pf.has_consumer_ts ? pf.consumer_qd_ts[bus_idx, t] : 0.0
-
-            pd_total = pd_val + pd_cons
-            qd_total = qd_val + qd_cons
+            pd_total = pf.has_bus_ts ? pf.pd_ts[bus_idx, t] : bus.pd[bus_idx]
+            qd_total = pf.has_bus_ts ? pf.qd_ts[bus_idx, t] : bus.qd[bus_idx]
 
             vr_b = vr[b, t]
             vi_b = vi[b, t]
