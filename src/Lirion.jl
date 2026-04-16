@@ -80,6 +80,7 @@ include("data/preprocess_case.jl")
 # ------------------------------------------------------------------
 include("partitioning/partitioning_utils.jl")
 include("partitioning/tie_line.jl")
+include("partitioning/create_partition.jl")
 
 # ------------------------------------------------------------------
 # Inputs structs (legacy CLI + shared input pipeline)
@@ -259,6 +260,7 @@ end
 export solve,
     dc, ac, acr, ivr, lpac, socwr, socbf, bfa, nfa,
     centralized, admm, aladin,
+    create_partition, write_matpower,
     partition_from_case, partition_metis
 
 end

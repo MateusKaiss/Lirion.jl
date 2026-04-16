@@ -62,7 +62,7 @@ end
 function _eps_primal_branch(
     partitions::Partitions,
     consensus_vecs,
-    var_symbols::NTuple{N, Symbol} where N,
+    var_symbols::NTuple{N, Symbol} where {N},
     interzonal::Vector{Int},
     eps_abs::Float64,
     eps_rel::Float64,
