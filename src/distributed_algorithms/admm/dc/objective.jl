@@ -25,6 +25,7 @@ function build_quad_branch_expr!(
     part::PartitionDC,
     rho_p::Float64,
     zone_edges::Vector{Int},
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )
     m = part.model::JuMP.Model
     quad = zero(JuMP.QuadExpr)
@@ -35,6 +36,24 @@ function build_quad_branch_expr!(
 
         p = m[:p_flow_branches][l, 1]
         quad += 0.5 * rho_p * p^2
+    end
+
+    pos = part.position
+    @inbounds for (ga, za, gb, zb) in branch_pairs
+        if za == pos
+            l = part.branch_idx_full_to_zone[ga]
+            if l != 0
+                p = m[:p_flow_branches][l, 1]
+                quad += 0.5 * rho_p * p^2
+            end
+        end
+        if zb == pos
+            l = part.branch_idx_full_to_zone[gb]
+            if l != 0
+                p = m[:p_flow_branches][l, 1]
+                quad += 0.5 * rho_p * p^2
+            end
+        end
     end
 
     part.quad_branch_expr = quad
@@ -69,9 +88,11 @@ function build_linear_branch_term(
     duals_p_flow::AbstractVector{Float64},
     interzonal::Vector{Int},
     rho_p::Float64,
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )::JuMP.AffExpr
     m = part.model::JuMP.Model
     lin = zero(JuMP.AffExpr)
+    n_inter = length(interzonal)
     @inbounds for (k, e) in enumerate(interzonal)
         l = part.branch_idx_full_to_zone[e]
         l == 0 && continue
@@ -79,6 +100,27 @@ function build_linear_branch_term(
         p_cons = p_flow_consensus[k]
         p_dual = duals_p_flow[k]
         lin += (p_dual - rho_p * p_cons) * p
+    end
+
+    pos = part.position
+    @inbounds for (k, (ga, za, gb, zb)) in enumerate(branch_pairs)
+        idx = n_inter + k
+        p_cons = p_flow_consensus[idx]
+        p_dual = duals_p_flow[idx]
+        if za == pos
+            l = part.branch_idx_full_to_zone[ga]
+            if l != 0
+                p = m[:p_flow_branches][l, 1]
+                lin += (p_dual - rho_p * p_cons) * p
+            end
+        end
+        if zb == pos
+            l = part.branch_idx_full_to_zone[gb]
+            if l != 0
+                p = m[:p_flow_branches][l, 1]
+                lin += (p_dual - rho_p * p_cons) * p
+            end
+        end
     end
     return lin
 end
@@ -106,6 +148,7 @@ function update_objective!(part::PartitionDC, ws::DCPowerWorkspace)
         view(ws.vars.p_flow.duals, :, part.position),
         ws.interzonal,
         ws.vars.p_flow.rho[],
+        ws.branch_pairs,
     )
 
     @objective(part.model, Min, part.obj_static + lin)
@@ -126,6 +169,7 @@ function update_objective!(part::PartitionDC, ws::DCHybridWorkspace)
         view(ws.vars.p_flow.duals, :, part.position),
         ws.interzonal,
         ws.vars.p_flow.rho[],
+        ws.branch_pairs,
     )
 
     @objective(part.model, Min, part.obj_static + lin_bus + lin_branch)

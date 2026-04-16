@@ -23,6 +23,8 @@ Base.@kwdef mutable struct DCPowerWorkspace <: AbstractADMMWorkspace
     id::Vector{Int}
 
     interzonal::Vector{Int}
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[]
+    pair_counts::Vector{Int} = Int[]
 
     vars::NamedTuple{(:p_flow,), Tuple{VarState}}
 
@@ -41,6 +43,8 @@ Base.@kwdef mutable struct DCHybridWorkspace <: AbstractADMMWorkspace
     id::Vector{Int}
 
     interzonal::Vector{Int}
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[]
+    pair_counts::Vector{Int} = Int[]
 
     vars::NamedTuple{(:theta, :p_flow), Tuple{VarState, VarState}}
 
@@ -99,19 +103,24 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, DC})
     partitions = build_partitions(PartitionDC, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
+    pairs = sys.branch_pairs
     n_zones = length(partitions)
     n_inter = length(inter)
+    n_pairs = length(pairs)
+    n_total = n_inter + n_pairs
 
-    init_power_partition!(partitions, sys, optimizer_factory, config.rho_p, inter)
+    init_power_partition!(partitions, sys, optimizer_factory, config.rho_p, inter, pairs)
 
     vars = (
-        p_flow = VarState(n_inter, n_zones, config.rho_p),
+        p_flow = VarState(n_total, n_zones, config.rho_p),
     )
 
     return DCPowerWorkspace(;
         partitions = partitions,
         id = id,
         interzonal = inter,
+        branch_pairs = pairs,
+        pair_counts = fill(2, n_pairs),
         vars = vars,
         branch_counts = zeros(Int, n_inter),
     )
@@ -121,9 +130,12 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
     partitions = build_partitions(PartitionDC, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
+    pairs = sys.branch_pairs
     n_zones = length(partitions)
     n_shared = length(sys.full_shared_bus_ids)
     n_inter = length(inter)
+    n_pairs = length(pairs)
+    n_total = n_inter + n_pairs
 
     init_hybrid_partition!(
         partitions,
@@ -132,17 +144,20 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
         config.rho_theta,
         config.rho_p,
         inter,
+        pairs,
     )
 
     vars = (
         theta = VarState(n_shared, n_zones, config.rho_theta),
-        p_flow = VarState(n_inter, n_zones, config.rho_p),
+        p_flow = VarState(n_total, n_zones, config.rho_p),
     )
 
     return DCHybridWorkspace(;
         partitions = partitions,
         id = id,
         interzonal = inter,
+        branch_pairs = pairs,
+        pair_counts = fill(2, n_pairs),
         vars = vars,
         bus_counts = zeros(Int, n_shared),
         branch_counts = zeros(Int, n_inter),

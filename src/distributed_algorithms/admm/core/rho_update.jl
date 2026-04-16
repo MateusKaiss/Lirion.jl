@@ -37,11 +37,16 @@ function _refresh_rho_bus_dc!(parts::Partitions{PartitionDC}, rho, prev_rho)::Bo
 end
 
 # ---- DC branch ----
-function _refresh_rho_branch_dc!(parts::Partitions{PartitionDC}, rho, prev_rho)::Bool
+function _refresh_rho_branch_dc!(
+    parts::Partitions{PartitionDC},
+    rho,
+    prev_rho,
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
+)::Bool
     rho_val = rho[]
     rho_val == prev_rho[] && return false
     @inbounds for part in parts.parts
-        build_quad_branch_expr!(part, rho_val, part.zone_edges)
+        build_quad_branch_expr!(part, rho_val, part.zone_edges, branch_pairs)
     end
     prev_rho[] = rho_val
     return true
@@ -198,7 +203,10 @@ function refresh_rho!(ws::DCStateWorkspace)
 end
 
 function refresh_rho!(ws::DCPowerWorkspace)
-    if _refresh_rho_branch_dc!(ws.partitions, ws.vars.p_flow.rho, ws.vars.p_flow.prev_rho)
+    if _refresh_rho_branch_dc!(
+        ws.partitions, ws.vars.p_flow.rho, ws.vars.p_flow.prev_rho,
+        ws.branch_pairs,
+    )
         @inbounds for part in ws.partitions.parts
             part.obj_static = part.obj_base + part.quad_branch_expr
         end
@@ -210,7 +218,10 @@ function refresh_rho!(ws::DCHybridWorkspace)
     bus_changed =
         _refresh_rho_bus_dc!(ws.partitions, ws.vars.theta.rho, ws.vars.theta.prev_rho)
     branch_changed =
-        _refresh_rho_branch_dc!(ws.partitions, ws.vars.p_flow.rho, ws.vars.p_flow.prev_rho)
+        _refresh_rho_branch_dc!(
+            ws.partitions, ws.vars.p_flow.rho, ws.vars.p_flow.prev_rho,
+            ws.branch_pairs,
+        )
     if bus_changed || branch_changed
         @inbounds for part in ws.partitions.parts
             part.obj_static =

@@ -53,9 +53,9 @@ end
 # Branch duals: single variable (DC P)
 # ------------------------------------------------------------
 function _update_branch_duals_single!(
-    duals::Matrix{Float64},
+    duals::AbstractMatrix{Float64},
     partitions::Partitions,
-    consensus::Vector{Float64},
+    consensus::AbstractVector{Float64},
     rho::Float64,
     interzonal::Vector{Int},
     extract_fn,    # (part, l) -> Float64
@@ -67,6 +67,35 @@ function _update_branch_duals_single!(
             l == 0 && continue
             val = extract_fn(part, l)
             duals[k, p] += rho * (val - consensus[k])
+        end
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Branch pair duals (DummyBus Method 2)
+# ------------------------------------------------------------
+function _update_branch_pairs_duals_single!(
+    duals::AbstractMatrix{Float64},         # rows = pair region, cols = zones
+    partitions::Partitions,
+    consensus::AbstractVector{Float64},     # length == n_pairs
+    rho::Float64,
+    pairs::Vector{NTuple{4, Int}},
+    extract_fn,
+)
+    isempty(pairs) && return nothing
+    @inbounds for (k, (ga, za, gb, zb)) in enumerate(pairs)
+        pa = partitions.parts[za]
+        la = pa.branch_idx_full_to_zone[ga]
+        if la != 0
+            vala = extract_fn(pa, la)
+            duals[k, za] += rho * (vala - consensus[k])
+        end
+        pb = partitions.parts[zb]
+        lb = pb.branch_idx_full_to_zone[gb]
+        if lb != 0
+            valb = extract_fn(pb, lb)
+            duals[k, zb] += rho * (valb - consensus[k])
         end
     end
     return nothing
@@ -149,14 +178,28 @@ function dual_update!(ws::DCStateWorkspace)
 end
 
 function dual_update!(ws::DCPowerWorkspace)
-    _update_branch_duals_single!(
-        ws.vars.p_flow.duals,
-        ws.partitions,
-        ws.vars.p_flow.consensus,
-        ws.vars.p_flow.rho[],
-        ws.interzonal,
-        _dc_flow_value,
-    )
+    n_inter = length(ws.interzonal)
+    n_pairs = length(ws.branch_pairs)
+    if n_inter > 0
+        _update_branch_duals_single!(
+            view(ws.vars.p_flow.duals, 1:n_inter, :),
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            ws.vars.p_flow.rho[],
+            ws.interzonal,
+            _dc_flow_value,
+        )
+    end
+    if n_pairs > 0
+        _update_branch_pairs_duals_single!(
+            view(ws.vars.p_flow.duals, n_inter+1:n_inter+n_pairs, :),
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            ws.vars.p_flow.rho[],
+            ws.branch_pairs,
+            _dc_flow_value,
+        )
+    end
     return nothing
 end
 
@@ -168,14 +211,28 @@ function dual_update!(ws::DCHybridWorkspace)
         ws.vars.theta.rho[],
         snapshot_theta_shared!,
     )
-    _update_branch_duals_single!(
-        ws.vars.p_flow.duals,
-        ws.partitions,
-        ws.vars.p_flow.consensus,
-        ws.vars.p_flow.rho[],
-        ws.interzonal,
-        _dc_flow_value,
-    )
+    n_inter = length(ws.interzonal)
+    n_pairs = length(ws.branch_pairs)
+    if n_inter > 0
+        _update_branch_duals_single!(
+            view(ws.vars.p_flow.duals, 1:n_inter, :),
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            ws.vars.p_flow.rho[],
+            ws.interzonal,
+            _dc_flow_value,
+        )
+    end
+    if n_pairs > 0
+        _update_branch_pairs_duals_single!(
+            view(ws.vars.p_flow.duals, n_inter+1:n_inter+n_pairs, :),
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            ws.vars.p_flow.rho[],
+            ws.branch_pairs,
+            _dc_flow_value,
+        )
+    end
     return nothing
 end
 

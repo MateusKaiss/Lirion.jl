@@ -2,6 +2,11 @@
 # Interzonal branches (tie lines) finder
 # ==============================================================================
 
+# DummyBus sectioning does not have classical tie-lines (each split half is
+# internal to one zone, the dummy bus is shared). Branch pairs are carried
+# separately via `DistributedRawMeta.branch_pairs`.
+_find_interzonal_branches(::CaseRaw, ::DummyBus) = Int[]
+
 function _find_interzonal_branches(full::CaseRaw, ::TieLine)
     full_bus_ids = full.bus.bus_i
     full_bus_zones = full.bus.zone

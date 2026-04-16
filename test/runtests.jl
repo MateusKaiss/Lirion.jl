@@ -56,6 +56,7 @@ include(joinpath(@__DIR__, "test_aladin_socwr.jl"))
     run_admm_dc_state_tests(; rtol = 0.01)
     run_admm_dc_power_tests(; rtol = 0.01)
     run_admm_dc_hybrid_tests(; rtol = 0.01)
+    run_admm_dc_dummybus_hybrid_tests(; rtol = 0.05)
 
     # # # Distributed AC
     run_admm_ac_state_tests(;

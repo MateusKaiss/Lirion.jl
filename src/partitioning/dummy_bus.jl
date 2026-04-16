@@ -27,17 +27,26 @@ function prepare_distributed_partitions(full::CaseRaw, ::DummyBus)
 
     # Identify tie-lines (active branches crossing zone boundaries).
     tie_idxs = Int[]
+    tie_orig_zones = Tuple{Int, Int}[]  # (zone_from, zone_to) per tie for later pair zone mapping
     for b in eachindex(br.f_bus)
         br.br_status[b] == 1 || continue
         fi = bus_id_to_idx[br.f_bus[b]]
         ti = bus_id_to_idx[br.t_bus[b]]
-        bus.zone[fi] != bus.zone[ti] && push!(tie_idxs, b)
+        if bus.zone[fi] != bus.zone[ti]
+            push!(tie_idxs, b)
+            push!(tie_orig_zones, (bus.zone[fi], bus.zone[ti]))
+        end
     end
 
     isempty(tie_idxs) && return prepare_distributed_partitions(cas, TieLine())
 
     dummy_bus_ids = Set{Int}()
     next_bus_id = maximum(bus.bus_i) + 1
+
+    # Record global indices of the two halves of each split tie-line.
+    # After pushing, the two newly appended branches are the last two in `br`.
+    half_a_globals = Int[]  # global idx of (from → dummy) branch
+    half_b_globals = Int[]  # global idx of (dummy → to) branch
 
     for b in tie_idxs
         dummy_id = next_bus_id
@@ -81,9 +90,11 @@ function prepare_distributed_partitions(full::CaseRaw, ::DummyBus)
             has_xfmr ? br.tap[b] : 0.0,
             has_xfmr ? br.shift[b] : 0.0,
             br.angmin[b], br.angmax[b])
+        push!(half_a_globals, length(br.f_bus))   # just-appended index
 
         _push_branch!(br, dummy_id, t_orig, r_h, x_h, b_h, br.rate_a[b],
             br.rate_b[b], br.rate_c[b], 0.0, 0.0, br.angmin[b], br.angmax[b])
+        push!(half_b_globals, length(br.f_bus))
 
         # ── 3. Deactivate original tie-line ─────────────────────────────
         br.br_status[b] = 0
@@ -186,9 +197,33 @@ function prepare_distributed_partitions(full::CaseRaw, ::DummyBus)
         shared_mask[b] = true
     end
     cas.dist.full_shared_bus_ids = full_shared
+    full.dist.full_shared_bus_ids = full_shared
     for zc in parts
         zc.dist.zone_shared_bus_ids = [b for b in zc.bus.bus_i if shared_mask[b]]
     end
+
+    # Build branch pairs: map each split tie-line to (half_a_global, zone_a_pos,
+    # half_b_global, zone_b_pos). Zone positions are the 1-based indices into
+    # `parts` (aligned with sort!(unique(zones))).
+    zone_id_to_pos = Dict{Int, Int}()
+    for (pos, zid) in enumerate(zone_ids)
+        zone_id_to_pos[zid] = pos
+    end
+
+    pairs_nt = NTuple{4, Int}[]
+    for k in eachindex(tie_idxs)
+        za_id, zb_id = tie_orig_zones[k]
+        ga = half_a_globals[k]
+        gb = half_b_globals[k]
+        push!(pairs_nt,
+            (ga, zone_id_to_pos[za_id], gb, zone_id_to_pos[zb_id]),
+        )
+    end
+
+    # Persist the pairs on the ORIGINAL case (which is what
+    # `build_distributed_system` reads from).
+    full.dist.branch_pairs = pairs_nt
+    cas.dist.branch_pairs = pairs_nt
 
     return (zone_ids = zone_ids, parts = parts)
 end

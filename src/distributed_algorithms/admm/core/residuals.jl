@@ -50,7 +50,7 @@ end
 # ------------------------------------------------------------
 function _primal_residual_branch_single(
     partitions::Partitions,
-    consensus::Vector{Float64},
+    consensus::AbstractVector{Float64},
     interzonal::Vector{Int},
     extract_fn,    # (part, l) -> Float64
 )
@@ -63,6 +63,48 @@ function _primal_residual_branch_single(
         end
     end
     return sqrt(acc)
+end
+
+# ------------------------------------------------------------
+# Branch pairs primal residual (DummyBus Method 2)
+# ------------------------------------------------------------
+function _primal_residual_branch_pairs(
+    partitions::Partitions,
+    consensus::AbstractVector{Float64},
+    pairs::Vector{NTuple{4, Int}},
+    extract_fn,
+)
+    isempty(pairs) && return 0.0
+    acc = 0.0
+    @inbounds for (k, (ga, za, gb, zb)) in enumerate(pairs)
+        pa = partitions.parts[za]
+        la = pa.branch_idx_full_to_zone[ga]
+        if la != 0
+            acc += (extract_fn(pa, la) - consensus[k])^2
+        end
+        pb = partitions.parts[zb]
+        lb = pb.branch_idx_full_to_zone[gb]
+        if lb != 0
+            acc += (extract_fn(pb, lb) - consensus[k])^2
+        end
+    end
+    return sqrt(acc)
+end
+
+function _dual_residual_branch_pairs(
+    consensus::AbstractVector{Float64},
+    consensus_prev::AbstractVector{Float64},
+    pairs::Vector{NTuple{4, Int}},
+    rho::Float64,
+)
+    isempty(pairs) && return 0.0
+    s = 0.0
+    @inbounds for k in eachindex(pairs)
+        d = consensus[k] - consensus_prev[k]
+        # two contributions, one per zone
+        s += 2 * d^2
+    end
+    return rho * sqrt(s)
 end
 
 # ------------------------------------------------------------
@@ -163,8 +205,8 @@ end
 # ------------------------------------------------------------
 function _dual_residual_branch_single(
     partitions::Partitions,
-    consensus::Vector{Float64},
-    consensus_prev::Vector{Float64},
+    consensus::AbstractVector{Float64},
+    consensus_prev::AbstractVector{Float64},
     interzonal::Vector{Int},
     rho::Float64,
 )
@@ -227,21 +269,47 @@ function compute_residuals!(ws::DCStateWorkspace)
 end
 
 function compute_residuals!(ws::DCPowerWorkspace)
-    r = _primal_residual_branch_single(
-        ws.partitions,
-        ws.vars.p_flow.consensus,
-        ws.interzonal,
-        _dc_flow_value,
-    )
-    s = _dual_residual_branch_single(
-        ws.partitions,
-        ws.vars.p_flow.consensus,
-        ws.vars.p_flow.consensus_prev,
-        ws.interzonal,
-        ws.vars.p_flow.rho[],
-    )
-    ws.r_primal = r
-    ws.r_dual = s
+    n_inter = length(ws.interzonal)
+    n_pairs = length(ws.branch_pairs)
+    rho = ws.vars.p_flow.rho[]
+
+    r_inter =
+        n_inter > 0 ?
+        _primal_residual_branch_single(
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            ws.interzonal,
+            _dc_flow_value,
+        ) : 0.0
+    s_inter =
+        n_inter > 0 ?
+        _dual_residual_branch_single(
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            view(ws.vars.p_flow.consensus_prev, 1:n_inter),
+            ws.interzonal,
+            rho,
+        ) : 0.0
+
+    r_pair =
+        n_pairs > 0 ?
+        _primal_residual_branch_pairs(
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            ws.branch_pairs,
+            _dc_flow_value,
+        ) : 0.0
+    s_pair =
+        n_pairs > 0 ?
+        _dual_residual_branch_pairs(
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            view(ws.vars.p_flow.consensus_prev, n_inter+1:n_inter+n_pairs),
+            ws.branch_pairs,
+            rho,
+        ) : 0.0
+
+    ws.r_primal = hypot(r_inter, r_pair)
+    ws.r_dual = hypot(s_inter, s_pair)
     return nothing
 end
 
@@ -257,19 +325,48 @@ function compute_residuals!(ws::DCHybridWorkspace)
         ws.vars.theta.consensus_prev,
         ws.vars.theta.rho[],
     )
-    ws.r_primal_branch = _primal_residual_branch_single(
-        ws.partitions,
-        ws.vars.p_flow.consensus,
-        ws.interzonal,
-        _dc_flow_value,
-    )
-    ws.r_dual_branch = _dual_residual_branch_single(
-        ws.partitions,
-        ws.vars.p_flow.consensus,
-        ws.vars.p_flow.consensus_prev,
-        ws.interzonal,
-        ws.vars.p_flow.rho[],
-    )
+
+    n_inter = length(ws.interzonal)
+    n_pairs = length(ws.branch_pairs)
+    rho = ws.vars.p_flow.rho[]
+
+    r_inter =
+        n_inter > 0 ?
+        _primal_residual_branch_single(
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            ws.interzonal,
+            _dc_flow_value,
+        ) : 0.0
+    s_inter =
+        n_inter > 0 ?
+        _dual_residual_branch_single(
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            view(ws.vars.p_flow.consensus_prev, 1:n_inter),
+            ws.interzonal,
+            rho,
+        ) : 0.0
+
+    r_pair =
+        n_pairs > 0 ?
+        _primal_residual_branch_pairs(
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            ws.branch_pairs,
+            _dc_flow_value,
+        ) : 0.0
+    s_pair =
+        n_pairs > 0 ?
+        _dual_residual_branch_pairs(
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            view(ws.vars.p_flow.consensus_prev, n_inter+1:n_inter+n_pairs),
+            ws.branch_pairs,
+            rho,
+        ) : 0.0
+
+    ws.r_primal_branch = hypot(r_inter, r_pair)
+    ws.r_dual_branch = hypot(s_inter, s_pair)
 
     ws.r_primal = hypot(ws.r_primal_bus, ws.r_primal_branch)
     ws.r_dual = hypot(ws.r_dual_bus, ws.r_dual_branch)

@@ -72,8 +72,8 @@ end
 # Branch consensus: single variable (DC P)
 # ------------------------------------------------------------
 function _consensus_branch_single!(
-    consensus::Vector{Float64},
-    counts::Vector{Int},
+    consensus::AbstractVector{Float64},
+    counts::AbstractVector{Int},
     partitions::Partitions,
     interzonal::Vector{Int},
     extract_fn,    # (part, l) -> Float64
@@ -93,6 +93,32 @@ function _consensus_branch_single!(
     @inbounds for k in eachindex(consensus)
         c = counts[k]
         c > 0 && (consensus[k] /= c)
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Branch pairs consensus (DummyBus Method 2): two DIFFERENT
+# branches (one per zone) must share the same p_flow value.
+# ------------------------------------------------------------
+function _consensus_branch_pairs!(
+    consensus::AbstractVector{Float64},  # length == n_pairs
+    counts::AbstractVector{Int},
+    partitions::Partitions,
+    pairs::Vector{NTuple{4, Int}},
+    extract_fn,    # (part, l) -> Float64
+)
+    isempty(pairs) && return nothing
+    fill!(consensus, 0.0)
+    fill!(counts, 2)
+    @inbounds for (k, (ga, za, gb, zb)) in enumerate(pairs)
+        pa = partitions.parts[za]
+        la = pa.branch_idx_full_to_zone[ga]
+        pb = partitions.parts[zb]
+        lb = pb.branch_idx_full_to_zone[gb]
+        va = la == 0 ? 0.0 : extract_fn(pa, la)
+        vb = lb == 0 ? 0.0 : extract_fn(pb, lb)
+        consensus[k] = 0.5 * (va + vb)
     end
     return nothing
 end
@@ -190,14 +216,29 @@ consensus!(ws::DCStateWorkspace) =
         snapshot_theta_shared!,
     )
 
-consensus!(ws::DCPowerWorkspace) =
-    _consensus_branch_single!(
-        ws.vars.p_flow.consensus,
-        ws.branch_counts,
-        ws.partitions,
-        ws.interzonal,
-        _dc_flow_value,
-    )
+function consensus!(ws::DCPowerWorkspace)
+    n_inter = length(ws.interzonal)
+    n_pairs = length(ws.branch_pairs)
+    if n_inter > 0
+        _consensus_branch_single!(
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            ws.branch_counts,
+            ws.partitions,
+            ws.interzonal,
+            _dc_flow_value,
+        )
+    end
+    if n_pairs > 0
+        _consensus_branch_pairs!(
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            ws.pair_counts,
+            ws.partitions,
+            ws.branch_pairs,
+            _dc_flow_value,
+        )
+    end
+    return nothing
+end
 
 function consensus!(ws::DCHybridWorkspace)
     _consensus_bus_single!(
@@ -206,13 +247,26 @@ function consensus!(ws::DCHybridWorkspace)
         ws.partitions,
         snapshot_theta_shared!,
     )
-    _consensus_branch_single!(
-        ws.vars.p_flow.consensus,
-        ws.branch_counts,
-        ws.partitions,
-        ws.interzonal,
-        _dc_flow_value,
-    )
+    n_inter = length(ws.interzonal)
+    n_pairs = length(ws.branch_pairs)
+    if n_inter > 0
+        _consensus_branch_single!(
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            ws.branch_counts,
+            ws.partitions,
+            ws.interzonal,
+            _dc_flow_value,
+        )
+    end
+    if n_pairs > 0
+        _consensus_branch_pairs!(
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            ws.pair_counts,
+            ws.partitions,
+            ws.branch_pairs,
+            _dc_flow_value,
+        )
+    end
     return nothing
 end
 
