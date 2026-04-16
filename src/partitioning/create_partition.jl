@@ -3,11 +3,11 @@
 # ============================================================
 
 function create_partition(::AbstractString; kwargs...)
-    _metis_not_loaded_error()
+    return _metis_not_loaded_error()
 end
 
 function create_partition(::CaseRaw; kwargs...)
-    _metis_not_loaded_error()
+    return _metis_not_loaded_error()
 end
 
 function _metis_not_loaded_error()

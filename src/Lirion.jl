@@ -80,6 +80,7 @@ include("data/preprocess_case.jl")
 # ------------------------------------------------------------------
 include("partitioning/partitioning_utils.jl")
 include("partitioning/tie_line.jl")
+include("partitioning/dummy_bus.jl")
 include("partitioning/create_partition.jl")
 
 # ------------------------------------------------------------------
@@ -232,12 +233,6 @@ include("api.jl")
 # ------------------------------------------------------------------
 include("solve.jl")
 
-# ------------------------------------------------------------------
-# Precompile hints — compile the ADMM / ALADIN main loops for every
-# workspace type at module-load time so the first call of each
-# `{algorithm, formulation, coupling}` combination doesn't pay JIT
-# overhead. Native Julia `precompile` directive, no extra dependency.
-# ------------------------------------------------------------------
 for T in (
     DCStateWorkspace, DCPowerWorkspace, DCHybridWorkspace,
     ACStateWorkspace, ACPowerWorkspace, ACHybridWorkspace,
