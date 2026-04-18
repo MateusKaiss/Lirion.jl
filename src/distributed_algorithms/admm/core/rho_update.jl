@@ -158,6 +158,7 @@ function _refresh_rho_hybrid_socwr!(
     rho_q, prev_rho_q,
     rho_r, prev_rho_r,
     rho_t, prev_rho_t,
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )
     rho_v2_val = rho_v2[]
     rho_p_val = rho_p[]
@@ -176,11 +177,12 @@ function _refresh_rho_hybrid_socwr!(
     @inbounds for part in parts.parts
         rho_v2_val != prev_rho_v2[] && build_quad_bus_expr!(part, rho_v2_val)
         (rho_p_val != prev_rho_p[] || rho_q_val != prev_rho_q[]) &&
-            build_quad_branch_pq_expr!(part, rho_p_val, rho_q_val, part.zone_edges)
+            build_quad_branch_pq_expr!(part, rho_p_val, rho_q_val,
+                part.zone_edges, branch_pairs)
         (rho_r_val != prev_rho_r[] || rho_t_val != prev_rho_t[]) &&
             build_quad_branch_rt_expr!(part, rho_r_val, rho_t_val, part.zone_edges)
-        # `quad_p_inj_expr` / `quad_q_inj_expr` are zero for TieLine, so
-        # including them unconditionally is safe and keeps SplitBus intact.
+        # `quad_p_inj_expr` / `quad_q_inj_expr` are zero for TieLine/DummyBus,
+        # so including them unconditionally is safe and keeps SplitBus intact.
         part.obj_static =
             part.obj_base + part.quad_bus_expr + part.quad_pq_expr +
             part.quad_rt_expr + part.quad_p_inj_expr + part.quad_q_inj_expr
@@ -314,6 +316,7 @@ function refresh_rho!(ws::SOCWRHybridWorkspace)
         ws.vars.q_flow.rho, ws.vars.q_flow.prev_rho,
         ws.vars.r.rho, ws.vars.r.prev_rho,
         ws.vars.t.rho, ws.vars.t.prev_rho,
+        ws.branch_pairs,
     )
     if !isempty(ws.bus_pairs)
         rho_pi = ws.vars.p_inj.rho[]

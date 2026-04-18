@@ -54,6 +54,7 @@ function init_hybrid_partition!(
     rho_r::Float64,
     rho_t::Float64,
     interzonal_branches,
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
     bus_pairs::Vector{NTuple{3, Int}} = NTuple{3, Int}[],
     p_inj_store::Union{Nothing, Dict{Int, JuMP.VariableRef}} = nothing,
     q_inj_store::Union{Nothing, Dict{Int, JuMP.VariableRef}} = nothing,
@@ -71,7 +72,7 @@ function init_hybrid_partition!(
     end
 
     build_quad_bus_expr!(part, rho_v2)
-    build_quad_branch_pq_expr!(part, rho_p, rho_q, part.zone_edges)
+    build_quad_branch_pq_expr!(part, rho_p, rho_q, part.zone_edges, branch_pairs)
     build_quad_branch_rt_expr!(part, rho_r, rho_t, part.zone_edges)
     build_quad_p_inj_expr_socwr!(part, rho_p, p_inj_store)
     build_quad_q_inj_expr_socwr!(part, rho_q, q_inj_store)
@@ -204,6 +205,7 @@ function init_hybrid_partition!(
     rho_r::Float64,
     rho_t::Float64,
     interzonal_branches,
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
     bus_pairs::Vector{NTuple{3, Int}} = NTuple{3, Int}[],
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
         Dict{Int, JuMP.VariableRef}[],
@@ -218,6 +220,7 @@ function init_hybrid_partition!(
         init_hybrid_partition!(
             partitions.parts[i], sys.parts[i], optimizer_factory,
             rho_v2, rho_p, rho_q, rho_r, rho_t, interzonal_branches,
+            branch_pairs,
             bus_pairs,
             have_p_inj ? p_inj_vars[i] : nothing,
             have_q_inj ? q_inj_vars[i] : nothing,

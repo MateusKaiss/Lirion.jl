@@ -46,6 +46,16 @@ end
     return JuMP.value(p), JuMP.value(q)
 end
 
+@inline function _socwr_p_value(part::PartitionSOCWR, l::Int)
+    p, _ = _pq_flow_from_exprs(part.model, l)
+    return JuMP.value(p)
+end
+
+@inline function _socwr_q_value(part::PartitionSOCWR, l::Int)
+    _, q = _pq_flow_from_exprs(part.model, l)
+    return JuMP.value(q)
+end
+
 @inline function _socwr_rt_values(part::PartitionSOCWR, l::Int)
     r, t = _rt_from_exprs(part.model, l)
     return JuMP.value(r), JuMP.value(t)

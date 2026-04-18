@@ -149,8 +149,8 @@ end
 # ------------------------------------------------------------
 function _primal_residual_branch_paired_components(
     partitions::Partitions,
-    consensus_a::Vector{Float64},
-    consensus_b::Vector{Float64},
+    consensus_a::AbstractVector{Float64},
+    consensus_b::AbstractVector{Float64},
     interzonal::Vector{Int},
     extract_fn,    # (part, l) -> (Float64, Float64)
 )
@@ -263,10 +263,10 @@ end
 # ------------------------------------------------------------
 function _dual_residual_branch_paired_components(
     partitions::Partitions,
-    consensus_a::Vector{Float64},
-    consensus_b::Vector{Float64},
-    consensus_a_prev::Vector{Float64},
-    consensus_b_prev::Vector{Float64},
+    consensus_a::AbstractVector{Float64},
+    consensus_b::AbstractVector{Float64},
+    consensus_a_prev::AbstractVector{Float64},
+    consensus_b_prev::AbstractVector{Float64},
     interzonal::Vector{Int},
     rho_a::Float64,
     rho_b::Float64,
@@ -591,6 +591,11 @@ function compute_residuals!(ws::SOCWRPowerWorkspace)
 end
 
 function compute_residuals!(ws::SOCWRHybridWorkspace)
+    n_inter = length(ws.interzonal)
+    n_pairs = length(ws.branch_pairs)
+    rho_p = ws.vars.p_flow.rho[]
+    rho_q = ws.vars.q_flow.rho[]
+
     ws.r_primal_bus = _primal_residual_bus_single(
         ws.partitions,
         ws.vars.v2.consensus,
@@ -602,32 +607,82 @@ function compute_residuals!(ws::SOCWRHybridWorkspace)
         ws.vars.v2.consensus_prev,
         ws.vars.v2.rho[],
     )
-    ws.r_primal_p, ws.r_primal_q = _primal_residual_branch_paired_components(
-        ws.partitions,
-        ws.vars.p_flow.consensus,
-        ws.vars.q_flow.consensus,
-        ws.interzonal,
-        _socwr_pq_values,
-    )
-    ws.r_dual_p, ws.r_dual_q = _dual_residual_branch_paired_components(
-        ws.partitions,
-        ws.vars.p_flow.consensus, ws.vars.q_flow.consensus,
-        ws.vars.p_flow.consensus_prev, ws.vars.q_flow.consensus_prev,
-        ws.interzonal, ws.vars.p_flow.rho[], ws.vars.q_flow.rho[],
-    )
-    ws.r_primal_r, ws.r_primal_t = _primal_residual_branch_paired_components(
-        ws.partitions,
-        ws.vars.r.consensus,
-        ws.vars.t.consensus,
-        ws.interzonal,
-        _socwr_rt_values,
-    )
-    ws.r_dual_r, ws.r_dual_t = _dual_residual_branch_paired_components(
-        ws.partitions,
-        ws.vars.r.consensus, ws.vars.t.consensus,
-        ws.vars.r.consensus_prev, ws.vars.t.consensus_prev,
-        ws.interzonal, ws.vars.r.rho[], ws.vars.t.rho[],
-    )
+
+    # Interzonal P/Q (TieLine)
+    r_p_inter, r_q_inter =
+        n_inter > 0 ?
+        _primal_residual_branch_paired_components(
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            view(ws.vars.q_flow.consensus, 1:n_inter),
+            ws.interzonal,
+            _socwr_pq_values,
+        ) : (0.0, 0.0)
+    s_p_inter, s_q_inter =
+        n_inter > 0 ?
+        _dual_residual_branch_paired_components(
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            view(ws.vars.q_flow.consensus, 1:n_inter),
+            view(ws.vars.p_flow.consensus_prev, 1:n_inter),
+            view(ws.vars.q_flow.consensus_prev, 1:n_inter),
+            ws.interzonal, rho_p, rho_q,
+        ) : (0.0, 0.0)
+
+    # Branch pairs P/Q (DummyBus)
+    r_p_pair =
+        n_pairs > 0 ?
+        _primal_residual_branch_pairs(
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            ws.branch_pairs,
+            _socwr_p_value,
+        ) : 0.0
+    r_q_pair =
+        n_pairs > 0 ?
+        _primal_residual_branch_pairs(
+            ws.partitions,
+            view(ws.vars.q_flow.consensus, n_inter+1:n_inter+n_pairs),
+            ws.branch_pairs,
+            _socwr_q_value,
+        ) : 0.0
+    s_p_pair =
+        n_pairs > 0 ?
+        _dual_residual_branch_pairs(
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            view(ws.vars.p_flow.consensus_prev, n_inter+1:n_inter+n_pairs),
+            ws.branch_pairs, rho_p,
+        ) : 0.0
+    s_q_pair =
+        n_pairs > 0 ?
+        _dual_residual_branch_pairs(
+            view(ws.vars.q_flow.consensus, n_inter+1:n_inter+n_pairs),
+            view(ws.vars.q_flow.consensus_prev, n_inter+1:n_inter+n_pairs),
+            ws.branch_pairs, rho_q,
+        ) : 0.0
+
+    ws.r_primal_p = hypot(r_p_inter, r_p_pair)
+    ws.r_primal_q = hypot(r_q_inter, r_q_pair)
+    ws.r_dual_p = hypot(s_p_inter, s_p_pair)
+    ws.r_dual_q = hypot(s_q_inter, s_q_pair)
+
+    ws.r_primal_r, ws.r_primal_t =
+        n_inter > 0 ?
+        _primal_residual_branch_paired_components(
+            ws.partitions,
+            ws.vars.r.consensus,
+            ws.vars.t.consensus,
+            ws.interzonal,
+            _socwr_rt_values,
+        ) : (0.0, 0.0)
+    ws.r_dual_r, ws.r_dual_t =
+        n_inter > 0 ?
+        _dual_residual_branch_paired_components(
+            ws.partitions,
+            ws.vars.r.consensus, ws.vars.t.consensus,
+            ws.vars.r.consensus_prev, ws.vars.t.consensus_prev,
+            ws.interzonal, ws.vars.r.rho[], ws.vars.t.rho[],
+        ) : (0.0, 0.0)
 
     if !isempty(ws.bus_pairs)
         ws.r_primal_p_inj = _primal_residual_bus_pairs_signed(

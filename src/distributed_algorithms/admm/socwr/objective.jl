@@ -43,15 +43,37 @@ function build_quad_branch_pq_expr!(
     rho_p::Float64,
     rho_q::Float64,
     zone_edges::Vector{Int},
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )
     m = part.model::JuMP.Model
     quad = zero(JuMP.QuadExpr)
 
+    # Interzonal P/Q (TieLine)
     @inbounds for e in zone_edges
         l = part.branch_idx_full_to_zone[e]
         l == 0 && continue
         p, q = _pq_flow_from_exprs(m, l)
         quad += 0.5 * rho_p * p^2 + 0.5 * rho_q * q^2
+    end
+
+    # Branch pairs P/Q (DummyBus Method 2): each half of a split tie-line
+    # contributes one quadratic term to the partition that owns it.
+    pos = part.position
+    @inbounds for (ga, za, gb, zb) in branch_pairs
+        if za == pos
+            l = part.branch_idx_full_to_zone[ga]
+            if l != 0
+                p, q = _pq_flow_from_exprs(m, l)
+                quad += 0.5 * rho_p * p^2 + 0.5 * rho_q * q^2
+            end
+        end
+        if zb == pos
+            l = part.branch_idx_full_to_zone[gb]
+            if l != 0
+                p, q = _pq_flow_from_exprs(m, l)
+                quad += 0.5 * rho_p * p^2 + 0.5 * rho_q * q^2
+            end
+        end
     end
 
     part.quad_pq_expr = quad
@@ -120,10 +142,13 @@ function build_linear_branch_pq_term(
     interzonal::Vector{Int},
     rho_p::Float64,
     rho_q::Float64,
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )::JuMP.AffExpr
     m = part.model::JuMP.Model
     lin = zero(JuMP.AffExpr)
+    n_inter = length(interzonal)
 
+    # Interzonal (TieLine): indices 1..n_inter in consensus/duals.
     @inbounds for (k, e) in enumerate(interzonal)
         l = part.branch_idx_full_to_zone[e]
         l == 0 && continue
@@ -135,6 +160,32 @@ function build_linear_branch_pq_term(
         q_dual = duals_q[k]
 
         lin += (p_dual - rho_p * p_cons) * p + (q_dual - rho_q * q_cons) * q
+    end
+
+    # Branch pairs (DummyBus): indices n_inter+1..n_inter+n_pairs.
+    pos = part.position
+    @inbounds for (k, (ga, za, gb, zb)) in enumerate(branch_pairs)
+        idx = n_inter + k
+        p_cons = p_consensus[idx]
+        q_cons = q_consensus[idx]
+        p_dual = duals_p[idx]
+        q_dual = duals_q[idx]
+        if za == pos
+            l = part.branch_idx_full_to_zone[ga]
+            if l != 0
+                p, q = _pq_flow_from_exprs(m, l)
+                lin += (p_dual - rho_p * p_cons) * p +
+                       (q_dual - rho_q * q_cons) * q
+            end
+        end
+        if zb == pos
+            l = part.branch_idx_full_to_zone[gb]
+            if l != 0
+                p, q = _pq_flow_from_exprs(m, l)
+                lin += (p_dual - rho_p * p_cons) * p +
+                       (q_dual - rho_q * q_cons) * q
+            end
+        end
     end
 
     return lin
@@ -207,6 +258,7 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRHybridWorkspace)
         ws.interzonal,
         ws.vars.p_flow.rho[],
         ws.vars.q_flow.rho[],
+        ws.branch_pairs,
     )
 
     lin_rt = build_linear_branch_rt_term(

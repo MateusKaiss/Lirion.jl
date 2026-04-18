@@ -159,9 +159,9 @@ end
 # Branch consensus: paired variables (SOCWR PQ, SOCWR RT)
 # ------------------------------------------------------------
 function _consensus_branch_paired!(
-    consensus_a::Vector{Float64},
-    consensus_b::Vector{Float64},
-    counts::Vector{Int},
+    consensus_a::AbstractVector{Float64},
+    consensus_b::AbstractVector{Float64},
+    counts::AbstractVector{Int},
     partitions::Partitions,
     interzonal::Vector{Int},
     extract_fn,    # (part, l) -> (Float64, Float64)
@@ -393,28 +393,49 @@ consensus!(ws::SOCWRPowerWorkspace) =
     )
 
 function consensus!(ws::SOCWRHybridWorkspace)
+    n_inter = length(ws.interzonal)
+    n_pairs = length(ws.branch_pairs)
+
     _consensus_bus_single!(
         ws.vars.v2.consensus,
         ws.bus_counts,
         ws.partitions,
         snapshot_v2_shared!,
     )
-    _consensus_branch_paired!(
-        ws.vars.p_flow.consensus,
-        ws.vars.q_flow.consensus,
-        ws.branch_counts,
-        ws.partitions,
-        ws.interzonal,
-        _socwr_pq_values,
-    )
-    _consensus_branch_paired!(
-        ws.vars.r.consensus,
-        ws.vars.t.consensus,
-        ws.branch_counts,
-        ws.partitions,
-        ws.interzonal,
-        _socwr_rt_values,
-    )
+    if n_inter > 0
+        _consensus_branch_paired!(
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            view(ws.vars.q_flow.consensus, 1:n_inter),
+            ws.branch_counts,
+            ws.partitions,
+            ws.interzonal,
+            _socwr_pq_values,
+        )
+        _consensus_branch_paired!(
+            ws.vars.r.consensus,
+            ws.vars.t.consensus,
+            ws.branch_counts,
+            ws.partitions,
+            ws.interzonal,
+            _socwr_rt_values,
+        )
+    end
+    if n_pairs > 0
+        _consensus_branch_pairs!(
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            ws.pair_counts,
+            ws.partitions,
+            ws.branch_pairs,
+            _socwr_p_value,
+        )
+        _consensus_branch_pairs!(
+            view(ws.vars.q_flow.consensus, n_inter+1:n_inter+n_pairs),
+            ws.pair_counts,
+            ws.partitions,
+            ws.branch_pairs,
+            _socwr_q_value,
+        )
+    end
     if !isempty(ws.bus_pairs)
         _consensus_bus_pairs_signed!(
             ws.vars.p_inj.consensus, ws.partitions,
