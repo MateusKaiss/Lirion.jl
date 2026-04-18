@@ -189,12 +189,28 @@ function compute_tolerances!(
     return nothing
 end
 
+@inline function _norms_dummy_pq_ac(ws)
+    ni = 0.0
+    nj = 0.0
+    @inbounds for pair in ws.dummy_branch_pairs
+        yi = ws.zones[pair.zone_i].y
+        yj = ws.zones[pair.zone_j].y
+        pfi = _dummy_ac_pf_at(pair, yi, :i)
+        pfj = _dummy_ac_pf_at(pair, yj, :j)
+        qfi = _dummy_ac_qf_at(pair, yi, :i)
+        qfj = _dummy_ac_qf_at(pair, yj, :j)
+        ni += pfi * pfi + qfi * qfi
+        nj += pfj * pfj + qfj * qfj
+    end
+    return ni, nj
+end
+
 function compute_tolerances!(
     ws::ACPowerWorkspaceALADIN,
     eps_abs::Float64,
     eps_rel::Float64,
 )
-    n = 2 * length(ws.edge_pairs)
+    n = 2 * length(ws.edge_pairs) + 2 * length(ws.dummy_branch_pairs)
     norm_i = 0.0
     norm_j = 0.0
     @inbounds for pair in ws.edge_pairs
@@ -207,6 +223,9 @@ function compute_tolerances!(
         norm_i += pfi * pfi + qfi * qfi
         norm_j += pfj * pfj + qfj * qfj
     end
+    nd_i, nd_j = _norms_dummy_pq_ac(ws)
+    norm_i += nd_i
+    norm_j += nd_j
     ws.eps_primal =
         sqrt(max(n, 1)) * eps_abs +
         eps_rel * max(sqrt(norm_i), sqrt(norm_j))
@@ -219,8 +238,9 @@ function compute_tolerances!(
     eps_abs::Float64,
     eps_rel::Float64,
 )
-    n = 2 * length(ws.bus_pairs) + 2 * length(ws.edge_pairs) +
-        2 * length(ws.split_bus_pairs)
+    n =
+        2 * length(ws.bus_pairs) + 2 * length(ws.edge_pairs) +
+        2 * length(ws.split_bus_pairs) + 2 * length(ws.dummy_branch_pairs)
     norm_i = 0.0
     norm_j = 0.0
     @inbounds for pair in ws.bus_pairs
@@ -253,6 +273,9 @@ function compute_tolerances!(
         norm_i += pi_val * pi_val + qi_val * qi_val
         norm_j += pj_val * pj_val + qj_val * qj_val
     end
+    nd_i, nd_j = _norms_dummy_pq_ac(ws)
+    norm_i += nd_i
+    norm_j += nd_j
     ws.eps_primal =
         sqrt(max(n, 1)) * eps_abs +
         eps_rel * max(sqrt(norm_i), sqrt(norm_j))

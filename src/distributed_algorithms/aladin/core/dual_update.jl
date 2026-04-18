@@ -38,6 +38,8 @@ function dual_update!(ws::ACPowerWorkspaceALADIN)
     a3 = ws.alpha3
     _apply_dual_step!(ws.vars.p_flow, a3)
     _apply_dual_step!(ws.vars.q_flow, a3)
+    _apply_dual_step!(ws.vars.p_dummy, a3)
+    _apply_dual_step!(ws.vars.q_dummy, a3)
     return nothing
 end
 
@@ -49,6 +51,8 @@ function dual_update!(ws::ACHybridWorkspaceALADIN)
     _apply_dual_step!(ws.vars.q_flow, a3)
     _apply_dual_step!(ws.vars.p_inj, a3)
     _apply_dual_step!(ws.vars.q_inj, a3)
+    _apply_dual_step!(ws.vars.p_dummy, a3)
+    _apply_dual_step!(ws.vars.q_dummy, a3)
     return nothing
 end
 

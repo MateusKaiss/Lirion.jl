@@ -36,6 +36,37 @@ struct SplitBusPairAC
     qinj_col_j::Int
 end
 
+# DummyBus (Method 2) pairs for AC: the two halves of a split tie-line are
+# DIFFERENT internal branches in each zone. Cache θ/V endpoint columns, branch
+# parameters (g, b, b_sh, inv_tap, tap_angle) per side plus the local branch
+# index so the coord QP can linearise the AC flow at current y and the local
+# objective can reference `p_flow_branches[l,1]` directly.
+struct DummyBranchPairAC
+    consensus_idx::Int
+    zone_i::Int
+    local_i::Int
+    from_theta_col_i::Int
+    to_theta_col_i::Int
+    from_vm_col_i::Int
+    to_vm_col_i::Int
+    g_i::Float64
+    b_i::Float64
+    b_sh_i::Float64
+    inv_tap_i::Float64
+    tap_angle_i::Float64
+    zone_j::Int
+    local_j::Int
+    from_theta_col_j::Int
+    to_theta_col_j::Int
+    from_vm_col_j::Int
+    to_vm_col_j::Int
+    g_j::Float64
+    b_j::Float64
+    b_sh_j::Float64
+    inv_tap_j::Float64
+    tap_angle_j::Float64
+end
+
 # ------------------------------------------------------------
 # STATE workspace
 # ------------------------------------------------------------
@@ -95,9 +126,14 @@ Base.@kwdef mutable struct ACPowerWorkspaceALADIN <: AbstractALADINWorkspace
     zones::Vector{AladinZoneDataAC}
 
     edge_pairs::Vector{SharedEdgePairAC}
+    # DummyBus (Method 2): symmetric p/q-flow consensus on half-branches.
+    dummy_branch_pairs::Vector{DummyBranchPairAC} = DummyBranchPairAC[]
 
-    # Duals: branch p_flow + q_flow. Legacy aliases lambda_p/lambda_q.
-    vars::NamedTuple{(:p_flow, :q_flow), Tuple{LambdaState, LambdaState}}
+    # Duals: branch p_flow + q_flow + dummy half-branch p/q.
+    vars::NamedTuple{
+        (:p_flow, :q_flow, :p_dummy, :q_dummy),
+        Tuple{LambdaState, LambdaState, LambdaState, LambdaState},
+    }
 
     qp_optimizer::Any
 
@@ -142,13 +178,15 @@ Base.@kwdef mutable struct ACHybridWorkspaceALADIN <: AbstractALADINWorkspace
         Vector{Dict{Int, JuMP.VariableRef}}()
     q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
         Vector{Dict{Int, JuMP.VariableRef}}()
+    # DummyBus (Method 2): symmetric p/q-flow consensus on half-branches.
+    dummy_branch_pairs::Vector{DummyBranchPairAC} = DummyBranchPairAC[]
 
-    # Duals: bus (θ, |V|) + branch (p, q) + split bus (p_inj, q_inj).
+    # Duals: bus (θ, |V|) + branch (p, q) + split-bus (p_inj, q_inj) + dummy (p, q).
     vars::NamedTuple{
-        (:theta, :v_mag, :p_flow, :q_flow, :p_inj, :q_inj),
+        (:theta, :v_mag, :p_flow, :q_flow, :p_inj, :q_inj, :p_dummy, :q_dummy),
         Tuple{
             LambdaState, LambdaState, LambdaState, LambdaState,
-            LambdaState, LambdaState,
+            LambdaState, LambdaState, LambdaState, LambdaState,
         },
     }
 
@@ -232,6 +270,63 @@ function _build_shared_edge_pairs_ac(
         zi, li = entries[1]
         zj, lj = entries[2]
         push!(pairs, SharedEdgePairAC(cidx, e, zi, li, zj, lj))
+    end
+    return pairs
+end
+
+function _build_dummy_branch_pairs_ac(
+    partitions::Partitions{PartitionAC},
+    zones::Vector{AladinZoneDataAC},
+    sys_branch_pairs::Vector{NTuple{4, Int}},
+)::Vector{DummyBranchPairAC}
+    pairs = DummyBranchPairAC[]
+    isempty(sys_branch_pairs) && return pairs
+    sizehint!(pairs, length(sys_branch_pairs))
+
+    for (k, (ga, za, gb, zb)) in enumerate(sys_branch_pairs)
+        pa = partitions.parts[za]
+        pb = partitions.parts[zb]
+        la = pa.branch_idx_full_to_zone[ga]
+        lb = pb.branch_idx_full_to_zone[gb]
+        (la == 0 || lb == 0) && continue
+
+        zda = zones[za]
+        zdb = zones[zb]
+
+        theta_a = pa.model[:theta]
+        theta_b = pb.model[:theta]
+        vm_a = pa.model[:v_magnitude]
+        vm_b = pb.model[:v_magnitude]
+
+        fa = pa.branch.from[la]
+        ta = pa.branch.to[la]
+        fb = pb.branch.from[lb]
+        tb = pb.branch.to[lb]
+
+        from_theta_col_i = zda.var_to_col[theta_a[fa, 1]]
+        to_theta_col_i = zda.var_to_col[theta_a[ta, 1]]
+        from_vm_col_i = zda.var_to_col[vm_a[fa, 1]]
+        to_vm_col_i = zda.var_to_col[vm_a[ta, 1]]
+
+        from_theta_col_j = zdb.var_to_col[theta_b[fb, 1]]
+        to_theta_col_j = zdb.var_to_col[theta_b[tb, 1]]
+        from_vm_col_j = zdb.var_to_col[vm_b[fb, 1]]
+        to_vm_col_j = zdb.var_to_col[vm_b[tb, 1]]
+
+        push!(
+            pairs,
+            DummyBranchPairAC(
+                k,
+                za, la,
+                from_theta_col_i, to_theta_col_i, from_vm_col_i, to_vm_col_i,
+                pa.branch.g[la], pa.branch.b[la], pa.branch.b_sh[la],
+                pa.branch.inv_tap[la], pa.branch.tap_angle[la],
+                zb, lb,
+                from_theta_col_j, to_theta_col_j, from_vm_col_j, to_vm_col_j,
+                pb.branch.g[lb], pb.branch.b[lb], pb.branch.b_sh[lb],
+                pb.branch.inv_tap[lb], pb.branch.tap_angle[lb],
+            ),
+        )
     end
     return pairs
 end
@@ -320,12 +415,15 @@ function build_workspace(
     partitions = build_partitions(PartitionAC, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
+    sys_branch_pairs = sys.branch_pairs
 
     build_local_model!(partitions, sys, Power, optimizer_factory, inter)
 
     zones = _build_zone_data_vector_ac(partitions; include_edges = true)
     edge_pairs = _build_shared_edge_pairs_ac(partitions, inter)
+    dummy_pairs = _build_dummy_branch_pairs_ac(partitions, zones, sys_branch_pairs)
     n_edge = length(edge_pairs)
+    n_dummy = length(dummy_pairs)
 
     return ACPowerWorkspaceALADIN(;
         partitions = partitions,
@@ -333,9 +431,12 @@ function build_workspace(
         interzonal = inter,
         zones = zones,
         edge_pairs = edge_pairs,
+        dummy_branch_pairs = dummy_pairs,
         vars = (
             p_flow = LambdaState(n_edge),
             q_flow = LambdaState(n_edge),
+            p_dummy = LambdaState(n_dummy),
+            q_dummy = LambdaState(n_dummy),
         ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
         rho = Ref(cfg.rho),
@@ -380,9 +481,11 @@ function build_workspace(
     split_pairs = _build_split_bus_pairs_ac(
         zones, sys_bus_pairs, p_inj_vars, q_inj_vars,
     )
+    dummy_pairs = _build_dummy_branch_pairs_ac(partitions, zones, sys.branch_pairs)
     n_bus = length(bus_pairs)
     n_edge = length(edge_pairs)
     n_split = length(split_pairs)
+    n_dummy = length(dummy_pairs)
 
     return ACHybridWorkspaceALADIN(;
         partitions = partitions,
@@ -394,6 +497,7 @@ function build_workspace(
         split_bus_pairs = split_pairs,
         p_inj_vars = p_inj_vars,
         q_inj_vars = q_inj_vars,
+        dummy_branch_pairs = dummy_pairs,
         vars = (
             theta = LambdaState(n_bus),
             v_mag = LambdaState(n_bus),
@@ -401,6 +505,8 @@ function build_workspace(
             q_flow = LambdaState(n_edge),
             p_inj = LambdaState(n_split),
             q_inj = LambdaState(n_split),
+            p_dummy = LambdaState(n_dummy),
+            q_dummy = LambdaState(n_dummy),
         ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
         rho = Ref(cfg.rho),

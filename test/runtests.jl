@@ -153,6 +153,16 @@ include(joinpath(@__DIR__, "test_aladin_socwr.jl"))
         central_optimizer = Ipopt.Optimizer,
         distributed_optimizer = Ipopt.Optimizer,
     )
+    run_aladin_ac_dummybus_hybrid_tests(;
+        rtol = 0.05,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
+    run_aladin_ac_dummybus_power_tests(;
+        rtol = 0.05,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
 
     # Distributed ALADIN — SOCWR
     run_aladin_socwr_state_tests(;

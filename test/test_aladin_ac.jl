@@ -26,6 +26,19 @@ const ALADIN_AC_SPLITBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd__sad.m",
 ]
 
+const ALADIN_AC_DUMMYBUS_HYBRID_CASES = [
+    "pglib_opf_case3_lmbd.m",
+    "pglib_opf_case3_lmbd__api.m",
+    "pglib_opf_case3_lmbd__sad.m",
+]
+
+# Power-only DummyBus excludes __api (tight bounds can trip infeasibility
+# before θ/V discipline kicks in via v² / bus consensus).
+const ALADIN_AC_DUMMYBUS_POWER_CASES = [
+    "pglib_opf_case3_lmbd.m",
+    "pglib_opf_case3_lmbd__sad.m",
+]
+
 # ============================================================
 # OBJECTIVE EXTRACTORS
 # ============================================================
@@ -235,6 +248,120 @@ function run_aladin_ac_splitbus_hybrid_tests(;
         label = "ALADIN-AC SPLITBUS-HYBRID",
         test_dir = test_dir,
         case_list = ALADIN_AC_SPLITBUS_HYBRID_CASES,
+        model = Lirion.ac(),
+        central_optimizer = central_optimizer,
+        distributed_optimizer = distributed_optimizer,
+        objective_central = aladin_central_obj_ac,
+        objective_dist = aladin_dist_obj_ac,
+        make_algorithm = make_alg,
+        defaults = defaults,
+        overrides = overrides,
+        rtol = rtol,
+        atol = atol,
+    )
+end
+
+# ============================================================
+# ALADIN AC - DUMMY-BUS HYBRID (Method 2 — Harris et al. 2022)
+# ============================================================
+function run_aladin_ac_dummybus_hybrid_tests(;
+    rtol = 0.05,
+    atol = 1e-6,
+    central_optimizer = nothing,
+    distributed_optimizer = nothing,
+)
+    test_dir = joinpath(@__DIR__, "distributed")
+
+    make_alg(p) = Lirion.aladin(;
+        coupling = :hybrid,
+        sectioning = Lirion.DummyBus(),
+        max_iter = p.max_iter,
+        rho = p.rho,
+        mu = p.mu,
+        rho_growth = p.rho_growth,
+        mu_growth = p.mu_growth,
+        adaptive = p.adaptive,
+        eps_abs = p.eps_abs,
+        eps_rel = p.eps_rel,
+    )
+
+    defaults(_) = (
+        max_iter = 2000,
+        rho = 10000.0,
+        mu = 10000.0,
+        rho_growth = 1.05,
+        mu_growth = 1.1,
+        adaptive = true,
+        eps_abs = 1e-4,
+        eps_rel = 1e-4,
+    )
+
+    overrides(case_name) = begin
+        if case_name == "pglib_opf_case3_lmbd__api.m"
+            # Tight bounds: needs stronger consensus penalty to close gap.
+            return (rho = 100000.0, mu = 100000.0)
+        end
+        return NamedTuple()
+    end
+
+    return run_case_suite(;
+        label = "ALADIN-AC DUMMYBUS-HYBRID",
+        test_dir = test_dir,
+        case_list = ALADIN_AC_DUMMYBUS_HYBRID_CASES,
+        model = Lirion.ac(),
+        central_optimizer = central_optimizer,
+        distributed_optimizer = distributed_optimizer,
+        objective_central = aladin_central_obj_ac,
+        objective_dist = aladin_dist_obj_ac,
+        make_algorithm = make_alg,
+        defaults = defaults,
+        overrides = overrides,
+        rtol = rtol,
+        atol = atol,
+    )
+end
+
+# ============================================================
+# ALADIN AC - DUMMY-BUS POWER (Method 2, power-only)
+# ============================================================
+function run_aladin_ac_dummybus_power_tests(;
+    rtol = 0.05,
+    atol = 1e-6,
+    central_optimizer = nothing,
+    distributed_optimizer = nothing,
+)
+    test_dir = joinpath(@__DIR__, "distributed")
+
+    make_alg(p) = Lirion.aladin(;
+        coupling = :power,
+        sectioning = Lirion.DummyBus(),
+        max_iter = p.max_iter,
+        rho = p.rho,
+        mu = p.mu,
+        rho_growth = p.rho_growth,
+        mu_growth = p.mu_growth,
+        adaptive = p.adaptive,
+        eps_abs = p.eps_abs,
+        eps_rel = p.eps_rel,
+    )
+
+    defaults(_) = (
+        max_iter = 2000,
+        rho = 10000.0,
+        mu = 10000.0,
+        rho_growth = 1.05,
+        mu_growth = 1.1,
+        adaptive = true,
+        eps_abs = 1e-4,
+        eps_rel = 1e-4,
+    )
+
+    overrides(_case_name) = NamedTuple()
+
+    return run_case_suite(;
+        label = "ALADIN-AC DUMMYBUS-POWER",
+        test_dir = test_dir,
+        case_list = ALADIN_AC_DUMMYBUS_POWER_CASES,
         model = Lirion.ac(),
         central_optimizer = central_optimizer,
         distributed_optimizer = distributed_optimizer,

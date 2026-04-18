@@ -139,8 +139,34 @@ function update_objective!(part::PartitionAC, ws::ACPowerWorkspaceALADIN)
 
     obj_expr = part.obj_base + quad
     obj_expr = _lambda_edge_pq_ac!(model, obj_expr, ws, zone_pos)
+    obj_expr = _lambda_dummy_pq_ac!(model, obj_expr, ws, zone_pos)
     @objective(model, Min, obj_expr)
     return nothing
+end
+
+function _lambda_dummy_pq_ac!(
+    model::JuMP.Model,
+    obj_expr,
+    ws::Union{ACPowerWorkspaceALADIN, ACHybridWorkspaceALADIN},
+    zone_pos::Int,
+)
+    part_pf = model[:p_flow_branches]
+    part_qf = model[:q_flow_branches]
+    for (k, pair) in enumerate(ws.dummy_branch_pairs)
+        if pair.zone_i == zone_pos
+            l = pair.local_i
+            sign = 1.0
+        elseif pair.zone_j == zone_pos
+            l = pair.local_j
+            sign = -1.0
+        else
+            continue
+        end
+        lp = sign * ws.vars.p_dummy.lambda[k]
+        lq = sign * ws.vars.q_dummy.lambda[k]
+        obj_expr += lp * part_pf[l, 1] + lq * part_qf[l, 1]
+    end
+    return obj_expr
 end
 
 @inline function _lambda_split_bus_ac!(
@@ -187,6 +213,7 @@ function update_objective!(part::PartitionAC, ws::ACHybridWorkspaceALADIN)
 
     obj_expr = part.obj_base + lin + quad
     obj_expr = _lambda_edge_pq_ac!(model, obj_expr, ws, zone_pos)
+    obj_expr = _lambda_dummy_pq_ac!(model, obj_expr, ws, zone_pos)
     @objective(model, Min, obj_expr)
     return nothing
 end
