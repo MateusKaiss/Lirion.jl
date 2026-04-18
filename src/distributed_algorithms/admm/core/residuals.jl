@@ -629,15 +629,44 @@ function compute_residuals!(ws::SOCWRHybridWorkspace)
         ws.interzonal, ws.vars.r.rho[], ws.vars.t.rho[],
     )
 
-    ws.r_primal = sqrt(
-        ws.r_primal_bus^2 +
-        ws.r_primal_p^2 + ws.r_primal_q^2 +
-        ws.r_primal_r^2 + ws.r_primal_t^2,
-    )
-    ws.r_dual = sqrt(
-        ws.r_dual_bus^2 +
-        ws.r_dual_p^2 + ws.r_dual_q^2 +
-        ws.r_dual_r^2 + ws.r_dual_t^2,
-    )
+    if !isempty(ws.bus_pairs)
+        ws.r_primal_p_inj = _primal_residual_bus_pairs_signed(
+            ws.partitions, ws.vars.p_inj.consensus, ws.bus_pairs, ws.p_inj_vars,
+        )
+        ws.r_dual_p_inj = _dual_residual_bus_pairs_signed(
+            ws.vars.p_inj.consensus, ws.vars.p_inj.consensus_prev,
+            ws.bus_pairs, ws.vars.p_inj.rho[],
+        )
+        ws.r_primal_q_inj = _primal_residual_bus_pairs_signed(
+            ws.partitions, ws.vars.q_inj.consensus, ws.bus_pairs, ws.q_inj_vars,
+        )
+        ws.r_dual_q_inj = _dual_residual_bus_pairs_signed(
+            ws.vars.q_inj.consensus, ws.vars.q_inj.consensus_prev,
+            ws.bus_pairs, ws.vars.q_inj.rho[],
+        )
+        ws.r_primal = sqrt(
+            ws.r_primal_bus^2 +
+            ws.r_primal_p^2 + ws.r_primal_q^2 +
+            ws.r_primal_r^2 + ws.r_primal_t^2 +
+            ws.r_primal_p_inj^2 + ws.r_primal_q_inj^2,
+        )
+        ws.r_dual = sqrt(
+            ws.r_dual_bus^2 +
+            ws.r_dual_p^2 + ws.r_dual_q^2 +
+            ws.r_dual_r^2 + ws.r_dual_t^2 +
+            ws.r_dual_p_inj^2 + ws.r_dual_q_inj^2,
+        )
+    else
+        ws.r_primal = sqrt(
+            ws.r_primal_bus^2 +
+            ws.r_primal_p^2 + ws.r_primal_q^2 +
+            ws.r_primal_r^2 + ws.r_primal_t^2,
+        )
+        ws.r_dual = sqrt(
+            ws.r_dual_bus^2 +
+            ws.r_dual_p^2 + ws.r_dual_q^2 +
+            ws.r_dual_r^2 + ws.r_dual_t^2,
+        )
+    end
     return nothing
 end

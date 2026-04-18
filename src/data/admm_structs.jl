@@ -113,6 +113,9 @@ Base.@kwdef mutable struct PartitionSOCWR <: AbstractPartition
     quad_bus_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
     quad_rt_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
     quad_pq_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
+    # Populated by SplitBus (Method 3) only; zero otherwise.
+    quad_p_inj_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
+    quad_q_inj_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
 
     soft_anchor_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
 

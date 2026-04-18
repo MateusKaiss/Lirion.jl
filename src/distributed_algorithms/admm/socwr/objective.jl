@@ -221,5 +221,66 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRHybridWorkspace)
         ws.vars.t.rho[],
     )
 
-    @objective(part.model, Min, part.obj_static + lin_bus + lin_pq + lin_rt)
+    # Fast path: TieLine has no split buses, skip p_inj/q_inj machinery.
+    if isempty(ws.bus_pairs)
+        @objective(part.model, Min, part.obj_static + lin_bus + lin_pq + lin_rt)
+        return nothing
+    end
+
+    lin_p_inj = build_linear_inj_term_socwr(
+        part,
+        ws.bus_pairs,
+        ws.p_inj_vars,
+        ws.vars.p_inj.consensus,
+        view(ws.vars.p_inj.duals, :, p),
+        ws.vars.p_inj.rho[],
+    )
+    lin_q_inj = build_linear_inj_term_socwr(
+        part,
+        ws.bus_pairs,
+        ws.q_inj_vars,
+        ws.vars.q_inj.consensus,
+        view(ws.vars.q_inj.duals, :, p),
+        ws.vars.q_inj.rho[],
+    )
+
+    @objective(
+        part.model, Min,
+        part.obj_static + lin_bus + lin_pq + lin_rt + lin_p_inj + lin_q_inj,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Signed linear term for virtual injection at split buses
+# (p_inj or q_inj). Zone A targets +z: (λ - ρz)·v.
+# Zone B targets -z:                   (λ + ρz)·v.
+# ------------------------------------------------------------
+function build_linear_inj_term_socwr(
+    part::PartitionSOCWR,
+    bus_pairs::Vector{NTuple{3, Int}},
+    inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+    consensus::Vector{Float64},
+    duals::AbstractVector{Float64},
+    rho::Float64,
+)::JuMP.AffExpr
+    lin = zero(JuMP.AffExpr)
+    isempty(bus_pairs) && return lin
+    pos = part.position
+    store = inj_vars[pos]
+    isempty(store) && return lin
+    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
+        z = consensus[k]
+        lam = duals[k]
+        if za == pos
+            v = get(store, bid, nothing)
+            v === nothing && continue
+            lin += (lam - rho * z) * v
+        elseif zb == pos
+            v = get(store, bid, nothing)
+            v === nothing && continue
+            lin += (lam + rho * z) * v
+        end
+    end
+    return lin
 end

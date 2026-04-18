@@ -179,9 +179,11 @@ function _refresh_rho_hybrid_socwr!(
             build_quad_branch_pq_expr!(part, rho_p_val, rho_q_val, part.zone_edges)
         (rho_r_val != prev_rho_r[] || rho_t_val != prev_rho_t[]) &&
             build_quad_branch_rt_expr!(part, rho_r_val, rho_t_val, part.zone_edges)
+        # `quad_p_inj_expr` / `quad_q_inj_expr` are zero for TieLine, so
+        # including them unconditionally is safe and keeps SplitBus intact.
         part.obj_static =
             part.obj_base + part.quad_bus_expr + part.quad_pq_expr +
-            part.quad_rt_expr
+            part.quad_rt_expr + part.quad_p_inj_expr + part.quad_q_inj_expr
     end
 
     prev_rho_v2[] = rho_v2_val
@@ -305,7 +307,7 @@ refresh_rho!(ws::SOCWRPowerWorkspace) = _refresh_rho_branch_pq_socwr!(
 )
 
 function refresh_rho!(ws::SOCWRHybridWorkspace)
-    return _refresh_rho_hybrid_socwr!(
+    _refresh_rho_hybrid_socwr!(
         ws.partitions,
         ws.vars.v2.rho, ws.vars.v2.prev_rho,
         ws.vars.p_flow.rho, ws.vars.p_flow.prev_rho,
@@ -313,6 +315,29 @@ function refresh_rho!(ws::SOCWRHybridWorkspace)
         ws.vars.r.rho, ws.vars.r.prev_rho,
         ws.vars.t.rho, ws.vars.t.prev_rho,
     )
+    if !isempty(ws.bus_pairs)
+        rho_pi = ws.vars.p_inj.rho[]
+        rho_qi = ws.vars.q_inj.rho[]
+        pi_changed = rho_pi != ws.vars.p_inj.prev_rho[]
+        qi_changed = rho_qi != ws.vars.q_inj.prev_rho[]
+        if pi_changed || qi_changed
+            @inbounds for (i, part) in enumerate(ws.partitions.parts)
+                pi_changed && build_quad_p_inj_expr_socwr!(
+                    part, rho_pi, ws.p_inj_vars[i],
+                )
+                qi_changed && build_quad_q_inj_expr_socwr!(
+                    part, rho_qi, ws.q_inj_vars[i],
+                )
+                part.obj_static =
+                    part.obj_base + part.quad_bus_expr + part.quad_pq_expr +
+                    part.quad_rt_expr + part.quad_p_inj_expr +
+                    part.quad_q_inj_expr
+            end
+            pi_changed && (ws.vars.p_inj.prev_rho[] = rho_pi)
+            qi_changed && (ws.vars.q_inj.prev_rho[] = rho_qi)
+        end
+    end
+    return nothing
 end
 
 refresh_rho!(::AbstractADMMWorkspace) = nothing
@@ -406,5 +431,10 @@ function rho_update!(ws::SOCWRHybridWorkspace, params::ADMMParams)
     _adapt!(ws.vars.q_flow.rho, ws.r_primal_q, ws.r_dual_q, params)
     _adapt!(ws.vars.r.rho, ws.r_primal_r, ws.r_dual_r, params)
     _adapt!(ws.vars.t.rho, ws.r_primal_t, ws.r_dual_t, params)
+    if !isempty(ws.bus_pairs)
+        _adapt!(ws.vars.p_inj.rho, ws.r_primal_p_inj, ws.r_dual_p_inj, params)
+        _adapt!(ws.vars.q_inj.rho, ws.r_primal_q_inj, ws.r_dual_q_inj, params)
+    end
     return nothing
 end
+

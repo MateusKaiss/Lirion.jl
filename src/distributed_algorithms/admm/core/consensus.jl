@@ -415,5 +415,15 @@ function consensus!(ws::SOCWRHybridWorkspace)
         ws.interzonal,
         _socwr_rt_values,
     )
+    if !isempty(ws.bus_pairs)
+        _consensus_bus_pairs_signed!(
+            ws.vars.p_inj.consensus, ws.partitions,
+            ws.bus_pairs, ws.p_inj_vars,
+        )
+        _consensus_bus_pairs_signed!(
+            ws.vars.q_inj.consensus, ws.partitions,
+            ws.bus_pairs, ws.q_inj_vars,
+        )
+    end
     return nothing
 end

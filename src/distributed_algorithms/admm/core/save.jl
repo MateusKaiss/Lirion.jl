@@ -74,5 +74,9 @@ function save_prev!(ws::SOCWRHybridWorkspace)
     copyto!(ws.vars.q_flow.consensus_prev, ws.vars.q_flow.consensus)
     copyto!(ws.vars.r.consensus_prev, ws.vars.r.consensus)
     copyto!(ws.vars.t.consensus_prev, ws.vars.t.consensus)
+    if !isempty(ws.bus_pairs)
+        copyto!(ws.vars.p_inj.consensus_prev, ws.vars.p_inj.consensus)
+        copyto!(ws.vars.q_inj.consensus_prev, ws.vars.q_inj.consensus)
+    end
     return nothing
 end

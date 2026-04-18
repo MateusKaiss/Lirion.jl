@@ -535,54 +535,76 @@ function compute_tolerances!(ws::SOCWRPowerWorkspace, eps_abs::Float64, eps_rel:
 end
 
 function compute_tolerances!(ws::SOCWRHybridWorkspace, eps_abs::Float64, eps_rel::Float64)
-    eps_r = sqrt(
-        _eps_primal_bus(
-            ws.partitions,
-            (ws.vars.v2.consensus,),
-            (snapshot_v2!,),
-            eps_abs,
-            eps_rel,
-        )^2 +
-        _eps_primal_branch(
-            ws.partitions,
-            (ws.vars.p_flow.consensus, ws.vars.q_flow.consensus),
-            (:p_flow_branches, :q_flow_branches),
-            ws.interzonal,
-            eps_abs,
-            eps_rel,
-        )^2 +
-        _eps_primal_branch(
-            ws.partitions,
-            (ws.vars.r.consensus, ws.vars.t.consensus),
-            (:R, :T_var),
-            ws.interzonal,
-            eps_abs,
-            eps_rel,
-        )^2,
+    eps_r_bus = _eps_primal_bus(
+        ws.partitions,
+        (ws.vars.v2.consensus,),
+        (snapshot_v2!,),
+        eps_abs,
+        eps_rel,
     )
-    eps_s = sqrt(
-        _eps_dual_bus(
-            (ws.vars.v2.duals,),
-            ws.partitions,
-            eps_abs,
-            eps_rel,
-        )^2 +
-        _eps_dual_branch(
-            (ws.vars.p_flow.duals, ws.vars.q_flow.duals),
-            ws.partitions,
-            ws.interzonal,
-            eps_abs,
-            eps_rel,
-        )^2 +
-        _eps_dual_branch(
-            (ws.vars.r.duals, ws.vars.t.duals),
-            ws.partitions,
-            ws.interzonal,
-            eps_abs,
-            eps_rel,
-        )^2,
+    eps_r_pq = _eps_primal_branch(
+        ws.partitions,
+        (ws.vars.p_flow.consensus, ws.vars.q_flow.consensus),
+        (:p_flow_branches, :q_flow_branches),
+        ws.interzonal,
+        eps_abs,
+        eps_rel,
     )
-    ws.eps_primal = eps_r
-    ws.eps_dual = eps_s
+    eps_r_rt = _eps_primal_branch(
+        ws.partitions,
+        (ws.vars.r.consensus, ws.vars.t.consensus),
+        (:R, :T_var),
+        ws.interzonal,
+        eps_abs,
+        eps_rel,
+    )
+    eps_s_bus = _eps_dual_bus(
+        (ws.vars.v2.duals,),
+        ws.partitions,
+        eps_abs,
+        eps_rel,
+    )
+    eps_s_pq = _eps_dual_branch(
+        (ws.vars.p_flow.duals, ws.vars.q_flow.duals),
+        ws.partitions,
+        ws.interzonal,
+        eps_abs,
+        eps_rel,
+    )
+    eps_s_rt = _eps_dual_branch(
+        (ws.vars.r.duals, ws.vars.t.duals),
+        ws.partitions,
+        ws.interzonal,
+        eps_abs,
+        eps_rel,
+    )
+
+    if !isempty(ws.bus_pairs)
+        eps_r_p_inj = _eps_primal_bus_pairs_signed(
+            ws.partitions, ws.vars.p_inj.consensus, ws.bus_pairs,
+            ws.p_inj_vars, eps_abs, eps_rel,
+        )
+        eps_s_p_inj = _eps_dual_bus_pairs_signed(
+            ws.vars.p_inj.duals, ws.bus_pairs, eps_abs, eps_rel,
+        )
+        eps_r_q_inj = _eps_primal_bus_pairs_signed(
+            ws.partitions, ws.vars.q_inj.consensus, ws.bus_pairs,
+            ws.q_inj_vars, eps_abs, eps_rel,
+        )
+        eps_s_q_inj = _eps_dual_bus_pairs_signed(
+            ws.vars.q_inj.duals, ws.bus_pairs, eps_abs, eps_rel,
+        )
+        ws.eps_primal = sqrt(
+            eps_r_bus^2 + eps_r_pq^2 + eps_r_rt^2 +
+            eps_r_p_inj^2 + eps_r_q_inj^2,
+        )
+        ws.eps_dual = sqrt(
+            eps_s_bus^2 + eps_s_pq^2 + eps_s_rt^2 +
+            eps_s_p_inj^2 + eps_s_q_inj^2,
+        )
+    else
+        ws.eps_primal = sqrt(eps_r_bus^2 + eps_r_pq^2 + eps_r_rt^2)
+        ws.eps_dual = sqrt(eps_s_bus^2 + eps_s_pq^2 + eps_s_rt^2)
+    end
     return nothing
 end
