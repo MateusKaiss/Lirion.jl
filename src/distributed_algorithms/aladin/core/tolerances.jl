@@ -51,12 +51,26 @@ end
 
 # ---- Power ----
 
+@inline function _dummy_pf_norms(ws)
+    ni = 0.0
+    nj = 0.0
+    @inbounds for pair in ws.dummy_branch_pairs
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        pfi = pair.b_i * (zi.y[pair.from_col_i] - zi.y[pair.to_col_i])
+        pfj = pair.b_j * (zj.y[pair.from_col_j] - zj.y[pair.to_col_j])
+        ni += pfi * pfi
+        nj += pfj * pfj
+    end
+    return ni, nj
+end
+
 function compute_tolerances!(
     ws::DCPowerWorkspaceALADIN,
     eps_abs::Float64,
     eps_rel::Float64,
 )
-    n = length(ws.edge_pairs)
+    n = length(ws.edge_pairs) + length(ws.dummy_branch_pairs)
     norm_i = 0.0
     norm_j = 0.0
     @inbounds for pair in ws.edge_pairs
@@ -69,6 +83,9 @@ function compute_tolerances!(
         norm_i += pfi * pfi
         norm_j += pfj * pfj
     end
+    nd_i, nd_j = _dummy_pf_norms(ws)
+    norm_i += nd_i
+    norm_j += nd_j
     ws.eps_primal =
         sqrt(max(n, 1)) * eps_abs +
         eps_rel * max(sqrt(norm_i), sqrt(norm_j))
@@ -129,7 +146,16 @@ function compute_tolerances!(
         sqrt(max(n_split, 1)) * eps_abs +
         eps_rel * max(sqrt(norm_i_split), sqrt(norm_j_split))
 
-    ws.eps_primal = sqrt(eps_pri_bus^2 + eps_pri_edge^2 + eps_pri_split^2)
+    # DummyBus block: p_flow norms on half-branches
+    n_dummy = length(ws.dummy_branch_pairs)
+    nd_i, nd_j = _dummy_pf_norms(ws)
+    eps_pri_dummy =
+        sqrt(max(n_dummy, 1)) * eps_abs +
+        eps_rel * max(sqrt(nd_i), sqrt(nd_j))
+
+    ws.eps_primal = sqrt(
+        eps_pri_bus^2 + eps_pri_edge^2 + eps_pri_split^2 + eps_pri_dummy^2,
+    )
     ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
     return nothing
 end

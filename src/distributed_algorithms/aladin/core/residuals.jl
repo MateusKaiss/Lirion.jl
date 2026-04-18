@@ -39,6 +39,18 @@ end
 
 # ---- Power ----
 
+@inline function _dummy_pf_diff_sq(ws)
+    s = 0.0
+    @inbounds for pair in ws.dummy_branch_pairs
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        pfi = pair.b_i * (zi.y[pair.from_col_i] - zi.y[pair.to_col_i])
+        pfj = pair.b_j * (zj.y[pair.from_col_j] - zj.y[pair.to_col_j])
+        s += (pfi - pfj)^2
+    end
+    return s
+end
+
 function compute_residuals!(ws::DCPowerWorkspaceALADIN)
     r_pri_sq = 0.0
     @inbounds for pair in ws.edge_pairs
@@ -50,6 +62,7 @@ function compute_residuals!(ws::DCPowerWorkspaceALADIN)
         pfj = zj.edge_b[lj] * (zj.y[zj.edge_from_cols[lj]] - zj.y[zj.edge_to_cols[lj]])
         r_pri_sq += (pfi - pfj)^2
     end
+    r_pri_sq += _dummy_pf_diff_sq(ws)
     ws.r_primal = sqrt(r_pri_sq)
 
     prog_sq = 0.0
@@ -61,6 +74,10 @@ function compute_residuals!(ws::DCPowerWorkspaceALADIN)
     lam_sq = 0.0
     @inbounds for k in eachindex(ws.vars.p_flow.lambda)
         d = ws.vars.p_flow.lambda[k] - ws.vars.p_flow.lambda_prev[k]
+        lam_sq += d * d
+    end
+    @inbounds for k in eachindex(ws.vars.p_dummy.lambda)
+        d = ws.vars.p_dummy.lambda[k] - ws.vars.p_dummy.lambda_prev[k]
         lam_sq += d * d
     end
     ws.lambda_step = sqrt(lam_sq)
@@ -100,7 +117,12 @@ function compute_residuals!(ws::DCHybridWorkspaceALADIN)
         r_pri_split_sq += (yi + yj)^2
     end
 
-    ws.r_primal = sqrt(r_pri_bus_sq + r_pri_edge_sq + r_pri_split_sq)
+    # DummyBus half-branch flow consensus (p_i - p_j = 0).
+    r_pri_dummy_sq = _dummy_pf_diff_sq(ws)
+
+    ws.r_primal = sqrt(
+        r_pri_bus_sq + r_pri_edge_sq + r_pri_split_sq + r_pri_dummy_sq,
+    )
 
     # Progress block (shared across couplings: it is a single per-zone quantity)
     prog_sq = 0.0
@@ -122,6 +144,10 @@ function compute_residuals!(ws::DCHybridWorkspaceALADIN)
     end
     @inbounds for k in eachindex(ws.vars.p_inj.lambda)
         d = ws.vars.p_inj.lambda[k] - ws.vars.p_inj.lambda_prev[k]
+        lam_sq += d * d
+    end
+    @inbounds for k in eachindex(ws.vars.p_dummy.lambda)
+        d = ws.vars.p_dummy.lambda[k] - ws.vars.p_dummy.lambda_prev[k]
         lam_sq += d * d
     end
     ws.lambda_step = sqrt(lam_sq)

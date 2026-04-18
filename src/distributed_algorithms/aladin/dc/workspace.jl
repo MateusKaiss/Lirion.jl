@@ -27,6 +27,22 @@ struct SplitBusPair
     pinj_col_j::Int
 end
 
+# DummyBus (Method 2) branch-pair descriptor: the two halves of a split tie-line
+# are DIFFERENT internal branches in each zone. Cache θ columns and susceptances
+# at build time so the consensus QP and residuals can be assembled without any
+# per-iteration lookups into the JuMP model.
+struct DummyBranchPairDC
+    consensus_idx::Int
+    zone_i::Int
+    from_col_i::Int
+    to_col_i::Int
+    b_i::Float64
+    zone_j::Int
+    from_col_j::Int
+    to_col_j::Int
+    b_j::Float64
+end
+
 # ------------------------------------------------------------
 # DC State workspace
 # ------------------------------------------------------------
@@ -86,10 +102,12 @@ Base.@kwdef mutable struct DCPowerWorkspaceALADIN <: AbstractALADINWorkspace
 
     zones::Vector{AladinZoneData}
     edge_pairs::Vector{SharedEdgePair}
+    # DummyBus (Method 2): symmetric p_flow consensus between the two halves of
+    # each split tie-line. Empty for TieLine/SplitBus.
+    dummy_branch_pairs::Vector{DummyBranchPairDC} = DummyBranchPairDC[]
 
-    # Duals: DC Power couples only branch p_flow. Legacy alias
-    # `ws.vars.p_flow.lambda` → `vars.p_flow.lambda`.
-    vars::NamedTuple{(:p_flow,), Tuple{LambdaState}}
+    # Duals: branch p_flow (interzonal) + dummy half-branch flows.
+    vars::NamedTuple{(:p_flow, :p_dummy), Tuple{LambdaState, LambdaState}}
 
     qp_optimizer::Any
 
@@ -130,10 +148,12 @@ Base.@kwdef mutable struct DCHybridWorkspaceALADIN <: AbstractALADINWorkspace
     split_bus_pairs::Vector{SplitBusPair} = SplitBusPair[]
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
         Vector{Dict{Int, JuMP.VariableRef}}()
+    # DummyBus (Method 2): symmetric p_flow consensus on half-branch pairs.
+    dummy_branch_pairs::Vector{DummyBranchPairDC} = DummyBranchPairDC[]
 
-    # Duals: DC Hybrid couples bus θ, branch p_flow, and (SplitBus) p_inj.
-    vars::NamedTuple{(:theta, :p_flow, :p_inj),
-        Tuple{LambdaState, LambdaState, LambdaState}}
+    # Duals: bus θ + branch p_flow + split-bus p_inj + dummy half-branch p_flow.
+    vars::NamedTuple{(:theta, :p_flow, :p_inj, :p_dummy),
+        Tuple{LambdaState, LambdaState, LambdaState, LambdaState}}
 
     qp_optimizer::Any
 
@@ -230,6 +250,48 @@ function _build_shared_edge_pairs(
     return pairs
 end
 
+function _build_dummy_branch_pairs_dc(
+    partitions::Partitions{PartitionDC},
+    zones::Vector{AladinZoneData},
+    sys_branch_pairs::Vector{NTuple{4, Int}},
+)::Vector{DummyBranchPairDC}
+    pairs = DummyBranchPairDC[]
+    isempty(sys_branch_pairs) && return pairs
+    sizehint!(pairs, length(sys_branch_pairs))
+
+    for (k, (ga, za, gb, zb)) in enumerate(sys_branch_pairs)
+        pa = partitions.parts[za]
+        pb = partitions.parts[zb]
+        la = pa.branch_idx_full_to_zone[ga]
+        lb = pb.branch_idx_full_to_zone[gb]
+        (la == 0 || lb == 0) && continue
+
+        zda = zones[za]
+        zdb = zones[zb]
+
+        fa = pa.branch.from[la]
+        ta = pa.branch.to[la]
+        fb = pb.branch.from[lb]
+        tb = pb.branch.to[lb]
+
+        theta_a = pa.model[:theta]
+        theta_b = pb.model[:theta]
+        from_col_i = zda.var_to_col[theta_a[fa, 1]]
+        to_col_i = zda.var_to_col[theta_a[ta, 1]]
+        from_col_j = zdb.var_to_col[theta_b[fb, 1]]
+        to_col_j = zdb.var_to_col[theta_b[tb, 1]]
+
+        b_i = pa.branch.b[la]
+        b_j = pb.branch.b[lb]
+
+        push!(pairs, DummyBranchPairDC(
+            k, za, from_col_i, to_col_i, b_i,
+            zb, from_col_j, to_col_j, b_j,
+        ))
+    end
+    return pairs
+end
+
 function _build_split_bus_pairs(
     partitions::Partitions{PartitionDC},
     zones::Vector{AladinZoneData},
@@ -306,12 +368,15 @@ function build_workspace(
     partitions = build_partitions(PartitionDC, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
+    sys_branch_pairs = sys.branch_pairs
 
     build_local_model!(partitions, sys, Power, optimizer_factory, inter)
 
     zones = _build_zone_data_vector(partitions; include_edges = true)
     edge_pairs = _build_shared_edge_pairs(partitions, inter)
+    dummy_pairs = _build_dummy_branch_pairs_dc(partitions, zones, sys_branch_pairs)
     n_pairs = length(edge_pairs)
+    n_dummy = length(dummy_pairs)
 
     return DCPowerWorkspaceALADIN(;
         partitions = partitions,
@@ -319,7 +384,11 @@ function build_workspace(
         interzonal = inter,
         zones = zones,
         edge_pairs = edge_pairs,
-        vars = (p_flow = LambdaState(n_pairs),),
+        dummy_branch_pairs = dummy_pairs,
+        vars = (
+            p_flow = LambdaState(n_pairs),
+            p_dummy = LambdaState(n_dummy),
+        ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
         rho = Ref(cfg.rho),
         mu = Ref(cfg.mu),
@@ -361,9 +430,11 @@ function build_workspace(
     bus_pairs = _build_shared_bus_pairs(partitions, zones)
     edge_pairs = _build_shared_edge_pairs(partitions, inter)
     split_pairs = _build_split_bus_pairs(partitions, zones, sys_bus_pairs, p_inj_vars)
+    dummy_pairs = _build_dummy_branch_pairs_dc(partitions, zones, sys.branch_pairs)
     n_bus = length(bus_pairs)
     n_edge = length(edge_pairs)
     n_split = length(split_pairs)
+    n_dummy = length(dummy_pairs)
 
     return DCHybridWorkspaceALADIN(;
         partitions = partitions,
@@ -374,10 +445,12 @@ function build_workspace(
         edge_pairs = edge_pairs,
         split_bus_pairs = split_pairs,
         p_inj_vars = p_inj_vars,
+        dummy_branch_pairs = dummy_pairs,
         vars = (
             theta = LambdaState(n_bus),
             p_flow = LambdaState(n_edge),
             p_inj = LambdaState(n_split),
+            p_dummy = LambdaState(n_dummy),
         ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
         rho_bus = Ref(cfg.rho),

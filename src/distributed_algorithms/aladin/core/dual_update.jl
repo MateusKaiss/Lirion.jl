@@ -12,7 +12,9 @@ function dual_update!(ws::DCStateWorkspaceALADIN)
 end
 
 function dual_update!(ws::DCPowerWorkspaceALADIN)
-    _apply_dual_step!(ws.vars.p_flow, ws.alpha3)
+    a3 = ws.alpha3
+    _apply_dual_step!(ws.vars.p_flow, a3)
+    _apply_dual_step!(ws.vars.p_dummy, a3)
     return nothing
 end
 
@@ -21,6 +23,7 @@ function dual_update!(ws::DCHybridWorkspaceALADIN)
     _apply_dual_step!(ws.vars.theta, a3)
     _apply_dual_step!(ws.vars.p_flow, a3)
     _apply_dual_step!(ws.vars.p_inj, a3)
+    _apply_dual_step!(ws.vars.p_dummy, a3)
     return nothing
 end
 

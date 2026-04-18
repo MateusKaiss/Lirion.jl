@@ -68,6 +68,35 @@ end
     return lin
 end
 
+@inline function _lambda_dummy_affexpr!(
+    lin::JuMP.AffExpr,
+    ws_zones::Vector{AladinZoneData},
+    dummy_pairs::Vector{DummyBranchPairDC},
+    lambda_dummy::Vector{Float64},
+    zone_pos::Int,
+)
+    # For each dummy half-branch pair touching this zone, contribute
+    #   zone_i : +λ · b_i · (θ_f - θ_t)
+    #   zone_j : -λ · b_j · (θ_f - θ_t)
+    # The sign comes from the consensus residual p_i - p_j → 0.
+    for (k, pair) in enumerate(dummy_pairs)
+        if pair.zone_i == zone_pos
+            fcol, tcol, bval = pair.from_col_i, pair.to_col_i, pair.b_i
+            sign = 1.0
+        elseif pair.zone_j == zone_pos
+            fcol, tcol, bval = pair.from_col_j, pair.to_col_j, pair.b_j
+            sign = -1.0
+        else
+            continue
+        end
+        zdata = ws_zones[zone_pos]
+        coef = sign * lambda_dummy[k] * bval
+        JuMP.add_to_expression!(lin, coef, zdata.all_vars[fcol])
+        JuMP.add_to_expression!(lin, -coef, zdata.all_vars[tcol])
+    end
+    return lin
+end
+
 @inline function _lambda_edge_affexpr!(
     lin::JuMP.AffExpr,
     ws_zones::Vector{AladinZoneData},
@@ -123,6 +152,9 @@ function update_objective!(part::PartitionDC, ws::DCPowerWorkspaceALADIN)
 
     lin = zero(JuMP.AffExpr)
     _lambda_edge_affexpr!(lin, ws.zones, ws.edge_pairs, ws.vars.p_flow.lambda, zone_pos)
+    _lambda_dummy_affexpr!(
+        lin, ws.zones, ws.dummy_branch_pairs, ws.vars.p_dummy.lambda, zone_pos,
+    )
 
     quad = zero(JuMP.QuadExpr)
     _prox_all_quadexpr!(
@@ -152,6 +184,9 @@ function update_objective!(part::PartitionDC, ws::DCHybridWorkspaceALADIN)
         end
     end
     _lambda_edge_affexpr!(lin, ws.zones, ws.edge_pairs, ws.vars.p_flow.lambda, zone_pos)
+    _lambda_dummy_affexpr!(
+        lin, ws.zones, ws.dummy_branch_pairs, ws.vars.p_dummy.lambda, zone_pos,
+    )
 
     # SplitBus p_inj consensus: residual is p_inj_i + p_inj_j (sign-flipped), so
     # both zones contribute +λ_k · p_inj term to the local objective.
