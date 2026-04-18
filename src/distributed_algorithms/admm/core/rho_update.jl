@@ -79,12 +79,14 @@ function _refresh_rho_branch_ac!(
     prev_rho_p,
     rho_q,
     prev_rho_q,
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )
     rho_p_val = rho_p[]
     rho_q_val = rho_q[]
     if rho_p_val != prev_rho_p[] || rho_q_val != prev_rho_q[]
         @inbounds for part in parts.parts
-            build_quad_branch_expr!(part, rho_p_val, rho_q_val, part.zone_edges)
+            build_quad_branch_expr!(part, rho_p_val, rho_q_val,
+                part.zone_edges, branch_pairs)
         end
         prev_rho_p[] = rho_p_val
         prev_rho_q[] = rho_q_val
@@ -271,6 +273,7 @@ function refresh_rho!(ws::ACHybridWorkspace)
         ws.partitions,
         ws.vars.p_flow.rho, ws.vars.p_flow.prev_rho,
         ws.vars.q_flow.rho, ws.vars.q_flow.prev_rho,
+        ws.branch_pairs,
     )
     if !isempty(ws.bus_pairs)
         rho_pi = ws.vars.p_inj.rho[]

@@ -63,9 +63,13 @@ Base.@kwdef mutable struct ACHybridWorkspace <: AbstractADMMWorkspace
     id::Vector{Int}
 
     interzonal::Vector{Int}
+    # DummyBus (Method 2) bookkeeping: symmetric P/Q consensus on the two
+    # halves of each split tie-line. Empty for TieLine/SplitBus.
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[]
+    pair_counts::Vector{Int} = Int[]
 
     # SplitBus (Method 3) bookkeeping: sign-flipped p_inj / q_inj consensus
-    # per split bus. Empty for TieLine.
+    # per split bus. Empty for TieLine/DummyBus.
     bus_pairs::Vector{NTuple{3, Int}} = NTuple{3, Int}[]
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
         Vector{Dict{Int, JuMP.VariableRef}}()
@@ -203,11 +207,14 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC})
     partitions = build_partitions(PartitionAC, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
+    brpairs = sys.branch_pairs
     bpairs = sys.bus_pairs
     n_zones = length(partitions)
     n_shared = length(sys.full_shared_bus_ids)
     n_inter = length(inter)
+    n_pairs = length(brpairs)
     n_bus_pairs = length(bpairs)
+    n_total = n_inter + n_pairs
 
     # Per-zone p_inj / q_inj containers: populated by init_hybrid_partition! only
     # when bus_pairs is non-empty (i.e. SplitBus sectioning).
@@ -223,6 +230,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC})
         config.rho_p,
         config.rho_q,
         inter,
+        brpairs,
         bpairs,
         p_inj_vars,
         q_inj_vars,
@@ -231,8 +239,10 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC})
     vars = (
         theta = VarState(n_shared, n_zones, config.rho_theta),
         v_mag = VarState(n_shared, n_zones, config.rho_v; init_value = 1.0),
-        p_flow = VarState(n_inter, n_zones, config.rho_p),
-        q_flow = VarState(n_inter, n_zones, config.rho_q),
+        # p_flow / q_flow cover interzonal (TieLine) + branch_pairs (DummyBus)
+        # in a single VarState: [1..n_inter] | [n_inter+1..n_inter+n_pairs].
+        p_flow = VarState(n_total, n_zones, config.rho_p),
+        q_flow = VarState(n_total, n_zones, config.rho_q),
         # Virtual injections at split buses (SplitBus Method 3).
         p_inj = VarState(n_bus_pairs, n_zones, config.rho_p),
         q_inj = VarState(n_bus_pairs, n_zones, config.rho_q),
@@ -242,6 +252,8 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC})
         partitions = partitions,
         id = id,
         interzonal = inter,
+        branch_pairs = brpairs,
+        pair_counts = fill(2, n_pairs),
         bus_pairs = bpairs,
         p_inj_vars = p_inj_vars,
         q_inj_vars = q_inj_vars,

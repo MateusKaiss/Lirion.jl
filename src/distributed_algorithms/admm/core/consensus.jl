@@ -194,11 +194,54 @@ end
 # ------------------------------------------------------------
 # Branch consensus: AC P/Q (with isfinite checks for NLP)
 # ------------------------------------------------------------
+# ------------------------------------------------------------
+# Branch pairs consensus AC (DummyBus Method 2): NaN-safe P/Q consensus on
+# the two halves of each split tie-line.
+# ------------------------------------------------------------
+function _consensus_branch_pairs_ac!(
+    p_consensus::AbstractVector{Float64},
+    q_consensus::AbstractVector{Float64},
+    counts::AbstractVector{Int},
+    partitions::Partitions{PartitionAC},
+    pairs::Vector{NTuple{4, Int}},
+)
+    isempty(pairs) && return nothing
+    @inbounds for (k, (ga, za, gb, zb)) in enumerate(pairs)
+        pa = partitions.parts[za]
+        pb = partitions.parts[zb]
+        la = pa.branch_idx_full_to_zone[ga]
+        lb = pb.branch_idx_full_to_zone[gb]
+
+        p_sum = 0.0
+        q_sum = 0.0
+        p_n = 0
+        q_n = 0
+        if la != 0
+            p_expr, q_expr = _pq_flow_from_exprs(pa, la)
+            p_val = JuMP.value(p_expr)
+            q_val = JuMP.value(q_expr)
+            if isfinite(p_val); p_sum += p_val; p_n += 1; end
+            if isfinite(q_val); q_sum += q_val; q_n += 1; end
+        end
+        if lb != 0
+            p_expr, q_expr = _pq_flow_from_exprs(pb, lb)
+            p_val = JuMP.value(p_expr)
+            q_val = JuMP.value(q_expr)
+            if isfinite(p_val); p_sum += p_val; p_n += 1; end
+            if isfinite(q_val); q_sum += q_val; q_n += 1; end
+        end
+        p_consensus[k] = p_n > 0 ? p_sum / p_n : 0.0
+        q_consensus[k] = q_n > 0 ? q_sum / q_n : 0.0
+        counts[k] = 2
+    end
+    return nothing
+end
+
 function _consensus_branch_ac!(
-    p_consensus::Vector{Float64},
-    q_consensus::Vector{Float64},
-    p_counts::Vector{Int},
-    q_counts::Vector{Int},
+    p_consensus::AbstractVector{Float64},
+    q_consensus::AbstractVector{Float64},
+    p_counts::AbstractVector{Int},
+    q_counts::AbstractVector{Int},
     partitions::Partitions{PartitionAC},
     interzonal::Vector{Int},
 )
@@ -333,6 +376,9 @@ consensus!(ws::ACPowerWorkspace) =
     )
 
 function consensus!(ws::ACHybridWorkspace)
+    n_inter = length(ws.interzonal)
+    n_pairs = length(ws.branch_pairs)
+
     _consensus_bus_ac!(
         ws.vars.theta.consensus,
         ws.vars.v_mag.consensus,
@@ -341,14 +387,25 @@ function consensus!(ws::ACHybridWorkspace)
         ws.bus_counts,
         ws.partitions,
     )
-    _consensus_branch_ac!(
-        ws.vars.p_flow.consensus,
-        ws.vars.q_flow.consensus,
-        ws.p_branch_counts,
-        ws.q_branch_counts,
-        ws.partitions,
-        ws.interzonal,
-    )
+    if n_inter > 0
+        _consensus_branch_ac!(
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            view(ws.vars.q_flow.consensus, 1:n_inter),
+            ws.p_branch_counts,
+            ws.q_branch_counts,
+            ws.partitions,
+            ws.interzonal,
+        )
+    end
+    if n_pairs > 0
+        _consensus_branch_pairs_ac!(
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            view(ws.vars.q_flow.consensus, n_inter+1:n_inter+n_pairs),
+            ws.pair_counts,
+            ws.partitions,
+            ws.branch_pairs,
+        )
+    end
     if !isempty(ws.bus_pairs)
         _consensus_bus_pairs_signed!(
             ws.vars.p_inj.consensus, ws.partitions,

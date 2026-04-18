@@ -157,12 +157,51 @@ end
 # ------------------------------------------------------------
 # Specialized variant because AC flow expressions can return NaN; a bad
 # P must NOT skip a good Q update (and vice versa).
-function _update_branch_duals_ac!(
-    duals_p::Matrix{Float64},
-    duals_q::Matrix{Float64},
+# NaN-safe branch_pairs dual update for AC (DummyBus).
+function _update_branch_pairs_duals_ac!(
+    duals_p::AbstractMatrix{Float64},
+    duals_q::AbstractMatrix{Float64},
     partitions::Partitions{PartitionAC},
-    p_consensus::Vector{Float64},
-    q_consensus::Vector{Float64},
+    p_consensus::AbstractVector{Float64},
+    q_consensus::AbstractVector{Float64},
+    rho_p::Float64,
+    rho_q::Float64,
+    pairs::Vector{NTuple{4, Int}},
+)
+    isempty(pairs) && return nothing
+    @inbounds for (k, (ga, za, gb, zb)) in enumerate(pairs)
+        pa = partitions.parts[za]
+        pb = partitions.parts[zb]
+        la = pa.branch_idx_full_to_zone[ga]
+        lb = pb.branch_idx_full_to_zone[gb]
+        if la != 0
+            p_expr, q_expr = _pq_flow_from_exprs(pa, la)
+            p_val = JuMP.value(p_expr)
+            q_val = JuMP.value(q_expr)
+            isfinite(p_val) &&
+                (duals_p[k, za] += rho_p * (p_val - p_consensus[k]))
+            isfinite(q_val) &&
+                (duals_q[k, za] += rho_q * (q_val - q_consensus[k]))
+        end
+        if lb != 0
+            p_expr, q_expr = _pq_flow_from_exprs(pb, lb)
+            p_val = JuMP.value(p_expr)
+            q_val = JuMP.value(q_expr)
+            isfinite(p_val) &&
+                (duals_p[k, zb] += rho_p * (p_val - p_consensus[k]))
+            isfinite(q_val) &&
+                (duals_q[k, zb] += rho_q * (q_val - q_consensus[k]))
+        end
+    end
+    return nothing
+end
+
+function _update_branch_duals_ac!(
+    duals_p::AbstractMatrix{Float64},
+    duals_q::AbstractMatrix{Float64},
+    partitions::Partitions{PartitionAC},
+    p_consensus::AbstractVector{Float64},
+    q_consensus::AbstractVector{Float64},
     rho_p::Float64,
     rho_q::Float64,
     interzonal::Vector{Int},
@@ -300,6 +339,11 @@ function dual_update!(ws::ACPowerWorkspace)
 end
 
 function dual_update!(ws::ACHybridWorkspace)
+    n_inter = length(ws.interzonal)
+    n_pairs = length(ws.branch_pairs)
+    rho_p = ws.vars.p_flow.rho[]
+    rho_q = ws.vars.q_flow.rho[]
+
     _update_bus_duals_ac!(
         ws.vars.theta.duals,
         ws.vars.v_mag.duals,
@@ -309,16 +353,28 @@ function dual_update!(ws::ACHybridWorkspace)
         ws.vars.theta.rho[],
         ws.vars.v_mag.rho[],
     )
-    _update_branch_duals_ac!(
-        ws.vars.p_flow.duals,
-        ws.vars.q_flow.duals,
-        ws.partitions,
-        ws.vars.p_flow.consensus,
-        ws.vars.q_flow.consensus,
-        ws.vars.p_flow.rho[],
-        ws.vars.q_flow.rho[],
-        ws.interzonal,
-    )
+    if n_inter > 0
+        _update_branch_duals_ac!(
+            view(ws.vars.p_flow.duals, 1:n_inter, :),
+            view(ws.vars.q_flow.duals, 1:n_inter, :),
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            view(ws.vars.q_flow.consensus, 1:n_inter),
+            rho_p, rho_q,
+            ws.interzonal,
+        )
+    end
+    if n_pairs > 0
+        _update_branch_pairs_duals_ac!(
+            view(ws.vars.p_flow.duals, n_inter+1:n_inter+n_pairs, :),
+            view(ws.vars.q_flow.duals, n_inter+1:n_inter+n_pairs, :),
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            view(ws.vars.q_flow.consensus, n_inter+1:n_inter+n_pairs),
+            rho_p, rho_q,
+            ws.branch_pairs,
+        )
+    end
     if !isempty(ws.bus_pairs)
         _update_bus_pairs_duals_signed!(
             ws.vars.p_inj.duals, ws.partitions,

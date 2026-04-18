@@ -29,15 +29,36 @@ function build_quad_branch_expr!(
     rho_p::Float64,
     rho_q::Float64,
     zone_edges::Vector{Int},
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )
     quad = zero(JuMP.QuadExpr)
 
+    # Interzonal P/Q (TieLine)
     @inbounds for e in zone_edges
         l = part.branch_idx_full_to_zone[e]
         l == 0 && continue
 
         p, q = _pq_flow_from_exprs(part, l)
         quad += 0.5 * rho_p * p^2 + 0.5 * rho_q * q^2
+    end
+
+    # Branch pairs P/Q (DummyBus Method 2)
+    pos = part.position
+    @inbounds for (ga, za, gb, zb) in branch_pairs
+        if za == pos
+            l = part.branch_idx_full_to_zone[ga]
+            if l != 0
+                p, q = _pq_flow_from_exprs(part, l)
+                quad += 0.5 * rho_p * p^2 + 0.5 * rho_q * q^2
+            end
+        end
+        if zb == pos
+            l = part.branch_idx_full_to_zone[gb]
+            if l != 0
+                p, q = _pq_flow_from_exprs(part, l)
+                quad += 0.5 * rho_p * p^2 + 0.5 * rho_q * q^2
+            end
+        end
     end
 
     part.quad_branch_expr = quad
@@ -74,16 +95,19 @@ end
 function build_linear_branch_term(
     part::PartitionAC,
     zone_edges::Vector{Int},
-    p_consensus::Vector{Float64},
-    q_consensus::Vector{Float64},
+    p_consensus::AbstractVector{Float64},
+    q_consensus::AbstractVector{Float64},
     duals_p::AbstractVector{Float64},
     duals_q::AbstractVector{Float64},
     interzonal::Vector{Int},
     rho_p::Float64,
     rho_q::Float64,
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )
     lin = zero(JuMP.AffExpr)
+    n_inter = length(interzonal)
 
+    # Interzonal: consensus/duals indices 1..n_inter
     @inbounds for (k, e) in enumerate(interzonal)
         l = part.branch_idx_full_to_zone[e]
         l == 0 && continue
@@ -96,6 +120,32 @@ function build_linear_branch_term(
         q_dual = duals_q[k]
 
         lin += (p_dual - rho_p * p_cons) * p + (q_dual - rho_q * q_cons) * q
+    end
+
+    # Branch pairs: indices n_inter+1..n_inter+n_pairs
+    pos = part.position
+    @inbounds for (k, (ga, za, gb, zb)) in enumerate(branch_pairs)
+        idx = n_inter + k
+        p_cons = p_consensus[idx]
+        q_cons = q_consensus[idx]
+        p_dual = duals_p[idx]
+        q_dual = duals_q[idx]
+        if za == pos
+            l = part.branch_idx_full_to_zone[ga]
+            if l != 0
+                p, q = _pq_flow_from_exprs(part, l)
+                lin += (p_dual - rho_p * p_cons) * p +
+                       (q_dual - rho_q * q_cons) * q
+            end
+        end
+        if zb == pos
+            l = part.branch_idx_full_to_zone[gb]
+            if l != 0
+                p, q = _pq_flow_from_exprs(part, l)
+                lin += (p_dual - rho_p * p_cons) * p +
+                       (q_dual - rho_q * q_cons) * q
+            end
+        end
     end
 
     return lin
@@ -156,6 +206,7 @@ function update_objective!(part::PartitionAC, ws::ACHybridWorkspace)
         ws.interzonal,
         ws.vars.p_flow.rho[],
         ws.vars.q_flow.rho[],
+        ws.branch_pairs,
     )
 
     # Fast path: pure TieLine (no split buses anywhere). Skip p_inj/q_inj
