@@ -365,15 +365,30 @@ consensus!(ws::ACStateWorkspace) =
         ws.partitions,
     )
 
-consensus!(ws::ACPowerWorkspace) =
-    _consensus_branch_ac!(
-        ws.vars.p_flow.consensus,
-        ws.vars.q_flow.consensus,
-        ws.p_branch_counts,
-        ws.q_branch_counts,
-        ws.partitions,
-        ws.interzonal,
-    )
+function consensus!(ws::ACPowerWorkspace)
+    n_inter = length(ws.interzonal)
+    n_pairs = length(ws.branch_pairs)
+    if n_inter > 0
+        _consensus_branch_ac!(
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            view(ws.vars.q_flow.consensus, 1:n_inter),
+            ws.p_branch_counts,
+            ws.q_branch_counts,
+            ws.partitions,
+            ws.interzonal,
+        )
+    end
+    if n_pairs > 0
+        _consensus_branch_pairs_ac!(
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            view(ws.vars.q_flow.consensus, n_inter+1:n_inter+n_pairs),
+            ws.pair_counts,
+            ws.partitions,
+            ws.branch_pairs,
+        )
+    end
+    return nothing
+end
 
 function consensus!(ws::ACHybridWorkspace)
     n_inter = length(ws.interzonal)

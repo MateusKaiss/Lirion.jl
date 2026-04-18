@@ -24,9 +24,10 @@ function init_power_partition!(
     rho_p::Float64,
     rho_q::Float64,
     interzonal_branches,
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )
     build_local_model!(part, sys_zone, Power, optimizer_factory, interzonal_branches)
-    build_quad_branch_expr!(part, rho_p, rho_q, part.zone_edges)
+    build_quad_branch_expr!(part, rho_p, rho_q, part.zone_edges, branch_pairs)
     @objective(part.model, Min, part.obj_base + part.quad_branch_expr)
     return nothing
 end
@@ -196,13 +197,14 @@ function init_power_partition!(
     rho_p::Float64,
     rho_q::Float64,
     interzonal_branches,
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )
     n = length(partitions.parts)
     @assert length(sys.parts) == n
     @inbounds for i in 1:n
         init_power_partition!(
             partitions.parts[i], sys.parts[i], optimizer_factory,
-            rho_p, rho_q, interzonal_branches,
+            rho_p, rho_q, interzonal_branches, branch_pairs,
         )
     end
     return nothing

@@ -180,6 +180,7 @@ function update_objective!(part::PartitionAC, ws::ACPowerWorkspace)
         ws.interzonal,
         ws.vars.p_flow.rho[],
         ws.vars.q_flow.rho[],
+        ws.branch_pairs,
     )
 
     @objective(part.model, Min, part.obj_base + part.quad_branch_expr + lin)

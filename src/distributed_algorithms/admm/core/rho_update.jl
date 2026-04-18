@@ -263,6 +263,7 @@ refresh_rho!(ws::ACPowerWorkspace) = _refresh_rho_branch_ac!(
     ws.partitions,
     ws.vars.p_flow.rho, ws.vars.p_flow.prev_rho,
     ws.vars.q_flow.rho, ws.vars.q_flow.prev_rho,
+    ws.branch_pairs,
 )
 
 function refresh_rho!(ws::ACHybridWorkspace)

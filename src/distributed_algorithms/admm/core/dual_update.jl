@@ -325,16 +325,33 @@ function dual_update!(ws::ACStateWorkspace)
 end
 
 function dual_update!(ws::ACPowerWorkspace)
-    _update_branch_duals_ac!(
-        ws.vars.p_flow.duals,
-        ws.vars.q_flow.duals,
-        ws.partitions,
-        ws.vars.p_flow.consensus,
-        ws.vars.q_flow.consensus,
-        ws.vars.p_flow.rho[],
-        ws.vars.q_flow.rho[],
-        ws.interzonal,
-    )
+    n_inter = length(ws.interzonal)
+    n_pairs = length(ws.branch_pairs)
+    rho_p = ws.vars.p_flow.rho[]
+    rho_q = ws.vars.q_flow.rho[]
+
+    if n_inter > 0
+        _update_branch_duals_ac!(
+            view(ws.vars.p_flow.duals, 1:n_inter, :),
+            view(ws.vars.q_flow.duals, 1:n_inter, :),
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            view(ws.vars.q_flow.consensus, 1:n_inter),
+            rho_p, rho_q,
+            ws.interzonal,
+        )
+    end
+    if n_pairs > 0
+        _update_branch_pairs_duals_ac!(
+            view(ws.vars.p_flow.duals, n_inter+1:n_inter+n_pairs, :),
+            view(ws.vars.q_flow.duals, n_inter+1:n_inter+n_pairs, :),
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            view(ws.vars.q_flow.consensus, n_inter+1:n_inter+n_pairs),
+            rho_p, rho_q,
+            ws.branch_pairs,
+        )
+    end
     return nothing
 end
 

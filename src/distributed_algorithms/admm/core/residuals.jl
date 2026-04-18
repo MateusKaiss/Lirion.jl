@@ -488,18 +488,57 @@ function compute_residuals!(ws::ACStateWorkspace)
 end
 
 function compute_residuals!(ws::ACPowerWorkspace)
-    ws.r_primal_p, ws.r_primal_q = _primal_residual_branch_ac_components(
-        ws.partitions,
-        ws.vars.p_flow.consensus,
-        ws.vars.q_flow.consensus,
-        ws.interzonal,
-    )
-    ws.r_dual_p, ws.r_dual_q = _dual_residual_branch_paired_components(
-        ws.partitions,
-        ws.vars.p_flow.consensus, ws.vars.q_flow.consensus,
-        ws.vars.p_flow.consensus_prev, ws.vars.q_flow.consensus_prev,
-        ws.interzonal, ws.vars.p_flow.rho[], ws.vars.q_flow.rho[],
-    )
+    n_inter = length(ws.interzonal)
+    n_pairs = length(ws.branch_pairs)
+    rho_p = ws.vars.p_flow.rho[]
+    rho_q = ws.vars.q_flow.rho[]
+
+    r_p_inter, r_q_inter =
+        n_inter > 0 ?
+        _primal_residual_branch_ac_components(
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            view(ws.vars.q_flow.consensus, 1:n_inter),
+            ws.interzonal,
+        ) : (0.0, 0.0)
+    s_p_inter, s_q_inter =
+        n_inter > 0 ?
+        _dual_residual_branch_paired_components(
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            view(ws.vars.q_flow.consensus, 1:n_inter),
+            view(ws.vars.p_flow.consensus_prev, 1:n_inter),
+            view(ws.vars.q_flow.consensus_prev, 1:n_inter),
+            ws.interzonal, rho_p, rho_q,
+        ) : (0.0, 0.0)
+
+    r_p_pair, r_q_pair =
+        n_pairs > 0 ?
+        _primal_residual_branch_pairs_ac(
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            view(ws.vars.q_flow.consensus, n_inter+1:n_inter+n_pairs),
+            ws.branch_pairs,
+        ) : (0.0, 0.0)
+    s_p_pair =
+        n_pairs > 0 ?
+        _dual_residual_branch_pairs(
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            view(ws.vars.p_flow.consensus_prev, n_inter+1:n_inter+n_pairs),
+            ws.branch_pairs, rho_p,
+        ) : 0.0
+    s_q_pair =
+        n_pairs > 0 ?
+        _dual_residual_branch_pairs(
+            view(ws.vars.q_flow.consensus, n_inter+1:n_inter+n_pairs),
+            view(ws.vars.q_flow.consensus_prev, n_inter+1:n_inter+n_pairs),
+            ws.branch_pairs, rho_q,
+        ) : 0.0
+
+    ws.r_primal_p = hypot(r_p_inter, r_p_pair)
+    ws.r_primal_q = hypot(r_q_inter, r_q_pair)
+    ws.r_dual_p = hypot(s_p_inter, s_p_pair)
+    ws.r_dual_q = hypot(s_q_inter, s_q_pair)
 
     ws.r_primal = hypot(ws.r_primal_p, ws.r_primal_q)
     ws.r_dual = hypot(ws.r_dual_p, ws.r_dual_q)
