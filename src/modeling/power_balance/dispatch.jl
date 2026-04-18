@@ -50,7 +50,7 @@ function add_active_power_balance_constraints!(
     gs = pf.shunt_conductance
     bus_idx_map = pf.bus_idx_map
 
-    @constraint(model, [b in valid_bus_ids, t in 1:T],
+    @constraint(model, active_power_balance[b in valid_bus_ids, t in 1:T],
         compute_active_power_balance(model, sys, b, t) -
         gs[bus_idx_map[b]] == 0
     )

@@ -7,6 +7,11 @@
 # separately via `DistributedRawMeta.branch_pairs`.
 _find_interzonal_branches(::CaseRaw, ::DummyBus) = Int[]
 
+# SplitBus sectioning has no interzonal branches either: every original
+# tie-line becomes internal to the zone that owns its `to` endpoint.
+# Bus pairs are carried via `DistributedRawMeta.bus_pairs`.
+_find_interzonal_branches(::CaseRaw, ::SplitBus) = Int[]
+
 function _find_interzonal_branches(full::CaseRaw, ::TieLine)
     full_bus_ids = full.bus.bus_i
     full_bus_zones = full.bus.zone

@@ -124,6 +124,38 @@ function _consensus_branch_pairs!(
 end
 
 # ------------------------------------------------------------
+# Bus pairs consensus (SplitBus Method 3): sign-flipped injection.
+# Zone A targets p_A = +z, zone B targets p_B = -z, so the closed-form
+# minimizer of Σ (p_A - z)² + (p_B + z)²  is  z = (p_A - p_B) / 2.
+# ------------------------------------------------------------
+function _consensus_bus_pairs_signed!(
+    consensus::AbstractVector{Float64},   # length == n_bus_pairs
+    partitions::Partitions,
+    bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+)
+    isempty(bus_pairs) && return nothing
+    fill!(consensus, 0.0)
+    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
+        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], bid)
+        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], bid)
+        consensus[k] = 0.5 * (va - vb)
+    end
+    return nothing
+end
+
+@inline function _p_inj_value(
+    part::AbstractPartition,
+    store::Dict{Int, JuMP.VariableRef},
+    bid::Int,
+)
+    v = get(store, bid, nothing)
+    v === nothing && return 0.0
+    m = part.model::JuMP.Model
+    return JuMP.has_values(m) ? JuMP.value(v) : 0.0
+end
+
+# ------------------------------------------------------------
 # Branch consensus: paired variables (SOCWR PQ, SOCWR RT)
 # ------------------------------------------------------------
 function _consensus_branch_paired!(
@@ -265,6 +297,14 @@ function consensus!(ws::DCHybridWorkspace)
             ws.partitions,
             ws.branch_pairs,
             _dc_flow_value,
+        )
+    end
+    if !isempty(ws.bus_pairs)
+        _consensus_bus_pairs_signed!(
+            ws.vars.p_inj.consensus,
+            ws.partitions,
+            ws.bus_pairs,
+            ws.p_inj_vars,
         )
     end
     return nothing

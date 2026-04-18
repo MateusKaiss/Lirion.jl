@@ -249,8 +249,12 @@ mutable struct DistributedRawMeta
     full_shared_bus_ids::Vector{Int}
     # Branch pairs produced by DummyBus sectioning: each tuple
     # (branch_a_global, zone_a_pos, branch_b_global, zone_b_pos).
-    # Empty for TieLine.
+    # Empty for TieLine and SplitBus.
     branch_pairs::Vector{NTuple{4, Int}}
+    # Bus pairs produced by SplitBus sectioning (Method 3): each tuple
+    # (bus_id, zone_a_pos, zone_b_pos), where zone_a owns the physical
+    # content and zone_b holds the ghost copy. Empty for TieLine/DummyBus.
+    bus_pairs::Vector{NTuple{3, Int}}
 
     function DistributedRawMeta()
         return new(
@@ -259,6 +263,7 @@ mutable struct DistributedRawMeta
             Int[],
             Int[],
             NTuple{4, Int}[],
+            NTuple{3, Int}[],
         )
     end
 end

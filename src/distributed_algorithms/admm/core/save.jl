@@ -19,6 +19,7 @@ end
 function save_prev!(ws::DCHybridWorkspace)
     copyto!(ws.vars.theta.consensus_prev, ws.vars.theta.consensus)
     copyto!(ws.vars.p_flow.consensus_prev, ws.vars.p_flow.consensus)
+    copyto!(ws.vars.p_inj.consensus_prev, ws.vars.p_inj.consensus)
     return nothing
 end
 

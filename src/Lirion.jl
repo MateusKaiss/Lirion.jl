@@ -81,6 +81,7 @@ include("data/preprocess_case.jl")
 include("partitioning/partitioning_utils.jl")
 include("partitioning/tie_line.jl")
 include("partitioning/dummy_bus.jl")
+include("partitioning/split_bus.jl")
 include("partitioning/create_partition.jl")
 
 # ------------------------------------------------------------------

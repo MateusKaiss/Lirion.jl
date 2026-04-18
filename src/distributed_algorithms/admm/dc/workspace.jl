@@ -46,7 +46,15 @@ Base.@kwdef mutable struct DCHybridWorkspace <: AbstractADMMWorkspace
     branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[]
     pair_counts::Vector{Int} = Int[]
 
-    vars::NamedTuple{(:theta, :p_flow), Tuple{VarState, VarState}}
+    # SplitBus (Method 3) bookkeeping: sign-flipped p_inj consensus per split bus.
+    bus_pairs::Vector{NTuple{3, Int}} = NTuple{3, Int}[]
+    # Per-partition container of p_inj variable references, indexed by bus_id.
+    # Filled by `init_hybrid_partition!` when bus_pairs is non-empty.
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
+        Vector{Dict{Int, JuMP.VariableRef}}()
+
+    vars::NamedTuple{(:theta, :p_flow, :p_inj),
+        Tuple{VarState, VarState, VarState}}
 
     bus_counts::Vector{Int}
     branch_counts::Vector{Int}
@@ -55,6 +63,8 @@ Base.@kwdef mutable struct DCHybridWorkspace <: AbstractADMMWorkspace
     r_dual_bus::Float64 = 0.0
     r_primal_branch::Float64 = 0.0
     r_dual_branch::Float64 = 0.0
+    r_primal_bus_pair::Float64 = 0.0
+    r_dual_bus_pair::Float64 = 0.0
 
     r_primal::Float64 = 0.0
     r_dual::Float64 = 0.0
@@ -73,6 +83,7 @@ _get_rhos(ws::DCPowerWorkspace) = (rho_p = ws.vars.p_flow.rho[],)
 _get_rhos(ws::DCHybridWorkspace) = (
     rho_theta = ws.vars.theta.rho[],
     rho_p = ws.vars.p_flow.rho[],
+    rho_p_inj = ws.vars.p_inj.rho[],
 )
 
 # ============================================================
@@ -131,11 +142,17 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
     id = partitions.zones
     inter = sys.interzonal_branches
     pairs = sys.branch_pairs
+    bpairs = sys.bus_pairs
     n_zones = length(partitions)
     n_shared = length(sys.full_shared_bus_ids)
     n_inter = length(inter)
     n_pairs = length(pairs)
     n_total = n_inter + n_pairs
+    n_bus_pairs = length(bpairs)
+
+    # Pre-allocate per-partition p_inj variable containers (populated when
+    # bus_pairs is non-empty, by `init_hybrid_partition!`).
+    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
 
     init_hybrid_partition!(
         partitions,
@@ -145,11 +162,15 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
         config.rho_p,
         inter,
         pairs,
+        bpairs,
+        p_inj_vars,
     )
 
     vars = (
         theta = VarState(n_shared, n_zones, config.rho_theta),
         p_flow = VarState(n_total, n_zones, config.rho_p),
+        # Use rho_p for p_inj as well (both are active-power consensus).
+        p_inj = VarState(n_bus_pairs, n_zones, config.rho_p),
     )
 
     return DCHybridWorkspace(;
@@ -158,6 +179,8 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
         interzonal = inter,
         branch_pairs = pairs,
         pair_counts = fill(2, n_pairs),
+        bus_pairs = bpairs,
+        p_inj_vars = p_inj_vars,
         vars = vars,
         bus_counts = zeros(Int, n_shared),
         branch_counts = zeros(Int, n_inter),

@@ -35,8 +35,11 @@ struct DistributedSystem
     full_shared_bus_ids::Vector{Int}
     interzonal_branches::Vector{Int}
     # DummyBus branch pairs: (branch_a_global, zone_a_pos, branch_b_global, zone_b_pos).
-    # Empty for TieLine; populated for DummyBus.
+    # Empty for TieLine/SplitBus; populated for DummyBus.
     branch_pairs::Vector{NTuple{4, Int}}
+    # SplitBus bus pairs: (bus_id, zone_a_pos, zone_b_pos).
+    # Empty for TieLine/DummyBus; populated for SplitBus.
+    bus_pairs::Vector{NTuple{3, Int}}
 end
 
 # ==============================================================================
@@ -111,6 +114,7 @@ function build_distributed_system(
 
     full_shared_bus_ids = case_raw.dist.full_shared_bus_ids
     branch_pairs = case_raw.dist.branch_pairs
+    bus_pairs = case_raw.dist.bus_pairs
 
     return DistributedSystem(
         zones,
@@ -121,5 +125,6 @@ function build_distributed_system(
         full_shared_bus_ids,
         interzonal_branches,
         branch_pairs,
+        bus_pairs,
     )
 end

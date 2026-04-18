@@ -36,6 +36,8 @@ Base.@kwdef mutable struct PartitionDC <: AbstractPartition
     obj_static::JuMP.QuadExpr = zero(JuMP.QuadExpr)
     quad_bus_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
     quad_branch_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
+    # Populated by SplitBus (Method 3) only; zero otherwise.
+    quad_p_inj_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
 
     objective_params::ObjectiveData
     has_solution::Bool = false

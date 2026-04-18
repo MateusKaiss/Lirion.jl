@@ -108,6 +108,43 @@ function _dual_residual_branch_pairs(
 end
 
 # ------------------------------------------------------------
+# Bus pair residuals (SplitBus Method 3): zone A targets +z, zone B
+# targets -z, so zone B's residual is `p_B - (-z) = p_B + z`.
+# ------------------------------------------------------------
+function _primal_residual_bus_pairs_signed(
+    partitions::Partitions,
+    consensus::AbstractVector{Float64},
+    bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+)
+    isempty(bus_pairs) && return 0.0
+    acc = 0.0
+    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
+        z = consensus[k]
+        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], bid)
+        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], bid)
+        acc += (va - z)^2 + (vb + z)^2
+    end
+    return sqrt(acc)
+end
+
+function _dual_residual_bus_pairs_signed(
+    consensus::AbstractVector{Float64},
+    consensus_prev::AbstractVector{Float64},
+    bus_pairs::Vector{NTuple{3, Int}},
+    rho::Float64,
+)
+    isempty(bus_pairs) && return 0.0
+    s = 0.0
+    @inbounds for k in eachindex(bus_pairs)
+        d = consensus[k] - consensus_prev[k]
+        # Two contributions (+z in A, -z in B); both flip by the same Δz.
+        s += 2 * d^2
+    end
+    return rho * sqrt(s)
+end
+
+# ------------------------------------------------------------
 # Branch primal residual: paired components (SOCWR PQ, SOCWR RT)
 # ------------------------------------------------------------
 function _primal_residual_branch_paired_components(
@@ -368,8 +405,32 @@ function compute_residuals!(ws::DCHybridWorkspace)
     ws.r_primal_branch = hypot(r_inter, r_pair)
     ws.r_dual_branch = hypot(s_inter, s_pair)
 
-    ws.r_primal = hypot(ws.r_primal_bus, ws.r_primal_branch)
-    ws.r_dual = hypot(ws.r_dual_bus, ws.r_dual_branch)
+    n_bus_pairs = length(ws.bus_pairs)
+    if n_bus_pairs > 0
+        rho_pi = ws.vars.p_inj.rho[]
+        ws.r_primal_bus_pair = _primal_residual_bus_pairs_signed(
+            ws.partitions,
+            ws.vars.p_inj.consensus,
+            ws.bus_pairs,
+            ws.p_inj_vars,
+        )
+        ws.r_dual_bus_pair = _dual_residual_bus_pairs_signed(
+            ws.vars.p_inj.consensus,
+            ws.vars.p_inj.consensus_prev,
+            ws.bus_pairs,
+            rho_pi,
+        )
+    else
+        ws.r_primal_bus_pair = 0.0
+        ws.r_dual_bus_pair = 0.0
+    end
+
+    ws.r_primal = sqrt(
+        ws.r_primal_bus^2 + ws.r_primal_branch^2 + ws.r_primal_bus_pair^2,
+    )
+    ws.r_dual = sqrt(
+        ws.r_dual_bus^2 + ws.r_dual_branch^2 + ws.r_dual_bus_pair^2,
+    )
     return nothing
 end
 

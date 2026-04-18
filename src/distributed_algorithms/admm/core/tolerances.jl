@@ -150,6 +150,49 @@ function _eps_dual_branch_pairs(
     return sqrt(max(1, n)) * eps_abs + eps_rel * sqrt(norm_y_sq)
 end
 
+# ------------------------------------------------------------
+# Bus-pair tolerance helpers (SplitBus Method 3)
+# ------------------------------------------------------------
+function _eps_primal_bus_pairs_signed(
+    partitions::Partitions,
+    consensus::AbstractVector{Float64},
+    bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+    eps_abs::Float64,
+    eps_rel::Float64,
+)
+    isempty(bus_pairs) && return 0.0
+    dim = 0
+    norm_x_sq = 0.0
+    norm_z_sq = 0.0
+    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
+        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], bid)
+        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], bid)
+        dim += 2
+        norm_x_sq += va^2 + vb^2
+        # Zone A targets +z, zone B targets -z: both contribute z² to the target norm.
+        norm_z_sq += 2 * consensus[k]^2
+    end
+    return sqrt(max(1, dim)) * eps_abs +
+           eps_rel * max(sqrt(norm_x_sq), sqrt(norm_z_sq), 1e-12)
+end
+
+function _eps_dual_bus_pairs_signed(
+    duals::AbstractMatrix{Float64},
+    bus_pairs::Vector{NTuple{3, Int}},
+    eps_abs::Float64,
+    eps_rel::Float64,
+)
+    isempty(bus_pairs) && return 0.0
+    n = 0
+    norm_y_sq = 0.0
+    @inbounds for (k, (_, za, zb)) in enumerate(bus_pairs)
+        n += 2
+        norm_y_sq += duals[k, za]^2 + duals[k, zb]^2
+    end
+    return sqrt(max(1, n)) * eps_abs + eps_rel * sqrt(norm_y_sq)
+end
+
 function _eps_dual_branch(
     duals_list,         # tuple of (Abstract)Matrix{Float64} (n_inter × n_zones)
     partitions::Partitions,
@@ -304,8 +347,29 @@ function compute_tolerances!(ws::DCHybridWorkspace, eps_abs::Float64, eps_rel::F
             eps_rel,
         ) : 0.0
 
-    ws.eps_primal = sqrt(eps_r_bus^2 + eps_r_inter^2 + eps_r_pair^2)
-    ws.eps_dual = sqrt(eps_s_bus^2 + eps_s_inter^2 + eps_s_pair^2)
+    eps_r_bpair =
+        !isempty(ws.bus_pairs) ?
+        _eps_primal_bus_pairs_signed(
+            ws.partitions,
+            ws.vars.p_inj.consensus,
+            ws.bus_pairs,
+            ws.p_inj_vars,
+            eps_abs,
+            eps_rel,
+        ) : 0.0
+    eps_s_bpair =
+        !isempty(ws.bus_pairs) ?
+        _eps_dual_bus_pairs_signed(
+            ws.vars.p_inj.duals,
+            ws.bus_pairs,
+            eps_abs,
+            eps_rel,
+        ) : 0.0
+
+    ws.eps_primal =
+        sqrt(eps_r_bus^2 + eps_r_inter^2 + eps_r_pair^2 + eps_r_bpair^2)
+    ws.eps_dual =
+        sqrt(eps_s_bus^2 + eps_s_inter^2 + eps_s_pair^2 + eps_s_bpair^2)
     return nothing
 end
 

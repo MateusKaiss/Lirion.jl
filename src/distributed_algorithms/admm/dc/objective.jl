@@ -172,5 +172,55 @@ function update_objective!(part::PartitionDC, ws::DCHybridWorkspace)
         ws.branch_pairs,
     )
 
-    @objective(part.model, Min, part.obj_static + lin_bus + lin_branch)
+    lin_p_inj = build_linear_p_inj_term(
+        part,
+        ws.bus_pairs,
+        ws.p_inj_vars,
+        ws.vars.p_inj.consensus,
+        view(ws.vars.p_inj.duals, :, part.position),
+        ws.vars.p_inj.rho[],
+    )
+
+    @objective(
+        part.model, Min,
+        part.obj_static + lin_bus + lin_branch + lin_p_inj,
+    )
+end
+
+# ------------------------------------------------------------
+# Linear term for the sign-flipped p_inj consensus (SplitBus).
+# Zone A (natively owning the split bus) targets p_A = +z:
+#     (λ_A - ρ z) * p_A
+# Zone B (ghost side) targets p_B = -z, so the coupling flips sign:
+#     (λ_B + ρ z) * p_B
+# ------------------------------------------------------------
+function build_linear_p_inj_term(
+    part::PartitionDC,
+    bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+    p_inj_consensus::Vector{Float64},
+    p_inj_duals::AbstractVector{Float64},
+    rho::Float64,
+)::JuMP.AffExpr
+    lin = zero(JuMP.AffExpr)
+    isempty(bus_pairs) && return lin
+
+    pos = part.position
+    store = p_inj_vars[pos]
+    isempty(store) && return lin
+
+    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
+        z = p_inj_consensus[k]
+        lam = p_inj_duals[k]
+        if za == pos
+            v = get(store, bid, nothing)
+            v === nothing && continue
+            lin += (lam - rho * z) * v
+        elseif zb == pos
+            v = get(store, bid, nothing)
+            v === nothing && continue
+            lin += (lam + rho * z) * v
+        end
+    end
+    return lin
 end

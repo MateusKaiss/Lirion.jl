@@ -102,6 +102,30 @@ function _update_branch_pairs_duals_single!(
 end
 
 # ------------------------------------------------------------
+# Bus pair duals (SplitBus Method 3): sign-flipped consensus.
+# Zone A: λ_A += ρ · (p_A - z)
+# Zone B: λ_B += ρ · (p_B + z)   (target is -z ⇒ residual is p_B + z)
+# ------------------------------------------------------------
+function _update_bus_pairs_duals_signed!(
+    duals::AbstractMatrix{Float64},       # rows = bus_pairs, cols = zones
+    partitions::Partitions,
+    consensus::AbstractVector{Float64},   # length == n_bus_pairs
+    rho::Float64,
+    bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+)
+    isempty(bus_pairs) && return nothing
+    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
+        z = consensus[k]
+        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], bid)
+        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], bid)
+        duals[k, za] += rho * (va - z)
+        duals[k, zb] += rho * (vb + z)
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
 # Branch duals: paired variables (SOCWR PQ, SOCWR RT)
 # ------------------------------------------------------------
 function _update_branch_duals_paired!(
@@ -231,6 +255,16 @@ function dual_update!(ws::DCHybridWorkspace)
             ws.vars.p_flow.rho[],
             ws.branch_pairs,
             _dc_flow_value,
+        )
+    end
+    if !isempty(ws.bus_pairs)
+        _update_bus_pairs_duals_signed!(
+            ws.vars.p_inj.duals,
+            ws.partitions,
+            ws.vars.p_inj.consensus,
+            ws.vars.p_inj.rho[],
+            ws.bus_pairs,
+            ws.p_inj_vars,
         )
     end
     return nothing

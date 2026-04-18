@@ -24,8 +24,13 @@ centralized() = CentralizedAlgorithm()
     x isa Sectioning && return x
     x === :tie_line && return TieLine()
     x === :dummy_bus && return DummyBus()
+    x === :split_bus && return SplitBus()
     x === :metis && return Metis()
-    throw(ArgumentError("Invalid sectioning=$x. Allowed: :tie_line, :dummy_bus, :metis"))
+    throw(
+        ArgumentError(
+            "Invalid sectioning=$x. Allowed: :tie_line, :dummy_bus, :split_bus, :metis",
+        ),
+    )
 end
 
 @inline function admm(;

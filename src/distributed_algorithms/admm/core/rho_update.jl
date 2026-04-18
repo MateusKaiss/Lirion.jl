@@ -222,10 +222,23 @@ function refresh_rho!(ws::DCHybridWorkspace)
             ws.partitions, ws.vars.p_flow.rho, ws.vars.p_flow.prev_rho,
             ws.branch_pairs,
         )
-    if bus_changed || branch_changed
+    # SplitBus (Method 3): if p_inj rho changed, rebuild its quadratic term too.
+    p_inj_changed = false
+    if !isempty(ws.bus_pairs)
+        rho_pi = ws.vars.p_inj.rho[]
+        if rho_pi != ws.vars.p_inj.prev_rho[]
+            @inbounds for (i, part) in enumerate(ws.partitions.parts)
+                build_quad_p_inj_expr!(part, rho_pi, ws.p_inj_vars[i])
+            end
+            ws.vars.p_inj.prev_rho[] = rho_pi
+            p_inj_changed = true
+        end
+    end
+    if bus_changed || branch_changed || p_inj_changed
         @inbounds for part in ws.partitions.parts
             part.obj_static =
-                part.obj_base + part.quad_bus_expr + part.quad_branch_expr
+                part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
+                part.quad_p_inj_expr
         end
     end
     return nothing
@@ -308,6 +321,11 @@ function rho_update!(ws::DCHybridWorkspace, params::ADMMParams)
 
     _adapt!(ws.vars.theta.rho, ws.r_primal_bus, ws.r_dual_bus, params)
     _adapt!(ws.vars.p_flow.rho, ws.r_primal_branch, ws.r_dual_branch, params)
+    if !isempty(ws.bus_pairs)
+        _adapt!(
+            ws.vars.p_inj.rho, ws.r_primal_bus_pair, ws.r_dual_bus_pair, params,
+        )
+    end
     return nothing
 end
 

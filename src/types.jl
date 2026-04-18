@@ -39,6 +39,7 @@ struct ALADIN{V <: ADMMVariant, M <: OPFModel} <: DistributedAlgorithm end
 abstract type Sectioning end
 struct TieLine <: Sectioning end
 struct DummyBus <: Sectioning end
+struct SplitBus <: Sectioning end
 struct Metis <: Sectioning end
 
 # ============================================================
