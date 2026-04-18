@@ -42,6 +42,10 @@ Base.@kwdef mutable struct SOCWRPowerWorkspace <: AbstractADMMWorkspace
     id::Vector{Int}
 
     interzonal::Vector{Int}
+    # DummyBus (Method 2) bookkeeping: symmetric P/Q consensus on the two
+    # halves of each split tie-line. Empty for TieLine.
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[]
+    pair_counts::Vector{Int} = Int[]
 
     vars::NamedTuple{(:p_flow, :q_flow), Tuple{VarState, VarState}}
 
@@ -188,8 +192,11 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWR})
     partitions = build_partitions(PartitionSOCWR, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
+    brpairs = sys.branch_pairs
     n_zones = length(partitions)
     n_inter = length(inter)
+    n_pairs = length(brpairs)
+    n_total = n_inter + n_pairs
 
     init_power_partition!(
         partitions,
@@ -198,17 +205,20 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWR})
         config.rho_p,
         config.rho_q,
         inter,
+        brpairs,
     )
 
     vars = (
-        p_flow = VarState(n_inter, n_zones, config.rho_p),
-        q_flow = VarState(n_inter, n_zones, config.rho_q),
+        p_flow = VarState(n_total, n_zones, config.rho_p),
+        q_flow = VarState(n_total, n_zones, config.rho_q),
     )
 
     return SOCWRPowerWorkspace(;
         partitions = partitions,
         id = id,
         interzonal = inter,
+        branch_pairs = brpairs,
+        pair_counts = fill(2, n_pairs),
         vars = vars,
         branch_counts = zeros(Int, n_inter),
     )

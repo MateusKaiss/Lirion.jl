@@ -113,6 +113,11 @@ include(joinpath(@__DIR__, "test_aladin_socwr.jl"))
         central_optimizer = DEFAULT_SOCWR_SOLVER,
         distributed_optimizer = DEFAULT_SOCWR_SOLVER,
     )
+    run_admm_socwr_dummybus_power_tests(;
+        rtol = 0.05,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
+    )
 
     # Distributed ALADIN — DC
     run_aladin_dc_state_tests(; rtol = 0.01)

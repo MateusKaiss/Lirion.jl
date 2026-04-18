@@ -568,23 +568,70 @@ function compute_tolerances!(ws::SOCWRStateWorkspace, eps_abs::Float64, eps_rel:
 end
 
 function compute_tolerances!(ws::SOCWRPowerWorkspace, eps_abs::Float64, eps_rel::Float64)
-    eps_r = _eps_primal_branch(
-        ws.partitions,
-        (ws.vars.p_flow.consensus, ws.vars.q_flow.consensus),
-        (:p_flow_branches, :q_flow_branches),
-        ws.interzonal,
-        eps_abs,
-        eps_rel,
-    )
-    eps_s = _eps_dual_branch(
-        (ws.vars.p_flow.duals, ws.vars.q_flow.duals),
-        ws.partitions,
-        ws.interzonal,
-        eps_abs,
-        eps_rel,
-    )
-    ws.eps_primal = eps_r
-    ws.eps_dual = eps_s
+    n_inter = length(ws.interzonal)
+    n_pairs = length(ws.branch_pairs)
+
+    eps_r_inter =
+        n_inter > 0 ?
+        _eps_primal_branch(
+            ws.partitions,
+            (view(ws.vars.p_flow.consensus, 1:n_inter),
+             view(ws.vars.q_flow.consensus, 1:n_inter)),
+            (:p_flow_branches, :q_flow_branches),
+            ws.interzonal,
+            eps_abs,
+            eps_rel,
+        ) : 0.0
+    eps_s_inter =
+        n_inter > 0 ?
+        _eps_dual_branch(
+            (view(ws.vars.p_flow.duals, 1:n_inter, :),
+             view(ws.vars.q_flow.duals, 1:n_inter, :)),
+            ws.partitions,
+            ws.interzonal,
+            eps_abs,
+            eps_rel,
+        ) : 0.0
+
+    eps_r_p_pair =
+        n_pairs > 0 ?
+        _eps_primal_branch_pairs(
+            ws.partitions,
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            ws.branch_pairs,
+            :p_flow_branches,
+            eps_abs,
+            eps_rel,
+        ) : 0.0
+    eps_r_q_pair =
+        n_pairs > 0 ?
+        _eps_primal_branch_pairs(
+            ws.partitions,
+            view(ws.vars.q_flow.consensus, n_inter+1:n_inter+n_pairs),
+            ws.branch_pairs,
+            :q_flow_branches,
+            eps_abs,
+            eps_rel,
+        ) : 0.0
+    eps_s_p_pair =
+        n_pairs > 0 ?
+        _eps_dual_branch_pairs(
+            view(ws.vars.p_flow.duals, n_inter+1:n_inter+n_pairs, :),
+            ws.branch_pairs,
+            eps_abs,
+            eps_rel,
+        ) : 0.0
+    eps_s_q_pair =
+        n_pairs > 0 ?
+        _eps_dual_branch_pairs(
+            view(ws.vars.q_flow.duals, n_inter+1:n_inter+n_pairs, :),
+            ws.branch_pairs,
+            eps_abs,
+            eps_rel,
+        ) : 0.0
+
+    ws.eps_primal = sqrt(eps_r_inter^2 + eps_r_p_pair^2 + eps_r_q_pair^2)
+    ws.eps_dual = sqrt(eps_s_inter^2 + eps_s_p_pair^2 + eps_s_q_pair^2)
     return nothing
 end
 

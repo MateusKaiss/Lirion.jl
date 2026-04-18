@@ -233,6 +233,7 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRPowerWorkspace)
         ws.interzonal,
         ws.vars.p_flow.rho[],
         ws.vars.q_flow.rho[],
+        ws.branch_pairs,
     )
 
     @objective(part.model, Min, part.obj_static + lin)

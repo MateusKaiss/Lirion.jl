@@ -439,15 +439,37 @@ function consensus!(ws::SOCWRStateWorkspace)
     return nothing
 end
 
-consensus!(ws::SOCWRPowerWorkspace) =
-    _consensus_branch_paired!(
-        ws.vars.p_flow.consensus,
-        ws.vars.q_flow.consensus,
-        ws.branch_counts,
-        ws.partitions,
-        ws.interzonal,
-        _socwr_pq_values,
-    )
+function consensus!(ws::SOCWRPowerWorkspace)
+    n_inter = length(ws.interzonal)
+    n_pairs = length(ws.branch_pairs)
+    if n_inter > 0
+        _consensus_branch_paired!(
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            view(ws.vars.q_flow.consensus, 1:n_inter),
+            ws.branch_counts,
+            ws.partitions,
+            ws.interzonal,
+            _socwr_pq_values,
+        )
+    end
+    if n_pairs > 0
+        _consensus_branch_pairs!(
+            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
+            ws.pair_counts,
+            ws.partitions,
+            ws.branch_pairs,
+            _socwr_p_value,
+        )
+        _consensus_branch_pairs!(
+            view(ws.vars.q_flow.consensus, n_inter+1:n_inter+n_pairs),
+            ws.pair_counts,
+            ws.partitions,
+            ws.branch_pairs,
+            _socwr_q_value,
+        )
+    end
+    return nothing
+end
 
 function consensus!(ws::SOCWRHybridWorkspace)
     n_inter = length(ws.interzonal)

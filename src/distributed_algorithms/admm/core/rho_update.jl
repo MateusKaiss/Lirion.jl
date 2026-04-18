@@ -137,12 +137,14 @@ function _refresh_rho_branch_pq_socwr!(
     prev_rho_p,
     rho_q,
     prev_rho_q,
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )
     rho_p_val = rho_p[]
     rho_q_val = rho_q[]
     if rho_p_val != prev_rho_p[] || rho_q_val != prev_rho_q[]
         @inbounds for part in parts.parts
-            build_quad_branch_pq_expr!(part, rho_p_val, rho_q_val, part.zone_edges)
+            build_quad_branch_pq_expr!(part, rho_p_val, rho_q_val,
+                part.zone_edges, branch_pairs)
             part.obj_static =
                 part.obj_base + part.quad_pq_expr + part.soft_anchor_expr
         end
@@ -309,6 +311,7 @@ refresh_rho!(ws::SOCWRPowerWorkspace) = _refresh_rho_branch_pq_socwr!(
     ws.partitions,
     ws.vars.p_flow.rho, ws.vars.p_flow.prev_rho,
     ws.vars.q_flow.rho, ws.vars.q_flow.prev_rho,
+    ws.branch_pairs,
 )
 
 function refresh_rho!(ws::SOCWRHybridWorkspace)
