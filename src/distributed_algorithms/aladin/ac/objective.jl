@@ -143,6 +143,29 @@ function update_objective!(part::PartitionAC, ws::ACPowerWorkspaceALADIN)
     return nothing
 end
 
+@inline function _lambda_split_bus_ac!(
+    lin::JuMP.AffExpr,
+    ws::ACHybridWorkspaceALADIN,
+    zone_pos::Int,
+)
+    zdata = ws.zones[zone_pos]
+    @inbounds for (k, pair) in enumerate(ws.split_bus_pairs)
+        if pair.zone_i == zone_pos
+            pcol = pair.pinj_col_i
+            qcol = pair.qinj_col_i
+        elseif pair.zone_j == zone_pos
+            pcol = pair.pinj_col_j
+            qcol = pair.qinj_col_j
+        else
+            continue
+        end
+        # Sign-flipped consensus: both zones contribute +λ.
+        JuMP.add_to_expression!(lin, ws.vars.p_inj.lambda[k], zdata.all_vars[pcol])
+        JuMP.add_to_expression!(lin, ws.vars.q_inj.lambda[k], zdata.all_vars[qcol])
+    end
+    return lin
+end
+
 function update_objective!(part::PartitionAC, ws::ACHybridWorkspaceALADIN)
     zone_pos = part.position
     zdata = ws.zones[zone_pos]
@@ -150,6 +173,7 @@ function update_objective!(part::PartitionAC, ws::ACHybridWorkspaceALADIN)
 
     lin = zero(JuMP.AffExpr)
     _lambda_bus_ac!(lin, ws, zone_pos)
+    _lambda_split_bus_ac!(lin, ws, zone_pos)
 
     quad = zero(JuMP.QuadExpr)
     _ac_prox_quadexpr!(

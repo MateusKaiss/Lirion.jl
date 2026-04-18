@@ -72,6 +72,22 @@ end
     return expr
 end
 
+@inline function _split_bus_coupling_expr!(
+    expr::JuMP.AffExpr,
+    zones::Vector{AladinZoneData},
+    dy_all::Vector{Vector{JuMP.VariableRef}},
+    pair::SplitBusPair,
+)
+    zi = zones[pair.zone_i]
+    zj = zones[pair.zone_j]
+    yi = zi.y[pair.pinj_col_i]
+    yj = zj.y[pair.pinj_col_j]
+    JuMP.add_to_expression!(expr, yi + yj)
+    JuMP.add_to_expression!(expr, 1.0, dy_all[pair.zone_i][pair.pinj_col_i])
+    JuMP.add_to_expression!(expr, 1.0, dy_all[pair.zone_j][pair.pinj_col_j])
+    return expr
+end
+
 @inline function _edge_coupling_expr!(
     expr::JuMP.AffExpr,
     zones::Vector{AladinZoneData},
@@ -222,8 +238,10 @@ function solve_coordinator_qp!(ws::DCHybridWorkspaceALADIN)
 
     n_bus = length(ws.bus_pairs)
     n_edge = length(ws.edge_pairs)
+    n_split = length(ws.split_bus_pairs)
     s_bus = JuMP.@variable(model, [1:n_bus], base_name = "sb")
     s_edge = JuMP.@variable(model, [1:n_edge], base_name = "se")
+    s_split = JuMP.@variable(model, [1:n_split], base_name = "sp")
 
     qp_obj = zero(JuMP.QuadExpr)
     @inbounds for i in 1:n_zones
@@ -237,6 +255,10 @@ function solve_coordinator_qp!(ws::DCHybridWorkspaceALADIN)
     @inbounds for k in 1:n_edge
         JuMP.add_to_expression!(qp_obj, ws.vars.p_flow.lambda[k], s_edge[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_edge[k], s_edge[k])
+    end
+    @inbounds for k in 1:n_split
+        JuMP.add_to_expression!(qp_obj, ws.vars.p_inj.lambda[k], s_split[k])
+        JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_split[k], s_split[k])
     end
     JuMP.@objective(model, Min, qp_obj)
 
@@ -259,6 +281,13 @@ function solve_coordinator_qp!(ws::DCHybridWorkspaceALADIN)
         cons_edge_refs[k] = JuMP.@constraint(model, expr == s_edge[k])
     end
 
+    cons_split_refs = Vector{JuMP.ConstraintRef}(undef, n_split)
+    @inbounds for k in 1:n_split
+        expr = zero(JuMP.AffExpr)
+        _split_bus_coupling_expr!(expr, ws.zones, dy_all, ws.split_bus_pairs[k])
+        cons_split_refs[k] = JuMP.@constraint(model, expr == s_split[k])
+    end
+
     JuMP.optimize!(model)
     _check_qp_status!(model, "ALADIN-hybrid/DC coordinator QP")
 
@@ -277,6 +306,10 @@ function solve_coordinator_qp!(ws::DCHybridWorkspaceALADIN)
     nu_edge = ws.vars.p_flow.nu
     @inbounds for k in 1:n_edge
         nu_edge[k] = -JuMP.dual(cons_edge_refs[k])
+    end
+    nu_split = ws.vars.p_inj.nu
+    @inbounds for k in 1:n_split
+        nu_split[k] = -JuMP.dual(cons_split_refs[k])
     end
     return nothing
 end

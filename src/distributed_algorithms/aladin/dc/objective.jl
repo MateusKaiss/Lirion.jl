@@ -153,6 +153,18 @@ function update_objective!(part::PartitionDC, ws::DCHybridWorkspaceALADIN)
     end
     _lambda_edge_affexpr!(lin, ws.zones, ws.edge_pairs, ws.vars.p_flow.lambda, zone_pos)
 
+    # SplitBus p_inj consensus: residual is p_inj_i + p_inj_j (sign-flipped), so
+    # both zones contribute +λ_k · p_inj term to the local objective.
+    for (k, pair) in enumerate(ws.split_bus_pairs)
+        if pair.zone_i == zone_pos
+            col = pair.pinj_col_i
+            JuMP.add_to_expression!(lin, ws.vars.p_inj.lambda[k], zdata.all_vars[col])
+        elseif pair.zone_j == zone_pos
+            col = pair.pinj_col_j
+            JuMP.add_to_expression!(lin, ws.vars.p_inj.lambda[k], zdata.all_vars[col])
+        end
+    end
+
     quad = zero(JuMP.QuadExpr)
     _prox_all_quadexpr!(
         quad, zdata, ws.rho_bus[];

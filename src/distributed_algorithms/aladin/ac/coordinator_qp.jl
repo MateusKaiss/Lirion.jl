@@ -156,6 +156,38 @@ end
     return expr
 end
 
+@inline function _pinj_coupling_expr_ac!(
+    expr::JuMP.AffExpr,
+    zones::Vector{AladinZoneDataAC},
+    dy_all::Vector{Vector{JuMP.VariableRef}},
+    pair::SplitBusPairAC,
+)
+    zi = zones[pair.zone_i]
+    zj = zones[pair.zone_j]
+    yi = zi.y[pair.pinj_col_i]
+    yj = zj.y[pair.pinj_col_j]
+    JuMP.add_to_expression!(expr, yi + yj)
+    JuMP.add_to_expression!(expr, 1.0, dy_all[pair.zone_i][pair.pinj_col_i])
+    JuMP.add_to_expression!(expr, 1.0, dy_all[pair.zone_j][pair.pinj_col_j])
+    return expr
+end
+
+@inline function _qinj_coupling_expr_ac!(
+    expr::JuMP.AffExpr,
+    zones::Vector{AladinZoneDataAC},
+    dy_all::Vector{Vector{JuMP.VariableRef}},
+    pair::SplitBusPairAC,
+)
+    zi = zones[pair.zone_i]
+    zj = zones[pair.zone_j]
+    yi = zi.y[pair.qinj_col_i]
+    yj = zj.y[pair.qinj_col_j]
+    JuMP.add_to_expression!(expr, yi + yj)
+    JuMP.add_to_expression!(expr, 1.0, dy_all[pair.zone_i][pair.qinj_col_i])
+    JuMP.add_to_expression!(expr, 1.0, dy_all[pair.zone_j][pair.qinj_col_j])
+    return expr
+end
+
 @inline function _add_flow_grad!(
     expr::JuMP.AffExpr,
     dy::Vector{JuMP.VariableRef},
@@ -311,11 +343,14 @@ function solve_coordinator_qp!(ws::ACHybridWorkspaceALADIN)
 
     n_bus = length(ws.bus_pairs)
     n_edge = length(ws.edge_pairs)
+    n_split = length(ws.split_bus_pairs)
 
     s_theta = JuMP.@variable(model, [1:n_bus], base_name = "sθ")
     s_vm = JuMP.@variable(model, [1:n_bus], base_name = "svm")
     s_p = JuMP.@variable(model, [1:n_edge], base_name = "sp")
     s_q = JuMP.@variable(model, [1:n_edge], base_name = "sq")
+    s_pinj = JuMP.@variable(model, [1:n_split], base_name = "spi")
+    s_qinj = JuMP.@variable(model, [1:n_split], base_name = "sqi")
 
     mu = ws.mu[]
     @inbounds for k in 1:n_bus
@@ -329,6 +364,12 @@ function solve_coordinator_qp!(ws::ACHybridWorkspaceALADIN)
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_p[k], s_p[k])
         JuMP.add_to_expression!(qp_obj, ws.vars.q_flow.lambda[k], s_q[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_q[k], s_q[k])
+    end
+    @inbounds for k in 1:n_split
+        JuMP.add_to_expression!(qp_obj, ws.vars.p_inj.lambda[k], s_pinj[k])
+        JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_pinj[k], s_pinj[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.q_inj.lambda[k], s_qinj[k])
+        JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_qinj[k], s_qinj[k])
     end
     JuMP.@objective(model, Min, qp_obj)
 
@@ -356,6 +397,18 @@ function solve_coordinator_qp!(ws::ACHybridWorkspaceALADIN)
         cons_q[k] = JuMP.@constraint(model, eq == s_q[k])
     end
 
+    cons_pinj = Vector{JuMP.ConstraintRef}(undef, n_split)
+    cons_qinj = Vector{JuMP.ConstraintRef}(undef, n_split)
+    @inbounds for k in 1:n_split
+        epi = zero(JuMP.AffExpr)
+        _pinj_coupling_expr_ac!(epi, ws.zones, dy_all, ws.split_bus_pairs[k])
+        cons_pinj[k] = JuMP.@constraint(model, epi == s_pinj[k])
+
+        eqi = zero(JuMP.AffExpr)
+        _qinj_coupling_expr_ac!(eqi, ws.zones, dy_all, ws.split_bus_pairs[k])
+        cons_qinj[k] = JuMP.@constraint(model, eqi == s_qinj[k])
+    end
+
     JuMP.optimize!(model)
     _check_qp_status!(model, "ALADIN-hybrid/AC coordinator QP")
 
@@ -365,6 +418,8 @@ function solve_coordinator_qp!(ws::ACHybridWorkspaceALADIN)
     nu_vm = ws.vars.v_mag.nu
     nu_p = ws.vars.p_flow.nu
     nu_q = ws.vars.q_flow.nu
+    nu_pinj = ws.vars.p_inj.nu
+    nu_qinj = ws.vars.q_inj.nu
     @inbounds for k in 1:n_bus
         nu_theta[k] = -JuMP.dual(cons_theta[k])
         nu_vm[k] = -JuMP.dual(cons_vm[k])
@@ -372,6 +427,10 @@ function solve_coordinator_qp!(ws::ACHybridWorkspaceALADIN)
     @inbounds for k in 1:n_edge
         nu_p[k] = -JuMP.dual(cons_p[k])
         nu_q[k] = -JuMP.dual(cons_q[k])
+    end
+    @inbounds for k in 1:n_split
+        nu_pinj[k] = -JuMP.dual(cons_pinj[k])
+        nu_qinj[k] = -JuMP.dual(cons_qinj[k])
     end
     return nothing
 end

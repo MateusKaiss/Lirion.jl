@@ -128,6 +128,7 @@ include(joinpath(@__DIR__, "test_aladin_socwr.jl"))
     run_aladin_dc_state_tests(; rtol = 0.01)
     run_aladin_dc_power_tests(; rtol = 0.01)
     run_aladin_dc_hybrid_tests(; rtol = 0.01)
+    run_aladin_dc_splitbus_hybrid_tests(; rtol = 0.05)
 
     # Distributed ALADIN — AC
     run_aladin_ac_state_tests(;
@@ -145,6 +146,11 @@ include(joinpath(@__DIR__, "test_aladin_socwr.jl"))
         central_optimizer = Ipopt.Optimizer,
         distributed_optimizer = Ipopt.Optimizer,
     )
+    run_aladin_ac_splitbus_hybrid_tests(;
+        rtol = 0.05,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
 
     # Distributed ALADIN — SOCWR
     run_aladin_socwr_state_tests(;
@@ -159,6 +165,11 @@ include(joinpath(@__DIR__, "test_aladin_socwr.jl"))
     )
     run_aladin_socwr_hybrid_tests(;
         rtol = 0.01,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
+    )
+    run_aladin_socwr_splitbus_hybrid_tests(;
+        rtol = 0.05,
         central_optimizer = DEFAULT_SOCWR_SOLVER,
         distributed_optimizer = DEFAULT_SOCWR_SOLVER,
     )

@@ -92,7 +92,15 @@ function compute_residuals!(ws::DCHybridWorkspaceALADIN)
     end
     ws.r_primal_edge = sqrt(r_pri_edge_sq)
 
-    ws.r_primal = hypot(ws.r_primal_bus, ws.r_primal_edge)
+    # SplitBus p_inj consensus block: residual is p_inj_i + p_inj_j (target 0).
+    r_pri_split_sq = 0.0
+    @inbounds for pair in ws.split_bus_pairs
+        yi = ws.zones[pair.zone_i].y[pair.pinj_col_i]
+        yj = ws.zones[pair.zone_j].y[pair.pinj_col_j]
+        r_pri_split_sq += (yi + yj)^2
+    end
+
+    ws.r_primal = sqrt(r_pri_bus_sq + r_pri_edge_sq + r_pri_split_sq)
 
     # Progress block (shared across couplings: it is a single per-zone quantity)
     prog_sq = 0.0
@@ -110,6 +118,10 @@ function compute_residuals!(ws::DCHybridWorkspaceALADIN)
     end
     @inbounds for k in eachindex(ws.vars.p_flow.lambda)
         d = ws.vars.p_flow.lambda[k] - ws.vars.p_flow.lambda_prev[k]
+        lam_sq += d * d
+    end
+    @inbounds for k in eachindex(ws.vars.p_inj.lambda)
+        d = ws.vars.p_inj.lambda[k] - ws.vars.p_inj.lambda_prev[k]
         lam_sq += d * d
     end
     ws.lambda_step = sqrt(lam_sq)
@@ -198,6 +210,15 @@ function compute_residuals!(ws::ACHybridWorkspaceALADIN)
         qfj = _ac_qf_at(zj, pair.edge_local_j)
         r_pri_sq += (pfi - pfj)^2 + (qfi - qfj)^2
     end
+    @inbounds for pair in ws.split_bus_pairs
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        pi_val = zi.y[pair.pinj_col_i]
+        pj_val = zj.y[pair.pinj_col_j]
+        qi_val = zi.y[pair.qinj_col_i]
+        qj_val = zj.y[pair.qinj_col_j]
+        r_pri_sq += (pi_val + pj_val)^2 + (qi_val + qj_val)^2
+    end
     ws.r_primal = sqrt(r_pri_sq)
 
     prog_sq = 0.0
@@ -215,6 +236,11 @@ function compute_residuals!(ws::ACHybridWorkspaceALADIN)
     @inbounds for k in eachindex(ws.vars.p_flow.lambda)
         dp = ws.vars.p_flow.lambda[k] - ws.vars.p_flow.lambda_prev[k]
         dq = ws.vars.q_flow.lambda[k] - ws.vars.q_flow.lambda_prev[k]
+        lam_sq += dp * dp + dq * dq
+    end
+    @inbounds for k in eachindex(ws.vars.p_inj.lambda)
+        dp = ws.vars.p_inj.lambda[k] - ws.vars.p_inj.lambda_prev[k]
+        dq = ws.vars.q_inj.lambda[k] - ws.vars.q_inj.lambda_prev[k]
         lam_sq += dp * dp + dq * dq
     end
     ws.lambda_step = sqrt(lam_sq)
@@ -256,6 +282,20 @@ end
         qfi = _socwr_flow_value_at_y(zi, pair.edge_local_i, :q)
         qfj = _socwr_flow_value_at_y(zj, pair.edge_local_j, :q)
         s += (pfi - pfj)^2 + (qfi - qfj)^2
+    end
+    return s
+end
+
+@inline function _r_pri_split_pq_sq_socwr(ws)
+    s = 0.0
+    @inbounds for pair in ws.split_bus_pairs
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        pi_val = zi.y[pair.pinj_col_i]
+        pj_val = zj.y[pair.pinj_col_j]
+        qi_val = zi.y[pair.qinj_col_i]
+        qj_val = zj.y[pair.qinj_col_j]
+        s += (pi_val + pj_val)^2 + (qi_val + qj_val)^2
     end
     return s
 end
@@ -304,7 +344,8 @@ function compute_residuals!(ws::SOCWRHybridWorkspaceALADIN)
     ws.r_primal = sqrt(
         _r_pri_bus_sq_socwr(ws) +
         _r_pri_rt_sq_socwr(ws) +
-        _r_pri_pq_sq_socwr(ws),
+        _r_pri_pq_sq_socwr(ws) +
+        _r_pri_split_pq_sq_socwr(ws),
     )
     ws.r_progress = sqrt(_sum_progress_sq_socwr(ws))
 
@@ -319,6 +360,11 @@ function compute_residuals!(ws::SOCWRHybridWorkspaceALADIN)
         dp = ws.vars.p_flow.lambda[k] - ws.vars.p_flow.lambda_prev[k]
         dq = ws.vars.q_flow.lambda[k] - ws.vars.q_flow.lambda_prev[k]
         lam_sq += dr * dr + dt * dt + dp * dp + dq * dq
+    end
+    @inbounds for k in eachindex(ws.vars.p_inj.lambda)
+        dp = ws.vars.p_inj.lambda[k] - ws.vars.p_inj.lambda_prev[k]
+        dq = ws.vars.q_inj.lambda[k] - ws.vars.q_inj.lambda_prev[k]
+        lam_sq += dp * dp + dq * dq
     end
     ws.lambda_step = sqrt(lam_sq)
     return nothing

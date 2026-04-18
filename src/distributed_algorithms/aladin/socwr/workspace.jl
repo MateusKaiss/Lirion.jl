@@ -16,6 +16,21 @@ struct SharedEdgePairSOCWR
     edge_local_j::Int
 end
 
+# SplitBus (Method 3) pairs for SOCWR: sign-flipped p_inj / q_inj consensus
+# at each split bus. Both zones host p_inj and q_inj slack variables folded
+# into the AFFINE active/reactive balance; consensus target is p_A + p_B = 0
+# (and similarly for q).
+struct SplitBusPairSOCWR
+    consensus_idx::Int
+    bus_id::Int
+    zone_i::Int
+    pinj_col_i::Int
+    qinj_col_i::Int
+    zone_j::Int
+    pinj_col_j::Int
+    qinj_col_j::Int
+end
+
 Base.@kwdef mutable struct SOCWRStateWorkspaceALADIN <: AbstractALADINWorkspace
     partitions::Partitions{PartitionSOCWR}
     id::Vector{Int}
@@ -112,10 +127,19 @@ Base.@kwdef mutable struct SOCWRHybridWorkspaceALADIN <: AbstractALADINWorkspace
 
     bus_pairs::Vector{SharedBusPairSOCWR}
     edge_pairs::Vector{SharedEdgePairSOCWR}
+    # SplitBus (Method 3): sign-flipped p_inj / q_inj consensus per split bus.
+    split_bus_pairs::Vector{SplitBusPairSOCWR} = SplitBusPairSOCWR[]
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
+        Vector{Dict{Int, JuMP.VariableRef}}()
+    q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
+        Vector{Dict{Int, JuMP.VariableRef}}()
 
     vars::NamedTuple{
-        (:v2, :p_flow, :q_flow, :r, :t),
-        Tuple{LambdaState, LambdaState, LambdaState, LambdaState, LambdaState},
+        (:v2, :p_flow, :q_flow, :r, :t, :p_inj, :q_inj),
+        Tuple{
+            LambdaState, LambdaState, LambdaState, LambdaState, LambdaState,
+            LambdaState, LambdaState,
+        },
     }
 
     qp_optimizer::Any
@@ -201,6 +225,34 @@ function _build_shared_edge_pairs_socwr(
         zi, li = entries[1]
         zj, lj = entries[2]
         push!(pairs, SharedEdgePairSOCWR(cidx, e, zi, li, zj, lj))
+    end
+    return pairs
+end
+
+function _build_split_bus_pairs_socwr(
+    zones::Vector{AladinZoneDataSOCWR},
+    sys_bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+    q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+)::Vector{SplitBusPairSOCWR}
+    pairs = SplitBusPairSOCWR[]
+    isempty(sys_bus_pairs) && return pairs
+    sizehint!(pairs, length(sys_bus_pairs))
+
+    for (k, (bid, za, zb)) in enumerate(sys_bus_pairs)
+        vpa = get(p_inj_vars[za], bid, nothing)
+        vqa = get(q_inj_vars[za], bid, nothing)
+        vpb = get(p_inj_vars[zb], bid, nothing)
+        vqb = get(q_inj_vars[zb], bid, nothing)
+        (vpa === nothing || vqa === nothing ||
+         vpb === nothing || vqb === nothing) && continue
+        pcol_a = zones[za].var_to_col[vpa]
+        qcol_a = zones[za].var_to_col[vqa]
+        pcol_b = zones[zb].var_to_col[vpb]
+        qcol_b = zones[zb].var_to_col[vqb]
+        push!(pairs, SplitBusPairSOCWR(
+            k, bid, za, pcol_a, qcol_a, zb, pcol_b, qcol_b,
+        ))
     end
     return pairs
 end
@@ -307,15 +359,35 @@ function build_workspace(
     partitions = build_partitions(PartitionSOCWR, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
+    sys_bus_pairs = sys.bus_pairs
 
     build_local_model!(partitions, sys, Hybrid, optimizer_factory, inter)
+
+    # SplitBus: attach p_inj / q_inj slacks into the AFFINE active/reactive
+    # balance at each split bus (reuses the ADMM helper) before snapshotting
+    # the variable layout.
+    n_zones = length(partitions.parts)
+    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    if !isempty(sys_bus_pairs)
+        @inbounds for i in 1:n_zones
+            _attach_pq_inj_variables_socwr!(
+                partitions.parts[i], sys_bus_pairs,
+                p_inj_vars[i], q_inj_vars[i],
+            )
+        end
+    end
 
     zones = _build_zone_data_vector_socwr(partitions; include_edges = true)
     bus_pairs = _build_shared_bus_pairs_socwr(partitions, zones)
     edge_pairs = _build_shared_edge_pairs_socwr(partitions, inter)
+    split_pairs = _build_split_bus_pairs_socwr(
+        zones, sys_bus_pairs, p_inj_vars, q_inj_vars,
+    )
 
     n_bus = length(bus_pairs)
     n_edge = length(edge_pairs)
+    n_split = length(split_pairs)
 
     return SOCWRHybridWorkspaceALADIN(;
         partitions = partitions,
@@ -324,12 +396,17 @@ function build_workspace(
         zones = zones,
         bus_pairs = bus_pairs,
         edge_pairs = edge_pairs,
+        split_bus_pairs = split_pairs,
+        p_inj_vars = p_inj_vars,
+        q_inj_vars = q_inj_vars,
         vars = (
             v2 = LambdaState(n_bus),
             p_flow = LambdaState(n_edge),
             q_flow = LambdaState(n_edge),
             r = LambdaState(n_edge),
             t = LambdaState(n_edge),
+            p_inj = LambdaState(n_split),
+            q_inj = LambdaState(n_split),
         ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
         rho = Ref(cfg.rho),

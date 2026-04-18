@@ -22,6 +22,20 @@ struct SharedEdgePairAC
     edge_local_j::Int
 end
 
+# SplitBus (Method 3) pairs for AC: sign-flipped p_inj / q_inj consensus at
+# each split bus. Both zones host p_inj and q_inj slacks folded into the AC
+# active/reactive balance (via delete+rebuild since the balance is nonlinear).
+struct SplitBusPairAC
+    consensus_idx::Int
+    bus_id::Int
+    zone_i::Int
+    pinj_col_i::Int
+    qinj_col_i::Int
+    zone_j::Int
+    pinj_col_j::Int
+    qinj_col_j::Int
+end
+
 # ------------------------------------------------------------
 # STATE workspace
 # ------------------------------------------------------------
@@ -122,12 +136,20 @@ Base.@kwdef mutable struct ACHybridWorkspaceALADIN <: AbstractALADINWorkspace
 
     bus_pairs::Vector{SharedBusPairAC}
     edge_pairs::Vector{SharedEdgePairAC}
+    # SplitBus (Method 3): sign-flipped p_inj / q_inj consensus per split bus.
+    split_bus_pairs::Vector{SplitBusPairAC} = SplitBusPairAC[]
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
+        Vector{Dict{Int, JuMP.VariableRef}}()
+    q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
+        Vector{Dict{Int, JuMP.VariableRef}}()
 
-    # Duals: bus (θ, |V|) + branch (p, q). Legacy accessors
-    # `ws.vars.theta.lambda`, `ws.vars.v_mag.lambda`, `ws.vars.p_flow.lambda`, `ws.vars.q_flow.lambda`.
+    # Duals: bus (θ, |V|) + branch (p, q) + split bus (p_inj, q_inj).
     vars::NamedTuple{
-        (:theta, :v_mag, :p_flow, :q_flow),
-        Tuple{LambdaState, LambdaState, LambdaState, LambdaState},
+        (:theta, :v_mag, :p_flow, :q_flow, :p_inj, :q_inj),
+        Tuple{
+            LambdaState, LambdaState, LambdaState, LambdaState,
+            LambdaState, LambdaState,
+        },
     }
 
     qp_optimizer::Any
@@ -210,6 +232,34 @@ function _build_shared_edge_pairs_ac(
         zi, li = entries[1]
         zj, lj = entries[2]
         push!(pairs, SharedEdgePairAC(cidx, e, zi, li, zj, lj))
+    end
+    return pairs
+end
+
+function _build_split_bus_pairs_ac(
+    zones::Vector{AladinZoneDataAC},
+    sys_bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+    q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+)::Vector{SplitBusPairAC}
+    pairs = SplitBusPairAC[]
+    isempty(sys_bus_pairs) && return pairs
+    sizehint!(pairs, length(sys_bus_pairs))
+
+    for (k, (bid, za, zb)) in enumerate(sys_bus_pairs)
+        vpa = get(p_inj_vars[za], bid, nothing)
+        vqa = get(q_inj_vars[za], bid, nothing)
+        vpb = get(p_inj_vars[zb], bid, nothing)
+        vqb = get(q_inj_vars[zb], bid, nothing)
+        (vpa === nothing || vqa === nothing ||
+         vpb === nothing || vqb === nothing) && continue
+        pcol_a = zones[za].var_to_col[vpa]
+        qcol_a = zones[za].var_to_col[vqa]
+        pcol_b = zones[zb].var_to_col[vpb]
+        qcol_b = zones[zb].var_to_col[vqb]
+        push!(pairs, SplitBusPairAC(
+            k, bid, za, pcol_a, qcol_a, zb, pcol_b, qcol_b,
+        ))
     end
     return pairs
 end
@@ -305,14 +355,34 @@ function build_workspace(
     partitions = build_partitions(PartitionAC, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
+    sys_bus_pairs = sys.bus_pairs
 
     build_local_model!(partitions, sys, Hybrid, optimizer_factory, inter)
+
+    # SplitBus: rebuild AC balance at each split bus with p_inj / q_inj folded
+    # in (reuses the ADMM helper, which handles the nonlinear case via
+    # delete+rebuild of the balance constraint).
+    n_zones = length(partitions.parts)
+    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    if !isempty(sys_bus_pairs)
+        @inbounds for i in 1:n_zones
+            _attach_pq_inj_variables_ac!(
+                partitions.parts[i], sys.parts[i], sys_bus_pairs,
+                p_inj_vars[i], q_inj_vars[i],
+            )
+        end
+    end
 
     zones = _build_zone_data_vector_ac(partitions; include_edges = true)
     bus_pairs = _build_shared_bus_pairs_ac(partitions, zones)
     edge_pairs = _build_shared_edge_pairs_ac(partitions, inter)
+    split_pairs = _build_split_bus_pairs_ac(
+        zones, sys_bus_pairs, p_inj_vars, q_inj_vars,
+    )
     n_bus = length(bus_pairs)
     n_edge = length(edge_pairs)
+    n_split = length(split_pairs)
 
     return ACHybridWorkspaceALADIN(;
         partitions = partitions,
@@ -321,11 +391,16 @@ function build_workspace(
         zones = zones,
         bus_pairs = bus_pairs,
         edge_pairs = edge_pairs,
+        split_bus_pairs = split_pairs,
+        p_inj_vars = p_inj_vars,
+        q_inj_vars = q_inj_vars,
         vars = (
             theta = LambdaState(n_bus),
             v_mag = LambdaState(n_bus),
             p_flow = LambdaState(n_edge),
             q_flow = LambdaState(n_edge),
+            p_inj = LambdaState(n_split),
+            q_inj = LambdaState(n_split),
         ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
         rho = Ref(cfg.rho),

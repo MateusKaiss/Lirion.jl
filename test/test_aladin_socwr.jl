@@ -20,6 +20,12 @@ const ALADIN_SOCWR_HYBRID_CASES = [
     "pglib_opf_case3_lmbd__sad.m",
 ]
 
+const ALADIN_SOCWR_SPLITBUS_HYBRID_CASES = [
+    "pglib_opf_case3_lmbd.m",
+    "pglib_opf_case3_lmbd__api.m",
+    "pglib_opf_case3_lmbd__sad.m",
+]
+
 # ============================================================
 # OBJECTIVE EXTRACTORS
 # ============================================================
@@ -199,6 +205,66 @@ function run_aladin_socwr_hybrid_tests(;
         label = "ALADIN-SOCWR HYBRID",
         test_dir = test_dir,
         case_list = ALADIN_SOCWR_HYBRID_CASES,
+        model = Lirion.socwr(),
+        central_optimizer = central_optimizer,
+        distributed_optimizer = distributed_optimizer,
+        objective_central = aladin_central_obj_socwr,
+        objective_dist = aladin_dist_obj_socwr,
+        make_algorithm = make_alg,
+        defaults = defaults,
+        overrides = overrides,
+        rtol = rtol,
+        atol = atol,
+    )
+end
+
+# ============================================================
+# ALADIN SOCWR - SPLIT-BUS HYBRID (Method 3 — Harris et al. 2022, Fig. 1c)
+# ============================================================
+function run_aladin_socwr_splitbus_hybrid_tests(;
+    rtol = 0.05,
+    atol = 1e-6,
+    central_optimizer = nothing,
+    distributed_optimizer = nothing,
+)
+    test_dir = joinpath(@__DIR__, "distributed")
+
+    make_alg(p) = Lirion.aladin(;
+        coupling = :hybrid,
+        sectioning = Lirion.SplitBus(),
+        max_iter = p.max_iter,
+        rho = p.rho,
+        mu = p.mu,
+        alpha1 = p.alpha1,
+        alpha2 = p.alpha2,
+        alpha3 = p.alpha3,
+        rho_growth = p.rho_growth,
+        mu_growth = p.mu_growth,
+        adaptive = p.adaptive,
+        eps_abs = p.eps_abs,
+        eps_rel = p.eps_rel,
+    )
+
+    defaults(_) = (
+        max_iter = 500,
+        rho = 1e4,
+        mu = 1e4,
+        alpha1 = 1.0,
+        alpha2 = 1.0,
+        alpha3 = 1.0,
+        rho_growth = 1.0,
+        mu_growth = 1.0,
+        adaptive = false,
+        eps_abs = 1e-4,
+        eps_rel = 1e-4,
+    )
+
+    overrides(_case_name) = NamedTuple()
+
+    return run_case_suite(;
+        label = "ALADIN-SOCWR SPLITBUS-HYBRID",
+        test_dir = test_dir,
+        case_list = ALADIN_SOCWR_SPLITBUS_HYBRID_CASES,
         model = Lirion.socwr(),
         central_optimizer = central_optimizer,
         distributed_optimizer = distributed_optimizer,

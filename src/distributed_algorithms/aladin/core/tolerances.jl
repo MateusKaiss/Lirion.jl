@@ -115,7 +115,21 @@ function compute_tolerances!(
         sqrt(max(n_edge, 1)) * eps_abs +
         eps_rel * max(sqrt(norm_i_edge), sqrt(norm_j_edge))
 
-    ws.eps_primal = hypot(eps_pri_bus, eps_pri_edge)
+    # SplitBus block: norm on p_inj values (sign-flipped consensus)
+    n_split = length(ws.split_bus_pairs)
+    norm_i_split = 0.0
+    norm_j_split = 0.0
+    @inbounds for pair in ws.split_bus_pairs
+        yi = ws.zones[pair.zone_i].y[pair.pinj_col_i]
+        yj = ws.zones[pair.zone_j].y[pair.pinj_col_j]
+        norm_i_split += yi * yi
+        norm_j_split += yj * yj
+    end
+    eps_pri_split =
+        sqrt(max(n_split, 1)) * eps_abs +
+        eps_rel * max(sqrt(norm_i_split), sqrt(norm_j_split))
+
+    ws.eps_primal = sqrt(eps_pri_bus^2 + eps_pri_edge^2 + eps_pri_split^2)
     ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
     return nothing
 end
@@ -179,7 +193,8 @@ function compute_tolerances!(
     eps_abs::Float64,
     eps_rel::Float64,
 )
-    n = 2 * length(ws.bus_pairs) + 2 * length(ws.edge_pairs)
+    n = 2 * length(ws.bus_pairs) + 2 * length(ws.edge_pairs) +
+        2 * length(ws.split_bus_pairs)
     norm_i = 0.0
     norm_j = 0.0
     @inbounds for pair in ws.bus_pairs
@@ -201,6 +216,16 @@ function compute_tolerances!(
         qfj = _ac_qf_at(zj, pair.edge_local_j)
         norm_i += pfi * pfi + qfi * qfi
         norm_j += pfj * pfj + qfj * qfj
+    end
+    @inbounds for pair in ws.split_bus_pairs
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        pi_val = zi.y[pair.pinj_col_i]
+        pj_val = zj.y[pair.pinj_col_j]
+        qi_val = zi.y[pair.qinj_col_i]
+        qj_val = zj.y[pair.qinj_col_j]
+        norm_i += pi_val * pi_val + qi_val * qi_val
+        norm_j += pj_val * pj_val + qj_val * qj_val
     end
     ws.eps_primal =
         sqrt(max(n, 1)) * eps_abs +
@@ -239,6 +264,22 @@ end
         tj = zj.y[zj.edge_t_cols[pair.edge_local_j]]
         ni += ri * ri + ti * ti
         nj += rj * rj + tj * tj
+    end
+    return ni, nj
+end
+
+@inline function _norms_split_pq_socwr(ws)
+    ni = 0.0
+    nj = 0.0
+    @inbounds for pair in ws.split_bus_pairs
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        pi_val = zi.y[pair.pinj_col_i]
+        pj_val = zj.y[pair.pinj_col_j]
+        qi_val = zi.y[pair.qinj_col_i]
+        qj_val = zj.y[pair.qinj_col_j]
+        ni += pi_val * pi_val + qi_val * qi_val
+        nj += pj_val * pj_val + qj_val * qj_val
     end
     return ni, nj
 end
@@ -295,12 +336,14 @@ function compute_tolerances!(
     eps_abs::Float64,
     eps_rel::Float64,
 )
-    n = length(ws.bus_pairs) + 4 * length(ws.edge_pairs)
+    n = length(ws.bus_pairs) + 4 * length(ws.edge_pairs) +
+        2 * length(ws.split_bus_pairs)
     ni_b, nj_b = _norms_bus_v2_socwr(ws)
     ni_rt, nj_rt = _norms_edge_rt_socwr(ws)
     ni_pq, nj_pq = _norms_edge_pq_socwr(ws)
-    ni = ni_b + ni_rt + ni_pq
-    nj = nj_b + nj_rt + nj_pq
+    ni_sp, nj_sp = _norms_split_pq_socwr(ws)
+    ni = ni_b + ni_rt + ni_pq + ni_sp
+    nj = nj_b + nj_rt + nj_pq + nj_sp
     ws.eps_primal =
         sqrt(max(n, 1)) * eps_abs +
         eps_rel * max(sqrt(ni), sqrt(nj))

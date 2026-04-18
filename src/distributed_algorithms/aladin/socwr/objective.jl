@@ -191,6 +191,29 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRPowerWorkspaceALADIN)
     return nothing
 end
 
+@inline function _lambda_split_bus_socwr!(
+    lin::JuMP.AffExpr,
+    ws::SOCWRHybridWorkspaceALADIN,
+    zone_pos::Int,
+)
+    zdata = ws.zones[zone_pos]
+    @inbounds for (k, pair) in enumerate(ws.split_bus_pairs)
+        if pair.zone_i == zone_pos
+            pcol = pair.pinj_col_i
+            qcol = pair.qinj_col_i
+        elseif pair.zone_j == zone_pos
+            pcol = pair.pinj_col_j
+            qcol = pair.qinj_col_j
+        else
+            continue
+        end
+        # Sign-flipped consensus: both zones contribute +λ (no sign switch).
+        JuMP.add_to_expression!(lin, ws.vars.p_inj.lambda[k], zdata.all_vars[pcol])
+        JuMP.add_to_expression!(lin, ws.vars.q_inj.lambda[k], zdata.all_vars[qcol])
+    end
+    return lin
+end
+
 function update_objective!(part::PartitionSOCWR, ws::SOCWRHybridWorkspaceALADIN)
     zone_pos = part.position
     zdata = ws.zones[zone_pos]
@@ -199,6 +222,7 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRHybridWorkspaceALADIN)
     _lambda_bus_v2_socwr!(lin, ws, zone_pos)
     _lambda_edge_rt_socwr!(lin, ws, zone_pos)
     _lambda_edge_pq_socwr!(lin, ws, zone_pos)
+    _lambda_split_bus_socwr!(lin, ws, zone_pos)
 
     quad = _socwr_prox_quad(zdata, ws)
 

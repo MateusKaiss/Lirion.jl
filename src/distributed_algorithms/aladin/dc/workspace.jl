@@ -16,6 +16,17 @@ struct SharedEdgePair
     edge_local_j::Int
 end
 
+# SplitBus (Method 3) sign-flipped p_inj consensus: for each split bus, both
+# zones hold a `p_inj` slack variable and enforce p_inj_A + p_inj_B = 0.
+struct SplitBusPair
+    consensus_idx::Int
+    bus_id::Int
+    zone_i::Int
+    pinj_col_i::Int
+    zone_j::Int
+    pinj_col_j::Int
+end
+
 # ------------------------------------------------------------
 # DC State workspace
 # ------------------------------------------------------------
@@ -115,15 +126,20 @@ Base.@kwdef mutable struct DCHybridWorkspaceALADIN <: AbstractALADINWorkspace
     zones::Vector{AladinZoneData}
     bus_pairs::Vector{SharedBusPair}
     edge_pairs::Vector{SharedEdgePair}
+    # SplitBus (Method 3): sign-flipped p_inj consensus per split bus.
+    split_bus_pairs::Vector{SplitBusPair} = SplitBusPair[]
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
+        Vector{Dict{Int, JuMP.VariableRef}}()
 
-    # Duals: DC Hybrid couples both bus θ and branch p_flow. Legacy
-    # aliases `lambda_bus` → vars.theta, `lambda_edge` → vars.p_flow.
-    vars::NamedTuple{(:theta, :p_flow), Tuple{LambdaState, LambdaState}}
+    # Duals: DC Hybrid couples bus θ, branch p_flow, and (SplitBus) p_inj.
+    vars::NamedTuple{(:theta, :p_flow, :p_inj),
+        Tuple{LambdaState, LambdaState, LambdaState}}
 
     qp_optimizer::Any
 
     rho_bus::Base.RefValue{Float64}
     rho_edge::Base.RefValue{Float64}
+    rho_inj::Base.RefValue{Float64}
     mu::Base.RefValue{Float64}
 
     alpha1::Float64 = 1.0
@@ -156,8 +172,11 @@ end
 
 _get_rhos(ws::DCStateWorkspaceALADIN) = (rho = ws.rho[],)
 _get_rhos(ws::DCPowerWorkspaceALADIN) = (rho = ws.rho[],)
-_get_rhos(ws::DCHybridWorkspaceALADIN) =
-    (rho_bus = ws.rho_bus[], rho_edge = ws.rho_edge[])
+_get_rhos(ws::DCHybridWorkspaceALADIN) = (
+    rho_bus = ws.rho_bus[],
+    rho_edge = ws.rho_edge[],
+    rho_inj = ws.rho_inj[],
+)
 
 function _build_shared_bus_pairs(
     partitions::Partitions{PartitionDC},
@@ -207,6 +226,27 @@ function _build_shared_edge_pairs(
         zi, li = entries[1]
         zj, lj = entries[2]
         push!(pairs, SharedEdgePair(cidx, e, zi, li, zj, lj))
+    end
+    return pairs
+end
+
+function _build_split_bus_pairs(
+    partitions::Partitions{PartitionDC},
+    zones::Vector{AladinZoneData},
+    sys_bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+)::Vector{SplitBusPair}
+    pairs = SplitBusPair[]
+    isempty(sys_bus_pairs) && return pairs
+    sizehint!(pairs, length(sys_bus_pairs))
+
+    for (k, (bid, za, zb)) in enumerate(sys_bus_pairs)
+        v_a = get(p_inj_vars[za], bid, nothing)
+        v_b = get(p_inj_vars[zb], bid, nothing)
+        (v_a === nothing || v_b === nothing) && continue
+        col_a = zones[za].var_to_col[v_a]
+        col_b = zones[zb].var_to_col[v_b]
+        push!(pairs, SplitBusPair(k, bid, za, col_a, zb, col_b))
     end
     return pairs
 end
@@ -302,14 +342,28 @@ function build_workspace(
     partitions = build_partitions(PartitionDC, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
+    sys_bus_pairs = sys.bus_pairs
 
     build_local_model!(partitions, sys, Hybrid, optimizer_factory, inter)
+
+    # SplitBus: attach p_inj variables and wire them into active power balance
+    # before we snapshot the variable layout. Reuses ADMM's helper — the
+    # partition object is identical.
+    n_zones = length(partitions.parts)
+    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    if !isempty(sys_bus_pairs)
+        @inbounds for i in 1:n_zones
+            _attach_p_inj_variables!(partitions.parts[i], sys_bus_pairs, p_inj_vars[i])
+        end
+    end
 
     zones = _build_zone_data_vector(partitions; include_edges = true)
     bus_pairs = _build_shared_bus_pairs(partitions, zones)
     edge_pairs = _build_shared_edge_pairs(partitions, inter)
+    split_pairs = _build_split_bus_pairs(partitions, zones, sys_bus_pairs, p_inj_vars)
     n_bus = length(bus_pairs)
     n_edge = length(edge_pairs)
+    n_split = length(split_pairs)
 
     return DCHybridWorkspaceALADIN(;
         partitions = partitions,
@@ -318,13 +372,17 @@ function build_workspace(
         zones = zones,
         bus_pairs = bus_pairs,
         edge_pairs = edge_pairs,
+        split_bus_pairs = split_pairs,
+        p_inj_vars = p_inj_vars,
         vars = (
             theta = LambdaState(n_bus),
             p_flow = LambdaState(n_edge),
+            p_inj = LambdaState(n_split),
         ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
         rho_bus = Ref(cfg.rho),
         rho_edge = Ref(cfg.rho),
+        rho_inj = Ref(cfg.rho),
         mu = Ref(cfg.mu),
         alpha1 = cfg.alpha1,
         alpha2 = cfg.alpha2,
