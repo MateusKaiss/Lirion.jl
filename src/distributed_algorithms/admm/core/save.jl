@@ -44,6 +44,10 @@ function save_prev!(ws::ACHybridWorkspace)
     copyto!(ws.vars.v_mag.consensus_prev, ws.vars.v_mag.consensus)
     copyto!(ws.vars.p_flow.consensus_prev, ws.vars.p_flow.consensus)
     copyto!(ws.vars.q_flow.consensus_prev, ws.vars.q_flow.consensus)
+    if !isempty(ws.bus_pairs)
+        copyto!(ws.vars.p_inj.consensus_prev, ws.vars.p_inj.consensus)
+        copyto!(ws.vars.q_inj.consensus_prev, ws.vars.q_inj.consensus)
+    end
     return nothing
 end
 

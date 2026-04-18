@@ -319,6 +319,18 @@ function dual_update!(ws::ACHybridWorkspace)
         ws.vars.q_flow.rho[],
         ws.interzonal,
     )
+    if !isempty(ws.bus_pairs)
+        _update_bus_pairs_duals_signed!(
+            ws.vars.p_inj.duals, ws.partitions,
+            ws.vars.p_inj.consensus, ws.vars.p_inj.rho[],
+            ws.bus_pairs, ws.p_inj_vars,
+        )
+        _update_bus_pairs_duals_signed!(
+            ws.vars.q_inj.duals, ws.partitions,
+            ws.vars.q_inj.consensus, ws.vars.q_inj.rho[],
+            ws.bus_pairs, ws.q_inj_vars,
+        )
+    end
     return nothing
 end
 

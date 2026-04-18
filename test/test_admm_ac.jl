@@ -43,6 +43,14 @@ const AC_HYBRID_CASES = [
     # "pglib_opf_case500_goc.m",
 ]
 
+# ------------------------
+# AC - SPLIT-BUS HYBRID
+# ------------------------
+const AC_SPLITBUS_HYBRID_CASES = [
+    "pglib_opf_case3_lmbd.m",
+    "pglib_opf_case3_lmbd__sad.m",
+]
+
 # ============================================================
 # OBJECTIVE EXTRACTORS
 # ============================================================
@@ -239,6 +247,60 @@ function run_admm_ac_hybrid_tests(;
         label = "ADMM-AC HYBRID",
         test_dir = test_dir,
         case_list = AC_HYBRID_CASES,
+        model = Lirion.ac(),
+        central_optimizer = central_optimizer,
+        distributed_optimizer = distributed_optimizer,
+        objective_central = central_obj_ac,
+        objective_dist = dist_obj_ac,
+        make_algorithm = make_alg,
+        defaults = defaults,
+        overrides = _ -> NamedTuple(),
+        rtol = rtol,
+        atol = atol,
+    )
+end
+
+# ============================================================
+# AC - SPLIT-BUS HYBRID (Method 3 — Harris et al. 2022, Fig. 1c)
+# ============================================================
+function run_admm_ac_splitbus_hybrid_tests(;
+    rtol = 0.05,
+    atol = 1e-6,
+    central_optimizer = nothing,
+    distributed_optimizer = nothing,
+)
+    test_dir = joinpath(@__DIR__, "distributed")
+
+    make_alg(p) = Lirion.admm(;
+        coupling = :hybrid,
+        sectioning = Lirion.SplitBus(),
+        max_iter = p.max_iter,
+        rho = p.rho,
+        eps_abs = p.eps_abs,
+        eps_rel = p.eps_rel,
+        adaptive_rho = p.adaptive,
+        mu_incr = p.mu_incr,
+        mu_decr = p.mu_decr,
+        tau_incr = p.tau_incr,
+        tau_decr = p.tau_decr,
+    )
+
+    defaults(_) = (
+        max_iter = 10000,
+        rho = 1000.0,
+        eps_abs = 1e-4,
+        eps_rel = 1e-4,
+        adaptive = true,
+        mu_incr = 3.0,
+        mu_decr = 3.0,
+        tau_incr = 1.05,
+        tau_decr = 0.98,
+    )
+
+    return run_case_suite(;
+        label = "ADMM-AC SPLITBUS-HYBRID",
+        test_dir = test_dir,
+        case_list = AC_SPLITBUS_HYBRID_CASES,
         model = Lirion.ac(),
         central_optimizer = central_optimizer,
         distributed_optimizer = distributed_optimizer,

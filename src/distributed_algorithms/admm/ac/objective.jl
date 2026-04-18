@@ -158,10 +158,72 @@ function update_objective!(part::PartitionAC, ws::ACHybridWorkspace)
         ws.vars.q_flow.rho[],
     )
 
-    @objective(
-        part.model,
-        Min,
-        part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
-        lin_bus + lin_branch,
+    # Fast path: pure TieLine (no split buses anywhere). Skip p_inj/q_inj
+    # machinery entirely so TieLine AC hybrid pays no extra per-iter cost.
+    if isempty(ws.bus_pairs)
+        @objective(
+            part.model, Min,
+            part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
+            lin_bus + lin_branch,
+        )
+        return nothing
+    end
+
+    lin_p_inj = build_linear_inj_term_ac(
+        part,
+        ws.bus_pairs,
+        ws.p_inj_vars,
+        ws.vars.p_inj.consensus,
+        view(ws.vars.p_inj.duals, :, part.position),
+        ws.vars.p_inj.rho[],
     )
+    lin_q_inj = build_linear_inj_term_ac(
+        part,
+        ws.bus_pairs,
+        ws.q_inj_vars,
+        ws.vars.q_inj.consensus,
+        view(ws.vars.q_inj.duals, :, part.position),
+        ws.vars.q_inj.rho[],
+    )
+
+    @objective(
+        part.model, Min,
+        part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
+        part.quad_p_inj_expr + part.quad_q_inj_expr +
+        lin_bus + lin_branch + lin_p_inj + lin_q_inj,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Signed linear term for a generic virtual injection (p_inj or q_inj).
+# Zone A: (λ_A - ρz) * v;  Zone B: (λ_B + ρz) * v   (target -z).
+# ------------------------------------------------------------
+function build_linear_inj_term_ac(
+    part::PartitionAC,
+    bus_pairs::Vector{NTuple{3, Int}},
+    inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+    consensus::Vector{Float64},
+    duals::AbstractVector{Float64},
+    rho::Float64,
+)::JuMP.AffExpr
+    lin = zero(JuMP.AffExpr)
+    isempty(bus_pairs) && return lin
+    pos = part.position
+    store = inj_vars[pos]
+    isempty(store) && return lin
+    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
+        z = consensus[k]
+        lam = duals[k]
+        if za == pos
+            v = get(store, bid, nothing)
+            v === nothing && continue
+            lin += (lam - rho * z) * v
+        elseif zb == pos
+            v = get(store, bid, nothing)
+            v === nothing && continue
+            lin += (lam + rho * z) * v
+        end
+    end
+    return lin
 end

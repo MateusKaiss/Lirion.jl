@@ -268,6 +268,22 @@ function refresh_rho!(ws::ACHybridWorkspace)
         ws.vars.p_flow.rho, ws.vars.p_flow.prev_rho,
         ws.vars.q_flow.rho, ws.vars.q_flow.prev_rho,
     )
+    if !isempty(ws.bus_pairs)
+        rho_pi = ws.vars.p_inj.rho[]
+        if rho_pi != ws.vars.p_inj.prev_rho[]
+            @inbounds for (i, part) in enumerate(ws.partitions.parts)
+                build_quad_p_inj_expr_ac!(part, rho_pi, ws.p_inj_vars[i])
+            end
+            ws.vars.p_inj.prev_rho[] = rho_pi
+        end
+        rho_qi = ws.vars.q_inj.rho[]
+        if rho_qi != ws.vars.q_inj.prev_rho[]
+            @inbounds for (i, part) in enumerate(ws.partitions.parts)
+                build_quad_q_inj_expr_ac!(part, rho_qi, ws.q_inj_vars[i])
+            end
+            ws.vars.q_inj.prev_rho[] = rho_qi
+        end
+    end
     return nothing
 end
 
@@ -355,6 +371,10 @@ function rho_update!(ws::ACHybridWorkspace, params::ADMMParams)
     _adapt!(ws.vars.v_mag.rho, ws.r_primal_v_mag, ws.r_dual_v_mag, params)
     _adapt!(ws.vars.p_flow.rho, ws.r_primal_p, ws.r_dual_p, params)
     _adapt!(ws.vars.q_flow.rho, ws.r_primal_q, ws.r_dual_q, params)
+    if !isempty(ws.bus_pairs)
+        _adapt!(ws.vars.p_inj.rho, ws.r_primal_p_inj, ws.r_dual_p_inj, params)
+        _adapt!(ws.vars.q_inj.rho, ws.r_primal_q_inj, ws.r_dual_q_inj, params)
+    end
     return nothing
 end
 

@@ -74,6 +74,9 @@ Base.@kwdef mutable struct PartitionAC <: AbstractPartition
         nothing
     quad_bus_expr::Union{Nothing, JuMP.QuadExpr, JuMP.NonlinearExpr} = nothing
     quad_branch_expr::Union{Nothing, JuMP.QuadExpr, JuMP.NonlinearExpr} = nothing
+    # Populated by SplitBus (Method 3) only; zero otherwise.
+    quad_p_inj_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
+    quad_q_inj_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
 
     objective_params::ObjectiveData
     has_solution::Bool = false

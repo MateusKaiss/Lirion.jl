@@ -416,40 +416,60 @@ function compute_tolerances!(ws::ACPowerWorkspace, eps_abs::Float64, eps_rel::Fl
 end
 
 function compute_tolerances!(ws::ACHybridWorkspace, eps_abs::Float64, eps_rel::Float64)
-    eps_r = hypot(
-        _eps_primal_bus(
-            ws.partitions,
-            (ws.vars.theta.consensus, ws.vars.v_mag.consensus),
-            (snapshot_theta!, snapshot_v_mag!),
-            eps_abs,
-            eps_rel,
-        ),
-        _eps_primal_branch(
-            ws.partitions,
-            (ws.vars.p_flow.consensus, ws.vars.q_flow.consensus),
-            (:p_flow_branches, :q_flow_branches),
-            ws.interzonal,
-            eps_abs,
-            eps_rel,
-        ),
+    eps_r_bus = _eps_primal_bus(
+        ws.partitions,
+        (ws.vars.theta.consensus, ws.vars.v_mag.consensus),
+        (snapshot_theta!, snapshot_v_mag!),
+        eps_abs,
+        eps_rel,
     )
-    eps_s = hypot(
-        _eps_dual_bus(
-            (ws.vars.theta.duals, ws.vars.v_mag.duals),
-            ws.partitions,
-            eps_abs,
-            eps_rel,
-        ),
-        _eps_dual_branch(
-            (ws.vars.p_flow.duals, ws.vars.q_flow.duals),
-            ws.partitions,
-            ws.interzonal,
-            eps_abs,
-            eps_rel,
-        ),
+    eps_r_branch = _eps_primal_branch(
+        ws.partitions,
+        (ws.vars.p_flow.consensus, ws.vars.q_flow.consensus),
+        (:p_flow_branches, :q_flow_branches),
+        ws.interzonal,
+        eps_abs,
+        eps_rel,
     )
-    ws.eps_primal = eps_r
-    ws.eps_dual = eps_s
+    eps_s_bus = _eps_dual_bus(
+        (ws.vars.theta.duals, ws.vars.v_mag.duals),
+        ws.partitions,
+        eps_abs,
+        eps_rel,
+    )
+    eps_s_branch = _eps_dual_branch(
+        (ws.vars.p_flow.duals, ws.vars.q_flow.duals),
+        ws.partitions,
+        ws.interzonal,
+        eps_abs,
+        eps_rel,
+    )
+
+    if !isempty(ws.bus_pairs)
+        eps_r_p_inj = _eps_primal_bus_pairs_signed(
+            ws.partitions, ws.vars.p_inj.consensus, ws.bus_pairs,
+            ws.p_inj_vars, eps_abs, eps_rel,
+        )
+        eps_s_p_inj = _eps_dual_bus_pairs_signed(
+            ws.vars.p_inj.duals, ws.bus_pairs, eps_abs, eps_rel,
+        )
+        eps_r_q_inj = _eps_primal_bus_pairs_signed(
+            ws.partitions, ws.vars.q_inj.consensus, ws.bus_pairs,
+            ws.q_inj_vars, eps_abs, eps_rel,
+        )
+        eps_s_q_inj = _eps_dual_bus_pairs_signed(
+            ws.vars.q_inj.duals, ws.bus_pairs, eps_abs, eps_rel,
+        )
+        ws.eps_primal = sqrt(
+            eps_r_bus^2 + eps_r_branch^2 + eps_r_p_inj^2 + eps_r_q_inj^2,
+        )
+        ws.eps_dual = sqrt(
+            eps_s_bus^2 + eps_s_branch^2 + eps_s_p_inj^2 + eps_s_q_inj^2,
+        )
+    else
+        ws.eps_primal = hypot(eps_r_bus, eps_r_branch)
+        ws.eps_dual = hypot(eps_s_bus, eps_s_branch)
+    end
     return nothing
 end
 
