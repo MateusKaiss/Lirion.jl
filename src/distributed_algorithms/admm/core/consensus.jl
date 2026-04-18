@@ -220,15 +220,27 @@ function _consensus_branch_pairs_ac!(
             p_expr, q_expr = _pq_flow_from_exprs(pa, la)
             p_val = JuMP.value(p_expr)
             q_val = JuMP.value(q_expr)
-            if isfinite(p_val); p_sum += p_val; p_n += 1; end
-            if isfinite(q_val); q_sum += q_val; q_n += 1; end
+            if isfinite(p_val)
+                p_sum += p_val
+                p_n += 1
+            end
+            if isfinite(q_val)
+                q_sum += q_val
+                q_n += 1
+            end
         end
         if lb != 0
             p_expr, q_expr = _pq_flow_from_exprs(pb, lb)
             p_val = JuMP.value(p_expr)
             q_val = JuMP.value(q_expr)
-            if isfinite(p_val); p_sum += p_val; p_n += 1; end
-            if isfinite(q_val); q_sum += q_val; q_n += 1; end
+            if isfinite(p_val)
+                p_sum += p_val
+                p_n += 1
+            end
+            if isfinite(q_val)
+                q_sum += q_val
+                q_n += 1
+            end
         end
         p_consensus[k] = p_n > 0 ? p_sum / p_n : 0.0
         q_consensus[k] = q_n > 0 ? q_sum / q_n : 0.0

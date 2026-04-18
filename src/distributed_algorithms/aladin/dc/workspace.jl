@@ -284,10 +284,13 @@ function _build_dummy_branch_pairs_dc(
         b_i = pa.branch.b[la]
         b_j = pb.branch.b[lb]
 
-        push!(pairs, DummyBranchPairDC(
-            k, za, from_col_i, to_col_i, b_i,
-            zb, from_col_j, to_col_j, b_j,
-        ))
+        push!(
+            pairs,
+            DummyBranchPairDC(
+                k, za, from_col_i, to_col_i, b_i,
+                zb, from_col_j, to_col_j, b_j,
+            ),
+        )
     end
     return pairs
 end

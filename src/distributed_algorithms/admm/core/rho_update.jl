@@ -447,4 +447,3 @@ function rho_update!(ws::SOCWRHybridWorkspace, params::ADMMParams)
     end
     return nothing
 end
-

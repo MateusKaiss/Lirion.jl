@@ -210,9 +210,9 @@ function init_hybrid_partition!(
     branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
     bus_pairs::Vector{NTuple{3, Int}} = NTuple{3, Int}[],
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
-        Dict{Int, JuMP.VariableRef}[],
+    Dict{Int, JuMP.VariableRef}[],
     q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
-        Dict{Int, JuMP.VariableRef}[],
+    Dict{Int, JuMP.VariableRef}[],
 )
     n = length(partitions.parts)
     @assert length(sys.parts) == n

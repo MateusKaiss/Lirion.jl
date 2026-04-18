@@ -403,7 +403,7 @@ function compute_tolerances!(ws::ACPowerWorkspace, eps_abs::Float64, eps_rel::Fl
         _eps_primal_branch(
             ws.partitions,
             (view(ws.vars.p_flow.consensus, 1:n_inter),
-             view(ws.vars.q_flow.consensus, 1:n_inter)),
+                view(ws.vars.q_flow.consensus, 1:n_inter)),
             (:p_flow_branches, :q_flow_branches),
             ws.interzonal,
             eps_abs,
@@ -413,7 +413,7 @@ function compute_tolerances!(ws::ACPowerWorkspace, eps_abs::Float64, eps_rel::Fl
         n_inter > 0 ?
         _eps_dual_branch(
             (view(ws.vars.p_flow.duals, 1:n_inter, :),
-             view(ws.vars.q_flow.duals, 1:n_inter, :)),
+                view(ws.vars.q_flow.duals, 1:n_inter, :)),
             ws.partitions,
             ws.interzonal,
             eps_abs,
@@ -485,7 +485,7 @@ function compute_tolerances!(ws::ACHybridWorkspace, eps_abs::Float64, eps_rel::F
         _eps_primal_branch(
             ws.partitions,
             (view(ws.vars.p_flow.consensus, 1:n_inter),
-             view(ws.vars.q_flow.consensus, 1:n_inter)),
+                view(ws.vars.q_flow.consensus, 1:n_inter)),
             (:p_flow_branches, :q_flow_branches),
             ws.interzonal,
             eps_abs,
@@ -495,7 +495,7 @@ function compute_tolerances!(ws::ACHybridWorkspace, eps_abs::Float64, eps_rel::F
         n_inter > 0 ?
         _eps_dual_branch(
             (view(ws.vars.p_flow.duals, 1:n_inter, :),
-             view(ws.vars.q_flow.duals, 1:n_inter, :)),
+                view(ws.vars.q_flow.duals, 1:n_inter, :)),
             ws.partitions,
             ws.interzonal,
             eps_abs,
@@ -623,7 +623,7 @@ function compute_tolerances!(ws::SOCWRPowerWorkspace, eps_abs::Float64, eps_rel:
         _eps_primal_branch(
             ws.partitions,
             (view(ws.vars.p_flow.consensus, 1:n_inter),
-             view(ws.vars.q_flow.consensus, 1:n_inter)),
+                view(ws.vars.q_flow.consensus, 1:n_inter)),
             (:p_flow_branches, :q_flow_branches),
             ws.interzonal,
             eps_abs,
@@ -633,7 +633,7 @@ function compute_tolerances!(ws::SOCWRPowerWorkspace, eps_abs::Float64, eps_rel:
         n_inter > 0 ?
         _eps_dual_branch(
             (view(ws.vars.p_flow.duals, 1:n_inter, :),
-             view(ws.vars.q_flow.duals, 1:n_inter, :)),
+                view(ws.vars.q_flow.duals, 1:n_inter, :)),
             ws.partitions,
             ws.interzonal,
             eps_abs,
@@ -706,7 +706,7 @@ function compute_tolerances!(ws::SOCWRHybridWorkspace, eps_abs::Float64, eps_rel
         _eps_primal_branch(
             ws.partitions,
             (view(ws.vars.p_flow.consensus, 1:n_inter),
-             view(ws.vars.q_flow.consensus, 1:n_inter)),
+                view(ws.vars.q_flow.consensus, 1:n_inter)),
             (:p_flow_branches, :q_flow_branches),
             ws.interzonal,
             eps_abs,
@@ -716,7 +716,7 @@ function compute_tolerances!(ws::SOCWRHybridWorkspace, eps_abs::Float64, eps_rel
         n_inter > 0 ?
         _eps_dual_branch(
             (view(ws.vars.p_flow.duals, 1:n_inter, :),
-             view(ws.vars.q_flow.duals, 1:n_inter, :)),
+                view(ws.vars.q_flow.duals, 1:n_inter, :)),
             ws.partitions,
             ws.interzonal,
             eps_abs,
