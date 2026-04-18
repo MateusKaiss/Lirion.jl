@@ -10,6 +10,17 @@ function create_partition(::CaseRaw; kwargs...)
     return _metis_not_loaded_error()
 end
 
+# SplitBus-compatible partition: guarantees that every boundary bus has tie-lines
+# to at most ONE neighbor zone, which is the requirement for `Lirion.SplitBus()`
+# sectioning (Method 3 — Harris et al. 2022, Fig. 1c).
+function create_partition_split_bus(::AbstractString; kwargs...)
+    return _metis_not_loaded_error()
+end
+
+function create_partition_split_bus(::CaseRaw; kwargs...)
+    return _metis_not_loaded_error()
+end
+
 function _metis_not_loaded_error()
     return error(
         "create_partition requires Metis.jl, Graphs.jl and SimpleWeightedGraphs.jl.\n" *
@@ -66,7 +77,7 @@ function _write_gen_table(io::IO, g::GenRaw)
     for i in eachindex(g.gen_bus)
         print(io, "\t", g.gen_bus[i], "\t", _fmt(g.pg[i]), "\t", _fmt(g.qg[i]), "\t")
         print(io, _fmt(g.qmax[i]), "\t", _fmt(g.qmin[i]), "\t")
-        print(io, _fmt(g.vg[i]), "\t", _fmt(g.mbase[i]), "\t", g.status[i], "\t")
+        print(io, _fmt(g.vg[i]), "\t", _fmt(g.mbase[i]), "\t", g.gen_status[i], "\t")
         print(io, _fmt(g.pmax[i]), "\t", _fmt(g.pmin[i]))
         if !isempty(g.pc1) && i <= length(g.pc1)
             print(io, "\t", _fmt(g.pc1[i]), "\t", _fmt(g.pc2[i]))
@@ -117,7 +128,7 @@ function _write_gencost_table(io::IO, gc::GencostRaw)
     for i in eachindex(gc.model)
         print(io, "\t", gc.model[i], "\t", _fmt(gc.startup[i]), "\t")
         print(io, _fmt(gc.shutdown[i]), "\t", gc.ncost[i])
-        for c in gc.cost[i]
+        for c in gc.cost_coefficients[i]
             print(io, "\t", _fmt(c))
         end
         println(io, ";")

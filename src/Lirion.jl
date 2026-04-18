@@ -256,6 +256,6 @@ end
 export solve, load,
     dc, ac, acr, ivr, lpac, socwr, socbf, bfa, nfa,
     centralized, admm, aladin,
-    create_partition, write_matpower
+    create_partition, create_partition_split_bus, write_matpower
 
 end

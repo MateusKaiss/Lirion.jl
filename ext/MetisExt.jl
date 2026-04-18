@@ -69,9 +69,19 @@ end
 # ============================================================
 
 function _metis_partition(g::SimpleWeightedGraph, k::Int)
-    mg = Metis.graph(g; weights = true)
+    # Metis.jl requires integer edge weights, so rebuild the graph with
+    # rounded / clamped integer weights (preserving topology and relative
+    # magnitudes via the same scaling used by `_to_metis_weights`).
+    n = Graphs.nv(g)
+    g_int = SimpleWeightedGraph(n)
+    for e in edges(g)
+        w_float = weight(e)
+        w_int = clamp(round(Int, w_float * 100), 1, 50_000)
+        add_edge!(g_int, src(e), dst(e), w_int)
+    end
+    mg = Metis.graph(g_int; weights = true)
     parts = Metis.partition(mg, k; alg = :KWAY)
-    return parts
+    return Int.(parts)   # Metis returns Int32; downstream helpers assume Int
 end
 
 # ============================================================
@@ -133,7 +143,7 @@ function _ensure_generation!(case::Lirion.CaseRaw, zone::Vector{Int},
     pmax_per_zone = zeros(Float64, k)
 
     for i in eachindex(gen.gen_bus)
-        gen.status[i] == 1 || continue
+        gen.gen_status[i] == 1 || continue
         gen.pmax[i] > 0 || continue
         idx = get(id_to_idx, gen.gen_bus[i], 0)
         idx == 0 && continue
@@ -151,7 +161,7 @@ function _ensure_generation!(case::Lirion.CaseRaw, zone::Vector{Int},
         best_dist = typemax(Int)
 
         for i in eachindex(gen.gen_bus)
-            gen.status[i] == 1 || continue
+            gen.gen_status[i] == 1 || continue
             gen.pmax[i] > 0 || continue
             gi = get(id_to_idx, gen.gen_bus[i], 0)
             gi == 0 && continue
@@ -235,7 +245,7 @@ function _has_gen_after_remove(case::Lirion.CaseRaw, zone::Vector{Int},
     id_to_idx::Dict{Int, Int}, node::Int, z::Int)
     gen = case.gen
     for i in eachindex(gen.gen_bus)
-        gen.status[i] == 1 || continue
+        gen.gen_status[i] == 1 || continue
         gen.pmax[i] > 0 || continue
         gi = get(id_to_idx, gen.gen_bus[i], 0)
         (gi == 0 || gi == node) && continue
@@ -406,6 +416,202 @@ function Lirion.create_partition(
         base = replace(basename(path), r"\.m$" => "")
         dir = dirname(abspath(path))
         out = joinpath(dir, "$(base)_$(k_actual)zones.m")
+    else
+        out = String(save_path)
+    end
+
+    Lirion.write_matpower(case, out)
+    return out
+end
+
+# ============================================================
+# SplitBus-compatible partition (Method 3 bilateral constraint)
+# ------------------------------------------------------------
+# Guarantees: every bus has neighbors in AT MOST ONE foreign zone. Equivalently,
+# no bus sits at the boundary of 3+ zones. Required by `Lirion.SplitBus()`.
+# ============================================================
+
+# Count how many buses violate the bilateral constraint (≥ 2 foreign zones).
+function _count_split_bus_violations(zone::Vector{Int}, adj::Vector{Vector{Int}})
+    violations = 0
+    for i in eachindex(zone)
+        z = zone[i]
+        foreign = Set{Int}()
+        for v in adj[i]
+            zv = zone[v]
+            zv != z && push!(foreign, zv)
+            length(foreign) >= 2 && break
+        end
+        length(foreign) >= 2 && (violations += 1)
+    end
+    return violations
+end
+
+# Iteratively move violating buses to their dominant foreign zone until no
+# violations remain (or max_passes exhausted).
+function _enforce_split_bus_compatible!(
+    case::Lirion.CaseRaw,
+    zone::Vector{Int},
+    adj::Vector{Vector{Int}},
+    id_to_idx::Dict{Int, Int};
+    max_passes::Int = 100,
+)
+    n = length(zone)
+    foreign_set = Set{Int}()
+    zone_count = Dict{Int, Int}()
+
+    for pass in 1:max_passes
+        changed = false
+        for i in 1:n
+            empty!(foreign_set)
+            z = zone[i]
+            for v in adj[i]
+                zv = zone[v]
+                zv != z && push!(foreign_set, zv)
+            end
+            length(foreign_set) >= 2 || continue
+
+            # Pick dominant foreign zone (most neighbors of i located there).
+            empty!(zone_count)
+            for v in adj[i]
+                zv = zone[v]
+                zv != z && (zone_count[zv] = get(zone_count, zv, 0) + 1)
+            end
+            best_zone = z
+            best_count = 0
+            for (fz, c) in zone_count
+                if c > best_count
+                    best_count = c
+                    best_zone = fz
+                end
+            end
+            best_zone == z && continue
+
+            # Safety: do not orphan a zone's generator and do not disconnect it.
+            _zone_connected_after_remove(zone, adj, i, z) || continue
+            _has_gen_after_remove(case, zone, id_to_idx, i, z) || continue
+
+            zone[i] = best_zone
+            changed = true
+        end
+        changed || break
+    end
+
+    # Final validation: raise an explicit error if any violation remains.
+    for i in 1:n
+        empty!(foreign_set)
+        z = zone[i]
+        for v in adj[i]
+            zv = zone[v]
+            zv != z && push!(foreign_set, zv)
+        end
+        if length(foreign_set) >= 2
+            bus_id = case.bus.bus_i[i]
+            fz_sorted = sort(collect(foreign_set))
+            error(
+                "create_partition_split_bus: no SplitBus-compatible partition " *
+                "found at this k. Bus $bus_id still borders multiple foreign " *
+                "zones $fz_sorted after $max_passes repair passes. Try a " *
+                "smaller k (k=2 is always feasible).",
+            )
+        end
+    end
+    return nothing
+end
+
+function _do_partition_split_bus!(
+    case::Lirion.CaseRaw;
+    k::Union{Int, Nothing},
+    refine::Bool,
+    max_refine_passes::Int,
+    max_repair_passes::Int,
+    seed::Int,
+)
+    n_bus = length(case.bus.bus_i)
+    kval = k === nothing ? _auto_k(n_bus) : k
+    kval = clamp(kval, 2, n_bus)
+
+    Random.seed!(seed)
+
+    g, id_to_idx = _build_impedance_graph(case)
+    zone = _metis_partition(g, kval)
+    adj = _build_adjacency(case, id_to_idx)
+
+    _fix_connectivity!(zone, adj)
+    _ensure_generation!(case, zone, id_to_idx)
+    _remap_zones!(zone)
+
+    if refine
+        _refine_partition!(case, zone, adj, id_to_idx;
+            max_passes = max_refine_passes)
+        _fix_connectivity!(zone, adj)
+        _remap_zones!(zone)
+    end
+
+    # SplitBus-specific repair: moves buses until bilateral constraint holds.
+    _enforce_split_bus_compatible!(
+        case, zone, adj, id_to_idx;
+        max_passes = max_repair_passes,
+    )
+    _fix_connectivity!(zone, adj)
+    _remap_zones!(zone)
+
+    # Write zones back to the bus table.
+    for i in eachindex(case.bus.bus_i)
+        idx = id_to_idx[case.bus.bus_i[i]]
+        case.bus.zone[i] = zone[idx]
+    end
+
+    k_actual = maximum(zone)
+    n_shared = _count_shared_buses(zone, adj)
+    n_ties = _count_tie_lines(zone, adj)
+    @info "Partition created (SplitBus-compatible)" zones = k_actual buses = n_bus shared_buses = n_shared tie_lines = n_ties
+
+    return case
+end
+
+function Lirion.create_partition_split_bus(
+    case::Lirion.CaseRaw;
+    k::Union{Int, Nothing} = 2,
+    refine::Bool = true,
+    max_refine_passes::Int = 50,
+    max_repair_passes::Int = 100,
+    seed::Int = 42,
+)
+    return _do_partition_split_bus!(
+        case;
+        k = k,
+        refine = refine,
+        max_refine_passes = max_refine_passes,
+        max_repair_passes = max_repair_passes,
+        seed = seed,
+    )
+end
+
+function Lirion.create_partition_split_bus(
+    path::AbstractString;
+    k::Union{Int, Nothing} = 2,
+    save_path::Union{AbstractString, Nothing} = nothing,
+    refine::Bool = true,
+    max_refine_passes::Int = 50,
+    max_repair_passes::Int = 100,
+    seed::Int = 42,
+)
+    case = Lirion.load_input_data(path)
+    _do_partition_split_bus!(
+        case;
+        k = k,
+        refine = refine,
+        max_refine_passes = max_refine_passes,
+        max_repair_passes = max_repair_passes,
+        seed = seed,
+    )
+
+    k_actual = maximum(case.bus.zone)
+    if save_path === nothing
+        base = replace(basename(path), r"\.m$" => "")
+        dir = dirname(abspath(path))
+        out = joinpath(dir, "$(base)_$(k_actual)zones_splitbus.m")
     else
         out = String(save_path)
     end
