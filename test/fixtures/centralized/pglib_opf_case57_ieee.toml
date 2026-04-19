@@ -1,0 +1,37 @@
+[metadata]
+case = "pglib_opf_case57_ieee.m"
+has_storage = false
+regenerated_at = "2026-04-19"
+
+[objectives]
+ac = 37589.33820419408
+acr = 37589.33822402824
+bfa = 34772.94789459044
+dc = 34772.94785147004
+ivr = 37589.33822402522
+lpac = 37249.39378615876
+qc = 37529.71693022551
+socbf = 37529.7172146372
+socwr = 37529.71675593975
+
+[pm_reference]
+ac = 37589.33820419325
+acr = 37589.33822402453
+bfa = 34772.947893640085
+dc = 34772.94785147004
+ivr = 37589.33822401351
+lpac = 37249.393785972454
+qc = 37529.716930097464
+socbf = 37529.71721496327
+socwr = 37529.71716454354
+
+[status]
+ac = "local_optimal"
+acr = "local_optimal"
+bfa = "optimal"
+dc = "local_optimal"
+ivr = "local_optimal"
+lpac = "local_optimal"
+qc = "local_optimal"
+socbf = "optimal"
+socwr = "optimal"

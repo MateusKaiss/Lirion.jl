@@ -1,0 +1,37 @@
+[metadata]
+case = "pglib_opf_case39_epri.m"
+has_storage = false
+regenerated_at = "2026-04-19"
+
+[objectives]
+ac = 138415.56265037842
+acr = 138415.56266302677
+bfa = 136141.21189965043
+dc = 136889.6914649186
+ivr = 138415.5626630266
+lpac = 138257.69139535422
+qc = 137664.0232778211
+socbf = 137654.06909888258
+socwr = 137654.06895244858
+
+[pm_reference]
+ac = 138415.5625287722
+acr = 138415.56254142025
+bfa = 136141.2116191839
+dc = 136889.69146491858
+ivr = 138415.56266302662
+lpac = 138257.69139535388
+qc = 137664.0232778211
+socbf = 137654.06909888063
+socwr = 137654.06899339543
+
+[status]
+ac = "local_optimal"
+acr = "local_optimal"
+bfa = "optimal"
+dc = "local_optimal"
+ivr = "local_optimal"
+lpac = "local_optimal"
+qc = "local_optimal"
+socbf = "optimal"
+socwr = "optimal"

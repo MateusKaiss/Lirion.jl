@@ -1,11 +1,19 @@
 using Test
 using Lirion
-using PowerModels
 using Glob
 using Ipopt
 using OSQP
 using Clarabel
 using JuMP: optimizer_with_attributes
+
+# PowerModels is only needed for the opt-in gold test that re-solves
+# against PM directly (env var LIRION_TEST_VS_PM=1) and by the fixture
+# regeneration script (test/scripts/regen_fixtures.jl). The default fast
+# suite uses frozen fixtures in test/fixtures/ and does not import PM.
+const LIRION_TEST_VS_PM = get(ENV, "LIRION_TEST_VS_PM", "0") == "1"
+if LIRION_TEST_VS_PM
+    using PowerModels
+end
 
 include("common.jl")
 
@@ -39,20 +47,26 @@ const DEFAULT_SOCWR_SOLVER = optimizer_with_attributes(
     "reduced_tol_ktratio" => 1e-4,
 )
 
-include(joinpath(@__DIR__, "test_objective.jl"))
+# Fast suite (default): frozen fixtures, no PM dependency.
+include(joinpath(@__DIR__, "test_centralized_fixtures.jl"))
+
+# Gold suite (opt-in): live PM roundtrip.
+LIRION_TEST_VS_PM && include(joinpath(@__DIR__, "test_objective.jl"))
+
 include(joinpath(@__DIR__, "test_multiperiod.jl"))
 include(joinpath(@__DIR__, "test_renewables.jl"))
 
-include(joinpath(@__DIR__, "test_admm_dc.jl"))
-include(joinpath(@__DIR__, "test_admm_ac.jl"))
-include(joinpath(@__DIR__, "test_admm_socwr.jl"))
-include(joinpath(@__DIR__, "test_aladin_dc.jl"))
-include(joinpath(@__DIR__, "test_aladin_ac.jl"))
-include(joinpath(@__DIR__, "test_aladin_socwr.jl"))
+include(joinpath(@__DIR__, "distributed", "test_admm_dc.jl"))
+include(joinpath(@__DIR__, "distributed", "test_admm_ac.jl"))
+include(joinpath(@__DIR__, "distributed", "test_admm_socwr.jl"))
+include(joinpath(@__DIR__, "distributed", "test_aladin_dc.jl"))
+include(joinpath(@__DIR__, "distributed", "test_aladin_ac.jl"))
+include(joinpath(@__DIR__, "distributed", "test_aladin_socwr.jl"))
 
 @testset "Lirion - All Tests" begin
-    # Centralizados
-    run_test_objective()
+    # Centralized: fast fixtures (default) + optional PM roundtrip.
+    run_centralized_fixture_tests(; rtol = 1e-3)
+    LIRION_TEST_VS_PM && run_test_objective()
 
     # Multi-period invariants (internal consistency)
     run_multiperiod_invariants(; optimizer = Ipopt.Optimizer)
@@ -60,7 +74,7 @@ include(joinpath(@__DIR__, "test_aladin_socwr.jl"))
     # Renewables
     run_renewables_tests(; optimizer = Ipopt.Optimizer)
 
-    # # Distributed DC
+    # Distributed DC
     run_admm_dc_state_tests(; rtol = 0.01)
     run_admm_dc_power_tests(; rtol = 0.01)
     run_admm_dc_hybrid_tests(; rtol = 0.01)
@@ -68,7 +82,7 @@ include(joinpath(@__DIR__, "test_aladin_socwr.jl"))
     run_admm_dc_dummybus_power_tests(; rtol = 0.05)
     run_admm_dc_splitbus_hybrid_tests(; rtol = 0.01)
 
-    # # # Distributed AC
+    # Distributed AC
     run_admm_ac_state_tests(;
         rtol = 0.01,
         central_optimizer = Ipopt.Optimizer,

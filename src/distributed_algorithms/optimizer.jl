@@ -67,6 +67,10 @@ const _CLARABEL_SILENT_FACTORY = optimizer_with_attributes(
 _silent_factory(::Type{Ipopt.Optimizer}) = _IPOPT_SILENT_FACTORY
 _silent_factory(::Type{Clarabel.Optimizer}) = _CLARABEL_SILENT_FACTORY
 
+# User-supplied OptimizerWithAttributes is assumed to be already configured
+# silent (caller's responsibility). Pass it through without a warning.
+_silent_factory(opt::MOI.OptimizerWithAttributes) = opt
+
 function _silent_factory(opt)
     @warn "No silent configuration registered for optimizer $opt; output may not be suppressed."
     return opt

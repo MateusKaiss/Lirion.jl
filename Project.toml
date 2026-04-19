@@ -45,10 +45,11 @@ Ipopt = "b6b21f68-93f8-5de0-b562-5493be1d77c9"
 OSQP = "ab2f91bb-94b4-55e3-9ba0-7f65df51de79"
 PowerModels = "c36e90e8-916a-50a6-bd94-075b64ef4655"
 SCS = "c946c3f1-0d1f-5ce8-9dea-7daa1f7e2d13"
+TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Glob", "Gurobi", "Ipopt", "OSQP", "PowerModels", "SCS", "Test"]
+test = ["Glob", "Gurobi", "Ipopt", "OSQP", "PowerModels", "SCS", "TOML", "Test"]
 
 [compat]
 Clarabel = "0.9, 0.10"

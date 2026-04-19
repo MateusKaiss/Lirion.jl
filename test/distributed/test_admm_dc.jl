@@ -96,7 +96,7 @@ function run_admm_dc_state_tests(;
     central_optimizer = nothing,
     distributed_optimizer = nothing,
 )
-    test_dir = joinpath(@__DIR__, "distributed")
+    test_dir = @__DIR__
 
     make_alg(p) = Lirion.admm(;
         coupling = :state,
@@ -180,7 +180,7 @@ function run_admm_dc_power_tests(;
     central_optimizer = nothing,
     distributed_optimizer = nothing,
 )
-    test_dir = joinpath(@__DIR__, "distributed")
+    test_dir = @__DIR__
 
     make_alg(p) = Lirion.admm(;
         coupling = :power,
@@ -251,7 +251,7 @@ function run_admm_dc_hybrid_tests(;
     central_optimizer = nothing,
     distributed_optimizer = nothing,
 )
-    test_dir = joinpath(@__DIR__, "distributed")
+    test_dir = @__DIR__
 
     make_alg(p) = Lirion.admm(;
         coupling = :hybrid,
@@ -323,7 +323,7 @@ function run_admm_dc_dummybus_hybrid_tests(;
     central_optimizer = nothing,
     distributed_optimizer = nothing,
 )
-    test_dir = joinpath(@__DIR__, "distributed")
+    test_dir = @__DIR__
 
     make_alg(p) = Lirion.admm(;
         coupling = :hybrid,
@@ -396,7 +396,7 @@ function run_admm_dc_splitbus_hybrid_tests(;
     central_optimizer = nothing,
     distributed_optimizer = nothing,
 )
-    test_dir = joinpath(@__DIR__, "distributed")
+    test_dir = @__DIR__
 
     make_alg(p) = Lirion.admm(;
         coupling = :hybrid,
@@ -466,7 +466,7 @@ function run_admm_dc_dummybus_power_tests(;
     central_optimizer = nothing,
     distributed_optimizer = nothing,
 )
-    test_dir = joinpath(@__DIR__, "distributed")
+    test_dir = @__DIR__
 
     make_alg(p) = Lirion.admm(;
         coupling = :power,

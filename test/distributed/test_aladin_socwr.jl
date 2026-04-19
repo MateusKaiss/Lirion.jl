@@ -41,7 +41,7 @@ function run_aladin_socwr_state_tests(;
     central_optimizer = nothing,
     distributed_optimizer = nothing,
 )
-    test_dir = joinpath(@__DIR__, "distributed")
+    test_dir = @__DIR__
 
     make_alg(p) = Lirion.aladin(;
         coupling = :state,
@@ -107,7 +107,7 @@ function run_aladin_socwr_power_tests(;
     central_optimizer = nothing,
     distributed_optimizer = nothing,
 )
-    test_dir = joinpath(@__DIR__, "distributed")
+    test_dir = @__DIR__
 
     make_alg(p) = Lirion.aladin(;
         coupling = :power,
@@ -167,7 +167,7 @@ function run_aladin_socwr_hybrid_tests(;
     central_optimizer = nothing,
     distributed_optimizer = nothing,
 )
-    test_dir = joinpath(@__DIR__, "distributed")
+    test_dir = @__DIR__
 
     make_alg(p) = Lirion.aladin(;
         coupling = :hybrid,
@@ -227,7 +227,7 @@ function run_aladin_socwr_splitbus_hybrid_tests(;
     central_optimizer = nothing,
     distributed_optimizer = nothing,
 )
-    test_dir = joinpath(@__DIR__, "distributed")
+    test_dir = @__DIR__
 
     make_alg(p) = Lirion.aladin(;
         coupling = :hybrid,

@@ -1,0 +1,19 @@
+[metadata]
+case = "case57_bus_6_bat.m"
+has_storage = true
+regenerated_at = "2026-04-19"
+
+[objectives]
+ac = 33447.33068062527
+acr = 33447.330698489095
+dc = 31078.31902787089
+
+[pm_reference]
+ac = 33447.33068062531
+acr = 33447.33069848911
+dc = 31078.319027870886
+
+[status]
+ac = "local_optimal"
+acr = "local_optimal"
+dc = "local_optimal"

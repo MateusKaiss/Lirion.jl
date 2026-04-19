@@ -126,14 +126,8 @@ function get_available_optimizer(preferred, fallback)
     return preferred
 end
 
-const GLOBAL_FAILED_CASES = Dict{String, Dict{String, Vector{String}}}()
-
-function track_failure(label::String, origin::String, case_name::String)
-    if !haskey(GLOBAL_FAILED_CASES, label)
-        GLOBAL_FAILED_CASES[label] = Dict("PowerModels" => String[], "Lirion" => String[])
-    end
-    return push!(GLOBAL_FAILED_CASES[label][origin], case_name)
-end
+# GLOBAL_FAILED_CASES and track_failure are defined in common.jl and
+# reused here.
 
 @inline function _objective_lirion(out::Lirion.LirionResult)
     return Float64(out.objective)

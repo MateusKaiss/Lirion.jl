@@ -1,0 +1,40 @@
+[metadata]
+case = "pglib_opf_case30_as.m"
+has_storage = false
+regenerated_at = "2026-04-19"
+
+[objectives]
+ac = 803.1273103946162
+acr = 803.1273107526168
+bfa = 767.6020998101069
+dc = 767.602099474677
+ivr = 803.1273107532445
+lpac = 796.4515147947561
+qc = 802.6801929585469
+sdpwrm = 803.0917892707355
+socbf = 802.680204094426
+socwr = 802.6801965431973
+
+[pm_reference]
+ac = 803.1273103853127
+acr = 803.1273107347206
+bfa = 767.6020998140045
+dc = 767.602099459817
+ivr = 803.1273107350133
+lpac = 796.451514581282
+qc = 802.6801927575639
+sdpwrm = 799.4322890874508
+socbf = 802.6802040367644
+socwr = 802.6802037574831
+
+[status]
+ac = "local_optimal"
+acr = "local_optimal"
+bfa = "optimal"
+dc = "local_optimal"
+ivr = "local_optimal"
+lpac = "local_optimal"
+qc = "local_optimal"
+sdpwrm = "numerical_error"
+socbf = "optimal"
+socwr = "almost_optimal"

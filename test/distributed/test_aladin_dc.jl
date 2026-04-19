@@ -1,40 +1,44 @@
 # ============================================================
-# =======================  ALADIN AC TESTS  =====================
+# =======================  ALADIN DC TESTS  =====================
 # ============================================================
 
-const ALADIN_AC_STATE_CASES = [
+# ------------------------
+# ALADIN DC - STATE
+# ------------------------
+const ALADIN_DC_STATE_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
 ]
 
-const ALADIN_AC_POWER_CASES = [
+const ALADIN_DC_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
 ]
 
-const ALADIN_AC_HYBRID_CASES = [
+const ALADIN_DC_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
 ]
 
-const ALADIN_AC_SPLITBUS_HYBRID_CASES = [
+const ALADIN_DC_SPLITBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
 ]
 
-const ALADIN_AC_DUMMYBUS_HYBRID_CASES = [
+const ALADIN_DC_DUMMYBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case3_lmbd__api.m",
     "pglib_opf_case3_lmbd__sad.m",
 ]
 
-# Power-only DummyBus excludes __api (tight bounds can trip infeasibility
-# before θ/V discipline kicks in via v² / bus consensus).
-const ALADIN_AC_DUMMYBUS_POWER_CASES = [
+# Power-only DummyBus: case3_lmbd__api excluded (same issue as ADMM — without θ
+# consensus at the dummy bus, tight bounds can drive early iterations to
+# infeasibility).
+const ALADIN_DC_DUMMYBUS_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case3_lmbd__sad.m",
 ]
@@ -42,19 +46,19 @@ const ALADIN_AC_DUMMYBUS_POWER_CASES = [
 # ============================================================
 # OBJECTIVE EXTRACTORS
 # ============================================================
-aladin_central_obj_ac(out) = Float64(out.objective)
-aladin_dist_obj_ac(out) = Float64(out.objective)
+aladin_central_obj_dc(out) = Float64(out.objective)
+aladin_dist_obj_dc(out) = Float64(out.objective)
 
 # ============================================================
-# ALADIN AC - STATE
+# ALADIN DC - STATE
 # ============================================================
-function run_aladin_ac_state_tests(;
+function run_aladin_dc_state_tests(;
     rtol = 0.01,
     atol = 1e-6,
     central_optimizer = nothing,
     distributed_optimizer = nothing,
 )
-    test_dir = joinpath(@__DIR__, "distributed")
+    test_dir = @__DIR__
 
     make_alg(p) = Lirion.aladin(;
         coupling = :state,
@@ -62,20 +66,14 @@ function run_aladin_ac_state_tests(;
         max_iter = p.max_iter,
         rho = p.rho,
         mu = p.mu,
-        rho_growth = p.rho_growth,
-        mu_growth = p.mu_growth,
-        adaptive = p.adaptive,
         eps_abs = p.eps_abs,
         eps_rel = p.eps_rel,
     )
 
     defaults(_) = (
-        max_iter = 1000,
+        max_iter = 5000,
         rho = 1000.0,
         mu = 1000.0,
-        rho_growth = 1.05,
-        mu_growth = 1.1,
-        adaptive = true,
         eps_abs = 1e-4,
         eps_rel = 1e-4,
     )
@@ -83,14 +81,14 @@ function run_aladin_ac_state_tests(;
     overrides(_case_name) = NamedTuple()
 
     return run_case_suite(;
-        label = "ALADIN-AC STATE",
+        label = "ALADIN-DC STATE",
         test_dir = test_dir,
-        case_list = ALADIN_AC_STATE_CASES,
-        model = Lirion.ac(),
+        case_list = ALADIN_DC_STATE_CASES,
+        model = Lirion.dc(),
         central_optimizer = central_optimizer,
         distributed_optimizer = distributed_optimizer,
-        objective_central = aladin_central_obj_ac,
-        objective_dist = aladin_dist_obj_ac,
+        objective_central = aladin_central_obj_dc,
+        objective_dist = aladin_dist_obj_dc,
         make_algorithm = make_alg,
         defaults = defaults,
         overrides = overrides,
@@ -100,15 +98,15 @@ function run_aladin_ac_state_tests(;
 end
 
 # ============================================================
-# ALADIN AC - POWER
+# ALADIN DC - POWER
 # ============================================================
-function run_aladin_ac_power_tests(;
+function run_aladin_dc_power_tests(;
     rtol = 0.01,
     atol = 1e-6,
     central_optimizer = nothing,
     distributed_optimizer = nothing,
 )
-    test_dir = joinpath(@__DIR__, "distributed")
+    test_dir = @__DIR__
 
     make_alg(p) = Lirion.aladin(;
         coupling = :power,
@@ -116,20 +114,14 @@ function run_aladin_ac_power_tests(;
         max_iter = p.max_iter,
         rho = p.rho,
         mu = p.mu,
-        rho_growth = p.rho_growth,
-        mu_growth = p.mu_growth,
-        adaptive = p.adaptive,
         eps_abs = p.eps_abs,
         eps_rel = p.eps_rel,
     )
 
     defaults(_) = (
-        max_iter = 1000,
-        rho = 1000.0,
+        max_iter = 5000,
+        rho = 100000.0,
         mu = 1000.0,
-        rho_growth = 1.05,
-        mu_growth = 1.1,
-        adaptive = true,
         eps_abs = 1e-4,
         eps_rel = 1e-4,
     )
@@ -137,14 +129,14 @@ function run_aladin_ac_power_tests(;
     overrides(_case_name) = NamedTuple()
 
     return run_case_suite(;
-        label = "ALADIN-AC POWER",
+        label = "ALADIN-DC POWER",
         test_dir = test_dir,
-        case_list = ALADIN_AC_POWER_CASES,
-        model = Lirion.ac(),
+        case_list = ALADIN_DC_POWER_CASES,
+        model = Lirion.dc(),
         central_optimizer = central_optimizer,
         distributed_optimizer = distributed_optimizer,
-        objective_central = aladin_central_obj_ac,
-        objective_dist = aladin_dist_obj_ac,
+        objective_central = aladin_central_obj_dc,
+        objective_dist = aladin_dist_obj_dc,
         make_algorithm = make_alg,
         defaults = defaults,
         overrides = overrides,
@@ -154,15 +146,15 @@ function run_aladin_ac_power_tests(;
 end
 
 # ============================================================
-# ALADIN AC - HYBRID
+# ALADIN DC - HYBRID
 # ============================================================
-function run_aladin_ac_hybrid_tests(;
+function run_aladin_dc_hybrid_tests(;
     rtol = 0.01,
     atol = 1e-6,
     central_optimizer = nothing,
     distributed_optimizer = nothing,
 )
-    test_dir = joinpath(@__DIR__, "distributed")
+    test_dir = @__DIR__
 
     make_alg(p) = Lirion.aladin(;
         coupling = :hybrid,
@@ -170,35 +162,29 @@ function run_aladin_ac_hybrid_tests(;
         max_iter = p.max_iter,
         rho = p.rho,
         mu = p.mu,
-        rho_growth = p.rho_growth,
-        mu_growth = p.mu_growth,
-        adaptive = p.adaptive,
         eps_abs = p.eps_abs,
         eps_rel = p.eps_rel,
     )
 
     defaults(_) = (
-        max_iter = 1000,
-        rho = 1000.0,
+        max_iter = 5000,
+        rho = 10000.0,
         mu = 1000.0,
-        rho_growth = 1.05,
-        mu_growth = 1.1,
-        adaptive = true,
-        eps_abs = 1e-4,
-        eps_rel = 1e-4,
+        eps_abs = 2e-4,
+        eps_rel = 2e-4,
     )
 
     overrides(_case_name) = NamedTuple()
 
     return run_case_suite(;
-        label = "ALADIN-AC HYBRID",
+        label = "ALADIN-DC HYBRID",
         test_dir = test_dir,
-        case_list = ALADIN_AC_HYBRID_CASES,
-        model = Lirion.ac(),
+        case_list = ALADIN_DC_HYBRID_CASES,
+        model = Lirion.dc(),
         central_optimizer = central_optimizer,
         distributed_optimizer = distributed_optimizer,
-        objective_central = aladin_central_obj_ac,
-        objective_dist = aladin_dist_obj_ac,
+        objective_central = aladin_central_obj_dc,
+        objective_dist = aladin_dist_obj_dc,
         make_algorithm = make_alg,
         defaults = defaults,
         overrides = overrides,
@@ -208,15 +194,15 @@ function run_aladin_ac_hybrid_tests(;
 end
 
 # ============================================================
-# ALADIN AC - SPLIT-BUS HYBRID (Method 3 — Harris et al. 2022, Fig. 1c)
+# ALADIN DC - SPLIT-BUS HYBRID (Method 3 — Harris et al. 2022, Fig. 1c)
 # ============================================================
-function run_aladin_ac_splitbus_hybrid_tests(;
+function run_aladin_dc_splitbus_hybrid_tests(;
     rtol = 0.05,
     atol = 1e-6,
     central_optimizer = nothing,
     distributed_optimizer = nothing,
 )
-    test_dir = joinpath(@__DIR__, "distributed")
+    test_dir = @__DIR__
 
     make_alg(p) = Lirion.aladin(;
         coupling = :hybrid,
@@ -224,35 +210,29 @@ function run_aladin_ac_splitbus_hybrid_tests(;
         max_iter = p.max_iter,
         rho = p.rho,
         mu = p.mu,
-        rho_growth = p.rho_growth,
-        mu_growth = p.mu_growth,
-        adaptive = p.adaptive,
         eps_abs = p.eps_abs,
         eps_rel = p.eps_rel,
     )
 
     defaults(_) = (
-        max_iter = 1000,
-        rho = 1000.0,
+        max_iter = 5000,
+        rho = 10000.0,
         mu = 1000.0,
-        rho_growth = 1.05,
-        mu_growth = 1.1,
-        adaptive = true,
-        eps_abs = 1e-4,
-        eps_rel = 1e-4,
+        eps_abs = 2e-4,
+        eps_rel = 2e-4,
     )
 
     overrides(_case_name) = NamedTuple()
 
     return run_case_suite(;
-        label = "ALADIN-AC SPLITBUS-HYBRID",
+        label = "ALADIN-DC SPLITBUS-HYBRID",
         test_dir = test_dir,
-        case_list = ALADIN_AC_SPLITBUS_HYBRID_CASES,
-        model = Lirion.ac(),
+        case_list = ALADIN_DC_SPLITBUS_HYBRID_CASES,
+        model = Lirion.dc(),
         central_optimizer = central_optimizer,
         distributed_optimizer = distributed_optimizer,
-        objective_central = aladin_central_obj_ac,
-        objective_dist = aladin_dist_obj_ac,
+        objective_central = aladin_central_obj_dc,
+        objective_dist = aladin_dist_obj_dc,
         make_algorithm = make_alg,
         defaults = defaults,
         overrides = overrides,
@@ -262,15 +242,15 @@ function run_aladin_ac_splitbus_hybrid_tests(;
 end
 
 # ============================================================
-# ALADIN AC - DUMMY-BUS HYBRID (Method 2 — Harris et al. 2022)
+# ALADIN DC - DUMMY-BUS HYBRID (Method 2 — Harris et al. 2022)
 # ============================================================
-function run_aladin_ac_dummybus_hybrid_tests(;
+function run_aladin_dc_dummybus_hybrid_tests(;
     rtol = 0.05,
     atol = 1e-6,
     central_optimizer = nothing,
     distributed_optimizer = nothing,
 )
-    test_dir = joinpath(@__DIR__, "distributed")
+    test_dir = @__DIR__
 
     make_alg(p) = Lirion.aladin(;
         coupling = :hybrid,
@@ -278,41 +258,29 @@ function run_aladin_ac_dummybus_hybrid_tests(;
         max_iter = p.max_iter,
         rho = p.rho,
         mu = p.mu,
-        rho_growth = p.rho_growth,
-        mu_growth = p.mu_growth,
-        adaptive = p.adaptive,
         eps_abs = p.eps_abs,
         eps_rel = p.eps_rel,
     )
 
     defaults(_) = (
-        max_iter = 2000,
+        max_iter = 5000,
         rho = 10000.0,
-        mu = 10000.0,
-        rho_growth = 1.05,
-        mu_growth = 1.1,
-        adaptive = true,
-        eps_abs = 1e-4,
-        eps_rel = 1e-4,
+        mu = 1000.0,
+        eps_abs = 2e-4,
+        eps_rel = 2e-4,
     )
 
-    overrides(case_name) = begin
-        if case_name == "pglib_opf_case3_lmbd__api.m"
-            # Tight bounds: needs stronger consensus penalty to close gap.
-            return (rho = 100000.0, mu = 100000.0)
-        end
-        return NamedTuple()
-    end
+    overrides(_case_name) = NamedTuple()
 
     return run_case_suite(;
-        label = "ALADIN-AC DUMMYBUS-HYBRID",
+        label = "ALADIN-DC DUMMYBUS-HYBRID",
         test_dir = test_dir,
-        case_list = ALADIN_AC_DUMMYBUS_HYBRID_CASES,
-        model = Lirion.ac(),
+        case_list = ALADIN_DC_DUMMYBUS_HYBRID_CASES,
+        model = Lirion.dc(),
         central_optimizer = central_optimizer,
         distributed_optimizer = distributed_optimizer,
-        objective_central = aladin_central_obj_ac,
-        objective_dist = aladin_dist_obj_ac,
+        objective_central = aladin_central_obj_dc,
+        objective_dist = aladin_dist_obj_dc,
         make_algorithm = make_alg,
         defaults = defaults,
         overrides = overrides,
@@ -322,15 +290,15 @@ function run_aladin_ac_dummybus_hybrid_tests(;
 end
 
 # ============================================================
-# ALADIN AC - DUMMY-BUS POWER (Method 2, power-only)
+# ALADIN DC - DUMMY-BUS POWER (Method 2 with power-only coupling)
 # ============================================================
-function run_aladin_ac_dummybus_power_tests(;
+function run_aladin_dc_dummybus_power_tests(;
     rtol = 0.05,
     atol = 1e-6,
     central_optimizer = nothing,
     distributed_optimizer = nothing,
 )
-    test_dir = joinpath(@__DIR__, "distributed")
+    test_dir = @__DIR__
 
     make_alg(p) = Lirion.aladin(;
         coupling = :power,
@@ -338,20 +306,14 @@ function run_aladin_ac_dummybus_power_tests(;
         max_iter = p.max_iter,
         rho = p.rho,
         mu = p.mu,
-        rho_growth = p.rho_growth,
-        mu_growth = p.mu_growth,
-        adaptive = p.adaptive,
         eps_abs = p.eps_abs,
         eps_rel = p.eps_rel,
     )
 
     defaults(_) = (
-        max_iter = 2000,
-        rho = 10000.0,
-        mu = 10000.0,
-        rho_growth = 1.05,
-        mu_growth = 1.1,
-        adaptive = true,
+        max_iter = 5000,
+        rho = 100000.0,
+        mu = 1000.0,
         eps_abs = 1e-4,
         eps_rel = 1e-4,
     )
@@ -359,14 +321,14 @@ function run_aladin_ac_dummybus_power_tests(;
     overrides(_case_name) = NamedTuple()
 
     return run_case_suite(;
-        label = "ALADIN-AC DUMMYBUS-POWER",
+        label = "ALADIN-DC DUMMYBUS-POWER",
         test_dir = test_dir,
-        case_list = ALADIN_AC_DUMMYBUS_POWER_CASES,
-        model = Lirion.ac(),
+        case_list = ALADIN_DC_DUMMYBUS_POWER_CASES,
+        model = Lirion.dc(),
         central_optimizer = central_optimizer,
         distributed_optimizer = distributed_optimizer,
-        objective_central = aladin_central_obj_ac,
-        objective_dist = aladin_dist_obj_ac,
+        objective_central = aladin_central_obj_dc,
+        objective_dist = aladin_dist_obj_dc,
         make_algorithm = make_alg,
         defaults = defaults,
         overrides = overrides,
