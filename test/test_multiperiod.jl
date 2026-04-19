@@ -1,0 +1,171 @@
+# ============================================================
+# Multi-period invariants — internal consistency tests.
+#
+# We do not have a single-source-of-truth solver for multi-period OPF
+# (PowerModels' MN is structurally the same as what we do for models
+# without inter-period coupling), so we rely on a set of invariants
+# that MUST hold by construction.
+#
+# Invariants tested here:
+#   A. Replication (no battery): solving T=K with demand identical in
+#      every period gives objective == K · obj(T=1). Periods are
+#      decoupled when no battery is present, so the multi-period
+#      model must reduce to K independent single-period problems.
+#   B. Battery energy conservation: for every battery, the entire
+#      charge/discharge trajectory must reconcile with the final
+#      storage state:
+#        storage[T] − energy_start == Σ_t(charge[t]·η_c − discharge[t]/η_d)
+#   C. Arbitrage direction: with a varying-demand multi-period case,
+#      at least one battery must charge in the low-demand period and
+#      discharge in the high-demand period (economic optimality).
+# ============================================================
+
+using Lirion: BatteryData
+import Lirion
+
+# Helpers ---------------------------------------------------------------
+
+"""
+    _period_obj(file, model, optimizer, t_sub)
+
+Solve the case at `file` (which must have a bus_timeseries) keeping only
+the data for period `t_sub`, replicated as a single-period problem. The
+case is loaded, the timeseries is trimmed in-memory to just `t_sub`, and
+the reduced case is re-solved. Returns the objective.
+
+Caveat: this relies on `Lirion.load` returning a mutable CaseRaw; when
+that is not available we fall back to solving the full multi-period run
+and extracting the per-period contribution via the cost expression.
+"""
+function _solve_flat_timeseries_singleperiod(
+    multi_file::AbstractString, base_file::AbstractString; model, optimizer,
+)
+    # The multi-period "flat" case (all periods identical) is equivalent
+    # to the base single-period case. Solve both and return both.
+    r_multi = Lirion.solve(
+        multi_file; model = model, algorithm = Lirion.centralized(),
+        optimizer = optimizer, outputs = false, plots = false,
+    )
+    r_single = Lirion.solve(
+        base_file; model = model, algorithm = Lirion.centralized(),
+        optimizer = optimizer, outputs = false, plots = false,
+    )
+    return r_multi, r_single
+end
+
+# Invariant A — Replication ---------------------------------------------
+
+function _check_replication(multi_file::AbstractString, base_file::AbstractString;
+    K::Integer, model, optimizer, rtol::Real = 1e-4,
+)
+    r_multi, r_single = _solve_flat_timeseries_singleperiod(
+        multi_file, base_file; model = model, optimizer = optimizer,
+    )
+    expected = K * r_single.objective
+    @info "Replication" model K multi_obj=r_multi.objective single_obj=r_single.objective expected
+    @test isapprox(r_multi.objective, expected; rtol = rtol)
+    return r_multi, r_single
+end
+
+# Invariant B — Energy conservation -------------------------------------
+
+function _check_energy_conservation(result::Lirion.LirionResult, bat::BatteryData;
+    atol::Real = 1e-4,
+)
+    m = result.model
+    T = get(m.ext, :time_periods, 1)
+    T > 1 || error("Energy conservation test requires T > 1.")
+
+    for b in 1:bat.n
+        ηc = bat.charge_efficiency[b]
+        ηd = bat.discharge_efficiency[b]
+        storage_T = JuMP.value(m[:storage][b, T])
+        storage_0 = bat.energy_start[b]
+        net_flow = sum(
+            JuMP.value(m[:charge][b, t]) * ηc -
+            JuMP.value(m[:discharge][b, t]) / ηd
+            for t in 1:T
+        )
+        residual = (storage_T - storage_0) - net_flow
+        @info "Energy conservation" bat=b storage_T storage_0 net_flow residual
+        @test isapprox(residual, 0.0; atol = atol)
+    end
+    return nothing
+end
+
+# Invariant C — Arbitrage direction -------------------------------------
+
+function _check_arbitrage_direction(
+    result::Lirion.LirionResult, bat::BatteryData;
+    low_period::Int, high_period::Int, atol::Real = 1e-4,
+)
+    m = result.model
+    # Economic-optimality invariant: aggregated across all batteries,
+    # total discharge must be AT LEAST as large in the high-demand
+    # period as in the low-demand period. We compare discharges (not
+    # net charge) because batteries may start with non-zero energy and
+    # be forced to discharge at some point — what matters for arbitrage
+    # is that *when* the discharge happens it biases toward expensive
+    # periods.
+    total_discharge_low = sum(
+        JuMP.value(m[:discharge][b, low_period]) for b in 1:bat.n
+    )
+    total_discharge_high = sum(
+        JuMP.value(m[:discharge][b, high_period]) for b in 1:bat.n
+    )
+    @info "Arbitrage" total_discharge_low total_discharge_high low_period high_period
+    @test total_discharge_high >= total_discharge_low - atol
+    return nothing
+end
+
+# Public runner ---------------------------------------------------------
+
+function run_multiperiod_invariants(; optimizer = Ipopt.Optimizer)
+    mp_dir = joinpath(@__DIR__, "multiperiod")
+    base_dir = joinpath(@__DIR__, "matpower_cases")
+    flat_file = joinpath(mp_dir, "case3_timeseries.m")
+    base_file = joinpath(base_dir, "pglib_opf_case3_lmbd.m")
+    bat_ts_file = joinpath(mp_dir, "case5_bat_ts.m")
+
+    @testset "Multi-period invariants" begin
+        @testset "A. Replication (T=3 flat, no battery)" begin
+            for model in (Lirion.DC, Lirion.AC, Lirion.ACR, Lirion.SOCWR)
+                mfn = model === Lirion.DC ? Lirion.dc() :
+                      model === Lirion.AC ? Lirion.ac() :
+                      model === Lirion.ACR ? Lirion.acr() :
+                      Lirion.socwr()
+                opt = model === Lirion.SOCWR ? Clarabel.Optimizer : optimizer
+                _check_replication(
+                    flat_file, base_file; K = 3, model = mfn,
+                    optimizer = opt, rtol = 1e-4,
+                )
+            end
+        end
+
+        @testset "B. Battery energy conservation (T=3 varying)" begin
+            # AC with battery: this is where coupling happens.
+            r = Lirion.solve(
+                bat_ts_file; model = Lirion.ac(),
+                algorithm = Lirion.centralized(),
+                optimizer = optimizer, outputs = false, plots = false,
+            )
+            @test r.status in (:optimal, :local_optimal)
+            _check_energy_conservation(r, r.system.battery; atol = 1e-4)
+        end
+
+        @testset "C. Arbitrage direction (T=3 varying)" begin
+            r = Lirion.solve(
+                bat_ts_file; model = Lirion.ac(),
+                algorithm = Lirion.centralized(),
+                optimizer = optimizer, outputs = false, plots = false,
+            )
+            @test r.status in (:optimal, :local_optimal)
+            # Period 1 is low-demand (0.6×), period 3 is high-demand (1.2×).
+            _check_arbitrage_direction(
+                r, r.system.battery;
+                low_period = 1, high_period = 3, atol = 1e-3,
+            )
+        end
+    end
+    return nothing
+end

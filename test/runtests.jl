@@ -40,6 +40,7 @@ const DEFAULT_SOCWR_SOLVER = optimizer_with_attributes(
 )
 
 include(joinpath(@__DIR__, "test_objective.jl"))
+include(joinpath(@__DIR__, "test_multiperiod.jl"))
 
 include(joinpath(@__DIR__, "test_admm_dc.jl"))
 include(joinpath(@__DIR__, "test_admm_ac.jl"))
@@ -51,6 +52,9 @@ include(joinpath(@__DIR__, "test_aladin_socwr.jl"))
 @testset "Lirion - All Tests" begin
     # Centralizados
     run_test_objective()
+
+    # Multi-period invariants (internal consistency)
+    run_multiperiod_invariants(; optimizer = Ipopt.Optimizer)
 
     # # Distributed DC
     run_admm_dc_state_tests(; rtol = 0.01)
