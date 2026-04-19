@@ -132,7 +132,7 @@ function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{LPAC
 end
 
 function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{SOCWR})
-    return add_socwr_branch_constraints!(model, sys.branch)
+    return add_socwr_branch_constraints!(model, sys.bus, sys.branch)
 end
 
 function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{QC})

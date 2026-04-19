@@ -11,7 +11,9 @@
 # ============================================================
 
 using Pkg
-Pkg.activate(dirname(dirname(@__DIR__)))
+Pkg.activate(@__DIR__)
+Pkg.develop(; path = dirname(dirname(@__DIR__)))
+Pkg.instantiate()
 
 using TOML
 using Lirion
