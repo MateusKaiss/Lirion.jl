@@ -74,6 +74,12 @@ function _parse_case(data_string::String, ::MatpowerM)::CaseRaw
         )
     end
 
+    if haskey(matlab_data, "mpc.gen_timeseries")
+        case.gen_timeseries = _gen_ts_from_mat(
+            matlab_data["mpc.gen_timeseries"]::Vector{Vector{String}},
+        )
+    end
+
     return case
 end
 

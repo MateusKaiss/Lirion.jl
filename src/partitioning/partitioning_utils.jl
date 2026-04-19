@@ -356,5 +356,34 @@ end
         )
     end
 
+    if full.gen_timeseries !== nothing
+        ts = full.gen_timeseries
+
+        n_global_gen = length(full.gen.gen_bus)
+        global_to_local_gen = zeros(Int, n_global_gen)
+        @inbounds for (local_k, global_k) in enumerate(zone_gen_idx)
+            global_to_local_gen[global_k] = local_k
+        end
+
+        zone_g_ts_idx = Int[]
+        sizehint!(zone_g_ts_idx, length(ts.gen_id))
+        @inbounds for i in eachindex(ts.gen_id)
+            g = ts.gen_id[i]
+            (g >= 1 && g <= n_global_gen && global_to_local_gen[g] != 0) || continue
+            push!(zone_g_ts_idx, i)
+        end
+
+        remapped_gen_id_ts = Vector{Int}(undef, length(zone_g_ts_idx))
+        @inbounds for (k, idx) in enumerate(zone_g_ts_idx)
+            remapped_gen_id_ts[k] = global_to_local_gen[ts.gen_id[idx]]
+        end
+
+        zone_case.gen_timeseries = GenTimeseriesRaw{Float64}(
+            ts.time[zone_g_ts_idx],
+            remapped_gen_id_ts,
+            ts.pmax[zone_g_ts_idx],
+        )
+    end
+
     return nothing
 end

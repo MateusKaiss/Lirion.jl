@@ -19,6 +19,12 @@ struct GenData
     curtailment_cost::Vector{Float64}
 
     curtailable::Vector{Int}
+
+    # Time-varying availability ceiling for each generator (size n × T).
+    # For a period t, pmax_ts[g, t] is the effective upper bound for
+    # p_generation[g, t]. If no gen_timeseries is provided, pmax_ts
+    # defaults to pmax[g] replicated across all periods.
+    pmax_ts::Matrix{Float64}
 end
 
 function get_gen_parameters(case_raw::CaseRaw)
@@ -46,6 +52,24 @@ function get_gen_parameters(case_raw::CaseRaw)
         (existing[g] && plant_type[g] == "R") && push!(curtailable, g)
     end
 
+    T = max(case_raw.T, 1)
+    pmax_ts = Matrix{Float64}(undef, n, T)
+    @inbounds for g in 1:n, t in 1:T
+        pmax_ts[g, t] = gen_raw.pmax[g]
+    end
+
+    if case_raw.gen_timeseries !== nothing &&
+       !isempty(case_raw.gen_timeseries.time)
+        ts = case_raw.gen_timeseries
+        @inbounds for i in eachindex(ts.time)
+            g = ts.gen_id[i]
+            t = ts.time[i]
+            (g < 1 || g > n) && continue
+            (t < 1 || t > T) && continue
+            pmax_ts[g, t] = ts.pmax[i]
+        end
+    end
+
     return (
         n = n,
         bus = gen_raw.gen_bus,
@@ -62,6 +86,7 @@ function get_gen_parameters(case_raw::CaseRaw)
         plant_type = plant_type,
         curtailment_cost = gen_raw.curtailment_cost,
         curtailable = curtailable,
+        pmax_ts = pmax_ts,
     )
 end
 
@@ -84,5 +109,6 @@ function build_gen_data(case_raw::CaseRaw)::GenData
         params.plant_type,
         params.curtailment_cost,
         params.curtailable,
+        params.pmax_ts,
     )
 end

@@ -155,6 +155,11 @@ function convert_timeseries_to_pu!(raw_case::CaseRaw)
         ts.bs ./= Sbase
     end
 
+    if raw_case.gen_timeseries !== nothing
+        ts = raw_case.gen_timeseries
+        ts.pmax ./= Sbase
+    end
+
     return raw_case
 end
 
@@ -183,6 +188,7 @@ function preprocess_case_data!(
 
     extend_bus_timeseries!(raw_case, time_horizon)
     extend_gencost_timeseries!(raw_case, time_horizon)
+    extend_gen_timeseries!(raw_case, time_horizon)
 
     sort_timeseries_by_time_and_id!(raw_case)
 

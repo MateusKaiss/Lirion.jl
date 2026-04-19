@@ -31,49 +31,49 @@ import PowerModels
 # don't have. This version is a direct copy with the MI pieces swapped.
 function _build_mn_opf_strg_nl(pm::PowerModels.AbstractPowerModel)
     for (n, network) in PowerModels.nws(pm)
-        PowerModels.variable_bus_voltage(pm, nw = n)
-        PowerModels.variable_gen_power(pm, nw = n)
-        PowerModels.variable_storage_power(pm, nw = n)  # non-MI
-        PowerModels.variable_branch_power(pm, nw = n)
-        PowerModels.variable_dcline_power(pm, nw = n)
+        PowerModels.variable_bus_voltage(pm; nw = n)
+        PowerModels.variable_gen_power(pm; nw = n)
+        PowerModels.variable_storage_power(pm; nw = n)  # non-MI
+        PowerModels.variable_branch_power(pm; nw = n)
+        PowerModels.variable_dcline_power(pm; nw = n)
 
-        PowerModels.constraint_model_voltage(pm, nw = n)
+        PowerModels.constraint_model_voltage(pm; nw = n)
 
-        for i in PowerModels.ids(pm, :ref_buses, nw = n)
-            PowerModels.constraint_theta_ref(pm, i, nw = n)
+        for i in PowerModels.ids(pm, :ref_buses; nw = n)
+            PowerModels.constraint_theta_ref(pm, i; nw = n)
         end
 
-        for i in PowerModels.ids(pm, :bus, nw = n)
-            PowerModels.constraint_power_balance(pm, i, nw = n)
+        for i in PowerModels.ids(pm, :bus; nw = n)
+            PowerModels.constraint_power_balance(pm, i; nw = n)
         end
 
-        for i in PowerModels.ids(pm, :storage, nw = n)
-            PowerModels.constraint_storage_complementarity_nl(pm, i, nw = n)  # non-MI
-            PowerModels.constraint_storage_losses(pm, i, nw = n)
-            PowerModels.constraint_storage_thermal_limit(pm, i, nw = n)
+        for i in PowerModels.ids(pm, :storage; nw = n)
+            PowerModels.constraint_storage_complementarity_nl(pm, i; nw = n)  # non-MI
+            PowerModels.constraint_storage_losses(pm, i; nw = n)
+            PowerModels.constraint_storage_thermal_limit(pm, i; nw = n)
         end
 
-        for i in PowerModels.ids(pm, :branch, nw = n)
-            PowerModels.constraint_ohms_yt_from(pm, i, nw = n)
-            PowerModels.constraint_ohms_yt_to(pm, i, nw = n)
-            PowerModels.constraint_voltage_angle_difference(pm, i, nw = n)
-            PowerModels.constraint_thermal_limit_from(pm, i, nw = n)
-            PowerModels.constraint_thermal_limit_to(pm, i, nw = n)
+        for i in PowerModels.ids(pm, :branch; nw = n)
+            PowerModels.constraint_ohms_yt_from(pm, i; nw = n)
+            PowerModels.constraint_ohms_yt_to(pm, i; nw = n)
+            PowerModels.constraint_voltage_angle_difference(pm, i; nw = n)
+            PowerModels.constraint_thermal_limit_from(pm, i; nw = n)
+            PowerModels.constraint_thermal_limit_to(pm, i; nw = n)
         end
 
-        for i in PowerModels.ids(pm, :dcline, nw = n)
-            PowerModels.constraint_dcline_power_losses(pm, i, nw = n)
+        for i in PowerModels.ids(pm, :dcline; nw = n)
+            PowerModels.constraint_dcline_power_losses(pm, i; nw = n)
         end
     end
 
     # Storage state coupling across periods (initial + recurrence)
     network_ids = sort(collect(PowerModels.nw_ids(pm)))
     n_1 = network_ids[1]
-    for i in PowerModels.ids(pm, :storage, nw = n_1)
-        PowerModels.constraint_storage_state(pm, i, nw = n_1)
+    for i in PowerModels.ids(pm, :storage; nw = n_1)
+        PowerModels.constraint_storage_state(pm, i; nw = n_1)
     end
     for n_2 in network_ids[2:end]
-        for i in PowerModels.ids(pm, :storage, nw = n_2)
+        for i in PowerModels.ids(pm, :storage; nw = n_2)
             PowerModels.constraint_storage_state(pm, i, n_1, n_2)
         end
         n_1 = n_2
@@ -149,7 +149,8 @@ function _check_replication(multi_file::AbstractString, base_file::AbstractStrin
         multi_file, base_file; model = model, optimizer = optimizer,
     )
     expected = K * r_single.objective
-    @info "Replication" model K multi_obj=r_multi.objective single_obj=r_single.objective expected
+    @info "Replication" model K multi_obj = r_multi.objective single_obj =
+        r_single.objective expected
     @test isapprox(r_multi.objective, expected; rtol = rtol)
     return r_multi, r_single
 end
@@ -174,7 +175,7 @@ function _check_energy_conservation(result::Lirion.LirionResult, bat::BatteryDat
             for t in 1:T
         )
         residual = (storage_T - storage_0) - net_flow
-        @info "Energy conservation" bat=b storage_T storage_0 net_flow residual
+        @info "Energy conservation" bat = b storage_T storage_0 net_flow residual
         @test isapprox(residual, 0.0; atol = atol)
     end
     return nothing
@@ -217,10 +218,11 @@ function run_multiperiod_invariants(; optimizer = Ipopt.Optimizer)
     @testset "Multi-period invariants" begin
         @testset "A. Replication (T=3 flat, no battery)" begin
             for model in (Lirion.DC, Lirion.AC, Lirion.ACR, Lirion.SOCWR)
-                mfn = model === Lirion.DC ? Lirion.dc() :
-                      model === Lirion.AC ? Lirion.ac() :
-                      model === Lirion.ACR ? Lirion.acr() :
-                      Lirion.socwr()
+                mfn =
+                    model === Lirion.DC ? Lirion.dc() :
+                    model === Lirion.AC ? Lirion.ac() :
+                    model === Lirion.ACR ? Lirion.acr() :
+                    Lirion.socwr()
                 opt = model === Lirion.SOCWR ? Clarabel.Optimizer : optimizer
                 _check_replication(
                     flat_file, base_file; K = 3, model = mfn,
@@ -267,7 +269,8 @@ function run_multiperiod_invariants(; optimizer = Ipopt.Optimizer)
                 )
                 pm_mn = _build_pm_mn_from_factors(base_file, [1.0, 1.0, 1.0])
                 pm_res = PowerModels.solve_mn_opf(pm_mn, pm_model, opt)
-                @info "PM MN match (no battery)" mfn lirion=r.objective pm=pm_res["objective"]
+                @info "PM MN match (no battery)" mfn lirion = r.objective pm =
+                    pm_res["objective"]
                 @test isapprox(r.objective, pm_res["objective"]; rtol = 1e-4)
             end
         end
@@ -282,7 +285,7 @@ function run_multiperiod_invariants(; optimizer = Ipopt.Optimizer)
             base_bat_file = joinpath(base_dir, "case5_bus_2_bat.m")
             pm_mn = _build_pm_mn_from_factors(base_bat_file, [0.6, 1.0, 1.2])
             pm_res = _pm_mn_opf_strg_nl(pm_mn, PowerModels.ACPPowerModel, optimizer)
-            @info "PM MN match (AC + battery)" lirion=r.objective pm=pm_res["objective"]
+            @info "PM MN match (AC + battery)" lirion = r.objective pm = pm_res["objective"]
             @test isapprox(r.objective, pm_res["objective"]; rtol = 1e-2)
         end
     end

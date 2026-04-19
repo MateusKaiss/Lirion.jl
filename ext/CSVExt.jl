@@ -232,6 +232,14 @@ function _bus_ts_from_df(df::DataFrame)
     )
 end
 
+function _gen_ts_from_df(df::DataFrame)
+    return Lirion.GenTimeseriesRaw{Float64}(
+        _icol(df, "time", 1),
+        _icol(df, "gen_id", 0),
+        _fcol(df, "pmax", 0.0),
+    )
+end
+
 function _gencost_from_df(df::DataFrame)
     n = nrow(df)
 
@@ -392,6 +400,14 @@ function Lirion._csv_parse_case(dir::String)::Lirion.CaseRaw
                 case.gencost_timeseries = _gencost_ts_from_df(_read_csv(p))
                 !isempty(case.gencost_timeseries.time) &&
                     (case.T = max(case.T, maximum(case.gencost_timeseries.time)))
+            end
+        end
+
+        let p = joinpath(tdir, "gen_timeseries.csv")
+            if isfile(p)
+                case.gen_timeseries = _gen_ts_from_df(_read_csv(p))
+                !isempty(case.gen_timeseries.time) &&
+                    (case.T = max(case.T, maximum(case.gen_timeseries.time)))
             end
         end
     end

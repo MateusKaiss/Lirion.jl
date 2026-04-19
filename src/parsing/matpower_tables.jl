@@ -410,6 +410,22 @@ function _bus_ts_from_mat(data::Vector{Vector{String}})
     return BusTimeseriesRaw{Float64}(time, bus, pd, qd, fill(0.0, n), fill(0.0, n))
 end
 
+function _gen_ts_from_mat(data::Vector{Vector{String}})
+    n = _nrows(data)
+    time = Vector{Int}(undef, n)
+    gen_id = Vector{Int}(undef, n)
+    pmax = Vector{Float64}(undef, n)
+
+    @inbounds for i in 1:n
+        row = data[i]
+        time[i] = _as_int(_tok(row, 1, "0"), 0)
+        gen_id[i] = _as_int(_tok(row, 2, "0"), 0)
+        pmax[i] = _as_f64(_tok(row, 3, ""), 0.0)
+    end
+
+    return GenTimeseriesRaw{Float64}(time, gen_id, pmax)
+end
+
 function _parse_gencost_table_raw(data::Vector{Vector{String}})
     n = _nrows(data)
     model = Vector{Int}(undef, n)

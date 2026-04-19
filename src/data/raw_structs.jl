@@ -168,6 +168,16 @@ struct GencostTimeseriesRaw{T <: Real} <: AbstractRawTable
     feed_in_tariff::Vector{T}
 end
 
+# Per-period renewable / generator availability. `pmax_available[g,t]` is
+# the time-varying upper bound on `p_generation[g,t]`; for curtailable
+# generators (plant_type == "R") it defines the "dispatchable envelope".
+# Any generator not listed falls back to its static `gen.pmax`.
+struct GenTimeseriesRaw{T <: Real} <: AbstractRawTable
+    time::Vector{Int}
+    gen_id::Vector{Int}
+    pmax::Vector{T}
+end
+
 @inline _empty_vec(::Type{T}) where {T} = T[]
 
 function empty_bus_raw(::Type{T} = Float64) where {T <: Real}
@@ -294,6 +304,7 @@ mutable struct CaseRaw
     # timeseries
     bus_timeseries::Union{Nothing, BusTimeseriesRaw{Float64}}
     gencost_timeseries::Union{Nothing, GencostTimeseriesRaw{Float64}}
+    gen_timeseries::Union{Nothing, GenTimeseriesRaw{Float64}}
 
     # maps/meta
     maps::CaseIndexMaps
@@ -313,7 +324,7 @@ mutable struct CaseRaw
             empty_branch_raw(Float64),
             empty_gencost_raw(Float64),
             nothing, nothing, nothing, nothing,
-            nothing, nothing,
+            nothing, nothing, nothing,
             CaseIndexMaps(),
             DistributedRawMeta(),
         )
@@ -345,4 +356,11 @@ slice_gencost_ts(ts::GencostTimeseriesRaw{T}, order::Vector{Int}) where {T} =
         _slice_vec(ts.cost_coefficients, order),
         _slice_vec(ts.tou, order),
         _slice_vec(ts.feed_in_tariff, order),
+    )
+
+slice_gen_ts(ts::GenTimeseriesRaw{T}, order::Vector{Int}) where {T} =
+    GenTimeseriesRaw{T}(
+        _slice_vec(ts.time, order),
+        _slice_vec(ts.gen_id, order),
+        _slice_vec(ts.pmax, order),
     )

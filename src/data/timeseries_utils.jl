@@ -7,6 +7,9 @@ function get_model_times(case::CaseRaw)
     if case.gencost_timeseries !== nothing && !isempty(case.gencost_timeseries.time)
         push!(time_vecs, case.gencost_timeseries.time)
     end
+    if case.gen_timeseries !== nothing && !isempty(case.gen_timeseries.time)
+        push!(time_vecs, case.gen_timeseries.time)
+    end
 
     isempty(time_vecs) && return Int[]
     all_times = unique(vcat(time_vecs...))
@@ -22,6 +25,9 @@ function check_time_alignment(case::CaseRaw)
     end
     if case.gencost_timeseries !== nothing && !isempty(case.gencost_timeseries.time)
         time_sets["gencost_timeseries"] = Set(case.gencost_timeseries.time)
+    end
+    if case.gen_timeseries !== nothing && !isempty(case.gen_timeseries.time)
+        time_sets["gen_timeseries"] = Set(case.gen_timeseries.time)
     end
 
     if length(time_sets) > 1
@@ -156,6 +162,13 @@ function extend_gencost_timeseries!(case::CaseRaw, T::Int)
     return _extend_generic_timeseries!(ts.time, ts.gen_id, cols, T, "gencost_timeseries")
 end
 
+function extend_gen_timeseries!(case::CaseRaw, T::Int)
+    case.gen_timeseries === nothing && return
+    ts = case.gen_timeseries
+    cols = AbstractVector[ts.pmax]
+    return _extend_generic_timeseries!(ts.time, ts.gen_id, cols, T, "gen_timeseries")
+end
+
 function sort_timeseries_by_time_and_id!(case::CaseRaw)
     if case.bus_timeseries !== nothing
         ts = case.bus_timeseries
@@ -166,6 +179,11 @@ function sort_timeseries_by_time_and_id!(case::CaseRaw)
         ts = case.gencost_timeseries
         order = sortperm([(ts.time[i], ts.gen_id[i]) for i in eachindex(ts.time)])
         case.gencost_timeseries = slice_gencost_ts(ts, order)
+    end
+    if case.gen_timeseries !== nothing
+        ts = case.gen_timeseries
+        order = sortperm([(ts.time[i], ts.gen_id[i]) for i in eachindex(ts.time)])
+        case.gen_timeseries = slice_gen_ts(ts, order)
     end
     return
 end
