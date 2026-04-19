@@ -70,8 +70,8 @@ const AC_DUMMYBUS_POWER_CASES = [
 # ============================================================
 # OBJECTIVE EXTRACTORS
 # ============================================================
-central_obj_ac(out) = Float64(out.result["objective"])
-dist_obj_ac(out) = Float64(out.result.total_cost)
+central_obj_ac(out) = Float64(out.objective)
+dist_obj_ac(out) = Float64(out.objective)
 
 # ============================================================
 # AC - STATE

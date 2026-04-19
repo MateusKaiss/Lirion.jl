@@ -29,8 +29,8 @@ const ALADIN_SOCWR_SPLITBUS_HYBRID_CASES = [
 # ============================================================
 # OBJECTIVE EXTRACTORS
 # ============================================================
-aladin_central_obj_socwr(out) = Float64(out.result["objective"])
-aladin_dist_obj_socwr(out) = Float64(out.result.total_cost)
+aladin_central_obj_socwr(out) = Float64(out.objective)
+aladin_dist_obj_socwr(out) = Float64(out.objective)
 
 # ============================================================
 # ALADIN SOCWR - STATE

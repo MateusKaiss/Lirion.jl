@@ -399,4 +399,46 @@ function Lirion._csv_parse_case(dir::String)::Lirion.CaseRaw
     return case
 end
 
+# ============================================================
+# LirionResult → CSV dump
+# ============================================================
+
+function Lirion.to_csvs(result::Lirion.LirionResult, outdir::AbstractString)
+    mkpath(outdir)
+
+    # Summary — one-row table.
+    summary_df = DataFrame(
+        algorithm = [String(result.algorithm)],
+        base_model = [String(result.base_model)],
+        coupling = [String(result.coupling)],
+        sectioning = [String(result.sectioning)],
+        objective = [result.objective],
+        status = [String(result.status)],
+        solve_time = [result.solve_time],
+        iter_done = [result.iter_done === nothing ? -1 : result.iter_done],
+    )
+    CSV.write(joinpath(outdir, "summary.csv"), summary_df)
+
+    # Merged tables.
+    nrow(result.bus) > 0 && CSV.write(joinpath(outdir, "bus.csv"), result.bus)
+    nrow(result.gen) > 0 && CSV.write(joinpath(outdir, "gen.csv"), result.gen)
+    nrow(result.branch) > 0 && CSV.write(joinpath(outdir, "branch.csv"), result.branch)
+
+    # Distributed extras.
+    if result.consensus !== nothing && nrow(result.consensus) > 0
+        CSV.write(joinpath(outdir, "consensus.csv"), result.consensus)
+    end
+    if result.zones !== nothing
+        for z in result.zones
+            zdir = joinpath(outdir, "zone_$(z.id)")
+            mkpath(zdir)
+            nrow(z.bus) > 0 && CSV.write(joinpath(zdir, "bus.csv"), z.bus)
+            nrow(z.gen) > 0 && CSV.write(joinpath(zdir, "gen.csv"), z.gen)
+            nrow(z.branch) > 0 && CSV.write(joinpath(zdir, "branch.csv"), z.branch)
+        end
+    end
+
+    return outdir
+end
+
 end # module

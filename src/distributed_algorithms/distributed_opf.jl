@@ -17,7 +17,7 @@ _algo_name(::ALADINConfig) = "ALADIN"
 # ------------------------------------------------------------
 # Distributed runner — single generic entry point
 # ------------------------------------------------------------
-function run_distributed(inputs::DistributedInputs)::LirionRunResult
+function run_distributed(inputs::DistributedInputs)::LirionResult
     cfg = inputs.model_type
     sys = inputs.system
 
@@ -28,22 +28,5 @@ function run_distributed(inputs::DistributedInputs)::LirionRunResult
     @info "  optimizer  = $(inputs.optimizer)"
 
     optimizer_factory = resolve_optimizer(cfg, inputs.optimizer)
-
-    output = run_algorithm(sys, cfg; optimizer_factory = optimizer_factory)
-
-    r = output.result
-    base_nt = r isa NamedTuple ? r : (result = r,)
-
-    meta_nt = (
-        config = cfg,
-        system = sys,
-        database = inputs.database_path,
-    )
-
-    return LirionRunResult(;
-        result = merge(base_nt, meta_nt),
-        model = output.model,
-        system = output.system,
-        diagnostics = output.diagnostics,
-    )
+    return run_algorithm(sys, cfg; optimizer_factory = optimizer_factory)
 end

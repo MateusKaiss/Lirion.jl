@@ -123,12 +123,8 @@ function track_failure(label::String, origin::String, case_name::String)
     return push!(GLOBAL_FAILED_CASES[label][origin], case_name)
 end
 
-@inline function _objective_lirion(out::Lirion.LirionRunResult)
-    d = out.result
-    d isa AbstractDict || error("Lirion out.result must be Dict, got $(typeof(d))")
-    haskey(d, "objective") ||
-        error("Lirion result has no key 'objective'. Keys=$(collect(keys(d)))")
-    return Float64(d["objective"])
+@inline function _objective_lirion(out::Lirion.LirionResult)
+    return Float64(out.objective)
 end
 
 @inline function _model_from_type(model_type::Type{<:Lirion.OPFModel})

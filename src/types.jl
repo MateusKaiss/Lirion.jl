@@ -615,65 +615,6 @@ Base.@kwdef struct ADMMHistory <: AbstractRunDiagnostics
     meta::Dict{Symbol, Any} = Dict{Symbol, Any}()
 end
 
-Base.@kwdef struct LirionRunResult
-    result::Any = nothing
-    model::Any = nothing
-    system::Any = nothing
-    diagnostics::AbstractRunDiagnostics = NoDiagnostics()
-end
-
-# Concise REPL display — the default recursive dump prints every partition's
-# BranchData, JuMP model, etc. which is unreadable. Internals stay accessible
-# through `out.result`, `out.system`, `out.model`, `out.diagnostics`.
-function Base.show(io::IO, ::MIME"text/plain", out::LirionRunResult)
-    println(io, "LirionRunResult")
-    r = out.result
-    if r isa NamedTuple && hasproperty(r, :total_cost)
-        # Distributed run
-        cfg = hasproperty(r, :config) ? r.config : nothing
-        algo_tag =
-            cfg isa ADMMConfig ? "ADMM" :
-            cfg isa ALADINConfig ? "ALADIN" :
-            "distributed"
-        println(io, "  ├─ algorithm:  ", algo_tag)
-        if cfg !== nothing
-            println(io, "  ├─ model:      ", nameof(cfg.base_model),
-                    " / ", cfg.coupling, " / ", nameof(typeof(cfg.sectioning)))
-        end
-        println(io, "  ├─ total_cost: ",
-                round(Float64(r.total_cost); digits = 4))
-        hasproperty(r, :iter_done) &&
-            println(io, "  ├─ iter_done:  ", r.iter_done)
-        hasproperty(r, :elapsed_s) &&
-            println(io, "  ├─ elapsed:    ", round(r.elapsed_s; digits = 3), " s")
-        if hasproperty(r, :partitions) && r.partitions isa Partitions
-            println(io, "  └─ partitions: ", length(r.partitions.parts), " zone(s)")
-        else
-            println(io, "  └─ (internals: out.result, out.system, out.diagnostics)")
-        end
-    elseif r isa AbstractDict && haskey(r, "objective")
-        # Centralized run
-        println(io, "  ├─ algorithm:  centralized")
-        println(io, "  ├─ objective:  ", round(Float64(r["objective"]); digits = 4))
-        if out.model !== nothing
-            st = try
-                JuMP.termination_status(out.model)
-            catch
-                nothing
-            end
-            st === nothing || println(io, "  ├─ status:     ", st)
-        end
-        println(io, "  └─ (internals: out.result, out.model, out.system)")
-    else
-        println(io, "  └─ (unknown result; internals in out.result, out.system, out.model)")
-    end
-    return nothing
-end
-
-# Also collapse the single-line `show(io, out)` form (e.g. used in arrays/tuples).
-Base.show(io::IO, out::LirionRunResult) =
-    print(io, "LirionRunResult(...)")
-
 # ============================================================
 # Inputs Format
 # ============================================================

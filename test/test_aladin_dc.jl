@@ -46,8 +46,8 @@ const ALADIN_DC_DUMMYBUS_POWER_CASES = [
 # ============================================================
 # OBJECTIVE EXTRACTORS
 # ============================================================
-aladin_central_obj_dc(out) = Float64(out.result["objective"])
-aladin_dist_obj_dc(out) = Float64(out.result.total_cost)
+aladin_central_obj_dc(out) = Float64(out.objective)
+aladin_dist_obj_dc(out) = Float64(out.objective)
 
 # ============================================================
 # ALADIN DC - STATE

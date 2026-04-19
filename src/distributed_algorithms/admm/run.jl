@@ -35,7 +35,7 @@ function run_algorithm(
     sys::DistributedSystem,
     config::ADMMConfig;
     optimizer_factory = nothing,
-)::LirionRunResult
+)::LirionResult
     t0 = time_ns()
     tag = ADMM{_variant_type(Val(config.coupling)), config.base_model}()
 
@@ -43,26 +43,22 @@ function run_algorithm(
     ws = build_workspace(sys, config, optimizer_factory, tag)
     initial_rhos = _get_rhos(ws)
     run_algorithm!(ws, params)
-    result = _finalize(ws.partitions, t0, ws.iter)
 
     tag_str = _print_tag(ws)
     final_rhos = _get_rhos(ws)
-
     rho_lines = [
         "$(k) inicial: $(initial_rhos[k]) | $(k) final: $(final_rhos[k])"
         for k in keys(final_rhos)
     ]
-    _FAST_USE_LOGS && _print_summary!(
-        tag_str,
-        "ADMM",
-        result;
-        rho_lines = rho_lines,
-    )
+    if _FAST_USE_LOGS
+        _print_summary!(
+            tag_str, "ADMM",
+            _finalize(ws.partitions, t0, ws.iter);
+            rho_lines = rho_lines,
+        )
+    end
 
-    return LirionRunResult(;
-        result = result,
-        model = nothing,
-        system = sys,
-        diagnostics = ws.hist,
+    return build_lirion_result_distributed(
+        ws.partitions, ws, config, ws.iter, t0, sys,
     )
 end

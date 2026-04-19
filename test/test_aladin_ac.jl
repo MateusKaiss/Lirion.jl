@@ -42,8 +42,8 @@ const ALADIN_AC_DUMMYBUS_POWER_CASES = [
 # ============================================================
 # OBJECTIVE EXTRACTORS
 # ============================================================
-aladin_central_obj_ac(out) = Float64(out.result["objective"])
-aladin_dist_obj_ac(out) = Float64(out.result.total_cost)
+aladin_central_obj_ac(out) = Float64(out.objective)
+aladin_dist_obj_ac(out) = Float64(out.objective)
 
 # ============================================================
 # ALADIN AC - STATE

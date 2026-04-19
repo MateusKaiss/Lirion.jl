@@ -72,8 +72,8 @@ const SOCWR_DUMMYBUS_POWER_CASES = [
 # ============================================================
 # OBJECTIVE EXTRACTORS
 # ============================================================
-central_obj_socwr(out) = Float64(out.result["objective"])
-dist_obj_socwr(out) = Float64(out.result.total_cost)
+central_obj_socwr(out) = Float64(out.objective)
+dist_obj_socwr(out) = Float64(out.objective)
 
 # ============================================================
 # SOCWR - STATE
