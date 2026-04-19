@@ -106,6 +106,7 @@ include("modeling/branch/ivr.jl")
 include("modeling/branch/lpac.jl")
 include("modeling/branch/socwr_rt.jl")
 include("modeling/branch/socwr.jl")
+include("modeling/branch/sdpwrm.jl")
 include("modeling/branch/socbf.jl")
 include("modeling/branch/bfa.jl")
 include("modeling/branch/nfa.jl")
@@ -255,7 +256,7 @@ end
 # Public exports
 # ------------------------------------------------------------------
 export solve, load,
-    dc, ac, acr, ivr, lpac, socwr, socbf, bfa, nfa,
+    dc, ac, acr, ivr, lpac, socwr, sdpwrm, socbf, bfa, nfa,
     centralized, admm, aladin,
     create_partition, create_partition_split_bus, write_matpower,
     LirionResult, to_csvs

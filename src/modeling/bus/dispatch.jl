@@ -41,6 +41,12 @@ function add_bus_variables!(model::JuMP.Model, bus::BusData, ::Type{SOCWR})
     return add_socwr_bus_variables!(model, bus)
 end
 
+function add_bus_variables!(model::JuMP.Model, bus::BusData, ::Type{SDPWRM})
+    # v_magnitude_sq is registered later by add_sdpwrm_bus_variables! once the
+    # branch data is available (it needs buspair bounds).
+    return nothing
+end
+
 function add_bus_variables!(model::JuMP.Model, bus::BusData, ::Type{SOCBF})
     return add_socwr_bus_variables!(model, bus)
 end

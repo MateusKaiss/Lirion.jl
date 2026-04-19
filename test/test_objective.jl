@@ -73,6 +73,18 @@ const reduced_list = [
     # "pglib_opf_case78484_epigrids.m",
 ]
 
+# Reduced list for SDP (dense SDPWRM). Dense SDP scales O(n²) variables and
+# scales poorly past ~60 buses; additionally, Clarabel often hits
+# NUMERICAL_ERROR on certain pathological cases (e.g. case30_ieee) where the
+# reported objective becomes meaningless — those cases are skipped here.
+const reduced_testlist_sdp = [
+    "pglib_opf_case3_lmbd.m",
+    "pglib_opf_case5_pjm.m",
+    "pglib_opf_case14_ieee.m",
+    "pglib_opf_case24_ieee_rts.m",
+    "pglib_opf_case30_as.m",
+]
+
 # Reduced list for AC only
 const reduced_testlist_ac = [
     "pglib_opf_case3_lmbd.m",
@@ -140,6 +152,8 @@ end
         return Lirion.lpac()
     elseif model_type == Lirion.SOCWR
         return Lirion.socwr()
+    elseif model_type == Lirion.SDPWRM
+        return Lirion.sdpwrm()
     elseif model_type == Lirion.SOCBF
         return Lirion.socbf()
     elseif model_type == Lirion.BFA
@@ -217,6 +231,10 @@ end
         elseif model_type == Lirion.SOCWR
             return Float64(
                 PowerModels.solve_opf(pm_data, SOCWRConicPowerModel, optimizer)["objective"],
+            )
+        elseif model_type == Lirion.SDPWRM
+            return Float64(
+                PowerModels.solve_opf(pm_data, SDPWRMPowerModel, optimizer)["objective"],
             )
         elseif model_type == Lirion.SOCBF
             return Float64(
@@ -365,6 +383,15 @@ function run_test_objective()
             "SOCWR";
             optimizer = socwr_optimizer,
             case_list = reduced_list,
+        )
+
+        sdp_optimizer = Clarabel.Optimizer
+        run_model_tests(
+            Lirion.SDPWRM,
+            "SDPWRM";
+            optimizer = sdp_optimizer,
+            case_list = reduced_testlist_sdp,
+            tol = 0.01,
         )
 
         socbf_optimizer = Clarabel.Optimizer

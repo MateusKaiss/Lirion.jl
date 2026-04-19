@@ -60,6 +60,12 @@ function add_generator_variables!(model::JuMP.Model, gen::GenData, ::Type{SOCWR}
     return add_curtailment_variables!(model, gen)
 end
 
+function add_generator_variables!(model::JuMP.Model, gen::GenData, ::Type{SDPWRM})
+    add_active_generation_variables!(model, gen)
+    add_reactive_generation_variables!(model, gen)
+    return add_curtailment_variables!(model, gen)
+end
+
 function add_generator_variables!(model::JuMP.Model, gen::GenData, ::Type{SOCBF})
     add_active_generation_variables!(model, gen)
     add_reactive_generation_variables!(model, gen)
@@ -102,6 +108,10 @@ function add_generator_constraints!(model::JuMP.Model, gen::GenData, ::Type{LPAC
 end
 
 function add_generator_constraints!(model::JuMP.Model, gen::GenData, ::Type{SOCWR})
+    return add_curtailment_constraints!(model, gen)
+end
+
+function add_generator_constraints!(model::JuMP.Model, gen::GenData, ::Type{SDPWRM})
     return add_curtailment_constraints!(model, gen)
 end
 

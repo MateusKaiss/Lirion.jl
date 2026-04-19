@@ -10,6 +10,7 @@ struct ACR <: OPFModel end    # AC rectangular (vr, vi)
 struct IVR <: OPFModel end    # Current-Voltage rectangular (vr, vi, cr, ci)
 struct LPAC <: OPFModel end   # Linear Power AC (Coffrin & Van Hentenryck 2014)
 struct SOCWR <: OPFModel end  # Jabr SOCP (W-rectangular)
+struct SDPWRM <: OPFModel end # Bai-Wei-Fujisawa SDP (W-rectangular matrix)
 struct SOCBF <: OPFModel end  # Branch Flow SOCP
 struct BFA <: OPFModel end    # Linear Branch Flow Approx (LinDistFlow)
 struct NFA <: OPFModel end    # Network Flow Approximation (LP, active-only)
