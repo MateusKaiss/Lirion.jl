@@ -23,6 +23,7 @@
 # ============================================================
 
 import Lirion
+import JuMP
 
 const _RENEW_DIR = joinpath(@__DIR__, "renewables")
 

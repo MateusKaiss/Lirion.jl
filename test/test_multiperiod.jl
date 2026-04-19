@@ -23,6 +23,7 @@
 using Lirion: StorageData
 import Lirion
 import PowerModels
+import JuMP
 
 # PowerModels multi-network build function that uses NONLINEAR storage
 # complementarity (sc·sd = 0), matching Lirion's formulation. The standard
