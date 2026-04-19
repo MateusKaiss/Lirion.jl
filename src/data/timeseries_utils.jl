@@ -165,7 +165,7 @@ end
 function extend_gen_timeseries!(case::CaseRaw, T::Int)
     case.gen_timeseries === nothing && return
     ts = case.gen_timeseries
-    cols = AbstractVector[ts.pmax]
+    cols = AbstractVector[ts.pmax, ts.pmin, ts.qmax, ts.qmin]
     return _extend_generic_timeseries!(ts.time, ts.gen_id, cols, T, "gen_timeseries")
 end
 

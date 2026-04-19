@@ -415,15 +415,23 @@ function _gen_ts_from_mat(data::Vector{Vector{String}})
     time = Vector{Int}(undef, n)
     gen_id = Vector{Int}(undef, n)
     pmax = Vector{Float64}(undef, n)
+    pmin = Vector{Float64}(undef, n)
+    qmax = Vector{Float64}(undef, n)
+    qmin = Vector{Float64}(undef, n)
 
+    # Columns 4-6 are optional. Absent tokens become NaN, which downstream
+    # code treats as "use the static gen.* field".
     @inbounds for i in 1:n
         row = data[i]
         time[i] = _as_int(_tok(row, 1, "0"), 0)
         gen_id[i] = _as_int(_tok(row, 2, "0"), 0)
-        pmax[i] = _as_f64(_tok(row, 3, ""), 0.0)
+        pmax[i] = _as_f64(_tok(row, 3, "NaN"), NaN)
+        pmin[i] = _as_f64(_tok(row, 4, "NaN"), NaN)
+        qmax[i] = _as_f64(_tok(row, 5, "NaN"), NaN)
+        qmin[i] = _as_f64(_tok(row, 6, "NaN"), NaN)
     end
 
-    return GenTimeseriesRaw{Float64}(time, gen_id, pmax)
+    return GenTimeseriesRaw{Float64}(time, gen_id, pmax, pmin, qmax, qmin)
 end
 
 function _parse_gencost_table_raw(data::Vector{Vector{String}})

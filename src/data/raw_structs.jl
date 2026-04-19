@@ -168,14 +168,19 @@ struct GencostTimeseriesRaw{T <: Real} <: AbstractRawTable
     feed_in_tariff::Vector{T}
 end
 
-# Per-period renewable / generator availability. `pmax_available[g,t]` is
-# the time-varying upper bound on `p_generation[g,t]`; for curtailable
-# generators (plant_type == "R") it defines the "dispatchable envelope".
-# Any generator not listed falls back to its static `gen.pmax`.
+# Per-period generator envelope. `pmax` is the time-varying upper bound
+# on `p_generation[g,t]`; for curtailable gens (plant_type == "R") it
+# defines the dispatchable availability. The optional `pmin`, `qmax`,
+# `qmin` fields override the corresponding static bounds when they are
+# tighter (smaller upper bound or larger lower bound) than the nameplate.
+# Missing entries carry NaN and fall back to the static `gen.*` field.
 struct GenTimeseriesRaw{T <: Real} <: AbstractRawTable
     time::Vector{Int}
     gen_id::Vector{Int}
     pmax::Vector{T}
+    pmin::Vector{T}
+    qmax::Vector{T}
+    qmin::Vector{T}
 end
 
 @inline _empty_vec(::Type{T}) where {T} = T[]
@@ -363,4 +368,7 @@ slice_gen_ts(ts::GenTimeseriesRaw{T}, order::Vector{Int}) where {T} =
         _slice_vec(ts.time, order),
         _slice_vec(ts.gen_id, order),
         _slice_vec(ts.pmax, order),
+        _slice_vec(ts.pmin, order),
+        _slice_vec(ts.qmax, order),
+        _slice_vec(ts.qmin, order),
     )

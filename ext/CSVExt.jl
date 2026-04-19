@@ -236,7 +236,10 @@ function _gen_ts_from_df(df::DataFrame)
     return Lirion.GenTimeseriesRaw{Float64}(
         _icol(df, "time", 1),
         _icol(df, "gen_id", 0),
-        _fcol(df, "pmax", 0.0),
+        _fcol(df, "pmax", NaN),
+        _fcol(df, "pmin", NaN),
+        _fcol(df, "qmax", NaN),
+        _fcol(df, "qmin", NaN),
     )
 end
 

@@ -133,7 +133,31 @@ function run_renewables_tests(; optimizer = Ipopt.Optimizer)
             @test r.objective >= 5696.0 + 50.0 * min_curt_mw - 1.0
         end
 
-        @testset "5. Distributed ADMM DC matches centralized" begin
+        @testset "5. Extra gen_timeseries columns (pmin/qmax/qmin)" begin
+            # case3_gen_ts_bounds: gen 1 must-run 300 MW at t=1, gen 2
+            # qmax tightened to 50 MVAr at t=2.
+            r = _solve(_case("case3_gen_ts_bounds.m"), Lirion.ac();
+                optimizer = optimizer)
+            @test r.status in (:optimal, :local_optimal)
+            g = r.system.gen
+            m = r.model
+
+            # gen 1: static pmin = 0, pmin_ts[1, 1] = 3.0 (pu), pmin_ts[1, 2] = 0.
+            @test isapprox(g.pmin_ts[1, 1], 3.0; atol = 1e-10)
+            @test isapprox(g.pmin_ts[1, 2], 0.0; atol = 1e-10)
+            @test JuMP.value(m[:p_generation][1, 1]) >= 3.0 - 1e-6
+
+            # gen 2: static qmax = 10.0 (pu), qmax_ts[2, 2] = 0.5.
+            @test isapprox(g.qmax_ts[2, 1], 10.0; atol = 1e-10)
+            @test isapprox(g.qmax_ts[2, 2], 0.5; atol = 1e-10)
+            @test JuMP.value(m[:q_generation][2, 2]) <= 0.5 + 1e-6
+
+            # NaN sentinel: other entries must fall back to static.
+            @test isapprox(g.pmax_ts[1, 1], g.pmax[1]; atol = 1e-10)
+            @test isapprox(g.qmin_ts[2, 1], g.qmin[2]; atol = 1e-10)
+        end
+
+        @testset "6. Distributed ADMM DC matches centralized" begin
             # Distributed ADMM is single-period only today, so use the
             # static renewable case. Both runs must land on the same
             # objective (within the usual ADMM tolerance).

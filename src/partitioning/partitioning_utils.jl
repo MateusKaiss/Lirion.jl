@@ -382,6 +382,9 @@ end
             ts.time[zone_g_ts_idx],
             remapped_gen_id_ts,
             ts.pmax[zone_g_ts_idx],
+            ts.pmin[zone_g_ts_idx],
+            ts.qmax[zone_g_ts_idx],
+            ts.qmin[zone_g_ts_idx],
         )
     end
 

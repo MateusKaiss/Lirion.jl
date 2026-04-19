@@ -20,11 +20,13 @@ struct GenData
 
     curtailable::Vector{Int}
 
-    # Time-varying availability ceiling for each generator (size n × T).
-    # For a period t, pmax_ts[g, t] is the effective upper bound for
-    # p_generation[g, t]. If no gen_timeseries is provided, pmax_ts
-    # defaults to pmax[g] replicated across all periods.
+    # Time-varying envelope for each generator (size n × T). Default to
+    # the static nameplate (pmax, pmin, qmax, qmin) replicated across
+    # periods; overridden where `gen_timeseries` provides finite entries.
     pmax_ts::Matrix{Float64}
+    pmin_ts::Matrix{Float64}
+    qmax_ts::Matrix{Float64}
+    qmin_ts::Matrix{Float64}
 end
 
 function get_gen_parameters(case_raw::CaseRaw)
@@ -54,8 +56,14 @@ function get_gen_parameters(case_raw::CaseRaw)
 
     T = max(case_raw.T, 1)
     pmax_ts = Matrix{Float64}(undef, n, T)
+    pmin_ts = Matrix{Float64}(undef, n, T)
+    qmax_ts = Matrix{Float64}(undef, n, T)
+    qmin_ts = Matrix{Float64}(undef, n, T)
     @inbounds for g in 1:n, t in 1:T
         pmax_ts[g, t] = gen_raw.pmax[g]
+        pmin_ts[g, t] = gen_raw.pmin[g]
+        qmax_ts[g, t] = gen_raw.qmax[g]
+        qmin_ts[g, t] = gen_raw.qmin[g]
     end
 
     if case_raw.gen_timeseries !== nothing &&
@@ -66,7 +74,10 @@ function get_gen_parameters(case_raw::CaseRaw)
             t = ts.time[i]
             (g < 1 || g > n) && continue
             (t < 1 || t > T) && continue
-            pmax_ts[g, t] = ts.pmax[i]
+            isnan(ts.pmax[i]) || (pmax_ts[g, t] = ts.pmax[i])
+            isnan(ts.pmin[i]) || (pmin_ts[g, t] = ts.pmin[i])
+            isnan(ts.qmax[i]) || (qmax_ts[g, t] = ts.qmax[i])
+            isnan(ts.qmin[i]) || (qmin_ts[g, t] = ts.qmin[i])
         end
     end
 
@@ -87,6 +98,9 @@ function get_gen_parameters(case_raw::CaseRaw)
         curtailment_cost = gen_raw.curtailment_cost,
         curtailable = curtailable,
         pmax_ts = pmax_ts,
+        pmin_ts = pmin_ts,
+        qmax_ts = qmax_ts,
+        qmin_ts = qmin_ts,
     )
 end
 
@@ -110,5 +124,8 @@ function build_gen_data(case_raw::CaseRaw)::GenData
         params.curtailment_cost,
         params.curtailable,
         params.pmax_ts,
+        params.pmin_ts,
+        params.qmax_ts,
+        params.qmin_ts,
     )
 end

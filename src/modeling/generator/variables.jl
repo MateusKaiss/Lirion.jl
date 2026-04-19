@@ -42,17 +42,22 @@ function add_active_generation_variables!(model::JuMP.Model, gen::GenData)
 
     model[:p_generation] = p_generation
 
-    # If gen_timeseries tightens the pmax for a non-curtailable gen, add
-    # the inequality explicitly. Skip curtailable gens — those get a tight
-    # equality constraint via add_curtailment_constraints!.
-    if T > 1 || any(pmax_ts .< pmax .- 1e-12)
-        for g in 1:G
-            gen.existing[g] || continue
-            gen.plant_type[g] == "R" && continue
-            for t in 1:T
-                if pmax_ts[g, t] < pmax[g] - 1e-12
-                    @constraint(model, p_generation[g, t] <= pmax_ts[g, t])
-                end
+    # Time-varying bounds on active power. pmax is the upper cap; pmin is
+    # the lower cap (useful for must-run windows). We only add the
+    # inequality when the time series value is STRICTLY tighter than the
+    # scalar variable bound, to avoid inflating the constraint count.
+    pmin_ts = gen.pmin_ts
+    for g in 1:G
+        gen.existing[g] || continue
+        is_renewable = gen.plant_type[g] == "R"
+        for t in 1:T
+            # Skip renewables' pmax — they get a tight equality via
+            # add_curtailment_constraints!.
+            if !is_renewable && pmax_ts[g, t] < pmax[g] - 1e-12
+                @constraint(model, p_generation[g, t] <= pmax_ts[g, t])
+            end
+            if pmin_ts[g, t] > pmin[g] + 1e-12
+                @constraint(model, p_generation[g, t] >= pmin_ts[g, t])
             end
         end
     end
@@ -67,16 +72,41 @@ function add_reactive_generation_variables!(model::JuMP.Model, gen::GenData)
     qg_fallback = gen.qg
     qmin = gen.qmin
     qmax = gen.qmax
+    qmax_ts = gen.qmax_ts
+    qmin_ts = gen.qmin_ts
 
     @variable(
         model,
         q_generation[g = 1:G, t = 1:T; gen.existing[g]],
         lower_bound = qmin[g],
         upper_bound = qmax[g],
-        start = isnan(qg_start[g]) ? qg_fallback[g] : qg_start[g],
     )
 
+    @inbounds for g in 1:G
+        gen.existing[g] || continue
+        base = isnan(qg_start[g]) ? qg_fallback[g] : qg_start[g]
+        for t in 1:T
+            s = min(max(base, qmin[g]), qmax[g])
+            JuMP.set_start_value(q_generation[g, t], s)
+        end
+    end
+
     model[:q_generation] = q_generation
+
+    # Time-varying reactive envelope. Only tighten when strictly narrower
+    # than the variable's scalar bound.
+    for g in 1:G
+        gen.existing[g] || continue
+        for t in 1:T
+            if qmax_ts[g, t] < qmax[g] - 1e-12
+                @constraint(model, q_generation[g, t] <= qmax_ts[g, t])
+            end
+            if qmin_ts[g, t] > qmin[g] + 1e-12
+                @constraint(model, q_generation[g, t] >= qmin_ts[g, t])
+            end
+        end
+    end
+
     return nothing
 end
 

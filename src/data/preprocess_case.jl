@@ -157,10 +157,21 @@ function convert_timeseries_to_pu!(raw_case::CaseRaw)
 
     if raw_case.gen_timeseries !== nothing
         ts = raw_case.gen_timeseries
-        ts.pmax ./= Sbase
+        # NaN sentinels stay NaN through division; only rescale finite values.
+        _rescale_finite!(ts.pmax, Sbase)
+        _rescale_finite!(ts.pmin, Sbase)
+        _rescale_finite!(ts.qmax, Sbase)
+        _rescale_finite!(ts.qmin, Sbase)
     end
 
     return raw_case
+end
+
+@inline function _rescale_finite!(v::Vector{Float64}, s::Float64)
+    @inbounds for i in eachindex(v)
+        isnan(v[i]) || (v[i] /= s)
+    end
+    return v
 end
 
 # ---------------------------------------------------------------------
