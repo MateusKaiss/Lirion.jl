@@ -152,6 +152,8 @@ end
         return Lirion.lpac()
     elseif model_type == Lirion.SOCWR
         return Lirion.socwr()
+    elseif model_type == Lirion.QC
+        return Lirion.qc()
     elseif model_type == Lirion.SDPWRM
         return Lirion.sdpwrm()
     elseif model_type == Lirion.SOCBF
@@ -231,6 +233,10 @@ end
         elseif model_type == Lirion.SOCWR
             return Float64(
                 PowerModels.solve_opf(pm_data, SOCWRConicPowerModel, optimizer)["objective"],
+            )
+        elseif model_type == Lirion.QC
+            return Float64(
+                PowerModels.solve_opf(pm_data, QCRMPowerModel, optimizer)["objective"],
             )
         elseif model_type == Lirion.SDPWRM
             return Float64(
@@ -383,6 +389,13 @@ function run_test_objective()
             "SOCWR";
             optimizer = socwr_optimizer,
             case_list = reduced_list,
+        )
+
+        run_model_tests(
+            Lirion.QC,
+            "QC";
+            optimizer = Ipopt.Optimizer,
+            case_list = reduced_testlist_ac,
         )
 
         sdp_optimizer = Clarabel.Optimizer

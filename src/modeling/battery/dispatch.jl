@@ -59,6 +59,10 @@ function add_battery_constraints!(model::JuMP.Model, bat::BatteryData, ::Type{SD
     return add_socwr_battery_constraints!(model, bat)
 end
 
+function add_battery_constraints!(model::JuMP.Model, bat::BatteryData, ::Type{QC})
+    return add_socwr_battery_constraints!(model, bat)
+end
+
 function add_battery_constraints!(model::JuMP.Model, bat::BatteryData, ::Type{SOCBF})
     return add_socwr_battery_constraints!(model, bat)
 end

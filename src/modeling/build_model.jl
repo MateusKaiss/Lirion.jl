@@ -9,6 +9,7 @@
 @inline _select_default_optimizer(::Type{LPAC}) = Ipopt.Optimizer
 
 @inline _select_default_optimizer(::Type{SOCWR}) = Clarabel.Optimizer
+@inline _select_default_optimizer(::Type{QC}) = Ipopt.Optimizer
 @inline _select_default_optimizer(::Type{SDPWRM}) = Clarabel.Optimizer
 @inline _select_default_optimizer(::Type{SOCBF}) = Clarabel.Optimizer
 @inline _select_default_optimizer(::Type{BFA}) = Clarabel.Optimizer
