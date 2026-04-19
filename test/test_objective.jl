@@ -105,7 +105,7 @@ const reduced_testlist_ac = [
 ]
 
 # Cases with batteries (matpower_cases folder)
-const battery_cases = [
+const storage_cases = [
     # "case5_bus_2_bat.m",
     "case14_bus_4_bat.m",
     "case57_bus_6_bat.m",
@@ -428,19 +428,19 @@ function run_test_objective()
             Lirion.DC,
             "DC com baterias";
             optimizer = dc_optimizer,
-            case_list = battery_cases,
+            case_list = storage_cases,
         )
         run_model_tests(
             Lirion.AC,
             "AC com baterias";
             optimizer = Ipopt.Optimizer,
-            case_list = battery_cases,
+            case_list = storage_cases,
         )
         run_model_tests(
             Lirion.ACR,
             "ACR com baterias";
             optimizer = Ipopt.Optimizer,
-            case_list = battery_cases,
+            case_list = storage_cases,
         )
         # LPAC + storage: PowerModels does not support _solve_opf_strg with
         # LPACCPowerModel, so we skip battery tests for LPAC.
@@ -448,13 +448,13 @@ function run_test_objective()
         #     Lirion.LPAC,
         #     "LPAC com baterias";
         #     optimizer = Ipopt.Optimizer,
-        #     case_list = battery_cases,
+        #     case_list = storage_cases,
         # )
         # run_model_tests(
         #     Lirion.SOCWR,
         #     "SOCWR com baterias";
         #     optimizer = socwr_optimizer,
-        #     case_list = battery_cases,
+        #     case_list = storage_cases,
         # )
     end
 end

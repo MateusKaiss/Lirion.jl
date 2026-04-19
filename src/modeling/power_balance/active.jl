@@ -17,11 +17,11 @@ function compute_active_power_balance(
         init = 0.0,
     )
 
-    p_bat =
-        haskey(model, :p_battery_injected) ?
+    p_stor =
+        haskey(model, :p_storage_injected) ?
         sum(
-            model[:p_battery_injected][b, t]
-            for b in pf.bus_to_batteries[bus_idx];
+            model[:p_storage_injected][b, t]
+            for b in pf.bus_to_storages[bus_idx];
             init = 0.0,
         ) : 0.0
 
@@ -45,5 +45,5 @@ function compute_active_power_balance(
 
     pd = pf.has_bus_ts ? pf.pd_ts[bus_idx, t] : bus.pd[bus_idx]
 
-    return p_gen - p_bat - pd - p_out - p_in
+    return p_gen - p_stor - pd - p_out - p_in
 end

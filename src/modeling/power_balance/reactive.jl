@@ -19,11 +19,11 @@ function compute_reactive_power_balance(
             init = 0.0,
         ) : 0.0
 
-    q_bat =
-        haskey(model, :q_battery_injected) ?
+    q_stor =
+        haskey(model, :q_storage_injected) ?
         sum(
-            model[:q_battery_injected][b, t]
-            for b in pf.bus_to_batteries[bus_idx];
+            model[:q_storage_injected][b, t]
+            for b in pf.bus_to_storages[bus_idx];
             init = 0.0,
         ) : 0.0
 
@@ -47,5 +47,5 @@ function compute_reactive_power_balance(
 
     qd = pf.has_bus_ts ? pf.qd_ts[bus_idx, t] : bus.qd[bus_idx]
 
-    return q_gen - q_bat - qd - q_out - q_in
+    return q_gen - q_stor - qd - q_out - q_in
 end

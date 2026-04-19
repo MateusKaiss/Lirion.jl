@@ -3,7 +3,7 @@ struct PowerFlowData
     bus_idx_map::Vector{Int}
 
     generator_bus_index::Vector{Int}
-    battery_bus_index::Vector{Int}
+    storage_bus_index::Vector{Int}
     demand_bus_index::Vector{Int}
 
     branch_bus_from::Vector{Int}
@@ -18,7 +18,7 @@ struct PowerFlowData
     has_timeseries::Bool
 
     bus_to_generators::Vector{Vector{Int}}
-    bus_to_batteries::Vector{Vector{Int}}
+    bus_to_storages::Vector{Vector{Int}}
     bus_to_branches_from::Vector{Vector{Int}}
     bus_to_branches_to::Vector{Vector{Int}}
     bus_to_inter_in_branches::Vector{Vector{Int}}
@@ -66,7 +66,7 @@ function get_power_flow_parameters(case_raw::CaseRaw)
     bus_idx_map = case_raw.maps.bus_idx_map
 
     gen_bus = case_raw.gen === nothing ? Int[] : case_raw.gen.gen_bus
-    bat_bus = case_raw.storage === nothing ? Int[] : case_raw.storage.storage_bus
+    stor_bus = case_raw.storage === nothing ? Int[] : case_raw.storage.storage_bus
 
     branch_bus_from = br.f_bus
     branch_bus_to = br.t_bus
@@ -83,9 +83,9 @@ function get_power_flow_parameters(case_raw::CaseRaw)
         isempty(case_raw.maps.bus_to_gens) ? [Int[] for _ in 1:nbus] :
         case_raw.maps.bus_to_gens
 
-    bus_to_bats =
-        isempty(case_raw.maps.bus_to_batteries) ? [Int[] for _ in 1:nbus] :
-        case_raw.maps.bus_to_batteries
+    bus_to_stors =
+        isempty(case_raw.maps.bus_to_storages) ? [Int[] for _ in 1:nbus] :
+        case_raw.maps.bus_to_storages
 
     bus_to_br_from =
         isempty(case_raw.maps.bus_to_branches_from) ? [Int[] for _ in 1:nbus] :
@@ -126,7 +126,7 @@ function get_power_flow_parameters(case_raw::CaseRaw)
         bus_ids = bus_ids,
         bus_idx_map = bus_idx_map,
         generator_bus_index = gen_bus,
-        battery_bus_index = bat_bus,
+        storage_bus_index = stor_bus,
         demand_bus_index = bus_ids,
         branch_bus_from = branch_bus_from,
         branch_bus_to = branch_bus_to,
@@ -137,7 +137,7 @@ function get_power_flow_parameters(case_raw::CaseRaw)
         is_virtual = is_virtual,
         has_timeseries = has_timeseries,
         bus_to_generators = bus_to_gens,
-        bus_to_batteries = bus_to_bats,
+        bus_to_storages = bus_to_stors,
         bus_to_branches_from = bus_to_br_from,
         bus_to_branches_to = bus_to_br_to,
         bus_to_inter_in_branches = bus_to_inter_in,
@@ -155,7 +155,7 @@ function build_power_flow_data(case_raw::CaseRaw)::PowerFlowData
         params.bus_ids,
         params.bus_idx_map,
         params.generator_bus_index,
-        params.battery_bus_index,
+        params.storage_bus_index,
         params.demand_bus_index,
         params.branch_bus_from,
         params.branch_bus_to,
@@ -166,7 +166,7 @@ function build_power_flow_data(case_raw::CaseRaw)::PowerFlowData
         params.is_virtual,
         params.has_timeseries,
         params.bus_to_generators,
-        params.bus_to_batteries,
+        params.bus_to_storages,
         params.bus_to_branches_from,
         params.bus_to_branches_to,
         params.bus_to_inter_in_branches,

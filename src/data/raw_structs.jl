@@ -243,7 +243,7 @@ mutable struct CaseIndexMaps
     bus_to_gens::Vector{Vector{Int}}
     bus_to_branches_from::Vector{Vector{Int}}
     bus_to_branches_to::Vector{Vector{Int}}
-    bus_to_batteries::Vector{Vector{Int}}
+    bus_to_storages::Vector{Vector{Int}}
 
     function CaseIndexMaps()
         return new(

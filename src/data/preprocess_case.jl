@@ -61,7 +61,7 @@ function add_case_index_maps!(raw_case::CaseRaw)
         m.bus_to_branches_to = [Int[] for _ in 1:nbus]
     end
 
-    m.bus_to_batteries =
+    m.bus_to_storages =
         raw_case.storage === nothing ? [Int[] for _ in 1:nbus] :
         _group_items_by_bus(raw_case.storage.storage_bus, m.bus_idx_map, nbus)
 

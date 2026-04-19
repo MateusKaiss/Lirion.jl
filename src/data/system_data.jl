@@ -9,7 +9,7 @@ struct SystemData
     bus::BusData
     branch::BranchData
     gen::GenData
-    battery::BatteryData
+    storage::StorageData
 
     bus_ts::BusTimeseriesData
     gencost_ts::GencostTimeseriesData
@@ -63,7 +63,7 @@ function build_system_data(case_raw::CaseRaw)::SystemData
     bus_data = build_bus_data(case_raw)
     branch_data = build_branch_data(case_raw)
     gen_data = build_gen_data(case_raw)
-    battery_data = build_battery_data(case_raw)
+    storage_data = build_storage_data(case_raw)
 
     bus_ts_data = build_bus_timeseries_data(case_raw)
     gencost_ts_data = build_gencost_timeseries_data(case_raw)
@@ -77,7 +77,7 @@ function build_system_data(case_raw::CaseRaw)::SystemData
         bus_data,
         branch_data,
         gen_data,
-        battery_data,
+        storage_data,
         bus_ts_data,
         gencost_ts_data,
         powerflow_data,

@@ -20,7 +20,7 @@
 #      discharge in the high-demand period (economic optimality).
 # ============================================================
 
-using Lirion: BatteryData
+using Lirion: StorageData
 import Lirion
 import PowerModels
 
@@ -157,7 +157,7 @@ end
 
 # Invariant B — Energy conservation -------------------------------------
 
-function _check_energy_conservation(result::Lirion.LirionResult, bat::BatteryData;
+function _check_energy_conservation(result::Lirion.LirionResult, bat::StorageData;
     atol::Real = 1e-4,
 )
     m = result.model
@@ -184,7 +184,7 @@ end
 # Invariant C — Arbitrage direction -------------------------------------
 
 function _check_arbitrage_direction(
-    result::Lirion.LirionResult, bat::BatteryData;
+    result::Lirion.LirionResult, bat::StorageData;
     low_period::Int, high_period::Int, atol::Real = 1e-4,
 )
     m = result.model
@@ -231,7 +231,7 @@ function run_multiperiod_invariants(; optimizer = Ipopt.Optimizer)
             end
         end
 
-        @testset "B. Battery energy conservation (T=3 varying)" begin
+        @testset "B. Storage energy conservation (T=3 varying)" begin
             # AC with battery: this is where coupling happens.
             r = Lirion.solve(
                 bat_ts_file; model = Lirion.ac(),
@@ -239,7 +239,7 @@ function run_multiperiod_invariants(; optimizer = Ipopt.Optimizer)
                 optimizer = optimizer, outputs = false, plots = false,
             )
             @test r.status in (:optimal, :local_optimal)
-            _check_energy_conservation(r, r.system.battery; atol = 1e-4)
+            _check_energy_conservation(r, r.system.storage; atol = 1e-4)
         end
 
         @testset "C. Arbitrage direction (T=3 varying)" begin
@@ -251,12 +251,12 @@ function run_multiperiod_invariants(; optimizer = Ipopt.Optimizer)
             @test r.status in (:optimal, :local_optimal)
             # Period 1 is low-demand (0.6×), period 3 is high-demand (1.2×).
             _check_arbitrage_direction(
-                r, r.system.battery;
+                r, r.system.storage;
                 low_period = 1, high_period = 3, atol = 1e-3,
             )
         end
 
-        @testset "D. PM MN no-battery match (T=3 flat)" begin
+        @testset "D. PM MN no-storage match (T=3 flat)" begin
             # Lirion case3_timeseries (T=3 identical demand) must match PM's
             # build_mn_opf on the same case replicated 3×, for DC and AC.
             for (mfn, pm_model, opt) in (
@@ -275,7 +275,7 @@ function run_multiperiod_invariants(; optimizer = Ipopt.Optimizer)
             end
         end
 
-        @testset "E. PM MN with-battery AC match (T=3 varying)" begin
+        @testset "E. PM MN with-storage AC match (T=3 varying)" begin
             # Lirion case5_bat_ts vs PM MN with NL storage complementarity.
             r = Lirion.solve(
                 bat_ts_file; model = Lirion.ac(),

@@ -1,8 +1,15 @@
 # ============================================================
-# Battery (Storage) data
+# Storage data
+#
+# Internal representation of the `mpc.storage` table. The name "storage"
+# matches both the matpower input convention and the more general
+# physical model (batteries, pumped hydro, flywheels, …). The
+# parametrisation here assumes a battery-like charge/discharge unit with
+# efficiencies and ramp limits, but the struct is not restricted to
+# electrochemical storage.
 # ============================================================
 
-struct BatteryData
+struct StorageData
     n::Int
     bus::Vector{Int}
 
@@ -26,7 +33,7 @@ struct BatteryData
     q_loss::Vector{Float64}
 end
 
-function get_battery_parameters(case_raw::CaseRaw)
+function get_storage_parameters(case_raw::CaseRaw)
     if case_raw.storage === nothing
         return (
             n = 0,
@@ -48,34 +55,34 @@ function get_battery_parameters(case_raw::CaseRaw)
         )
     end
 
-    battery_raw = case_raw.storage::StorageRaw{Float64}
+    storage_raw = case_raw.storage::StorageRaw{Float64}
 
-    n = length(battery_raw.storage_bus)
+    n = length(storage_raw.storage_bus)
 
     return (
         n = n,
-        bus = battery_raw.storage_bus,
-        min_storage = battery_raw.energy,
-        max_storage = battery_raw.energy_rating,
-        energy_start = battery_raw.energy,
-        charge_ramp = battery_raw.charge_rating,
-        discharge_ramp = battery_raw.discharge_rating,
-        qmin = battery_raw.qmin,
-        qmax = battery_raw.qmax,
-        thermal_limit = battery_raw.thermal_rating,
-        charge_efficiency = battery_raw.charge_efficiency,
-        discharge_efficiency = battery_raw.discharge_efficiency,
-        r = battery_raw.r,
-        x = battery_raw.x,
-        p_loss = battery_raw.p_loss,
-        q_loss = battery_raw.q_loss,
+        bus = storage_raw.storage_bus,
+        min_storage = storage_raw.energy,
+        max_storage = storage_raw.energy_rating,
+        energy_start = storage_raw.energy,
+        charge_ramp = storage_raw.charge_rating,
+        discharge_ramp = storage_raw.discharge_rating,
+        qmin = storage_raw.qmin,
+        qmax = storage_raw.qmax,
+        thermal_limit = storage_raw.thermal_rating,
+        charge_efficiency = storage_raw.charge_efficiency,
+        discharge_efficiency = storage_raw.discharge_efficiency,
+        r = storage_raw.r,
+        x = storage_raw.x,
+        p_loss = storage_raw.p_loss,
+        q_loss = storage_raw.q_loss,
     )
 end
 
-function build_battery_data(case_raw::CaseRaw)::BatteryData
-    params = get_battery_parameters(case_raw)
+function build_storage_data(case_raw::CaseRaw)::StorageData
+    params = get_storage_parameters(case_raw)
 
-    return BatteryData(
+    return StorageData(
         params.n,
         params.bus,
         params.min_storage,
