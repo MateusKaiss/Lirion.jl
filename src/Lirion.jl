@@ -1,21 +1,16 @@
 module Lirion
 
 # ------------------------------------------------------------------
-# Thread configuration (Julia + BLAS)
+# Threading — Lirion does NOT touch BLAS / OpenMP thread counts at load
+# time. Respecting the user's environment is the Julia-ecosystem norm.
+#
+# Distributed solves (ADMM / ALADIN) temporarily pin BLAS threads to 1
+# inside `run_distributed` to avoid oversubscription when multiple Julia
+# threads each call into BLAS. The previous value is restored on exit.
 # ------------------------------------------------------------------
-for k in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
-    if !haskey(ENV, k)
-        ENV[k] = "1"
-    end
-end
 
 using LinearAlgebra
 using SparseArrays
-try
-    LinearAlgebra.BLAS.set_num_threads(1)
-catch e
-    @debug "BLAS.set_num_threads(1) not supported by this backend" exception = e
-end
 
 # ------------------------------------------------------------------
 # Packages
@@ -40,6 +35,20 @@ function __init__()
         catch
         end
     end
+end
+
+"""
+    Lirion.threadinfo()
+
+Print current threading configuration — Julia threads, BLAS threads,
+and detected CPU cores. Useful before a distributed run to sanity-check
+that Julia has enough threads for the number of zones.
+"""
+function threadinfo()
+    println("Julia threads : $(Threads.nthreads())")
+    println("BLAS threads  : $(LinearAlgebra.BLAS.get_num_threads())")
+    println("CPU threads   : $(Sys.CPU_THREADS)")
+    return nothing
 end
 
 # ------------------------------------------------------------------

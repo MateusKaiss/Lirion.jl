@@ -187,12 +187,9 @@ end
 
 is_gurobi(m::JuMP.Model)::Bool = occursin("Gurobi", MOI.get(m, MOI.SolverName()))
 
-function _gurobi_socwr_factory()
-    return error("Gurobi not loaded. Add `using Gurobi` to use Gurobi for SOCWR.")
-end
-function _scs_socwr_factory()
-    return error("SCS not loaded. Add `using SCS` to use SCS for SOCWR.")
-end
+function _gurobi_socwr_factory end
+function _scs_socwr_factory end
+function _default_socwr_optimizer end
 
 function resolve_optimizer(::Val{:socwr}, inputs_optimizer = nothing)
     inputs_optimizer !== nothing && return _silent_factory(inputs_optimizer)

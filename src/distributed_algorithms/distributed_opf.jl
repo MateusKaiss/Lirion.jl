@@ -14,6 +14,16 @@ end
 _algo_name(::ADMMConfig) = "ADMM"
 _algo_name(::ALADINConfig) = "ALADIN"
 
+function _with_scoped_blas_threads(f, n::Integer = 1)
+    prev = LinearAlgebra.BLAS.get_num_threads()
+    try
+        LinearAlgebra.BLAS.set_num_threads(n)
+        return f()
+    finally
+        LinearAlgebra.BLAS.set_num_threads(prev)
+    end
+end
+
 # ------------------------------------------------------------
 # Distributed runner — single generic entry point
 # ------------------------------------------------------------
@@ -28,5 +38,8 @@ function run_distributed(inputs::DistributedInputs)::LirionResult
     @info "  optimizer  = $(inputs.optimizer)"
 
     optimizer_factory = resolve_optimizer(cfg, inputs.optimizer)
-    return run_algorithm(sys, cfg; optimizer_factory = optimizer_factory)
+
+    return _with_scoped_blas_threads(1) do
+        return run_algorithm(sys, cfg; optimizer_factory = optimizer_factory)
+    end
 end
