@@ -22,6 +22,93 @@
 
 using Lirion: BatteryData
 import Lirion
+import PowerModels
+
+# PowerModels multi-network build function that uses NONLINEAR storage
+# complementarity (sc·sd = 0), matching Lirion's formulation. The standard
+# PM `build_mn_opf_strg` uses MI complementarity (sc_on + sd_on == 1),
+# which requires an MIP-capable solver and introduces binary variables we
+# don't have. This version is a direct copy with the MI pieces swapped.
+function _build_mn_opf_strg_nl(pm::PowerModels.AbstractPowerModel)
+    for (n, network) in PowerModels.nws(pm)
+        PowerModels.variable_bus_voltage(pm, nw = n)
+        PowerModels.variable_gen_power(pm, nw = n)
+        PowerModels.variable_storage_power(pm, nw = n)  # non-MI
+        PowerModels.variable_branch_power(pm, nw = n)
+        PowerModels.variable_dcline_power(pm, nw = n)
+
+        PowerModels.constraint_model_voltage(pm, nw = n)
+
+        for i in PowerModels.ids(pm, :ref_buses, nw = n)
+            PowerModels.constraint_theta_ref(pm, i, nw = n)
+        end
+
+        for i in PowerModels.ids(pm, :bus, nw = n)
+            PowerModels.constraint_power_balance(pm, i, nw = n)
+        end
+
+        for i in PowerModels.ids(pm, :storage, nw = n)
+            PowerModels.constraint_storage_complementarity_nl(pm, i, nw = n)  # non-MI
+            PowerModels.constraint_storage_losses(pm, i, nw = n)
+            PowerModels.constraint_storage_thermal_limit(pm, i, nw = n)
+        end
+
+        for i in PowerModels.ids(pm, :branch, nw = n)
+            PowerModels.constraint_ohms_yt_from(pm, i, nw = n)
+            PowerModels.constraint_ohms_yt_to(pm, i, nw = n)
+            PowerModels.constraint_voltage_angle_difference(pm, i, nw = n)
+            PowerModels.constraint_thermal_limit_from(pm, i, nw = n)
+            PowerModels.constraint_thermal_limit_to(pm, i, nw = n)
+        end
+
+        for i in PowerModels.ids(pm, :dcline, nw = n)
+            PowerModels.constraint_dcline_power_losses(pm, i, nw = n)
+        end
+    end
+
+    # Storage state coupling across periods (initial + recurrence)
+    network_ids = sort(collect(PowerModels.nw_ids(pm)))
+    n_1 = network_ids[1]
+    for i in PowerModels.ids(pm, :storage, nw = n_1)
+        PowerModels.constraint_storage_state(pm, i, nw = n_1)
+    end
+    for n_2 in network_ids[2:end]
+        for i in PowerModels.ids(pm, :storage, nw = n_2)
+            PowerModels.constraint_storage_state(pm, i, n_1, n_2)
+        end
+        n_1 = n_2
+    end
+
+    PowerModels.objective_min_fuel_and_flow_cost(pm)
+    return nothing
+end
+
+# Build a PM multi-network dict from a single-period matpower file, applying
+# per-period load scaling factors (to mirror a Lirion bus_timeseries with a
+# uniform scale factor per period).
+function _build_pm_mn_from_factors(base_file::AbstractString, factors::Vector{<:Real})
+    pm_data = PowerModels.parse_file(base_file)
+    base_pd = Dict(l => load["pd"] for (l, load) in pm_data["load"])
+    base_qd = Dict(l => load["qd"] for (l, load) in pm_data["load"])
+    mn = PowerModels.replicate(pm_data, length(factors))
+    for (t_str, nw) in mn["nw"]
+        t = parse(Int, t_str)
+        f = factors[t]
+        for (l, load) in nw["load"]
+            load["pd"] = base_pd[l] * f
+            load["qd"] = base_qd[l] * f
+        end
+    end
+    return mn
+end
+
+# Solve a PM MN problem via our custom NL-storage build function.
+function _pm_mn_opf_strg_nl(mn_data::Dict, model_type::Type, optimizer)
+    return PowerModels.solve_model(
+        mn_data, model_type, optimizer, _build_mn_opf_strg_nl;
+        multinetwork = true,
+    )
+end
 
 # Helpers ---------------------------------------------------------------
 
@@ -165,6 +252,38 @@ function run_multiperiod_invariants(; optimizer = Ipopt.Optimizer)
                 r, r.system.battery;
                 low_period = 1, high_period = 3, atol = 1e-3,
             )
+        end
+
+        @testset "D. PM MN no-battery match (T=3 flat)" begin
+            # Lirion case3_timeseries (T=3 identical demand) must match PM's
+            # build_mn_opf on the same case replicated 3×, for DC and AC.
+            for (mfn, pm_model, opt) in (
+                (Lirion.dc(), PowerModels.DCPPowerModel, optimizer),
+                (Lirion.ac(), PowerModels.ACPPowerModel, optimizer),
+            )
+                r = Lirion.solve(
+                    flat_file; model = mfn, algorithm = Lirion.centralized(),
+                    optimizer = opt, outputs = false, plots = false,
+                )
+                pm_mn = _build_pm_mn_from_factors(base_file, [1.0, 1.0, 1.0])
+                pm_res = PowerModels.solve_mn_opf(pm_mn, pm_model, opt)
+                @info "PM MN match (no battery)" mfn lirion=r.objective pm=pm_res["objective"]
+                @test isapprox(r.objective, pm_res["objective"]; rtol = 1e-4)
+            end
+        end
+
+        @testset "E. PM MN with-battery AC match (T=3 varying)" begin
+            # Lirion case5_bat_ts vs PM MN with NL storage complementarity.
+            r = Lirion.solve(
+                bat_ts_file; model = Lirion.ac(),
+                algorithm = Lirion.centralized(),
+                optimizer = optimizer, outputs = false, plots = false,
+            )
+            base_bat_file = joinpath(base_dir, "case5_bus_2_bat.m")
+            pm_mn = _build_pm_mn_from_factors(base_bat_file, [0.6, 1.0, 1.2])
+            pm_res = _pm_mn_opf_strg_nl(pm_mn, PowerModels.ACPPowerModel, optimizer)
+            @info "PM MN match (AC + battery)" lirion=r.objective pm=pm_res["objective"]
+            @test isapprox(r.objective, pm_res["objective"]; rtol = 1e-2)
         end
     end
     return nothing
