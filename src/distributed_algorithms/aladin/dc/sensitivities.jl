@@ -239,7 +239,14 @@ function build_aladin_zone_data(
 
     lb, ub = _collect_bounds(all_vars)
 
-    # Constant Hessian: diagonal, non-zero only on pg columns
+    # DC QP Hessian: cost only (2·c2·sbase² on pg columns). Upstream the
+    # Phase-1 local NLP applies an additional proximal shift (ρ/2)·σ on
+    # every variable (see aladin/dc/objective.jl:_prox_all_quadexpr!).
+    # In principle HFD allows folding that curvature into H_i as well,
+    # but our default σ weights make the coupled-variable shift dominate
+    # the QP geometry on small cases and degrade convergence. Leaving the
+    # QP Hessian cost-only keeps behaviour aligned with the tests while
+    # the σ schedule is not auto-calibrated. (NOTE: future work.)
     hess_diag = zeros(Float64, n_vars)
     @inbounds for (k, col) in enumerate(pg_cols)
         hess_diag[col] = pg_c2_sbase2[k]

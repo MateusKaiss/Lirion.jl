@@ -110,15 +110,21 @@ function _consensus_branch_pairs!(
 )
     isempty(pairs) && return nothing
     fill!(consensus, 0.0)
-    fill!(counts, 2)
+    fill!(counts, 0)
     @inbounds for (k, (ga, za, gb, zb)) in enumerate(pairs)
         pa = partitions.parts[za]
         la = pa.branch_idx_full_to_zone[ga]
         pb = partitions.parts[zb]
         lb = pb.branch_idx_full_to_zone[gb]
-        va = la == 0 ? 0.0 : extract_fn(pa, la)
-        vb = lb == 0 ? 0.0 : extract_fn(pb, lb)
-        consensus[k] = 0.5 * (va + vb)
+        if la != 0
+            consensus[k] += extract_fn(pa, la)
+            counts[k] += 1
+        end
+        if lb != 0
+            consensus[k] += extract_fn(pb, lb)
+            counts[k] += 1
+        end
+        counts[k] > 0 && (consensus[k] /= counts[k])
     end
     return nothing
 end
