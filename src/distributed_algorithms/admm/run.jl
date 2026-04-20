@@ -24,8 +24,18 @@ function run_algorithm!(ws, params::ADMMParams)
             break
         end
 
-        rho_update!(ws, params)
-        refresh_rho!(ws)
+        # Skip adaptive-rho at iter 1: consensus_prev is initialized to
+        # zeros, so the dual residual s = ρ·‖z − 0‖ is artificially large
+        # compared to the primal residual r = ‖x − z‖. Firing the
+        # residual-balancing rule on that spurious s triggers a cascade
+        # of shrink steps that decays ρ by orders of magnitude over the
+        # remainder of the run (observed ρ: 1e3 → 1 in 500 iters on
+        # case14–case57). From iter 2 onwards consensus_prev holds a real
+        # previous consensus vector, so the rule measures genuine progress.
+        if iter >= 2
+            rho_update!(ws, params)
+            refresh_rho!(ws)
+        end
     end
 
     return nothing

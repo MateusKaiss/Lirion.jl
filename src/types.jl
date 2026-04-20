@@ -277,11 +277,18 @@ mutable struct ADMMConfig <: AbstractDistributedConfig
         rho_t::Real,
         eps_abs::Real,
         eps_rel::Real;
-        adaptive_rho::Bool = true,
-        mu_incr::Real = 3.0,
-        mu_decr::Real = 3.0,
-        tau_incr::Real = 1.05,
-        tau_decr::Real = 0.98,
+        adaptive_rho::Bool = false,
+        # Canonical Boyd et al. (2011, §3.4.1) residual-balancing
+        # parameters: μ = 10 (fire only on 10× imbalance), τ = 2 (shrink
+        # or grow by factor 2 when firing). The previous defaults (μ=3,
+        # τ_incr=1.05, τ_decr=0.98) fired almost every iteration with
+        # tiny steps, producing an exponential ρ decay of roughly
+        # ρ₀·0.98^iter that collapsed the penalty and broke consensus on
+        # IEEE cases <150 buses.
+        mu_incr::Real = 10.0,
+        mu_decr::Real = 10.0,
+        tau_incr::Real = 2.0,
+        tau_decr::Real = 0.5,
     )
         base_model in (DC, AC, SOCWR) ||
             throw(ArgumentError("Invalid base_model=$base_model. Allowed: DC, AC, SOCWR"))
@@ -344,11 +351,11 @@ ADMMConfig(
     rho::Real,
     eps_abs::Real,
     eps_rel::Real;
-    adaptive_rho::Bool = true,
-    mu_incr::Real = 3.0,
-    mu_decr::Real = 3.0,
-    tau_incr::Real = 1.05,
-    tau_decr::Real = 0.98,
+    adaptive_rho::Bool = false,
+    mu_incr::Real = 10.0,
+    mu_decr::Real = 10.0,
+    tau_incr::Real = 2.0,
+    tau_decr::Real = 0.5,
 ) = begin
     sec = _sectioning(sectioning)
     rhos = _normalize_rhos_strict(base_model, coupling; rho = rho)
@@ -389,11 +396,11 @@ ADMMConfig(
     rho_t::Union{Nothing, Real} = nothing,
     eps_abs::Real = 1e-7,
     eps_rel::Real = 1e-7,
-    adaptive_rho::Bool = true,
-    mu_incr::Real = 3.0,
-    mu_decr::Real = 3.0,
-    tau_incr::Real = 1.05,
-    tau_decr::Real = 0.98,
+    adaptive_rho::Bool = false,
+    mu_incr::Real = 10.0,
+    mu_decr::Real = 10.0,
+    tau_incr::Real = 2.0,
+    tau_decr::Real = 0.5,
 ) = begin
     sec = _sectioning(sectioning)
 
