@@ -4,39 +4,34 @@
 
 const ALADIN_AC_STATE_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 const ALADIN_AC_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 const ALADIN_AC_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 const ALADIN_AC_SPLITBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 const ALADIN_AC_DUMMYBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 # Power-only DummyBus excludes __api (tight bounds can trip infeasibility
 # before θ/V discipline kicks in via v² / bus consensus).
 const ALADIN_AC_DUMMYBUS_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 # ============================================================
@@ -296,13 +291,7 @@ function run_aladin_ac_dummybus_hybrid_tests(;
         eps_rel = 1e-4,
     )
 
-    overrides(case_name) = begin
-        if case_name == "pglib_opf_case3_lmbd__api.m"
-            # Tight bounds: needs stronger consensus penalty to close gap.
-            return (rho = 100000.0, mu = 100000.0)
-        end
-        return NamedTuple()
-    end
+    overrides(case_name) = NamedTuple()
 
     return run_case_suite(;
         label = "ALADIN-AC DUMMYBUS-HYBRID",

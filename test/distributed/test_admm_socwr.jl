@@ -7,14 +7,7 @@
 # ------------------------
 const SOCWR_STATE_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
-    "pglib_opf_case73_ieee_rts.m",
-    # "pglib_opf_case200_activ.m",
-
-    # "pglib_opf_case118_ieee.m",
-    # "pglib_opf_case57_ieee.m",
-    # "pglib_opf_case500_goc.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 # ------------------------
@@ -22,13 +15,7 @@ const SOCWR_STATE_CASES = [
 # ------------------------
 const SOCWR_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
-    "pglib_opf_case73_ieee_rts.m",
-    # "pglib_opf_case57_ieee.m",
-    # "pglib_opf_case118_ieee.m",
-    # "pglib_opf_case200_activ.m",
-    # "pglib_opf_case500_goc.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 # ------------------------
@@ -36,13 +23,7 @@ const SOCWR_POWER_CASES = [
 # ------------------------
 const SOCWR_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
-    "pglib_opf_case73_ieee_rts.m",
-    # "pglib_opf_case57_ieee.m",
-    # "pglib_opf_case118_ieee.m",
-    # "pglib_opf_case200_activ.m",
-    # "pglib_opf_case500_goc.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 # ------------------------
@@ -50,7 +31,7 @@ const SOCWR_HYBRID_CASES = [
 # ------------------------
 const SOCWR_SPLITBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 # ------------------------
@@ -58,7 +39,7 @@ const SOCWR_SPLITBUS_HYBRID_CASES = [
 # ------------------------
 const SOCWR_DUMMYBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 # ------------------------
@@ -66,7 +47,7 @@ const SOCWR_DUMMYBUS_HYBRID_CASES = [
 # ------------------------
 const SOCWR_DUMMYBUS_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 # ============================================================

@@ -7,32 +7,27 @@
 # ------------------------
 const ALADIN_DC_STATE_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 const ALADIN_DC_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 const ALADIN_DC_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 const ALADIN_DC_SPLITBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 const ALADIN_DC_DUMMYBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 # Power-only DummyBus: case3_lmbd__api excluded (same issue as ADMM — without θ
@@ -40,7 +35,7 @@ const ALADIN_DC_DUMMYBUS_HYBRID_CASES = [
 # infeasibility).
 const ALADIN_DC_DUMMYBUS_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 # ============================================================

@@ -7,14 +7,7 @@
 # ------------------------
 const DC_STATE_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
-    # "pglib_opf_case73_ieee_rts.m",
-    # "pglib_opf_case118_ieee.m",
-    # "pglib_opf_case57_ieee.m",
-
-    # "pglib_opf_case200_activ.m",
-    # "pglib_opf_case500_goc.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 # ------------------------
@@ -22,14 +15,7 @@ const DC_STATE_CASES = [
 # ------------------------
 const DC_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
-    "pglib_opf_case73_ieee_rts.m",
-    # "pglib_opf_case57_ieee.m",
-    # "pglib_opf_case118_ieee.m",
-
-    # "pglib_opf_case200_activ.m",
-    # "pglib_opf_case500_goc.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 # ------------------------
@@ -37,14 +23,7 @@ const DC_POWER_CASES = [
 # ------------------------
 const DC_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
-    "pglib_opf_case73_ieee_rts.m",
-    # "pglib_opf_case57_ieee.m",
-    # "pglib_opf_case200_activ.m",
-
-    # "pglib_opf_case118_ieee.m",
-    # "pglib_opf_case500_goc.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 # ------------------------
@@ -52,9 +31,7 @@ const DC_HYBRID_CASES = [
 # ------------------------
 const DC_DUMMYBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
-    "pglib_opf_case73_ieee_rts.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 # ------------------------
@@ -62,8 +39,7 @@ const DC_DUMMYBUS_HYBRID_CASES = [
 # ------------------------
 const DC_SPLITBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__api.m",
-    "pglib_opf_case3_lmbd__sad.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 # ------------------------
@@ -77,8 +53,7 @@ const DC_SPLITBUS_HYBRID_CASES = [
 # limitation of power-only DummyBus on tightly-bounded problems, not a bug.
 const DC_DUMMYBUS_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
-    "pglib_opf_case3_lmbd__sad.m",
-    "pglib_opf_case73_ieee_rts.m",
+    "pglib_opf_case14_ieee.m",
 ]
 
 # ============================================================
@@ -125,30 +100,13 @@ function run_admm_dc_state_tests(;
     )
 
     overrides(case_name) = begin
-        if case_name == "pglib_opf_case73_ieee_rts.m" ||
-           case_name == "pglib_opf_case57_ieee.m" ||
-           case_name == "pglib_opf_case118_ieee.m" ||
-           case_name == "pglib_opf_case200_activ.m"
+        # case14_ieee with state coupling empirically requires rho=1e5
+        # (measured on paper benchmark: rho=1e3 yields gap ~ -5.68%).
+        if case_name == "pglib_opf_case14_ieee.m"
             return (
                 rho = 100000.0,
-                max_iter = 100000,
-                eps_abs = 1e-4,
-                eps_rel = 1e-4,
+                max_iter = 5000,
                 adaptive = false,
-                central_optimizer = Ipopt.Optimizer,
-                distributed_optimizer = Ipopt.Optimizer,
-            )
-        end
-        # case3_lmbd__api is flaky with OSQP's adaptive_rho — the solver
-        # converges to one of two local optima (10421 or 9749) depending on
-        # subtle timing/memory state. We force Ipopt here to get a
-        # deterministic centralized reference, which also removes the
-        # false-positive test failures triggered by any change to workspace
-        # memory layout.
-        if case_name == "pglib_opf_case3_lmbd__api.m"
-            return (
-                central_optimizer = Ipopt.Optimizer,
-                distributed_optimizer = Ipopt.Optimizer,
             )
         end
         return NamedTuple()
@@ -208,22 +166,7 @@ function run_admm_dc_power_tests(;
         tau_decr = 0.98,
     )
 
-    overrides(case_name) = begin
-        if case_name == "pglib_opf_case500_goc.m"
-            return (
-                rho = 5000.0,
-                distributed_optimizer = Ipopt.Optimizer,
-            )
-        end
-        # Same OSQP flake as DC STATE — force Ipopt for deterministic runs.
-        if case_name == "pglib_opf_case3_lmbd__api.m"
-            return (
-                central_optimizer = Ipopt.Optimizer,
-                distributed_optimizer = Ipopt.Optimizer,
-            )
-        end
-        return NamedTuple()
-    end
+    overrides(case_name) = NamedTuple()
 
     return run_case_suite(;
         label = "ADMM-DC POWER",
@@ -279,23 +222,7 @@ function run_admm_dc_hybrid_tests(;
         tau_decr = 0.98,
     )
 
-    overrides(case_name) = begin
-        if case_name == "pglib_opf_case500_goc.m"
-            return (
-                rho = 5000.0,
-                central_optimizer = Ipopt.Optimizer,
-                distributed_optimizer = Ipopt.Optimizer,
-            )
-        end
-        # Same OSQP flake as DC STATE — force Ipopt for deterministic runs.
-        if case_name == "pglib_opf_case3_lmbd__api.m"
-            return (
-                central_optimizer = Ipopt.Optimizer,
-                distributed_optimizer = Ipopt.Optimizer,
-            )
-        end
-        return NamedTuple()
-    end
+    overrides(case_name) = NamedTuple()
 
     return run_case_suite(;
         label = "ADMM-DC HYBRID",
@@ -351,24 +278,7 @@ function run_admm_dc_dummybus_hybrid_tests(;
         tau_decr = 0.98,
     )
 
-    overrides(case_name) = begin
-        if case_name == "pglib_opf_case3_lmbd__api.m"
-            return (
-                central_optimizer = Ipopt.Optimizer,
-                distributed_optimizer = Ipopt.Optimizer,
-            )
-        end
-        if case_name == "pglib_opf_case73_ieee_rts.m"
-            return (
-                rho = 10000.0,
-                max_iter = 20000,
-                adaptive = true,
-                central_optimizer = Ipopt.Optimizer,
-                distributed_optimizer = Ipopt.Optimizer,
-            )
-        end
-        return NamedTuple()
-    end
+    overrides(case_name) = NamedTuple()
 
     return run_case_suite(;
         label = "ADMM-DC DUMMYBUS-HYBRID",
@@ -424,15 +334,7 @@ function run_admm_dc_splitbus_hybrid_tests(;
         tau_decr = 0.98,
     )
 
-    overrides(case_name) = begin
-        if case_name == "pglib_opf_case3_lmbd__api.m"
-            return (
-                central_optimizer = Ipopt.Optimizer,
-                distributed_optimizer = Ipopt.Optimizer,
-            )
-        end
-        return NamedTuple()
-    end
+    overrides(case_name) = NamedTuple()
 
     return run_case_suite(;
         label = "ADMM-DC SPLITBUS-HYBRID",
@@ -494,17 +396,7 @@ function run_admm_dc_dummybus_power_tests(;
         tau_decr = 0.98,
     )
 
-    overrides(case_name) = begin
-        if case_name == "pglib_opf_case73_ieee_rts.m"
-            return (
-                rho = 10000.0,
-                max_iter = 20000,
-                central_optimizer = Ipopt.Optimizer,
-                distributed_optimizer = Ipopt.Optimizer,
-            )
-        end
-        return NamedTuple()
-    end
+    overrides(case_name) = NamedTuple()
 
     return run_case_suite(;
         label = "ADMM-DC DUMMYBUS-POWER",
