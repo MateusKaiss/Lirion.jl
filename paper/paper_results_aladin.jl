@@ -103,22 +103,43 @@ const ALADIN_DEFAULTS = (
 # Key: (case, variant, base, sectioning, coupling) → Dict of kwargs
 # overrides. Any absent key falls through to ALADIN_DEFAULTS.
 const ALADIN_OVERRIDES = Dict{Tuple{String, String, Symbol, Symbol, Symbol}, Dict{Symbol, Any}}(
-    # --- case14_ieee (auto-generated from _tune_case14_aladin.toml) ----
-    ("case14_ieee", "std", :dc, :tie_line, :state) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => false),  # gap=+0.001%, iters=9
-    ("case14_ieee", "std", :dc, :tie_line, :power) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => false),  # gap=+0.001%, iters=7
-    ("case14_ieee", "std", :dc, :tie_line, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => false),  # gap=+0.001%, iters=17
-    ("case14_ieee", "std", :dc, :dummy_bus, :power) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => false),  # gap=+0.001%, iters=11
-    ("case14_ieee", "std", :dc, :dummy_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => false),  # gap=+0.001%, iters=29
-    ("case14_ieee", "std", :dc, :split_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => false),  # gap=+0.001%, iters=9
-    ("case14_ieee", "std", :ac, :dummy_bus, :power) => Dict(:rho => 1e+02, :mu => 1e+01, :adaptive => false),  # gap=-0.042%, iters=221
-    ("case14_ieee", "std", :ac, :split_bus, :hybrid) => Dict(:rho => 1e+02, :mu => 1e+01, :adaptive => true),  # gap=+0.208%, iters=21
-    ("case14_ieee", "std", :socwr, :tie_line, :power) => Dict(:rho => 1e+02, :mu => 1e+01, :adaptive => false),  # gap=-0.001%, iters=293
-    ("case14_ieee", "api", :dc, :tie_line, :state) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => true),  # gap=-0.926%, iters=20
-    ("case14_ieee", "api", :dc, :tie_line, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => true),  # gap=-0.926%, iters=14
-    ("case14_ieee", "api", :dc, :dummy_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => true),  # gap=-0.925%, iters=14
-    ("case14_ieee", "api", :dc, :split_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => true),  # gap=-0.926%, iters=14
-    ("case14_ieee", "api", :ac, :split_bus, :hybrid) => Dict(:rho => 1e+02, :mu => 1e+01, :adaptive => true),  # gap=-0.047%, iters=21
-    ("case14_ieee", "sad", :ac, :split_bus, :hybrid) => Dict(:rho => 1e+02, :mu => 1e+01, :adaptive => true),  # gap=+0.011%, iters=24
+    # --- case14_ieee (from _tune_case14_aladin_v2.toml) --------------
+    ("case14_ieee", "std", :dc, :tie_line, :state) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=+0.001%, iters=9
+    ("case14_ieee", "std", :dc, :tie_line, :power) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=+0.001%, iters=3
+    ("case14_ieee", "std", :dc, :tie_line, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=+0.001%, iters=3
+    ("case14_ieee", "std", :dc, :dummy_bus, :power) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=+0.001%, iters=3
+    ("case14_ieee", "std", :dc, :dummy_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=+0.001%, iters=7
+    ("case14_ieee", "std", :dc, :split_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=+0.001%, iters=3
+    ("case14_ieee", "std", :ac, :tie_line, :state) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=+0.294%, iters=405
+    ("case14_ieee", "std", :ac, :tie_line, :power) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=+0.019%, iters=43
+    ("case14_ieee", "std", :ac, :tie_line, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=+0.044%, iters=55
+    ("case14_ieee", "std", :ac, :dummy_bus, :power) => Dict(:rho => 1e+04, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_hi_rho gap=+0.584%, iters=75
+    ("case14_ieee", "std", :ac, :dummy_bus, :hybrid) => Dict(:rho => 1e+04, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_hi_rho gap=+0.478%, iters=121
+    ("case14_ieee", "std", :ac, :split_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=+0.112%, iters=59
+    ("case14_ieee", "std", :socwr, :tie_line, :state) => Dict(:rho => 100, :mu => 100, :adaptive => false),  # fixed_mid gap=-0.228%, iters=612
+    ("case14_ieee", "std", :socwr, :tie_line, :power) => Dict(:rho => 100, :mu => 10, :adaptive => false),  # fixed_1e2_mu1 gap=-0.001%, iters=293
+    ("case14_ieee", "std", :socwr, :tie_line, :hybrid) => Dict(:rho => 100, :mu => 10, :adaptive => false),  # fixed_1e2_mu1 gap=+0.008%, iters=347
+    ("case14_ieee", "std", :socwr, :split_bus, :hybrid) => Dict(:rho => 100, :mu => 100, :adaptive => false),  # fixed_mid gap=-0.005%, iters=436
+    ("case14_ieee", "api", :dc, :tie_line, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=-0.927%, iters=27
+    ("case14_ieee", "api", :dc, :dummy_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=-0.925%, iters=29
+    ("case14_ieee", "api", :dc, :split_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=-0.926%, iters=28
+    ("case14_ieee", "api", :ac, :tie_line, :state) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=-0.040%, iters=86
+    ("case14_ieee", "api", :ac, :tie_line, :power) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => false),  # fixed_1e3 gap=-0.113%, iters=580
+    ("case14_ieee", "api", :ac, :tie_line, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => false),  # fixed_1e3 gap=-0.040%, iters=867
+    ("case14_ieee", "api", :ac, :split_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=-0.047%, iters=60
+    ("case14_ieee", "api", :socwr, :tie_line, :state) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => false),  # fixed_1e3 gap=+0.017%, iters=411
+    ("case14_ieee", "api", :socwr, :tie_line, :power) => Dict(:rho => 100, :mu => 10, :adaptive => false),  # fixed_1e2_mu1 gap=-0.078%, iters=985
+    ("case14_ieee", "api", :socwr, :tie_line, :hybrid) => Dict(:rho => 100, :mu => 100, :adaptive => false),  # fixed_mid gap=-0.007%, iters=130
+    ("case14_ieee", "api", :socwr, :split_bus, :hybrid) => Dict(:rho => 100, :mu => 100, :adaptive => false),  # fixed_mid gap=-0.003%, iters=160
+    ("case14_ieee", "sad", :ac, :tie_line, :state) => Dict(:rho => 1e+04, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_hi_rho gap=-0.426%, iters=534
+    ("case14_ieee", "sad", :ac, :tie_line, :hybrid) => Dict(:rho => 1e+04, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_hi_rho gap=+0.198%, iters=126
+    ("case14_ieee", "sad", :ac, :dummy_bus, :power) => Dict(:rho => 1e+04, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_hi_rho gap=-0.787%, iters=112
+    ("case14_ieee", "sad", :ac, :dummy_bus, :hybrid) => Dict(:rho => 1e+04, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_hi_rho gap=+0.484%, iters=148
+    ("case14_ieee", "sad", :ac, :split_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=+0.023%, iters=61
+    ("case14_ieee", "sad", :socwr, :tie_line, :state) => Dict(:rho => 100, :mu => 100, :adaptive => false),  # fixed_mid gap=-0.261%, iters=838
+    ("case14_ieee", "sad", :socwr, :tie_line, :power) => Dict(:rho => 100, :mu => 10, :adaptive => false),  # fixed_1e2_mu1 gap=-0.013%, iters=357
+    ("case14_ieee", "sad", :socwr, :tie_line, :hybrid) => Dict(:rho => 100, :mu => 10, :adaptive => false),  # fixed_1e2_mu1 gap=-0.002%, iters=479
+    ("case14_ieee", "sad", :socwr, :split_bus, :hybrid) => Dict(:rho => 100, :mu => 100, :adaptive => false),  # fixed_mid gap=+0.007%, iters=381
 )
 
 function _aladin_kwargs(case::String, variant::String,
