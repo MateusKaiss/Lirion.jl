@@ -5,26 +5,31 @@
 const ALADIN_AC_STATE_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
+    "pglib_opf_case30_ieee.m",
 ]
 
 const ALADIN_AC_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
+    "pglib_opf_case30_ieee.m",
 ]
 
 const ALADIN_AC_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
+    "pglib_opf_case30_ieee.m",
 ]
 
 const ALADIN_AC_SPLITBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
+    "pglib_opf_case30_ieee.m",
 ]
 
 const ALADIN_AC_DUMMYBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
+    "pglib_opf_case30_ieee.m",
 ]
 
 # Power-only DummyBus excludes __api (tight bounds can trip infeasibility
@@ -32,6 +37,7 @@ const ALADIN_AC_DUMMYBUS_HYBRID_CASES = [
 const ALADIN_AC_DUMMYBUS_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
+    "pglib_opf_case30_ieee.m",
 ]
 
 # ============================================================

@@ -5,21 +5,25 @@
 const ALADIN_SOCWR_STATE_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
+    "pglib_opf_case30_ieee.m",
 ]
 
 const ALADIN_SOCWR_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
+    "pglib_opf_case30_ieee.m",
 ]
 
 const ALADIN_SOCWR_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
+    "pglib_opf_case30_ieee.m",
 ]
 
 const ALADIN_SOCWR_SPLITBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
+    "pglib_opf_case30_ieee.m",
 ]
 
 # ============================================================

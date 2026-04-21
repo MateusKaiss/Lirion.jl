@@ -64,7 +64,6 @@ function add_bfa_branch_constraints!(model::JuMP.Model, bus::BusData, br::Branch
         2 * (r[l] * p_fr[l, t] + x[l] * q_fr[l, t])
     )
 
-
     # --- Angle difference cuts (BF form, reused from SOCBF) ---
     _add_socbf_angle_constraints!(model, br)
 

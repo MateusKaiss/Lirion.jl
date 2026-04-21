@@ -4,6 +4,7 @@
 const AC_STATE_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
+    "pglib_opf_case30_ieee.m",
 ]
 
 # ------------------------
@@ -12,6 +13,7 @@ const AC_STATE_CASES = [
 const AC_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
+    "pglib_opf_case30_ieee.m",
 ]
 
 # ------------------------
@@ -20,6 +22,7 @@ const AC_POWER_CASES = [
 const AC_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
+    "pglib_opf_case30_ieee.m",
 ]
 
 # ------------------------
@@ -28,6 +31,7 @@ const AC_HYBRID_CASES = [
 const AC_SPLITBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
+    "pglib_opf_case30_ieee.m",
 ]
 
 # ------------------------
@@ -36,6 +40,7 @@ const AC_SPLITBUS_HYBRID_CASES = [
 const AC_DUMMYBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
+    "pglib_opf_case30_ieee.m",
 ]
 
 # ------------------------
@@ -44,6 +49,7 @@ const AC_DUMMYBUS_HYBRID_CASES = [
 const AC_DUMMYBUS_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
+    "pglib_opf_case30_ieee.m",
 ]
 
 # ============================================================
