@@ -103,7 +103,22 @@ const ALADIN_DEFAULTS = (
 # Key: (case, variant, base, sectioning, coupling) → Dict of kwargs
 # overrides. Any absent key falls through to ALADIN_DEFAULTS.
 const ALADIN_OVERRIDES = Dict{Tuple{String, String, Symbol, Symbol, Symbol}, Dict{Symbol, Any}}(
-    # --- case14_ieee (populated by tune_case14.jl) -----------------
+    # --- case14_ieee (auto-generated from _tune_case14_aladin.toml) ----
+    ("case14_ieee", "std", :dc, :tie_line, :state) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => false),  # gap=+0.001%, iters=9
+    ("case14_ieee", "std", :dc, :tie_line, :power) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => false),  # gap=+0.001%, iters=7
+    ("case14_ieee", "std", :dc, :tie_line, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => false),  # gap=+0.001%, iters=17
+    ("case14_ieee", "std", :dc, :dummy_bus, :power) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => false),  # gap=+0.001%, iters=11
+    ("case14_ieee", "std", :dc, :dummy_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => false),  # gap=+0.001%, iters=29
+    ("case14_ieee", "std", :dc, :split_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => false),  # gap=+0.001%, iters=9
+    ("case14_ieee", "std", :ac, :dummy_bus, :power) => Dict(:rho => 1e+02, :mu => 1e+01, :adaptive => false),  # gap=-0.042%, iters=221
+    ("case14_ieee", "std", :ac, :split_bus, :hybrid) => Dict(:rho => 1e+02, :mu => 1e+01, :adaptive => true),  # gap=+0.208%, iters=21
+    ("case14_ieee", "std", :socwr, :tie_line, :power) => Dict(:rho => 1e+02, :mu => 1e+01, :adaptive => false),  # gap=-0.001%, iters=293
+    ("case14_ieee", "api", :dc, :tie_line, :state) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => true),  # gap=-0.926%, iters=20
+    ("case14_ieee", "api", :dc, :tie_line, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => true),  # gap=-0.926%, iters=14
+    ("case14_ieee", "api", :dc, :dummy_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => true),  # gap=-0.925%, iters=14
+    ("case14_ieee", "api", :dc, :split_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+02, :adaptive => true),  # gap=-0.926%, iters=14
+    ("case14_ieee", "api", :ac, :split_bus, :hybrid) => Dict(:rho => 1e+02, :mu => 1e+01, :adaptive => true),  # gap=-0.047%, iters=21
+    ("case14_ieee", "sad", :ac, :split_bus, :hybrid) => Dict(:rho => 1e+02, :mu => 1e+01, :adaptive => true),  # gap=+0.011%, iters=24
 )
 
 function _aladin_kwargs(case::String, variant::String,

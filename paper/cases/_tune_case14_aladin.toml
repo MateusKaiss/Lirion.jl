@@ -1,0 +1,4562 @@
+[_meta]
+algo = "aladin"
+case = "case14_ieee"
+eps_abs = 0.0001
+eps_rel = 0.0001
+exhaustive = false
+gap_target = 1.0
+generated_at = "2026-04-21T13:36:48.239"
+max_iter = 5000
+script = "tune_case14.jl"
+
+[api.ac.dummy_bus_hybrid.adaptive.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.ac.dummy_bus_hybrid.adaptive.sweep."rho=1e+01"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10.0
+status = "error"
+time_s = 0.5918629169464111
+
+[api.ac.dummy_bus_hybrid.adaptive.sweep."rho=1e+02"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100.0
+status = "error"
+time_s = 1.0654220581054688
+
+[api.ac.dummy_bus_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1000.0
+status = "error"
+time_s = 0.5426170825958252
+
+[api.ac.dummy_bus_hybrid.adaptive.sweep."rho=1e+04"]
+gap_pct = 1.8038171851914064
+iters = 300
+objective = 6107.580696010303
+rho = 10000.0
+status = "did_not_converge"
+time_s = 7.150808811187744
+
+[api.ac.dummy_bus_hybrid.adaptive.sweep."rho=1e+05"]
+gap_pct = 3.069122381872066
+iters = 300
+objective = 6183.490949746176
+rho = 100000.0
+status = "did_not_converge"
+time_s = 7.177396059036255
+
+[api.ac.dummy_bus_hybrid.adaptive.sweep."rho=1e+06"]
+gap_pct = 3.737908635716218
+iters = 300
+objective = 6223.613865828047
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 7.523120880126953
+
+[api.ac.dummy_bus_hybrid.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.ac.dummy_bus_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -100.00005187990725
+iters = 300
+objective = -0.0031124640390178693
+rho = 10.0
+status = "did_not_converge"
+time_s = 7.839646100997925
+
+[api.ac.dummy_bus_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = -47.45210036013643
+iters = 300
+objective = 3152.539328387798
+rho = 100.0
+status = "did_not_converge"
+time_s = 6.927861928939819
+
+[api.ac.dummy_bus_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = -10.859469274287319
+iters = 300
+objective = 5347.864154269359
+rho = 1000.0
+status = "did_not_converge"
+time_s = 7.323754072189331
+
+[api.ac.dummy_bus_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = -0.8498259950408176
+iters = 300
+objective = 5948.379004857574
+rho = 10000.0
+status = "did_not_converge"
+time_s = 6.934243202209473
+
+[api.ac.dummy_bus_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = 5.9867261604096775
+iters = 300
+objective = 6358.528595770662
+rho = 100000.0
+status = "did_not_converge"
+time_s = 7.372753143310547
+
+[api.ac.dummy_bus_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = 8.564153839195667
+iters = 300
+objective = 6513.15784221316
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 7.572690010070801
+
+[api.ac.dummy_bus_power.adaptive.best]
+gap_pct = 5.096826512408416
+hit_target = false
+iters = 224
+rho = 100000.0
+time_s = 5.465646028518677
+
+[api.ac.dummy_bus_power.adaptive.sweep."rho=1e+01"]
+gap_pct = 5.4459637189419565
+iters = 300
+objective = 6326.086293114882
+rho = 10.0
+status = "did_not_converge"
+time_s = 7.991289138793945
+
+[api.ac.dummy_bus_power.adaptive.sweep."rho=1e+02"]
+gap_pct = 5.950777454163725
+iters = 300
+objective = 6356.371902334355
+rho = 100.0
+status = "did_not_converge"
+time_s = 8.156677007675171
+
+[api.ac.dummy_bus_power.adaptive.sweep."rho=1e+03"]
+gap_pct = 5.926787741205372
+iters = 300
+objective = 6354.932672334749
+rho = 1000.0
+status = "did_not_converge"
+time_s = 7.965612173080444
+
+[api.ac.dummy_bus_power.adaptive.sweep."rho=1e+04"]
+gap_pct = 5.819006071765568
+iters = 300
+objective = 6348.466458573267
+rho = 10000.0
+status = "did_not_converge"
+time_s = 7.397783994674683
+
+[api.ac.dummy_bus_power.adaptive.sweep."rho=1e+05"]
+gap_pct = 5.096826512408416
+iters = 224
+objective = 6305.140284194566
+rho = 100000.0
+status = "converged"
+time_s = 5.465646028518677
+
+[api.ac.dummy_bus_power.adaptive.sweep."rho=1e+06"]
+gap_pct = 13.442273502242164
+iters = 300
+objective = 6805.813955811078
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 7.81464695930481
+
+[api.ac.dummy_bus_power.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.ac.dummy_bus_power.fixed.sweep."rho=1e+01"]
+gap_pct = -100.00005188396605
+iters = 300
+objective = -0.003112707541980131
+rho = 10.0
+status = "did_not_converge"
+time_s = 8.2532479763031
+
+[api.ac.dummy_bus_power.fixed.sweep."rho=1e+02"]
+gap_pct = -47.45210035483609
+iters = 300
+objective = 3152.539328705785
+rho = 100.0
+status = "did_not_converge"
+time_s = 7.5287511348724365
+
+[api.ac.dummy_bus_power.fixed.sweep."rho=1e+03"]
+gap_pct = -8.832299097115675
+iters = 300
+objective = 5469.481454916336
+rho = 1000.0
+status = "did_not_converge"
+time_s = 7.722750186920166
+
+[api.ac.dummy_bus_power.fixed.sweep."rho=1e+04"]
+gap_pct = -1.9406227628441373
+iters = 300
+objective = 5882.938145501712
+rho = 10000.0
+status = "did_not_converge"
+time_s = 7.439812898635864
+
+[api.ac.dummy_bus_power.fixed.sweep."rho=1e+05"]
+gap_pct = -0.21247349379804356
+iters = 300
+objective = 5986.616095968441
+rho = 100000.0
+status = "did_not_converge"
+time_s = 7.187094211578369
+
+[api.ac.dummy_bus_power.fixed.sweep."rho=1e+06"]
+gap_pct = 4.062845165540661
+iters = 300
+objective = 6243.10798826723
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 7.229436159133911
+
+[api.ac.split_bus_hybrid.adaptive.best]
+gap_pct = -0.04715319184121572
+hit_target = true
+iters = 21
+rho = 100.0
+time_s = 0.43639206886291504
+
+[api.ac.split_bus_hybrid.adaptive.sweep."rho=1e+02"]
+gap_pct = -0.04715319184121572
+iters = 21
+objective = 5996.5342612475815
+rho = 100.0
+status = "converged"
+time_s = 0.43639206886291504
+
+[api.ac.split_bus_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = 2.766386146177225
+iters = 45
+objective = 6165.328703572743
+rho = 1000.0
+status = "converged"
+time_s = 0.8934290409088135
+
+[api.ac.split_bus_hybrid.adaptive.sweep."rho=1e+04"]
+gap_pct = 5.796684047752388
+iters = 27
+objective = 6347.127279289736
+rho = 10000.0
+status = "converged"
+time_s = 0.5342390537261963
+
+[api.ac.split_bus_hybrid.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.ac.split_bus_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -100.00005197550307
+iters = 300
+objective = -0.0031181991788009037
+rho = 10.0
+status = "did_not_converge"
+time_s = 6.170001983642578
+
+[api.ac.split_bus_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = -47.452100431916314
+iters = 300
+objective = 3152.539324081462
+rho = 100.0
+status = "did_not_converge"
+time_s = 6.350917816162109
+
+[api.ac.split_bus_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = -12.11494514887312
+iters = 300
+objective = 5272.543597261381
+rho = 1000.0
+status = "did_not_converge"
+time_s = 5.898965120315552
+
+[api.ac.split_bus_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = -1.2848517091695641
+iters = 300
+objective = 5922.28023246039
+rho = 10000.0
+status = "did_not_converge"
+time_s = 5.938172101974487
+
+[api.ac.split_bus_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = 0.026121304140554906
+iters = 300
+objective = 6000.930264359666
+rho = 100000.0
+status = "did_not_converge"
+time_s = 5.88916802406311
+
+[api.ac.split_bus_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = 2.7274780936598586
+iters = 300
+objective = 6162.994468206674
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 6.59328293800354
+
+[api.ac.tie_line_hybrid.adaptive.best]
+gap_pct = 5.775519885175707
+hit_target = false
+iters = 265
+rho = 1.0e6
+time_s = 5.97219705581665
+
+[api.ac.tie_line_hybrid.adaptive.sweep."rho=1e+01"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10.0
+status = "error"
+time_s = 0.5398750305175781
+
+[api.ac.tie_line_hybrid.adaptive.sweep."rho=1e+02"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100.0
+status = "error"
+time_s = 0.6702408790588379
+
+[api.ac.tie_line_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1000.0
+status = "error"
+time_s = 0.5610270500183105
+
+[api.ac.tie_line_hybrid.adaptive.sweep."rho=1e+04"]
+gap_pct = 5.08651790359723
+iters = 300
+objective = 6304.5218333160165
+rho = 10000.0
+status = "did_not_converge"
+time_s = 6.531052827835083
+
+[api.ac.tie_line_hybrid.adaptive.sweep."rho=1e+05"]
+gap_pct = 4.49726505492998
+iters = 300
+objective = 6269.170415038228
+rho = 100000.0
+status = "did_not_converge"
+time_s = 6.955821990966797
+
+[api.ac.tie_line_hybrid.adaptive.sweep."rho=1e+06"]
+gap_pct = 5.775519885175707
+iters = 265
+objective = 6345.857564318583
+rho = 1.0e6
+status = "converged"
+time_s = 5.97219705581665
+
+[api.ac.tie_line_hybrid.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.ac.tie_line_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -93.79223172986336
+iters = 300
+objective = 372.42656218893643
+rho = 10.0
+status = "did_not_converge"
+time_s = 7.820146083831787
+
+[api.ac.tie_line_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = -47.452100362613336
+iters = 300
+objective = 3152.539328239199
+rho = 100.0
+status = "did_not_converge"
+time_s = 7.000226020812988
+
+[api.ac.tie_line_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = -1.7138031417590764
+iters = 300
+objective = 5896.545878271648
+rho = 1000.0
+status = "did_not_converge"
+time_s = 6.937859058380127
+
+[api.ac.tie_line_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = 0.1819542216946877
+iters = 300
+objective = 6010.279246994818
+rho = 10000.0
+status = "did_not_converge"
+time_s = 6.314228057861328
+
+[api.ac.tie_line_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = 1.4685367198954677
+iters = 300
+objective = 6087.466003317928
+rho = 100000.0
+status = "did_not_converge"
+time_s = 6.353500127792358
+
+[api.ac.tie_line_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = 3.541387239225733
+iters = 300
+objective = 6211.823833580289
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 6.844385862350464
+
+[api.ac.tie_line_power.adaptive.best]
+gap_pct = 6.048091196817498
+hit_target = false
+iters = 105
+rho = 10000.0
+time_s = 2.3863229751586914
+
+[api.ac.tie_line_power.adaptive.sweep."rho=1e+01"]
+gap_pct = 6.246585192024545
+iters = 191
+objective = 6374.118482761714
+rho = 10.0
+status = "converged"
+time_s = 4.504081964492798
+
+[api.ac.tie_line_power.adaptive.sweep."rho=1e+02"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100.0
+status = "error"
+time_s = 0.7772791385650635
+
+[api.ac.tie_line_power.adaptive.sweep."rho=1e+03"]
+gap_pct = 6.153947504492468
+iters = 170
+objective = 6368.56081147062
+rho = 1000.0
+status = "converged"
+time_s = 4.507762908935547
+
+[api.ac.tie_line_power.adaptive.sweep."rho=1e+04"]
+gap_pct = 6.048091196817498
+iters = 105
+objective = 6362.210107153409
+rho = 10000.0
+status = "converged"
+time_s = 2.3863229751586914
+
+[api.ac.tie_line_power.adaptive.sweep."rho=1e+05"]
+gap_pct = 16.891682996268045
+iters = 81
+objective = 7012.756557973265
+rho = 100000.0
+status = "converged"
+time_s = 1.9471890926361084
+
+[api.ac.tie_line_power.adaptive.sweep."rho=1e+06"]
+gap_pct = 15.346110427765852
+iters = 83
+objective = 6920.032046803952
+rho = 1.0e6
+status = "converged"
+time_s = 1.9698948860168457
+
+[api.ac.tie_line_power.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.ac.tie_line_power.fixed.sweep."rho=1e+01"]
+gap_pct = -93.9628589102862
+iters = 300
+objective = 362.1900179985592
+rho = 10.0
+status = "did_not_converge"
+time_s = 8.011973142623901
+
+[api.ac.tie_line_power.fixed.sweep."rho=1e+02"]
+gap_pct = -47.45210038541766
+iters = 300
+objective = 3152.539326871085
+rho = 100.0
+status = "did_not_converge"
+time_s = 6.499825954437256
+
+[api.ac.tie_line_power.fixed.sweep."rho=1e+03"]
+gap_pct = -9.196062170993459
+iters = 300
+objective = 5447.657987099841
+rho = 1000.0
+status = "did_not_converge"
+time_s = 6.220806837081909
+
+[api.ac.tie_line_power.fixed.sweep."rho=1e+04"]
+gap_pct = -0.1804458369297588
+iters = 300
+objective = 5988.537551413195
+rho = 10000.0
+status = "did_not_converge"
+time_s = 7.040881872177124
+
+[api.ac.tie_line_power.fixed.sweep."rho=1e+05"]
+gap_pct = 1.4905838785816035
+iters = 300
+objective = 6088.788692432309
+rho = 100000.0
+status = "did_not_converge"
+time_s = 7.186911106109619
+
+[api.ac.tie_line_power.fixed.sweep."rho=1e+06"]
+gap_pct = 5.5380639086992804
+iters = 300
+objective = 6331.611717962533
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 7.458059072494507
+
+[api.ac.tie_line_state.adaptive.best]
+gap_pct = 6.420142110912335
+hit_target = false
+iters = 257
+rho = 10000.0
+time_s = 5.927740812301636
+
+[api.ac.tie_line_state.adaptive.sweep."rho=1e+01"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10.0
+status = "error"
+time_s = 0.5911619663238525
+
+[api.ac.tie_line_state.adaptive.sweep."rho=1e+02"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100.0
+status = "error"
+time_s = 0.5983450412750244
+
+[api.ac.tie_line_state.adaptive.sweep."rho=1e+03"]
+gap_pct = -4.866306568629749
+iters = 300
+objective = 5707.4157492998
+rho = 1000.0
+status = "did_not_converge"
+time_s = 7.441118001937866
+
+[api.ac.tie_line_state.adaptive.sweep."rho=1e+04"]
+gap_pct = 6.420142110912335
+iters = 257
+objective = 6384.5307926020205
+rho = 10000.0
+status = "converged"
+time_s = 5.927740812301636
+
+[api.ac.tie_line_state.adaptive.sweep."rho=1e+05"]
+gap_pct = 6.044811216905891
+iters = 300
+objective = 6362.013329247184
+rho = 100000.0
+status = "did_not_converge"
+time_s = 6.807752847671509
+
+[api.ac.tie_line_state.adaptive.sweep."rho=1e+06"]
+gap_pct = 7.299668165534965
+iters = 300
+objective = 6437.296754639372
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 6.869171142578125
+
+[api.ac.tie_line_state.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.ac.tie_line_state.fixed.sweep."rho=1e+01"]
+gap_pct = -94.01960578842032
+iters = 300
+objective = 358.7855667016084
+rho = 10.0
+status = "did_not_converge"
+time_s = 7.44118595123291
+
+[api.ac.tie_line_state.fixed.sweep."rho=1e+02"]
+gap_pct = -93.938303044271
+iters = 300
+objective = 363.6632135760454
+rho = 100.0
+status = "did_not_converge"
+time_s = 6.755808115005493
+
+[api.ac.tie_line_state.fixed.sweep."rho=1e+03"]
+gap_pct = -91.1435048657175
+iters = 300
+objective = 531.3333056859213
+rho = 1000.0
+status = "did_not_converge"
+time_s = 6.2360358238220215
+
+[api.ac.tie_line_state.fixed.sweep."rho=1e+04"]
+gap_pct = -47.45210016749364
+iters = 300
+objective = 3152.5393399451386
+rho = 10000.0
+status = "did_not_converge"
+time_s = 6.713608980178833
+
+[api.ac.tie_line_state.fixed.sweep."rho=1e+05"]
+gap_pct = 0.34819942046313646
+iters = 300
+objective = 6020.252900192473
+rho = 100000.0
+status = "did_not_converge"
+time_s = 6.461251974105835
+
+[api.ac.tie_line_state.fixed.sweep."rho=1e+06"]
+gap_pct = 12.008934563299725
+iters = 300
+objective = 6719.822747658245
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 6.421844005584717
+
+[api.dc.dummy_bus_hybrid.adaptive.best]
+gap_pct = -0.924590178006864
+hit_target = true
+iters = 14
+rho = 1000.0
+time_s = 0.04041695594787598
+
+[api.dc.dummy_bus_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = -0.924590178006864
+iters = 14
+objective = 4797.647105614529
+rho = 1000.0
+status = "converged"
+time_s = 0.04041695594787598
+
+[api.dc.dummy_bus_hybrid.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.dc.dummy_bus_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -100.00001437850644
+iters = 300
+objective = -0.0006962676197963818
+rho = 10.0
+status = "did_not_converge"
+time_s = 1.1061949729919434
+
+[api.dc.dummy_bus_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = -6.930755566887966
+iters = 300
+objective = 4506.803373092203
+rho = 100.0
+status = "did_not_converge"
+time_s = 0.7416110038757324
+
+[api.dc.dummy_bus_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = -34.14953042233252
+iters = 300
+objective = 3188.7560731797575
+rho = 1000.0
+status = "did_not_converge"
+time_s = 0.7693939208984375
+
+[api.dc.dummy_bus_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10000.0
+status = "error"
+time_s = 0.012382030487060547
+
+[api.dc.dummy_bus_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100000.0
+status = "error"
+time_s = 0.01235198974609375
+
+[api.dc.dummy_bus_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1.0e6
+status = "error"
+time_s = 0.012499094009399414
+
+[api.dc.dummy_bus_power.adaptive.best]
+gap_pct = -3.677128438823596
+hit_target = false
+iters = 11
+rho = 1000.0
+time_s = 0.03357505798339844
+
+[api.dc.dummy_bus_power.adaptive.sweep."rho=1e+01"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10.0
+status = "error"
+time_s = 0.07311391830444336
+
+[api.dc.dummy_bus_power.adaptive.sweep."rho=1e+02"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100.0
+status = "error"
+time_s = 0.04202604293823242
+
+[api.dc.dummy_bus_power.adaptive.sweep."rho=1e+03"]
+gap_pct = -3.677128438823596
+iters = 11
+objective = 4664.35765221911
+rho = 1000.0
+status = "converged"
+time_s = 0.03357505798339844
+
+[api.dc.dummy_bus_power.adaptive.sweep."rho=1e+04"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10000.0
+status = "error"
+time_s = 0.011233091354370117
+
+[api.dc.dummy_bus_power.adaptive.sweep."rho=1e+05"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100000.0
+status = "error"
+time_s = 0.012646198272705078
+
+[api.dc.dummy_bus_power.adaptive.sweep."rho=1e+06"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1.0e6
+status = "error"
+time_s = 0.013102054595947266
+
+[api.dc.dummy_bus_power.fixed.best]
+gap_pct = -3.6808126666193197
+hit_target = false
+iters = 100
+rho = 100.0
+time_s = 0.2721548080444336
+
+[api.dc.dummy_bus_power.fixed.sweep."rho=1e+01"]
+gap_pct = -100.0000072761532
+iters = 300
+objective = -0.0003523418715262959
+rho = 10.0
+status = "did_not_converge"
+time_s = 0.7966070175170898
+
+[api.dc.dummy_bus_power.fixed.sweep."rho=1e+02"]
+gap_pct = -3.6808126666193197
+iters = 100
+objective = 4664.179246448673
+rho = 100.0
+status = "converged"
+time_s = 0.2721548080444336
+
+[api.dc.dummy_bus_power.fixed.sweep."rho=1e+03"]
+gap_pct = -34.89745784170197
+iters = 300
+objective = 3152.5382889162897
+rho = 1000.0
+status = "did_not_converge"
+time_s = 0.7033090591430664
+
+[api.dc.dummy_bus_power.fixed.sweep."rho=1e+04"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10000.0
+status = "error"
+time_s = 0.01277303695678711
+
+[api.dc.dummy_bus_power.fixed.sweep."rho=1e+05"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100000.0
+status = "error"
+time_s = 0.013254165649414062
+
+[api.dc.dummy_bus_power.fixed.sweep."rho=1e+06"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1.0e6
+status = "error"
+time_s = 0.012486934661865234
+
+[api.dc.split_bus_hybrid.adaptive.best]
+gap_pct = -0.9263236703044818
+hit_target = true
+iters = 14
+rho = 1000.0
+time_s = 0.03893017768859863
+
+[api.dc.split_bus_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = -0.9263236703044818
+iters = 14
+objective = 4797.563162643017
+rho = 1000.0
+status = "converged"
+time_s = 0.03893017768859863
+
+[api.dc.split_bus_hybrid.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.dc.split_bus_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -100.00000019666321
+iters = 300
+objective = -9.52325846069666e-6
+rho = 10.0
+status = "did_not_converge"
+time_s = 0.6749298572540283
+
+[api.dc.split_bus_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100.0
+status = "error"
+time_s = 0.15979790687561035
+
+[api.dc.split_bus_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = -6.9113416203875815
+iters = 300
+objective = 4507.743477850826
+rho = 1000.0
+status = "did_not_converge"
+time_s = 0.7025289535522461
+
+[api.dc.split_bus_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10000.0
+status = "error"
+time_s = 0.012140035629272461
+
+[api.dc.split_bus_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100000.0
+status = "error"
+time_s = 0.012097835540771484
+
+[api.dc.split_bus_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1.0e6
+status = "error"
+time_s = 0.012277841567993164
+
+[api.dc.tie_line_hybrid.adaptive.best]
+gap_pct = -0.9255067094800807
+hit_target = true
+iters = 14
+rho = 1000.0
+time_s = 0.04012298583984375
+
+[api.dc.tie_line_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = -0.9255067094800807
+iters = 14
+objective = 4797.602723314445
+rho = 1000.0
+status = "converged"
+time_s = 0.04012298583984375
+
+[api.dc.tie_line_hybrid.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.dc.tie_line_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -95.38698693251756
+iters = 300
+objective = 223.38145086790522
+rho = 10.0
+status = "did_not_converge"
+time_s = 0.7699630260467529
+
+[api.dc.tie_line_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = -34.897453417709016
+iters = 300
+objective = 3152.5385031445935
+rho = 100.0
+status = "did_not_converge"
+time_s = 0.7273290157318115
+
+[api.dc.tie_line_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = -7.036337545499031
+iters = 300
+objective = 4501.690650621526
+rho = 1000.0
+status = "did_not_converge"
+time_s = 0.704272985458374
+
+[api.dc.tie_line_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10000.0
+status = "error"
+time_s = 0.01427006721496582
+
+[api.dc.tie_line_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100000.0
+status = "error"
+time_s = 0.011846065521240234
+
+[api.dc.tie_line_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1.0e6
+status = "error"
+time_s = 0.012279033660888672
+
+[api.dc.tie_line_power.adaptive.best]
+gap_pct = -3.6771420041244665
+hit_target = false
+iters = 17
+rho = 10.0
+time_s = 0.04716801643371582
+
+[api.dc.tie_line_power.adaptive.sweep."rho=1e+01"]
+gap_pct = -3.6771420041244665
+iters = 17
+objective = 4664.356995330316
+rho = 10.0
+status = "converged"
+time_s = 0.04716801643371582
+
+[api.dc.tie_line_power.adaptive.sweep."rho=1e+02"]
+gap_pct = -3.6784729908594223
+iters = 13
+objective = 4664.29254336723
+rho = 100.0
+status = "converged"
+time_s = 0.03526902198791504
+
+[api.dc.tie_line_power.adaptive.sweep."rho=1e+03"]
+gap_pct = -3.6772138288772993
+iters = 10
+objective = 4664.353517274377
+rho = 1000.0
+status = "converged"
+time_s = 0.030244827270507812
+
+[api.dc.tie_line_power.adaptive.sweep."rho=1e+04"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10000.0
+status = "error"
+time_s = 0.011050939559936523
+
+[api.dc.tie_line_power.adaptive.sweep."rho=1e+05"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100000.0
+status = "error"
+time_s = 0.010570049285888672
+
+[api.dc.tie_line_power.adaptive.sweep."rho=1e+06"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1.0e6
+status = "error"
+time_s = 0.011269092559814453
+
+[api.dc.tie_line_power.fixed.best]
+gap_pct = -3.67713204645549
+hit_target = false
+iters = 81
+rho = 1000.0
+time_s = 0.1744680404663086
+
+[api.dc.tie_line_power.fixed.sweep."rho=1e+01"]
+gap_pct = -95.38697813531064
+iters = 300
+objective = 223.3818768655811
+rho = 10.0
+status = "did_not_converge"
+time_s = 0.7631487846374512
+
+[api.dc.tie_line_power.fixed.sweep."rho=1e+02"]
+gap_pct = -34.897551497446955
+iters = 300
+objective = 3152.5337537120986
+rho = 100.0
+status = "did_not_converge"
+time_s = 0.6903860569000244
+
+[api.dc.tie_line_power.fixed.sweep."rho=1e+03"]
+gap_pct = -3.67713204645549
+iters = 81
+objective = 4664.357477522434
+rho = 1000.0
+status = "converged"
+time_s = 0.1744680404663086
+
+[api.dc.tie_line_power.fixed.sweep."rho=1e+04"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10000.0
+status = "error"
+time_s = 0.01233816146850586
+
+[api.dc.tie_line_power.fixed.sweep."rho=1e+05"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100000.0
+status = "error"
+time_s = 0.01180887222290039
+
+[api.dc.tie_line_power.fixed.sweep."rho=1e+06"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1.0e6
+status = "error"
+time_s = 0.012079000473022461
+
+[api.dc.tie_line_state.adaptive.best]
+gap_pct = -0.925500831780218
+hit_target = true
+iters = 20
+rho = 1000.0
+time_s = 0.08078193664550781
+
+[api.dc.tie_line_state.adaptive.sweep."rho=1e+03"]
+gap_pct = -0.925500831780218
+iters = 20
+objective = 4797.603007937338
+rho = 1000.0
+status = "converged"
+time_s = 0.08078193664550781
+
+[api.dc.tie_line_state.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.dc.tie_line_state.fixed.sweep."rho=1e+01"]
+gap_pct = -95.38698090787894
+iters = 300
+objective = 223.38174260618842
+rho = 10.0
+status = "did_not_converge"
+time_s = 0.7517240047454834
+
+[api.dc.tie_line_state.fixed.sweep."rho=1e+02"]
+gap_pct = -95.38690555351788
+iters = 300
+objective = 223.38539158057048
+rho = 100.0
+status = "did_not_converge"
+time_s = 0.6407911777496338
+
+[api.dc.tie_line_state.fixed.sweep."rho=1e+03"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1000.0
+status = "error"
+time_s = 0.13223695755004883
+
+[api.dc.tie_line_state.fixed.sweep."rho=1e+04"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10000.0
+status = "error"
+time_s = 0.012090921401977539
+
+[api.dc.tie_line_state.fixed.sweep."rho=1e+05"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100000.0
+status = "error"
+time_s = 0.012332916259765625
+
+[api.dc.tie_line_state.fixed.sweep."rho=1e+06"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1.0e6
+status = "error"
+time_s = 0.012276172637939453
+
+[api.socwr.dummy_bus_hybrid.adaptive.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.socwr.dummy_bus_hybrid.adaptive.sweep."rho=1e+01"]
+gap_pct = -16.90034710182509
+iters = 300
+objective = 4729.865074678679
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.27890419960022
+
+[api.socwr.dummy_bus_hybrid.adaptive.sweep."rho=1e+02"]
+gap_pct = -24.347055294544898
+iters = 300
+objective = 4306.013424597448
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.185794830322266
+
+[api.socwr.dummy_bus_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = -38.52482658578351
+iters = 300
+objective = 3499.0432035619715
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.276504039764404
+
+[api.socwr.dummy_bus_hybrid.adaptive.sweep."rho=1e+04"]
+gap_pct = -41.85930114378581
+iters = 300
+objective = 3309.2516195510825
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.691622018814087
+
+[api.socwr.dummy_bus_hybrid.adaptive.sweep."rho=1e+05"]
+gap_pct = -31.690701031758564
+iters = 300
+objective = 3888.02788215696
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.7753989696502686
+
+[api.socwr.dummy_bus_hybrid.adaptive.sweep."rho=1e+06"]
+gap_pct = -28.753458848134006
+iters = 300
+objective = 4055.2097985149267
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.716604948043823
+
+[api.socwr.dummy_bus_hybrid.fixed.best]
+gap_pct = -53.62006135051642
+hit_target = false
+iters = 258
+rho = 100000.0
+time_s = 4.0189900398254395
+
+[api.socwr.dummy_bus_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -96.88383756564869
+iters = 300
+objective = 177.36569710254034
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.230535984039307
+
+[api.socwr.dummy_bus_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = -89.02869276679024
+iters = 300
+objective = 624.4647371694147
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.162491083145142
+
+[api.socwr.dummy_bus_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = -67.75977353765387
+iters = 300
+objective = 1835.0488338481543
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.379759073257446
+
+[api.socwr.dummy_bus_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = -51.05320155128284
+iters = 300
+objective = 2785.9533033622147
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.889534950256348
+
+[api.socwr.dummy_bus_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = -53.62006135051642
+iters = 258
+objective = 2639.852807240187
+rho = 100000.0
+status = "converged"
+time_s = 4.0189900398254395
+
+[api.socwr.dummy_bus_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = -43.77820361265938
+iters = 300
+objective = 3200.0315512030093
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.681051015853882
+
+[api.socwr.dummy_bus_power.adaptive.best]
+gap_pct = -28.84597294277891
+hit_target = false
+iters = 1
+rho = 1.0e6
+time_s = 0.025588035583496094
+
+[api.socwr.dummy_bus_power.adaptive.sweep."rho=1e+01"]
+gap_pct = -96.97866871758652
+iters = 1
+objective = 171.96809870231732
+rho = 10.0
+status = "converged"
+time_s = 0.024910926818847656
+
+[api.socwr.dummy_bus_power.adaptive.sweep."rho=1e+02"]
+gap_pct = -86.50231218699014
+iters = 1
+objective = 768.2612375517342
+rho = 100.0
+status = "converged"
+time_s = 0.025074005126953125
+
+[api.socwr.dummy_bus_power.adaptive.sweep."rho=1e+03"]
+gap_pct = -66.41287545931428
+iters = 1
+objective = 1911.7115629656455
+rho = 1000.0
+status = "converged"
+time_s = 0.025629043579101562
+
+[api.socwr.dummy_bus_power.adaptive.sweep."rho=1e+04"]
+gap_pct = -34.27897227692687
+iters = 1
+objective = 3740.708689604887
+rho = 10000.0
+status = "converged"
+time_s = 0.0258481502532959
+
+[api.socwr.dummy_bus_power.adaptive.sweep."rho=1e+05"]
+gap_pct = -29.492161787683877
+iters = 1
+objective = 4013.1643132152385
+rho = 100000.0
+status = "converged"
+time_s = 0.02507495880126953
+
+[api.socwr.dummy_bus_power.adaptive.sweep."rho=1e+06"]
+gap_pct = -28.84597294277891
+iters = 1
+objective = 4049.9440823546843
+rho = 1.0e6
+status = "converged"
+time_s = 0.025588035583496094
+
+[api.socwr.dummy_bus_power.fixed.best]
+gap_pct = -28.84597294277891
+hit_target = false
+iters = 1
+rho = 1.0e6
+time_s = 0.02617502212524414
+
+[api.socwr.dummy_bus_power.fixed.sweep."rho=1e+01"]
+gap_pct = -96.97866871758652
+iters = 1
+objective = 171.96809870231732
+rho = 10.0
+status = "converged"
+time_s = 0.02546215057373047
+
+[api.socwr.dummy_bus_power.fixed.sweep."rho=1e+02"]
+gap_pct = -86.50231218699014
+iters = 1
+objective = 768.2612375517342
+rho = 100.0
+status = "converged"
+time_s = 0.025285005569458008
+
+[api.socwr.dummy_bus_power.fixed.sweep."rho=1e+03"]
+gap_pct = -66.41287545931428
+iters = 1
+objective = 1911.7115629656455
+rho = 1000.0
+status = "converged"
+time_s = 0.025429964065551758
+
+[api.socwr.dummy_bus_power.fixed.sweep."rho=1e+04"]
+gap_pct = -34.27897227692687
+iters = 1
+objective = 3740.708689604887
+rho = 10000.0
+status = "converged"
+time_s = 0.024415016174316406
+
+[api.socwr.dummy_bus_power.fixed.sweep."rho=1e+05"]
+gap_pct = -29.492161787683877
+iters = 1
+objective = 4013.1643132152385
+rho = 100000.0
+status = "converged"
+time_s = 0.025854825973510742
+
+[api.socwr.dummy_bus_power.fixed.sweep."rho=1e+06"]
+gap_pct = -28.84597294277891
+iters = 1
+objective = 4049.9440823546843
+rho = 1.0e6
+status = "converged"
+time_s = 0.02617502212524414
+
+[api.socwr.split_bus_hybrid.adaptive.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.socwr.split_bus_hybrid.adaptive.sweep."rho=1e+01"]
+gap_pct = 30.677353187329754
+iters = 300
+objective = 7437.892064959231
+rho = 10.0
+status = "did_not_converge"
+time_s = 3.8232598304748535
+
+[api.socwr.split_bus_hybrid.adaptive.sweep."rho=1e+02"]
+gap_pct = 30.55072493114954
+iters = 300
+objective = 7430.684639350508
+rho = 100.0
+status = "did_not_converge"
+time_s = 3.88337779045105
+
+[api.socwr.split_bus_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = 30.635308180954922
+iters = 300
+objective = 7435.498947776652
+rho = 1000.0
+status = "did_not_converge"
+time_s = 3.6647398471832275
+
+[api.socwr.split_bus_hybrid.adaptive.sweep."rho=1e+04"]
+gap_pct = 30.742530729910627
+iters = 300
+objective = 7441.601839567849
+rho = 10000.0
+status = "did_not_converge"
+time_s = 3.7688260078430176
+
+[api.socwr.split_bus_hybrid.adaptive.sweep."rho=1e+05"]
+gap_pct = 29.984235073921013
+iters = 300
+objective = 7398.441176262304
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.002748012542725
+
+[api.socwr.split_bus_hybrid.adaptive.sweep."rho=1e+06"]
+gap_pct = 32.85540530700393
+iters = 300
+objective = 7561.86241010977
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 3.7511720657348633
+
+[api.socwr.split_bus_hybrid.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.socwr.split_bus_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -99.99997327992855
+iters = 300
+objective = 0.0015208527155819204
+rho = 10.0
+status = "did_not_converge"
+time_s = 3.9543750286102295
+
+[api.socwr.split_bus_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = -44.61260269145887
+iters = 300
+objective = 3152.539234165372
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.496753931045532
+
+[api.socwr.split_bus_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = -0.16928735480242568
+iters = 300
+objective = 5682.16333826797
+rho = 1000.0
+status = "did_not_converge"
+time_s = 3.708527088165283
+
+[api.socwr.split_bus_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = 5.937048366008906
+iters = 300
+objective = 6029.723683622466
+rho = 10000.0
+status = "did_not_converge"
+time_s = 3.868983030319214
+
+[api.socwr.split_bus_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = 1.6140885906139881
+iters = 300
+objective = 5783.669509534209
+rho = 100000.0
+status = "did_not_converge"
+time_s = 3.725635051727295
+
+[api.socwr.split_bus_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = 14.466002593960889
+iters = 300
+objective = 6515.174600917562
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.330768823623657
+
+[api.socwr.tie_line_hybrid.adaptive.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.socwr.tie_line_hybrid.adaptive.sweep."rho=1e+01"]
+gap_pct = 33.83215377308017
+iters = 300
+objective = 7617.456967912568
+rho = 10.0
+status = "did_not_converge"
+time_s = 3.9994871616363525
+
+[api.socwr.tie_line_hybrid.adaptive.sweep."rho=1e+02"]
+gap_pct = 36.75315277049983
+iters = 300
+objective = 7783.714354787527
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.033301115036011
+
+[api.socwr.tie_line_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = 33.90196759744193
+iters = 300
+objective = 7621.4306303535295
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.430034160614014
+
+[api.socwr.tie_line_hybrid.adaptive.sweep."rho=1e+04"]
+gap_pct = 34.54423420722364
+iters = 300
+objective = 7657.987153759965
+rho = 10000.0
+status = "did_not_converge"
+time_s = 3.942643880844116
+
+[api.socwr.tie_line_hybrid.adaptive.sweep."rho=1e+05"]
+gap_pct = 33.01289596397611
+iters = 300
+objective = 7570.8264614869
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.339024066925049
+
+[api.socwr.tie_line_hybrid.adaptive.sweep."rho=1e+06"]
+gap_pct = 36.004790212408444
+iters = 300
+objective = 7741.119063432328
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.2681169509887695
+
+[api.socwr.tie_line_hybrid.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.socwr.tie_line_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -99.99933297187624
+iters = 300
+objective = 0.03796589896958957
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.044081926345825
+
+[api.socwr.tie_line_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = -44.612545805773784
+iters = 300
+objective = 3152.542471984132
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.121153831481934
+
+[api.socwr.tie_line_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = 0.150073868065554
+iters = 300
+objective = 5700.340736627273
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.123944997787476
+
+[api.socwr.tie_line_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = 0.5328644443774606
+iters = 300
+objective = 5722.1284061862825
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.434709072113037
+
+[api.socwr.tie_line_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = 1.276319518280607
+iters = 300
+objective = 5764.4443734136785
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.516309022903442
+
+[api.socwr.tie_line_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = 16.404754748620302
+iters = 300
+objective = 6625.524473449737
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.0727739334106445
+
+[api.socwr.tie_line_power.adaptive.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.socwr.tie_line_power.adaptive.sweep."rho=1e+01"]
+gap_pct = 33.12189208493672
+iters = 300
+objective = 7577.030301428792
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.349745988845825
+
+[api.socwr.tie_line_power.adaptive.sweep."rho=1e+02"]
+gap_pct = 33.81874804092006
+iters = 300
+objective = 7616.693940605795
+rho = 100.0
+status = "did_not_converge"
+time_s = 3.971630096435547
+
+[api.socwr.tie_line_power.adaptive.sweep."rho=1e+03"]
+gap_pct = 26.596630500296904
+iters = 300
+objective = 7205.625538641772
+rho = 1000.0
+status = "did_not_converge"
+time_s = 3.9923980236053467
+
+[api.socwr.tie_line_power.adaptive.sweep."rho=1e+04"]
+gap_pct = 26.55736415387106
+iters = 300
+objective = 7203.39057719377
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.458377122879028
+
+[api.socwr.tie_line_power.adaptive.sweep."rho=1e+05"]
+gap_pct = 31.256633213884953
+iters = 300
+objective = 7470.863518756032
+rho = 100000.0
+status = "did_not_converge"
+time_s = 3.939326047897339
+
+[api.socwr.tie_line_power.adaptive.sweep."rho=1e+06"]
+gap_pct = 28.56729348160878
+iters = 300
+objective = 7317.791711233258
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 3.9538919925689697
+
+[api.socwr.tie_line_power.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.socwr.tie_line_power.fixed.sweep."rho=1e+01"]
+gap_pct = -99.99944807528102
+iters = 300
+objective = 0.03141444471873252
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.159693002700806
+
+[api.socwr.tie_line_power.fixed.sweep."rho=1e+02"]
+gap_pct = -44.61258962421736
+iters = 300
+objective = 3152.5399779264717
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.585697889328003
+
+[api.socwr.tie_line_power.fixed.sweep."rho=1e+03"]
+gap_pct = -0.04239603393389296
+iters = 300
+objective = 5689.385736989555
+rho = 1000.0
+status = "did_not_converge"
+time_s = 3.9009671211242676
+
+[api.socwr.tie_line_power.fixed.sweep."rho=1e+04"]
+gap_pct = -1.838884052245586
+iters = 300
+objective = 5587.133252911155
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.059290170669556
+
+[api.socwr.tie_line_power.fixed.sweep."rho=1e+05"]
+gap_pct = 0.3983062214095798
+iters = 300
+objective = 5714.469622820407
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.144700050354004
+
+[api.socwr.tie_line_power.fixed.sweep."rho=1e+06"]
+gap_pct = 16.25676231154891
+iters = 300
+objective = 6617.101041642167
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.431024074554443
+
+[api.socwr.tie_line_state.adaptive.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.socwr.tie_line_state.adaptive.sweep."rho=1e+01"]
+gap_pct = 29.181655888795824
+iters = 300
+objective = 7352.759983561786
+rho = 10.0
+status = "did_not_converge"
+time_s = 3.955021858215332
+
+[api.socwr.tie_line_state.adaptive.sweep."rho=1e+02"]
+gap_pct = 30.03234987272561
+iters = 300
+objective = 7401.179773819624
+rho = 100.0
+status = "did_not_converge"
+time_s = 3.9512810707092285
+
+[api.socwr.tie_line_state.adaptive.sweep."rho=1e+03"]
+gap_pct = 29.623399189667023
+iters = 300
+objective = 7377.903123609845
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.2368690967559814
+
+[api.socwr.tie_line_state.adaptive.sweep."rho=1e+04"]
+gap_pct = 28.93292782185069
+iters = 300
+objective = 7338.6028823476845
+rho = 10000.0
+status = "did_not_converge"
+time_s = 3.9333300590515137
+
+[api.socwr.tie_line_state.adaptive.sweep."rho=1e+05"]
+gap_pct = 30.773294345728058
+iters = 300
+objective = 7443.3528426942285
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.275134086608887
+
+[api.socwr.tie_line_state.adaptive.sweep."rho=1e+06"]
+gap_pct = 29.210130240744732
+iters = 300
+objective = 7354.38068639399
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.459074974060059
+
+[api.socwr.tie_line_state.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[api.socwr.tie_line_state.fixed.sweep."rho=1e+01"]
+gap_pct = -99.99999148642004
+iters = 300
+objective = 0.00048457584392928095
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.086245775222778
+
+[api.socwr.tie_line_state.fixed.sweep."rho=1e+02"]
+gap_pct = -99.99991119749414
+iters = 300
+objective = 0.005054459992584476
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.151412010192871
+
+[api.socwr.tie_line_state.fixed.sweep."rho=1e+03"]
+gap_pct = -44.61518717639309
+iters = 300
+objective = 3152.392130482022
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.096991062164307
+
+[api.socwr.tie_line_state.fixed.sweep."rho=1e+04"]
+gap_pct = 8.437196824226058
+iters = 300
+objective = 6172.027104414405
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.494085073471069
+
+[api.socwr.tie_line_state.fixed.sweep."rho=1e+05"]
+gap_pct = -1.5624642849898307
+iters = 300
+objective = 5602.866510000638
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.572551965713501
+
+[api.socwr.tie_line_state.fixed.sweep."rho=1e+06"]
+gap_pct = 24.2587007248008
+iters = 300
+objective = 7072.555278941407
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 3.99092698097229
+
+[sad.ac.dummy_bus_hybrid.adaptive.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[sad.ac.dummy_bus_hybrid.adaptive.sweep."rho=1e+01"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10.0
+status = "error"
+time_s = 0.6010029315948486
+
+[sad.ac.dummy_bus_hybrid.adaptive.sweep."rho=1e+02"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100.0
+status = "error"
+time_s = 0.6292679309844971
+
+[sad.ac.dummy_bus_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1000.0
+status = "error"
+time_s = 0.5456380844116211
+
+[sad.ac.dummy_bus_hybrid.adaptive.sweep."rho=1e+04"]
+gap_pct = 10.504640861979016
+iters = 300
+objective = 3068.4791693864404
+rho = 10000.0
+status = "did_not_converge"
+time_s = 7.059453964233398
+
+[sad.ac.dummy_bus_hybrid.adaptive.sweep."rho=1e+05"]
+gap_pct = 10.541760289533967
+iters = 300
+objective = 3069.509897049491
+rho = 100000.0
+status = "did_not_converge"
+time_s = 7.4347429275512695
+
+[sad.ac.dummy_bus_hybrid.adaptive.sweep."rho=1e+06"]
+gap_pct = 10.422122983693168
+iters = 300
+objective = 3066.1878231710507
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 7.4080750942230225
+
+[sad.ac.dummy_bus_hybrid.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[sad.ac.dummy_bus_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -100.00011228410729
+iters = 300
+objective = -0.003117891172030831
+rho = 10.0
+status = "did_not_converge"
+time_s = 8.177589893341064
+
+[sad.ac.dummy_bus_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = -26.9216989910295
+iters = 300
+objective = 2029.2292036879635
+rho = 100.0
+status = "did_not_converge"
+time_s = 7.284887075424194
+
+[sad.ac.dummy_bus_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = -27.013731964067688
+iters = 300
+objective = 2026.6736435009745
+rho = 1000.0
+status = "did_not_converge"
+time_s = 7.117119073867798
+
+[sad.ac.dummy_bus_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = 4.745464714561462
+iters = 300
+objective = 2908.559080027928
+rho = 10000.0
+status = "did_not_converge"
+time_s = 6.763285160064697
+
+[sad.ac.dummy_bus_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = -6.954317385585697
+iters = 300
+objective = 2583.680980966895
+rho = 100000.0
+status = "did_not_converge"
+time_s = 7.381314992904663
+
+[sad.ac.dummy_bus_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = 4.195093885914734
+iters = 300
+objective = 2893.2764510816037
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 7.553049087524414
+
+[sad.ac.dummy_bus_power.adaptive.best]
+gap_pct = 7.6442827473411885
+hit_target = false
+iters = 32
+rho = 10000.0
+time_s = 0.8123629093170166
+
+[sad.ac.dummy_bus_power.adaptive.sweep."rho=1e+01"]
+gap_pct = 11.820835903305959
+iters = 300
+objective = 3105.0271101394974
+rho = 10.0
+status = "did_not_converge"
+time_s = 7.788454055786133
+
+[sad.ac.dummy_bus_power.adaptive.sweep."rho=1e+02"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100.0
+status = "error"
+time_s = 0.5126371383666992
+
+[sad.ac.dummy_bus_power.adaptive.sweep."rho=1e+03"]
+gap_pct = 11.406043543247016
+iters = 300
+objective = 3093.5092073027176
+rho = 1000.0
+status = "did_not_converge"
+time_s = 8.070950984954834
+
+[sad.ac.dummy_bus_power.adaptive.sweep."rho=1e+04"]
+gap_pct = 7.6442827473411885
+iters = 32
+objective = 2989.0530998269355
+rho = 10000.0
+status = "converged"
+time_s = 0.8123629093170166
+
+[sad.ac.dummy_bus_power.adaptive.sweep."rho=1e+05"]
+gap_pct = 8.715563424617818
+iters = 25
+objective = 3018.8002888784367
+rho = 100000.0
+status = "converged"
+time_s = 1.1342670917510986
+
+[sad.ac.dummy_bus_power.adaptive.sweep."rho=1e+06"]
+gap_pct = 8.75450177593168
+iters = 38
+objective = 3019.8815241909524
+rho = 1.0e6
+status = "converged"
+time_s = 0.8225390911102295
+
+[sad.ac.dummy_bus_power.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[sad.ac.dummy_bus_power.fixed.sweep."rho=1e+01"]
+gap_pct = -100.00011228427174
+iters = 300
+objective = -0.0031178957389180187
+rho = 10.0
+status = "did_not_converge"
+time_s = 7.652152061462402
+
+[sad.ac.dummy_bus_power.fixed.sweep."rho=1e+02"]
+gap_pct = -27.04123303568536
+iters = 300
+objective = 2025.9099971533064
+rho = 100.0
+status = "did_not_converge"
+time_s = 8.007174968719482
+
+[sad.ac.dummy_bus_power.fixed.sweep."rho=1e+03"]
+gap_pct = -25.20158022580121
+iters = 300
+objective = 2076.9932483362436
+rho = 1000.0
+status = "did_not_converge"
+time_s = 7.901390075683594
+
+[sad.ac.dummy_bus_power.fixed.sweep."rho=1e+04"]
+gap_pct = -5.721388802136398
+iters = 300
+objective = 2617.9167890392505
+rho = 10000.0
+status = "did_not_converge"
+time_s = 7.332230091094971
+
+[sad.ac.dummy_bus_power.fixed.sweep."rho=1e+05"]
+gap_pct = -0.13074346108686702
+iters = 300
+objective = 2773.157135857483
+rho = 100000.0
+status = "did_not_converge"
+time_s = 7.146988153457642
+
+[sad.ac.dummy_bus_power.fixed.sweep."rho=1e+06"]
+gap_pct = -2.7585177796401794
+iters = 300
+objective = 2700.189424316747
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 7.859779119491577
+
+[sad.ac.split_bus_hybrid.adaptive.best]
+gap_pct = 0.011052447728549077
+hit_target = true
+iters = 24
+rho = 100.0
+time_s = 0.47299814224243164
+
+[sad.ac.split_bus_hybrid.adaptive.sweep."rho=1e+02"]
+gap_pct = 0.011052447728549077
+iters = 24
+objective = 2777.0945070765592
+rho = 100.0
+status = "converged"
+time_s = 0.47299814224243164
+
+[sad.ac.split_bus_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = 1.5345820740188194
+iters = 21
+objective = 2819.3996888838446
+rho = 1000.0
+status = "converged"
+time_s = 0.40862607955932617
+
+[sad.ac.split_bus_hybrid.adaptive.sweep."rho=1e+04"]
+gap_pct = 6.722920837838594
+iters = 244
+objective = 2963.4688365351703
+rho = 10000.0
+status = "converged"
+time_s = 4.8587870597839355
+
+[sad.ac.split_bus_hybrid.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[sad.ac.split_bus_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -100.0001123054953
+iters = 300
+objective = -0.0031184850723288554
+rho = 10.0
+status = "did_not_converge"
+time_s = 6.277585983276367
+
+[sad.ac.split_bus_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = -27.273973932705594
+iters = 300
+objective = 2019.4472767752284
+rho = 100.0
+status = "did_not_converge"
+time_s = 6.468515872955322
+
+[sad.ac.split_bus_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = -27.283600235859804
+iters = 300
+objective = 2019.1799747825112
+rho = 1000.0
+status = "did_not_converge"
+time_s = 5.937777996063232
+
+[sad.ac.split_bus_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = 0.5581702128983049
+iters = 300
+objective = 2792.286805359502
+rho = 10000.0
+status = "did_not_converge"
+time_s = 5.798614978790283
+
+[sad.ac.split_bus_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = 1.6460798930187894
+iters = 300
+objective = 2822.4957465006532
+rho = 100000.0
+status = "did_not_converge"
+time_s = 5.908991098403931
+
+[sad.ac.split_bus_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = 8.036770120617447
+iters = 300
+objective = 2999.9516405556424
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 6.611725091934204
+
+[sad.ac.tie_line_hybrid.adaptive.best]
+gap_pct = 7.25937609941466
+hit_target = false
+iters = 156
+rho = 10000.0
+time_s = 3.6782259941101074
+
+[sad.ac.tie_line_hybrid.adaptive.sweep."rho=1e+01"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10.0
+status = "error"
+time_s = 0.46525096893310547
+
+[sad.ac.tie_line_hybrid.adaptive.sweep."rho=1e+02"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100.0
+status = "error"
+time_s = 0.35793113708496094
+
+[sad.ac.tie_line_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1000.0
+status = "error"
+time_s = 0.30900096893310547
+
+[sad.ac.tie_line_hybrid.adaptive.sweep."rho=1e+04"]
+gap_pct = 7.25937609941466
+iters = 156
+objective = 2978.365059740039
+rho = 10000.0
+status = "converged"
+time_s = 3.6782259941101074
+
+[sad.ac.tie_line_hybrid.adaptive.sweep."rho=1e+05"]
+gap_pct = 10.044217197219517
+iters = 38
+objective = 3055.6941821371565
+rho = 100000.0
+status = "converged"
+time_s = 0.8773329257965088
+
+[sad.ac.tie_line_hybrid.adaptive.sweep."rho=1e+06"]
+gap_pct = 7.9767985334280045
+iters = 125
+objective = 2998.286356956597
+rho = 1.0e6
+status = "converged"
+time_s = 2.7261440753936768
+
+[sad.ac.tie_line_hybrid.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[sad.ac.tie_line_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -94.33833280330622
+iters = 300
+objective = 157.21247290194847
+rho = 10.0
+status = "did_not_converge"
+time_s = 7.2454609870910645
+
+[sad.ac.tie_line_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = -27.296709119802887
+iters = 300
+objective = 2018.8159689181468
+rho = 100.0
+status = "did_not_converge"
+time_s = 6.7108070850372314
+
+[sad.ac.tie_line_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = -26.968224392031622
+iters = 300
+objective = 2027.9372921201889
+rho = 1000.0
+status = "did_not_converge"
+time_s = 6.440722942352295
+
+[sad.ac.tie_line_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = -5.733179510022876
+iters = 300
+objective = 2617.5893861242257
+rho = 10000.0
+status = "did_not_converge"
+time_s = 7.111021041870117
+
+[sad.ac.tie_line_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = 1.8429722985711574
+iters = 300
+objective = 2827.9630304114025
+rho = 100000.0
+status = "did_not_converge"
+time_s = 7.170553922653198
+
+[sad.ac.tie_line_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = 5.881416521061588
+iters = 300
+objective = 2940.1020489791244
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 7.305330991744995
+
+[sad.ac.tie_line_power.adaptive.best]
+gap_pct = 5.5242243381358715
+hit_target = false
+iters = 128
+rho = 10000.0
+time_s = 3.6334750652313232
+
+[sad.ac.tie_line_power.adaptive.sweep."rho=1e+01"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10.0
+status = "error"
+time_s = 0.42410802841186523
+
+[sad.ac.tie_line_power.adaptive.sweep."rho=1e+02"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100.0
+status = "error"
+time_s = 0.41097187995910645
+
+[sad.ac.tie_line_power.adaptive.sweep."rho=1e+03"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1000.0
+status = "error"
+time_s = 0.5249989032745361
+
+[sad.ac.tie_line_power.adaptive.sweep."rho=1e+04"]
+gap_pct = 5.5242243381358715
+iters = 128
+objective = 2930.1835807209072
+rho = 10000.0
+status = "converged"
+time_s = 3.6334750652313232
+
+[sad.ac.tie_line_power.adaptive.sweep."rho=1e+05"]
+gap_pct = 7.112832505692856
+iters = 79
+objective = 2974.2958553950016
+rho = 100000.0
+status = "converged"
+time_s = 1.7933270931243896
+
+[sad.ac.tie_line_power.adaptive.sweep."rho=1e+06"]
+gap_pct = 8.538941466204388
+iters = 34
+objective = 3013.8958722311327
+rho = 1.0e6
+status = "converged"
+time_s = 0.7110960483551025
+
+[sad.ac.tie_line_power.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[sad.ac.tie_line_power.fixed.sweep."rho=1e+01"]
+gap_pct = -94.33833280420716
+iters = 300
+objective = 157.2124728769313
+rho = 10.0
+status = "did_not_converge"
+time_s = 7.691181898117065
+
+[sad.ac.tie_line_power.fixed.sweep."rho=1e+02"]
+gap_pct = -27.21314577975266
+iters = 300
+objective = 2021.136345386215
+rho = 100.0
+status = "did_not_converge"
+time_s = 6.525353908538818
+
+[sad.ac.tie_line_power.fixed.sweep."rho=1e+03"]
+gap_pct = -25.63727155267569
+iters = 300
+objective = 2064.89502557955
+rho = 1000.0
+status = "did_not_converge"
+time_s = 6.141447067260742
+
+[sad.ac.tie_line_power.fixed.sweep."rho=1e+04"]
+gap_pct = -6.43048057571318
+iters = 300
+objective = 2598.226816569033
+rho = 10000.0
+status = "did_not_converge"
+time_s = 6.768211126327515
+
+[sad.ac.tie_line_power.fixed.sweep."rho=1e+05"]
+gap_pct = 2.743804343071674
+iters = 300
+objective = 2852.977222956656
+rho = 100000.0
+status = "did_not_converge"
+time_s = 7.386350154876709
+
+[sad.ac.tie_line_power.fixed.sweep."rho=1e+06"]
+gap_pct = -2.4297724822868827
+iters = 300
+objective = 2709.317982982643
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 6.3662660121917725
+
+[sad.ac.tie_line_state.adaptive.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[sad.ac.tie_line_state.adaptive.sweep."rho=1e+01"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10.0
+status = "error"
+time_s = 0.982856035232544
+
+[sad.ac.tie_line_state.adaptive.sweep."rho=1e+02"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100.0
+status = "error"
+time_s = 0.519597053527832
+
+[sad.ac.tie_line_state.adaptive.sweep."rho=1e+03"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1000.0
+status = "error"
+time_s = 0.530250072479248
+
+[sad.ac.tie_line_state.adaptive.sweep."rho=1e+04"]
+gap_pct = 8.522756822407477
+iters = 300
+objective = 3013.446459048416
+rho = 10000.0
+status = "did_not_converge"
+time_s = 5.8343188762664795
+
+[sad.ac.tie_line_state.adaptive.sweep."rho=1e+05"]
+gap_pct = 8.786653206200636
+iters = 300
+objective = 3020.7743011211946
+rho = 100000.0
+status = "did_not_converge"
+time_s = 5.953744888305664
+
+[sad.ac.tie_line_state.adaptive.sweep."rho=1e+06"]
+gap_pct = 12.976153876603226
+iters = 300
+objective = 3137.107836409702
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 6.12111496925354
+
+[sad.ac.tie_line_state.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[sad.ac.tie_line_state.fixed.sweep."rho=1e+01"]
+gap_pct = -94.33833285640017
+iters = 300
+objective = 157.21247142764201
+rho = 10.0
+status = "did_not_converge"
+time_s = 6.27944016456604
+
+[sad.ac.tie_line_state.fixed.sweep."rho=1e+02"]
+gap_pct = -94.33833285468275
+iters = 300
+objective = 157.21247147533114
+rho = 100.0
+status = "did_not_converge"
+time_s = 6.580353021621704
+
+[sad.ac.tie_line_state.fixed.sweep."rho=1e+03"]
+gap_pct = -94.33833262892745
+iters = 300
+objective = 157.21247774407615
+rho = 1000.0
+status = "did_not_converge"
+time_s = 6.7566139698028564
+
+[sad.ac.tie_line_state.fixed.sweep."rho=1e+04"]
+gap_pct = -28.274108333387414
+iters = 300
+objective = 1991.675668712975
+rho = 10000.0
+status = "did_not_converge"
+time_s = 5.814189910888672
+
+[sad.ac.tie_line_state.fixed.sweep."rho=1e+05"]
+gap_pct = 11.946986775148483
+iters = 300
+objective = 3108.530051911257
+rho = 100000.0
+status = "did_not_converge"
+time_s = 6.071465015411377
+
+[sad.ac.tie_line_state.fixed.sweep."rho=1e+06"]
+gap_pct = 13.103283653581336
+iters = 300
+objective = 3140.6379602979223
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 6.622629880905151
+
+[sad.socwr.dummy_bus_hybrid.adaptive.best]
+gap_pct = -20.729801108795883
+hit_target = false
+iters = 265
+rho = 1.0e6
+time_s = 3.8034942150115967
+
+[sad.socwr.dummy_bus_hybrid.adaptive.sweep."rho=1e+01"]
+gap_pct = -21.76004760039039
+iters = 300
+objective = 1704.9881406589643
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.63850212097168
+
+[sad.socwr.dummy_bus_hybrid.adaptive.sweep."rho=1e+02"]
+gap_pct = -27.780934833789285
+iters = 300
+objective = 1573.782266749955
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.2456488609313965
+
+[sad.socwr.dummy_bus_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = -27.754303102857705
+iters = 300
+objective = 1574.362619677212
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.200793027877808
+
+[sad.socwr.dummy_bus_hybrid.adaptive.sweep."rho=1e+04"]
+gap_pct = -33.68909446007381
+iters = 300
+objective = 1445.0329285028438
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.724126815795898
+
+[sad.socwr.dummy_bus_hybrid.adaptive.sweep."rho=1e+05"]
+gap_pct = -30.796773572775802
+iters = 231
+objective = 1508.061760456069
+rho = 100000.0
+status = "converged"
+time_s = 3.244163990020752
+
+[sad.socwr.dummy_bus_hybrid.adaptive.sweep."rho=1e+06"]
+gap_pct = -20.729801108795883
+iters = 265
+objective = 1727.439049641533
+rho = 1.0e6
+status = "converged"
+time_s = 3.8034942150115967
+
+[sad.socwr.dummy_bus_hybrid.fixed.best]
+gap_pct = -34.88319593735664
+hit_target = false
+iters = 227
+rho = 100000.0
+time_s = 3.4356749057769775
+
+[sad.socwr.dummy_bus_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -95.55005168513368
+iters = 300
+objective = 96.97231236339881
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.174219131469727
+
+[sad.socwr.dummy_bus_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = -88.114778548744
+iters = 300
+objective = 259.000178323193
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.154588937759399
+
+[sad.socwr.dummy_bus_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = -71.35715314457195
+iters = 300
+objective = 624.1787310118482
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.051837205886841
+
+[sad.socwr.dummy_bus_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = -41.25233011283551
+iters = 300
+objective = 1280.2165310297787
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.426208972930908
+
+[sad.socwr.dummy_bus_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = -34.88319593735664
+iters = 227
+objective = 1419.0113270694471
+rho = 100000.0
+status = "converged"
+time_s = 3.4356749057769775
+
+[sad.socwr.dummy_bus_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = -35.67190137879009
+iters = 196
+objective = 1401.8240284723183
+rho = 1.0e6
+status = "converged"
+time_s = 3.186800956726074
+
+[sad.socwr.dummy_bus_power.adaptive.best]
+gap_pct = -18.158987505887744
+hit_target = false
+iters = 1
+rho = 1.0e6
+time_s = 0.0255279541015625
+
+[sad.socwr.dummy_bus_power.adaptive.sweep."rho=1e+01"]
+gap_pct = -96.22458081345044
+iters = 1
+objective = 82.27311931640992
+rho = 10.0
+status = "converged"
+time_s = 0.03644299507141113
+
+[sad.socwr.dummy_bus_power.adaptive.sweep."rho=1e+02"]
+gap_pct = -84.90470835950369
+iters = 1
+objective = 328.9533344215462
+rho = 100.0
+status = "converged"
+time_s = 0.02469801902770996
+
+[sad.socwr.dummy_bus_power.adaptive.sweep."rho=1e+03"]
+gap_pct = -55.030477130436054
+iters = 1
+objective = 979.9661276900414
+rho = 1000.0
+status = "converged"
+time_s = 0.02766895294189453
+
+[sad.socwr.dummy_bus_power.adaptive.sweep."rho=1e+04"]
+gap_pct = -31.883344984199557
+iters = 1
+objective = 1484.3834309883503
+rho = 10000.0
+status = "converged"
+time_s = 0.025359153747558594
+
+[sad.socwr.dummy_bus_power.adaptive.sweep."rho=1e+05"]
+gap_pct = -23.4385479292696
+iters = 1
+objective = 1668.4106240953743
+rho = 100000.0
+status = "converged"
+time_s = 0.023351192474365234
+
+[sad.socwr.dummy_bus_power.adaptive.sweep."rho=1e+06"]
+gap_pct = -18.158987505887744
+iters = 1
+objective = 1783.4616643079626
+rho = 1.0e6
+status = "converged"
+time_s = 0.0255279541015625
+
+[sad.socwr.dummy_bus_power.fixed.best]
+gap_pct = -18.158987505887744
+hit_target = false
+iters = 1
+rho = 1.0e6
+time_s = 0.03763413429260254
+
+[sad.socwr.dummy_bus_power.fixed.sweep."rho=1e+01"]
+gap_pct = -96.22458081345044
+iters = 1
+objective = 82.27311931640992
+rho = 10.0
+status = "converged"
+time_s = 0.024597883224487305
+
+[sad.socwr.dummy_bus_power.fixed.sweep."rho=1e+02"]
+gap_pct = -84.90470835950369
+iters = 1
+objective = 328.9533344215462
+rho = 100.0
+status = "converged"
+time_s = 0.025589942932128906
+
+[sad.socwr.dummy_bus_power.fixed.sweep."rho=1e+03"]
+gap_pct = -55.030477130436054
+iters = 1
+objective = 979.9661276900414
+rho = 1000.0
+status = "converged"
+time_s = 0.025394916534423828
+
+[sad.socwr.dummy_bus_power.fixed.sweep."rho=1e+04"]
+gap_pct = -31.883344984199557
+iters = 1
+objective = 1484.3834309883503
+rho = 10000.0
+status = "converged"
+time_s = 0.035162925720214844
+
+[sad.socwr.dummy_bus_power.fixed.sweep."rho=1e+05"]
+gap_pct = -23.4385479292696
+iters = 1
+objective = 1668.4106240953743
+rho = 100000.0
+status = "converged"
+time_s = 0.02486896514892578
+
+[sad.socwr.dummy_bus_power.fixed.sweep."rho=1e+06"]
+gap_pct = -18.158987505887744
+iters = 1
+objective = 1783.4616643079626
+rho = 1.0e6
+status = "converged"
+time_s = 0.03763413429260254
+
+[sad.socwr.split_bus_hybrid.adaptive.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[sad.socwr.split_bus_hybrid.adaptive.sweep."rho=1e+01"]
+gap_pct = 40.7571208085471
+iters = 300
+objective = 3067.3487691573723
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.050539970397949
+
+[sad.socwr.split_bus_hybrid.adaptive.sweep."rho=1e+02"]
+gap_pct = 40.676247534834296
+iters = 300
+objective = 3065.586396247528
+rho = 100.0
+status = "did_not_converge"
+time_s = 3.8447799682617188
+
+[sad.socwr.split_bus_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = 40.65267439724304
+iters = 300
+objective = 3065.072695525601
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.222257137298584
+
+[sad.socwr.split_bus_hybrid.adaptive.sweep."rho=1e+04"]
+gap_pct = 41.993355832199704
+iters = 300
+objective = 3094.2885357312266
+rho = 10000.0
+status = "did_not_converge"
+time_s = 3.787471055984497
+
+[sad.socwr.split_bus_hybrid.adaptive.sweep."rho=1e+05"]
+gap_pct = 42.67344062586052
+iters = 300
+objective = 3109.1087966372133
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.241427898406982
+
+[sad.socwr.split_bus_hybrid.adaptive.sweep."rho=1e+06"]
+gap_pct = 43.14930388015802
+iters = 300
+objective = 3119.478705874999
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 3.909402847290039
+
+[sad.socwr.split_bus_hybrid.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[sad.socwr.split_bus_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -99.99998570056759
+iters = 300
+objective = 0.00031161014219954417
+rho = 10.0
+status = "did_not_converge"
+time_s = 3.932217836380005
+
+[sad.socwr.split_bus_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = -0.007826915343027905
+iters = 300
+objective = 2179.0078347352023
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.109336853027344
+
+[sad.socwr.split_bus_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = -0.06070385351680075
+iters = 300
+objective = 2177.8555519214274
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.258013010025024
+
+[sad.socwr.split_bus_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = 2.8329609582268467
+iters = 300
+objective = 2240.913670385846
+rho = 10000.0
+status = "did_not_converge"
+time_s = 3.8040740489959717
+
+[sad.socwr.split_bus_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = 0.5216924458225728
+iters = 300
+objective = 2190.5470062626273
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.233362197875977
+
+[sad.socwr.split_bus_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = 11.4288899992222
+iters = 300
+objective = 2428.234299084442
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 3.8719449043273926
+
+[sad.socwr.tie_line_hybrid.adaptive.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[sad.socwr.tie_line_hybrid.adaptive.sweep."rho=1e+01"]
+gap_pct = 21.10845124380372
+iters = 300
+objective = 2639.169206668511
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.085377931594849
+
+[sad.socwr.tie_line_hybrid.adaptive.sweep."rho=1e+02"]
+gap_pct = 43.911699089781294
+iters = 300
+objective = 3136.0926575842714
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.4495689868927
+
+[sad.socwr.tie_line_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = 37.013811911553546
+iters = 300
+objective = 2985.77539033424
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.045762062072754
+
+[sad.socwr.tie_line_hybrid.adaptive.sweep."rho=1e+04"]
+gap_pct = 47.579574058987426
+iters = 300
+objective = 3216.022196548913
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.076153039932251
+
+[sad.socwr.tie_line_hybrid.adaptive.sweep."rho=1e+05"]
+gap_pct = 35.420117840722135
+iters = 300
+objective = 2951.0459534254874
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.038817882537842
+
+[sad.socwr.tie_line_hybrid.adaptive.sweep."rho=1e+06"]
+gap_pct = 35.57981906331959
+iters = 300
+objective = 2954.526127968369
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.362046957015991
+
+[sad.socwr.tie_line_hybrid.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[sad.socwr.tie_line_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -99.99995910756117
+iters = 300
+objective = 0.0008911191929374016
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.28063702583313
+
+[sad.socwr.tie_line_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = 0.02239075823843854
+iters = 300
+objective = 2179.666331750021
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.216202020645142
+
+[sad.socwr.tie_line_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = -0.21211652108509854
+iters = 300
+objective = 2174.5559997791797
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.500293016433716
+
+[sad.socwr.tie_line_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = -2.292405552513318
+iters = 300
+objective = 2129.2227906073176
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.130192995071411
+
+[sad.socwr.tie_line_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = 0.7741282727337973
+iters = 300
+objective = 2196.0480332694283
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.499769926071167
+
+[sad.socwr.tie_line_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = 12.310886224351052
+iters = 300
+objective = 2447.454570286424
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.566401958465576
+
+[sad.socwr.tie_line_power.adaptive.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[sad.socwr.tie_line_power.adaptive.sweep."rho=1e+01"]
+gap_pct = 41.038006890308694
+iters = 300
+objective = 3073.4697779718163
+rho = 10.0
+status = "did_not_converge"
+time_s = 3.9686310291290283
+
+[sad.socwr.tie_line_power.adaptive.sweep."rho=1e+02"]
+gap_pct = 19.15219866471679
+iters = 300
+objective = 2596.538973070703
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.041004180908203
+
+[sad.socwr.tie_line_power.adaptive.sweep."rho=1e+03"]
+gap_pct = 16.764585309344216
+iters = 300
+objective = 2544.508618622155
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.14882493019104
+
+[sad.socwr.tie_line_power.adaptive.sweep."rho=1e+04"]
+gap_pct = 49.02311564238319
+iters = 300
+objective = 3247.4795428886346
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.292329788208008
+
+[sad.socwr.tie_line_power.adaptive.sweep."rho=1e+05"]
+gap_pct = 48.75360339950935
+iters = 300
+objective = 3241.606390314163
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.423187017440796
+
+[sad.socwr.tie_line_power.adaptive.sweep."rho=1e+06"]
+gap_pct = 42.63996424239937
+iters = 300
+objective = 3108.3792865206697
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.0748419761657715
+
+[sad.socwr.tie_line_power.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[sad.socwr.tie_line_power.fixed.sweep."rho=1e+01"]
+gap_pct = -99.99993274706647
+iters = 300
+objective = 0.0014655613992114096
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.629754066467285
+
+[sad.socwr.tie_line_power.fixed.sweep."rho=1e+02"]
+gap_pct = -0.07394329474106823
+iters = 300
+objective = 2177.5670408783603
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.071527004241943
+
+[sad.socwr.tie_line_power.fixed.sweep."rho=1e+03"]
+gap_pct = -0.09690951794312276
+iters = 300
+objective = 2177.066565903692
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.353393077850342
+
+[sad.socwr.tie_line_power.fixed.sweep."rho=1e+04"]
+gap_pct = 0.6234905333322165
+iters = 300
+objective = 2192.7653681943834
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.504175186157227
+
+[sad.socwr.tie_line_power.fixed.sweep."rho=1e+05"]
+gap_pct = 0.658700915850519
+iters = 300
+objective = 2193.532665243788
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.161623001098633
+
+[sad.socwr.tie_line_power.fixed.sweep."rho=1e+06"]
+gap_pct = 9.969773791110544
+iters = 300
+objective = 2396.437553887469
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.155764818191528
+
+[sad.socwr.tie_line_state.adaptive.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[sad.socwr.tie_line_state.adaptive.sweep."rho=1e+01"]
+gap_pct = 31.108201367908315
+iters = 300
+objective = 2857.0816011453308
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.44435715675354
+
+[sad.socwr.tie_line_state.adaptive.sweep."rho=1e+02"]
+gap_pct = 28.29817613908755
+iters = 300
+objective = 2795.8461384034617
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.324416875839233
+
+[sad.socwr.tie_line_state.adaptive.sweep."rho=1e+03"]
+gap_pct = 31.99056976462557
+iters = 300
+objective = 2876.3099826301677
+rho = 1000.0
+status = "did_not_converge"
+time_s = 3.892666816711426
+
+[sad.socwr.tie_line_state.adaptive.sweep."rho=1e+04"]
+gap_pct = 29.337156661166624
+iters = 300
+objective = 2818.4873774915536
+rho = 10000.0
+status = "did_not_converge"
+time_s = 3.983651876449585
+
+[sad.socwr.tie_line_state.adaptive.sweep."rho=1e+05"]
+gap_pct = 38.49567440625767
+iters = 300
+objective = 3018.067817694797
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.138762950897217
+
+[sad.socwr.tie_line_state.adaptive.sweep."rho=1e+06"]
+gap_pct = 35.431635410911234
+iters = 300
+objective = 2951.2969418269286
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.677870988845825
+
+[sad.socwr.tie_line_state.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[sad.socwr.tie_line_state.fixed.sweep."rho=1e+01"]
+gap_pct = -99.99999618418444
+iters = 300
+objective = 8.315342833923804e-5
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.242114067077637
+
+[sad.socwr.tie_line_state.fixed.sweep."rho=1e+02"]
+gap_pct = -99.99992976817975
+iters = 300
+objective = 0.0015304766548560394
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.165546894073486
+
+[sad.socwr.tie_line_state.fixed.sweep."rho=1e+03"]
+gap_pct = -80.92660641431284
+iters = 300
+objective = 415.6432726290822
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.50888204574585
+
+[sad.socwr.tie_line_state.fixed.sweep."rho=1e+04"]
+gap_pct = 4.81218765654832
+iters = 300
+objective = 2284.0445510269565
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.130861043930054
+
+[sad.socwr.tie_line_state.fixed.sweep."rho=1e+05"]
+gap_pct = -6.137729098334906
+iters = 300
+objective = 2045.426330594962
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.342954874038696
+
+[sad.socwr.tie_line_state.fixed.sweep."rho=1e+06"]
+gap_pct = 33.08549520230416
+iters = 300
+objective = 2900.1703612333267
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.406835079193115
+
+[std.ac.dummy_bus_hybrid.adaptive.best]
+gap_pct = 14.890726594636556
+hit_target = false
+iters = 289
+rho = 10000.0
+time_s = 6.840665102005005
+
+[std.ac.dummy_bus_hybrid.adaptive.sweep."rho=1e+01"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10.0
+status = "error"
+time_s = 0.6175441741943359
+
+[std.ac.dummy_bus_hybrid.adaptive.sweep."rho=1e+02"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100.0
+status = "error"
+time_s = 0.5766558647155762
+
+[std.ac.dummy_bus_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1000.0
+status = "error"
+time_s = 0.5535199642181396
+
+[std.ac.dummy_bus_hybrid.adaptive.sweep."rho=1e+04"]
+gap_pct = 14.890726594636556
+iters = 289
+objective = 2502.4124098061657
+rho = 10000.0
+status = "converged"
+time_s = 6.840665102005005
+
+[std.ac.dummy_bus_hybrid.adaptive.sweep."rho=1e+05"]
+gap_pct = 26.646485203398946
+iters = 300
+objective = 2758.4622852068665
+rho = 100000.0
+status = "did_not_converge"
+time_s = 7.276701927185059
+
+[std.ac.dummy_bus_hybrid.adaptive.sweep."rho=1e+06"]
+gap_pct = 26.909611017923194
+iters = 300
+objective = 2764.1933770288288
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 7.87577486038208
+
+[std.ac.dummy_bus_hybrid.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[std.ac.dummy_bus_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -100.00014314857965
+iters = 300
+objective = -0.003117891171986693
+rho = 10.0
+status = "did_not_converge"
+time_s = 8.123215198516846
+
+[std.ac.dummy_bus_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = 7.286564640448931
+iters = 300
+objective = 2336.7876478750027
+rho = 100.0
+status = "did_not_converge"
+time_s = 7.744986057281494
+
+[std.ac.dummy_bus_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = 9.039012187023404
+iters = 300
+objective = 2374.957364596831
+rho = 1000.0
+status = "did_not_converge"
+time_s = 7.145885944366455
+
+[std.ac.dummy_bus_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = -0.8414984845942116
+iters = 300
+objective = 2159.7518971693808
+rho = 10000.0
+status = "did_not_converge"
+time_s = 6.851986885070801
+
+[std.ac.dummy_bus_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = 4.014365998711309
+iters = 300
+objective = 2265.516530256208
+rho = 100000.0
+status = "did_not_converge"
+time_s = 6.964967966079712
+
+[std.ac.dummy_bus_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = 17.291878136948093
+iters = 300
+objective = 2554.7114211833477
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 6.895564079284668
+
+[std.ac.dummy_bus_power.adaptive.best]
+gap_pct = 30.01581418100472
+hit_target = false
+iters = 92
+rho = 100.0
+time_s = 2.1194779872894287
+
+[std.ac.dummy_bus_power.adaptive.sweep."rho=1e+01"]
+gap_pct = 34.26077158091233
+iters = 109
+objective = 2924.3075652191965
+rho = 10.0
+status = "converged"
+time_s = 2.5763890743255615
+
+[std.ac.dummy_bus_power.adaptive.sweep."rho=1e+02"]
+gap_pct = 30.01581418100472
+iters = 92
+objective = 2831.8489796441686
+rho = 100.0
+status = "converged"
+time_s = 2.1194779872894287
+
+[std.ac.dummy_bus_power.adaptive.sweep."rho=1e+03"]
+gap_pct = 30.036497506794994
+iters = 96
+objective = 2832.2994791115125
+rho = 1000.0
+status = "converged"
+time_s = 2.717296838760376
+
+[std.ac.dummy_bus_power.adaptive.sweep."rho=1e+04"]
+gap_pct = 33.94468990482308
+iters = 26
+objective = 2917.423052150106
+rho = 10000.0
+status = "converged"
+time_s = 0.6143560409545898
+
+[std.ac.dummy_bus_power.adaptive.sweep."rho=1e+05"]
+gap_pct = 37.37452969430435
+iters = 19
+objective = 2992.127720727296
+rho = 100000.0
+status = "converged"
+time_s = 0.4900801181793213
+
+[std.ac.dummy_bus_power.adaptive.sweep."rho=1e+06"]
+gap_pct = 37.56079343414673
+iters = 40
+objective = 2996.184694757263
+rho = 1.0e6
+status = "converged"
+time_s = 0.8834929466247559
+
+[std.ac.dummy_bus_power.fixed.best]
+gap_pct = -0.04178582285917388
+hit_target = true
+iters = 221
+rho = 100.0
+time_s = 5.402161121368408
+
+[std.ac.dummy_bus_power.fixed.sweep."rho=1e+02"]
+gap_pct = -0.04178582285917388
+iters = 221
+objective = 2177.170281997476
+rho = 100.0
+status = "converged"
+time_s = 5.402161121368408
+
+[std.ac.dummy_bus_power.fixed.sweep."rho=1e+03"]
+gap_pct = 1.2159661437383993
+iters = 300
+objective = 2204.565131198637
+rho = 1000.0
+status = "did_not_converge"
+time_s = 7.487962961196899
+
+[std.ac.dummy_bus_power.fixed.sweep."rho=1e+04"]
+gap_pct = -1.4262675563428264
+iters = 300
+objective = 2147.015156569092
+rho = 10000.0
+status = "did_not_converge"
+time_s = 6.769320011138916
+
+[std.ac.split_bus_hybrid.adaptive.best]
+gap_pct = 0.20805127121841752
+hit_target = true
+iters = 21
+rho = 100.0
+time_s = 0.4127230644226074
+
+[std.ac.split_bus_hybrid.adaptive.sweep."rho=1e+02"]
+gap_pct = 0.20805127121841752
+iters = 21
+objective = 2182.6119348025413
+rho = 100.0
+status = "converged"
+time_s = 0.4127230644226074
+
+[std.ac.split_bus_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = 7.362073960358811
+iters = 27
+objective = 2338.432301580303
+rho = 1000.0
+status = "converged"
+time_s = 0.5283050537109375
+
+[std.ac.split_bus_hybrid.adaptive.sweep."rho=1e+04"]
+gap_pct = 37.960359609650006
+iters = 20
+objective = 3004.887567354161
+rho = 10000.0
+status = "converged"
+time_s = 0.3891918659210205
+
+[std.ac.split_bus_hybrid.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[std.ac.split_bus_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -100.00014317585
+iters = 300
+objective = -0.003118485141810402
+rho = 10.0
+status = "did_not_converge"
+time_s = 7.442340135574341
+
+[std.ac.split_bus_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = -0.5607687186712351
+iters = 300
+objective = 2165.866417208289
+rho = 100.0
+status = "did_not_converge"
+time_s = 6.792140007019043
+
+[std.ac.split_bus_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = -0.540890426537256
+iters = 300
+objective = 2166.2993823952647
+rho = 1000.0
+status = "did_not_converge"
+time_s = 6.466054916381836
+
+[std.ac.split_bus_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = 0.10427877624701788
+iters = 300
+objective = 2180.3516864177504
+rho = 10000.0
+status = "did_not_converge"
+time_s = 6.117740869522095
+
+[std.ac.split_bus_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = -0.03902444161215896
+iters = 300
+objective = 2177.2304271014855
+rho = 100000.0
+status = "did_not_converge"
+time_s = 6.339984893798828
+
+[std.ac.split_bus_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = 3.19144198687745
+iters = 300
+objective = 2247.5925835585235
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 6.365432024002075
+
+[std.ac.tie_line_hybrid.adaptive.best]
+gap_pct = 34.505583650172326
+hit_target = false
+iters = 112
+rho = 1.0e6
+time_s = 2.2956058979034424
+
+[std.ac.tie_line_hybrid.adaptive.sweep."rho=1e+01"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10.0
+status = "error"
+time_s = 0.37981486320495605
+
+[std.ac.tie_line_hybrid.adaptive.sweep."rho=1e+02"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100.0
+status = "error"
+time_s = 0.5462219715118408
+
+[std.ac.tie_line_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1000.0
+status = "error"
+time_s = 0.4866008758544922
+
+[std.ac.tie_line_hybrid.adaptive.sweep."rho=1e+04"]
+gap_pct = 35.86236968573889
+iters = 26
+objective = 2959.1916598004827
+rho = 10000.0
+status = "converged"
+time_s = 0.5555379390716553
+
+[std.ac.tie_line_hybrid.adaptive.sweep."rho=1e+05"]
+gap_pct = 37.04676777595974
+iters = 25
+objective = 2984.9888025897053
+rho = 100000.0
+status = "converged"
+time_s = 0.5208828449249268
+
+[std.ac.tie_line_hybrid.adaptive.sweep."rho=1e+06"]
+gap_pct = 34.505583650172326
+iters = 112
+objective = 2929.6397689430705
+rho = 1.0e6
+status = "converged"
+time_s = 2.2956058979034424
+
+[std.ac.tie_line_hybrid.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[std.ac.tie_line_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -100.00014316798212
+iters = 300
+objective = -0.0031183137731236603
+rho = 10.0
+status = "did_not_converge"
+time_s = 7.117614984512329
+
+[std.ac.tie_line_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = -7.450541685772503
+iters = 300
+objective = 2015.801621861907
+rho = 100.0
+status = "did_not_converge"
+time_s = 6.495909929275513
+
+[std.ac.tie_line_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = 6.328462956461399
+iters = 300
+objective = 2315.919422780337
+rho = 1000.0
+status = "did_not_converge"
+time_s = 7.77921199798584
+
+[std.ac.tie_line_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = 0.051277773302246143
+iters = 300
+objective = 2179.1972819550724
+rho = 10000.0
+status = "did_not_converge"
+time_s = 6.830400228500366
+
+[std.ac.tie_line_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = 2.148530861705057
+iters = 300
+objective = 2224.8771406388846
+rho = 100000.0
+status = "did_not_converge"
+time_s = 6.941227912902832
+
+[std.ac.tie_line_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = 3.009041286531106
+iters = 300
+objective = 2243.619749635082
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 7.088798999786377
+
+[std.ac.tie_line_power.adaptive.best]
+gap_pct = 27.581175086435284
+hit_target = false
+iters = 95
+rho = 100.0
+time_s = 2.196742057800293
+
+[std.ac.tie_line_power.adaptive.sweep."rho=1e+01"]
+gap_pct = 28.724550459142165
+iters = 100
+objective = 2803.7242174662592
+rho = 10.0
+status = "converged"
+time_s = 2.282816171646118
+
+[std.ac.tie_line_power.adaptive.sweep."rho=1e+02"]
+gap_pct = 27.581175086435284
+iters = 95
+objective = 2778.8205824511942
+rho = 100.0
+status = "converged"
+time_s = 2.196742057800293
+
+[std.ac.tie_line_power.adaptive.sweep."rho=1e+03"]
+gap_pct = 38.669564342991606
+iters = 81
+objective = 3020.3346167236805
+rho = 1000.0
+status = "converged"
+time_s = 2.29148006439209
+
+[std.ac.tie_line_power.adaptive.sweep."rho=1e+04"]
+gap_pct = 33.42814495995155
+iters = 21
+objective = 2906.17228789278
+rho = 10000.0
+status = "converged"
+time_s = 0.42957305908203125
+
+[std.ac.tie_line_power.adaptive.sweep."rho=1e+05"]
+gap_pct = 36.50714462188762
+iters = 18
+objective = 2973.235376378613
+rho = 100000.0
+status = "converged"
+time_s = 0.37804198265075684
+
+[std.ac.tie_line_power.adaptive.sweep."rho=1e+06"]
+gap_pct = 36.71117953684077
+iters = 32
+objective = 2977.6794208924402
+rho = 1.0e6
+status = "converged"
+time_s = 0.6536779403686523
+
+[std.ac.tie_line_power.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[std.ac.tie_line_power.fixed.sweep."rho=1e+01"]
+gap_pct = -100.00014317013066
+iters = 300
+objective = -0.0031183605700559475
+rho = 10.0
+status = "did_not_converge"
+time_s = 7.350269079208374
+
+[std.ac.tie_line_power.fixed.sweep."rho=1e+02"]
+gap_pct = -0.0049523181769511836
+iters = 300
+objective = 2177.972545347578
+rho = 100.0
+status = "did_not_converge"
+time_s = 6.818789005279541
+
+[std.ac.tie_line_power.fixed.sweep."rho=1e+03"]
+gap_pct = -0.6804591630452255
+iters = 300
+objective = 2163.259463085756
+rho = 1000.0
+status = "did_not_converge"
+time_s = 7.5782999992370605
+
+[std.ac.tie_line_power.fixed.sweep."rho=1e+04"]
+gap_pct = -0.10382868608180484
+iters = 300
+objective = 2175.8189385473124
+rho = 10000.0
+status = "did_not_converge"
+time_s = 6.835258960723877
+
+[std.ac.tie_line_power.fixed.sweep."rho=1e+05"]
+gap_pct = -0.8705688258521496
+iters = 300
+objective = 2159.118721761083
+rho = 100000.0
+status = "did_not_converge"
+time_s = 7.040055990219116
+
+[std.ac.tie_line_power.fixed.sweep."rho=1e+06"]
+gap_pct = 0.8813805641880241
+iters = 300
+objective = 2197.277588233023
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 6.2091288566589355
+
+[std.ac.tie_line_state.adaptive.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[std.ac.tie_line_state.adaptive.sweep."rho=1e+01"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10.0
+status = "error"
+time_s = 0.5953109264373779
+
+[std.ac.tie_line_state.adaptive.sweep."rho=1e+02"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100.0
+status = "error"
+time_s = 0.4768650531768799
+
+[std.ac.tie_line_state.adaptive.sweep."rho=1e+03"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1000.0
+status = "error"
+time_s = 0.6973278522491455
+
+[std.ac.tie_line_state.adaptive.sweep."rho=1e+04"]
+gap_pct = 7.321995512611286
+iters = 300
+objective = 2337.5593607609535
+rho = 10000.0
+status = "did_not_converge"
+time_s = 6.70182204246521
+
+[std.ac.tie_line_state.adaptive.sweep."rho=1e+05"]
+gap_pct = 38.24083608115158
+iters = 300
+objective = 3010.996570436895
+rho = 100000.0
+status = "did_not_converge"
+time_s = 6.2796759605407715
+
+[std.ac.tie_line_state.adaptive.sweep."rho=1e+06"]
+gap_pct = 18.06629307193995
+iters = 300
+objective = 2571.5788011808672
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 7.044360876083374
+
+[std.ac.tie_line_state.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[std.ac.tie_line_state.fixed.sweep."rho=1e+01"]
+gap_pct = -100.00014318203786
+iters = 300
+objective = -0.003118619918680433
+rho = 10.0
+status = "did_not_converge"
+time_s = 6.878711223602295
+
+[std.ac.tie_line_state.fixed.sweep."rho=1e+02"]
+gap_pct = -100.00014318140201
+iters = 300
+objective = -0.0031186060690270748
+rho = 100.0
+status = "did_not_converge"
+time_s = 6.830655097961426
+
+[std.ac.tie_line_state.fixed.sweep."rho=1e+03"]
+gap_pct = -100.00014314995411
+iters = 300
+objective = -0.003117921108824957
+rho = 1000.0
+status = "did_not_converge"
+time_s = 11.611602067947388
+
+[std.ac.tie_line_state.fixed.sweep."rho=1e+04"]
+gap_pct = 23.646661433734984
+iters = 300
+objective = 2693.1237113207035
+rho = 10000.0
+status = "did_not_converge"
+time_s = 6.669054985046387
+
+[std.ac.tie_line_state.fixed.sweep."rho=1e+05"]
+gap_pct = 23.646661270964138
+iters = 300
+objective = 2693.1237077754236
+rho = 100000.0
+status = "did_not_converge"
+time_s = 7.349632978439331
+
+[std.ac.tie_line_state.fixed.sweep."rho=1e+06"]
+gap_pct = 56.98900634846731
+iters = 300
+objective = 3419.346794416417
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 6.467437982559204
+
+[std.dc.dummy_bus_hybrid.adaptive.best]
+gap_pct = 0.0009261895867504174
+hit_target = true
+iters = 7
+rho = 1000.0
+time_s = 0.024785995483398438
+
+[std.dc.dummy_bus_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = 0.0009261895867504174
+iters = 7
+objective = 2051.5262886185724
+rho = 1000.0
+status = "converged"
+time_s = 0.024785995483398438
+
+[std.dc.dummy_bus_hybrid.fixed.best]
+gap_pct = 0.0009226504441087189
+hit_target = true
+iters = 29
+rho = 1000.0
+time_s = 0.07265615463256836
+
+[std.dc.dummy_bus_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = 0.0009226504441087189
+iters = 29
+objective = 2051.526216012803
+rho = 1000.0
+status = "converged"
+time_s = 0.07265615463256836
+
+[std.dc.dummy_bus_power.adaptive.best]
+gap_pct = 0.0009218298615803163
+hit_target = true
+iters = 13
+rho = 10.0
+time_s = 0.06728196144104004
+
+[std.dc.dummy_bus_power.adaptive.sweep."rho=1e+01"]
+gap_pct = 0.0009218298615803163
+iters = 13
+objective = 2051.526199178493
+rho = 10.0
+status = "converged"
+time_s = 0.06728196144104004
+
+[std.dc.dummy_bus_power.adaptive.sweep."rho=1e+02"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100.0
+status = "error"
+time_s = 0.02734208106994629
+
+[std.dc.dummy_bus_power.adaptive.sweep."rho=1e+03"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 1000.0
+status = "error"
+time_s = 0.08182907104492188
+
+[std.dc.dummy_bus_power.adaptive.sweep."rho=1e+04"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 10000.0
+status = "error"
+time_s = 0.01568603515625
+
+[std.dc.dummy_bus_power.adaptive.sweep."rho=1e+05"]
+gap_pct = nan
+iters = 0
+objective = 0.0
+rho = 100000.0
+status = "error"
+time_s = 0.010319948196411133
+
+[std.dc.dummy_bus_power.fixed.best]
+gap_pct = 0.0009336044471633977
+hit_target = true
+iters = 11
+rho = 1000.0
+time_s = 3.8876230716705322
+
+[std.dc.dummy_bus_power.fixed.sweep."rho=1e+03"]
+gap_pct = 0.0009336044471633977
+iters = 11
+objective = 2051.526440734974
+rho = 1000.0
+status = "converged"
+time_s = 3.8876230716705322
+
+[std.dc.split_bus_hybrid.adaptive.best]
+gap_pct = 0.0009294689124610303
+hit_target = true
+iters = 10
+rho = 1000.0
+time_s = 0.029387950897216797
+
+[std.dc.split_bus_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = 0.0009294689124610303
+iters = 10
+objective = 2051.5263558941783
+rho = 1000.0
+status = "converged"
+time_s = 0.029387950897216797
+
+[std.dc.split_bus_hybrid.fixed.best]
+gap_pct = 0.0009286875404972695
+hit_target = true
+iters = 9
+rho = 1000.0
+time_s = 3.506742000579834
+
+[std.dc.split_bus_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = 0.0009286875404972695
+iters = 9
+objective = 2051.5263398642755
+rho = 1000.0
+status = "converged"
+time_s = 3.506742000579834
+
+[std.dc.tie_line_hybrid.adaptive.best]
+gap_pct = 0.0009272399423794306
+hit_target = true
+iters = 7
+rho = 1000.0
+time_s = 0.027302026748657227
+
+[std.dc.tie_line_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = 0.0009272399423794306
+iters = 7
+objective = 2051.5263101666947
+rho = 1000.0
+status = "converged"
+time_s = 0.027302026748657227
+
+[std.dc.tie_line_hybrid.fixed.best]
+gap_pct = 0.0009283692170194708
+hit_target = true
+iters = 17
+rho = 1000.0
+time_s = 1.1557362079620361
+
+[std.dc.tie_line_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = 0.0009283692170194708
+iters = 17
+objective = 2051.526333333846
+rho = 1000.0
+status = "converged"
+time_s = 1.1557362079620361
+
+[std.dc.tie_line_power.adaptive.best]
+gap_pct = 0.0009265975798806255
+hit_target = true
+iters = 7
+rho = 1000.0
+time_s = 0.02863907814025879
+
+[std.dc.tie_line_power.adaptive.sweep."rho=1e+03"]
+gap_pct = 0.0009265975798806255
+iters = 7
+objective = 2051.526296988581
+rho = 1000.0
+status = "converged"
+time_s = 0.02863907814025879
+
+[std.dc.tie_line_power.fixed.best]
+gap_pct = 0.0009400732882857754
+hit_target = true
+iters = 7
+rho = 1000.0
+time_s = 3.444438934326172
+
+[std.dc.tie_line_power.fixed.sweep."rho=1e+03"]
+gap_pct = 0.0009400732882857754
+iters = 7
+objective = 2051.526573443721
+rho = 1000.0
+status = "converged"
+time_s = 3.444438934326172
+
+[std.dc.tie_line_state.adaptive.best]
+gap_pct = 0.14072542993497147
+hit_target = true
+iters = 35
+rho = 1000.0
+time_s = 0.12842702865600586
+
+[std.dc.tie_line_state.adaptive.sweep."rho=1e+03"]
+gap_pct = 0.14072542993497147
+iters = 35
+objective = 2054.3942802225656
+rho = 1000.0
+status = "converged"
+time_s = 0.12842702865600586
+
+[std.dc.tie_line_state.fixed.best]
+gap_pct = 0.0009334343516213312
+hit_target = true
+iters = 9
+rho = 1000.0
+time_s = 12.206434965133667
+
+[std.dc.tie_line_state.fixed.sweep."rho=1e+03"]
+gap_pct = 0.0009334343516213312
+iters = 9
+objective = 2051.5264372454517
+rho = 1000.0
+status = "converged"
+time_s = 12.206434965133667
+
+[std.socwr.dummy_bus_hybrid.adaptive.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[std.socwr.dummy_bus_hybrid.adaptive.sweep."rho=1e+01"]
+gap_pct = -19.0322433342724
+iters = 300
+objective = 1761.6191866869103
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.590036869049072
+
+[std.socwr.dummy_bus_hybrid.adaptive.sweep."rho=1e+02"]
+gap_pct = -18.663369561778627
+iters = 300
+objective = 1769.6447902339291
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.696091890335083
+
+[std.socwr.dummy_bus_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = -24.1998027897375
+iters = 300
+objective = 1649.1883591579324
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.681643962860107
+
+[std.socwr.dummy_bus_hybrid.adaptive.sweep."rho=1e+04"]
+gap_pct = -30.05239279675129
+iters = 300
+objective = 1521.8532905733825
+rho = 10000.0
+status = "did_not_converge"
+time_s = 5.0878801345825195
+
+[std.socwr.dummy_bus_hybrid.adaptive.sweep."rho=1e+05"]
+gap_pct = -20.806972737145003
+iters = 300
+objective = 1723.0063178608048
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.940017938613892
+
+[std.socwr.dummy_bus_hybrid.adaptive.sweep."rho=1e+06"]
+gap_pct = -17.190160272565645
+iters = 300
+objective = 1801.6974721502295
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 5.113183975219727
+
+[std.socwr.dummy_bus_hybrid.fixed.best]
+gap_pct = -27.937185896735063
+hit_target = false
+iters = 254
+rho = 100000.0
+time_s = 4.215782880783081
+
+[std.socwr.dummy_bus_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -96.1806871655717
+iters = 300
+objective = 83.09696410221017
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.6210339069366455
+
+[std.socwr.dummy_bus_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = -91.55958253700955
+iters = 300
+objective = 183.63854895766133
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.546064138412476
+
+[std.socwr.dummy_bus_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = -52.70818423860305
+iters = 300
+objective = 1028.9301994926482
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.617839813232422
+
+[std.socwr.dummy_bus_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = -36.23530536756631
+iters = 300
+objective = 1387.331378853358
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.829881906509399
+
+[std.socwr.dummy_bus_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = -27.937185896735063
+iters = 254
+objective = 1567.873943884361
+rho = 100000.0
+status = "converged"
+time_s = 4.215782880783081
+
+[std.socwr.dummy_bus_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = -27.51101567154339
+iters = 300
+objective = 1577.1461489744906
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.891572952270508
+
+[std.socwr.dummy_bus_power.adaptive.best]
+gap_pct = -17.376455722319033
+hit_target = false
+iters = 1
+rho = 1.0e6
+time_s = 0.0319211483001709
+
+[std.socwr.dummy_bus_power.adaptive.sweep."rho=1e+01"]
+gap_pct = -98.70081581100014
+iters = 1
+objective = 28.266409847948562
+rho = 10.0
+status = "converged"
+time_s = 0.03239107131958008
+
+[std.socwr.dummy_bus_power.adaptive.sweep."rho=1e+02"]
+gap_pct = -90.95652406747523
+iters = 1
+objective = 196.75931967398049
+rho = 100.0
+status = "converged"
+time_s = 0.029692888259887695
+
+[std.socwr.dummy_bus_power.adaptive.sweep."rho=1e+03"]
+gap_pct = -42.236015100165986
+iters = 1
+objective = 1256.7736626215953
+rho = 1000.0
+status = "converged"
+time_s = 0.02706003189086914
+
+[std.socwr.dummy_bus_power.adaptive.sweep."rho=1e+04"]
+gap_pct = -22.755331336525412
+iters = 1
+objective = 1680.6157906613796
+rho = 10000.0
+status = "converged"
+time_s = 0.027988910675048828
+
+[std.socwr.dummy_bus_power.adaptive.sweep."rho=1e+05"]
+gap_pct = -17.71097109028439
+iters = 1
+objective = 1790.3661673579381
+rho = 100000.0
+status = "converged"
+time_s = 0.03132295608520508
+
+[std.socwr.dummy_bus_power.adaptive.sweep."rho=1e+06"]
+gap_pct = -17.376455722319033
+iters = 1
+objective = 1797.6442335254653
+rho = 1.0e6
+status = "converged"
+time_s = 0.0319211483001709
+
+[std.socwr.dummy_bus_power.fixed.best]
+gap_pct = -17.376455722319033
+hit_target = false
+iters = 1
+rho = 1.0e6
+time_s = 0.026118993759155273
+
+[std.socwr.dummy_bus_power.fixed.sweep."rho=1e+01"]
+gap_pct = -98.70081581100014
+iters = 1
+objective = 28.266409847948562
+rho = 10.0
+status = "converged"
+time_s = 0.025516033172607422
+
+[std.socwr.dummy_bus_power.fixed.sweep."rho=1e+02"]
+gap_pct = -90.95652406747523
+iters = 1
+objective = 196.75931967398049
+rho = 100.0
+status = "converged"
+time_s = 0.02747178077697754
+
+[std.socwr.dummy_bus_power.fixed.sweep."rho=1e+03"]
+gap_pct = -42.236015100165986
+iters = 1
+objective = 1256.7736626215953
+rho = 1000.0
+status = "converged"
+time_s = 0.05399894714355469
+
+[std.socwr.dummy_bus_power.fixed.sweep."rho=1e+04"]
+gap_pct = -22.755331336525412
+iters = 1
+objective = 1680.6157906613796
+rho = 10000.0
+status = "converged"
+time_s = 0.044378042221069336
+
+[std.socwr.dummy_bus_power.fixed.sweep."rho=1e+05"]
+gap_pct = -17.71097109028439
+iters = 1
+objective = 1790.3661673579381
+rho = 100000.0
+status = "converged"
+time_s = 0.026678085327148438
+
+[std.socwr.dummy_bus_power.fixed.sweep."rho=1e+06"]
+gap_pct = -17.376455722319033
+iters = 1
+objective = 1797.6442335254653
+rho = 1.0e6
+status = "converged"
+time_s = 0.026118993759155273
+
+[std.socwr.split_bus_hybrid.adaptive.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[std.socwr.split_bus_hybrid.adaptive.sweep."rho=1e+01"]
+gap_pct = 40.13417793119035
+iters = 300
+objective = 3048.9057214879667
+rho = 10.0
+status = "did_not_converge"
+time_s = 3.9262359142303467
+
+[std.socwr.split_bus_hybrid.adaptive.sweep."rho=1e+02"]
+gap_pct = 40.56392051364809
+iters = 300
+objective = 3058.2556505185976
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.331953048706055
+
+[std.socwr.split_bus_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = 40.513353812033436
+iters = 300
+objective = 3057.155468477744
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.280906915664673
+
+[std.socwr.split_bus_hybrid.adaptive.sweep."rho=1e+04"]
+gap_pct = 40.68429147312693
+iters = 300
+objective = 3060.8745669918953
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.072251081466675
+
+[std.socwr.split_bus_hybrid.adaptive.sweep."rho=1e+05"]
+gap_pct = 41.30041446413636
+iters = 300
+objective = 3074.2795830997525
+rho = 100000.0
+status = "did_not_converge"
+time_s = 3.829801082611084
+
+[std.socwr.split_bus_hybrid.adaptive.sweep."rho=1e+06"]
+gap_pct = 43.14817438839817
+iters = 300
+objective = 3114.481380321443
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.273334980010986
+
+[std.socwr.split_bus_hybrid.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[std.socwr.split_bus_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -99.99998841170273
+iters = 300
+objective = 0.0002521271141284613
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.551666021347046
+
+[std.socwr.split_bus_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = -0.01260764529504399
+iters = 300
+objective = 2175.430270669677
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.681442975997925
+
+[std.socwr.split_bus_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = -0.1167945497052241
+iters = 300
+objective = 2173.163471423056
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.592832088470459
+
+[std.socwr.split_bus_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = 7.230288752672079
+iters = 300
+objective = 2333.0142990196337
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.422658920288086
+
+[std.socwr.split_bus_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = 0.412020369242532
+iters = 300
+objective = 2184.6689218120373
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.704166889190674
+
+[std.socwr.split_bus_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = 11.228417645580699
+iters = 300
+objective = 2420.001772288439
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.67514705657959
+
+[std.socwr.tie_line_hybrid.adaptive.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[std.socwr.tie_line_hybrid.adaptive.sweep."rho=1e+01"]
+gap_pct = 41.85410466056038
+iters = 300
+objective = 3086.326246039024
+rho = 10.0
+status = "did_not_converge"
+time_s = 5.197667837142944
+
+[std.socwr.tie_line_hybrid.adaptive.sweep."rho=1e+02"]
+gap_pct = 41.82435896423574
+iters = 300
+objective = 3085.67906756299
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.667869806289673
+
+[std.socwr.tie_line_hybrid.adaptive.sweep."rho=1e+03"]
+gap_pct = 43.32294732220152
+iters = 300
+objective = 3118.2839230394366
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.685425043106079
+
+[std.socwr.tie_line_hybrid.adaptive.sweep."rho=1e+04"]
+gap_pct = 41.81217040976972
+iters = 300
+objective = 3085.4138806257506
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.504993915557861
+
+[std.socwr.tie_line_hybrid.adaptive.sweep."rho=1e+05"]
+gap_pct = 43.33072085833165
+iters = 300
+objective = 3118.45305222072
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.24792218208313
+
+[std.socwr.tie_line_hybrid.adaptive.sweep."rho=1e+06"]
+gap_pct = 43.36277342118446
+iters = 300
+objective = 3119.150421297365
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.184886932373047
+
+[std.socwr.tie_line_hybrid.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[std.socwr.tie_line_hybrid.fixed.sweep."rho=1e+01"]
+gap_pct = -99.99995037961412
+iters = 300
+objective = 0.0010795930061411017
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.3838300704956055
+
+[std.socwr.tie_line_hybrid.fixed.sweep."rho=1e+02"]
+gap_pct = -0.01160240285053909
+iters = 300
+objective = 2175.45214177554
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.708600044250488
+
+[std.socwr.tie_line_hybrid.fixed.sweep."rho=1e+03"]
+gap_pct = -0.05850178952140656
+iters = 300
+objective = 2174.4317496737267
+rho = 1000.0
+status = "did_not_converge"
+time_s = 6.003123044967651
+
+[std.socwr.tie_line_hybrid.fixed.sweep."rho=1e+04"]
+gap_pct = 2.1712490697805964
+iters = 300
+objective = 2222.9445411481715
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.640322923660278
+
+[std.socwr.tie_line_hybrid.fixed.sweep."rho=1e+05"]
+gap_pct = 0.9637754950432178
+iters = 300
+objective = 2196.6734833312125
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.9756128787994385
+
+[std.socwr.tie_line_hybrid.fixed.sweep."rho=1e+06"]
+gap_pct = 13.186134257243301
+iters = 300
+objective = 2462.5959021892904
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.973160028457642
+
+[std.socwr.tie_line_power.adaptive.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[std.socwr.tie_line_power.adaptive.sweep."rho=1e+01"]
+gap_pct = 42.6464438591212
+iters = 300
+objective = 3103.565206237852
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.364437103271484
+
+[std.socwr.tie_line_power.adaptive.sweep."rho=1e+02"]
+gap_pct = 42.60539310298808
+iters = 300
+objective = 3102.6720630582695
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.476358890533447
+
+[std.socwr.tie_line_power.adaptive.sweep."rho=1e+03"]
+gap_pct = 42.64650040271268
+iters = 300
+objective = 3103.5664364593595
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.978235960006714
+
+[std.socwr.tie_line_power.adaptive.sweep."rho=1e+04"]
+gap_pct = 42.64674799426642
+iters = 300
+objective = 3103.5718233201233
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.6075661182403564
+
+[std.socwr.tie_line_power.adaptive.sweep."rho=1e+05"]
+gap_pct = 42.60536921767819
+iters = 300
+objective = 3102.6715433844893
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.484277963638306
+
+[std.socwr.tie_line_power.adaptive.sweep."rho=1e+06"]
+gap_pct = 42.60536004136752
+iters = 300
+objective = 3102.671343735078
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.300294876098633
+
+[std.socwr.tie_line_power.fixed.best]
+gap_pct = -0.0013435458731191512
+hit_target = true
+iters = 293
+rho = 100.0
+time_s = 3.938302993774414
+
+[std.socwr.tie_line_power.fixed.sweep."rho=1e+02"]
+gap_pct = -0.0013435458731191512
+iters = 293
+objective = 2175.675344196221
+rho = 100.0
+status = "converged"
+time_s = 3.938302993774414
+
+[std.socwr.tie_line_power.fixed.sweep."rho=1e+03"]
+gap_pct = 0.10051444953870889
+iters = 300
+objective = 2177.8914732631993
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.7694361209869385
+
+[std.socwr.tie_line_power.fixed.sweep."rho=1e+04"]
+gap_pct = -6.916666539923909
+iters = 300
+objective = 2025.2183453843277
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.378675937652588
+
+[std.socwr.tie_line_state.adaptive.best]
+gap_pct = 35.496394831033896
+hit_target = false
+iters = 272
+rho = 1.0e6
+time_s = 3.984591007232666
+
+[std.socwr.tie_line_state.adaptive.sweep."rho=1e+01"]
+gap_pct = 35.77764800794992
+iters = 300
+objective = 2954.1205006025707
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.708728075027466
+
+[std.socwr.tie_line_state.adaptive.sweep."rho=1e+02"]
+gap_pct = 35.41071619663963
+iters = 300
+objective = 2946.137148393881
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.1364030838012695
+
+[std.socwr.tie_line_state.adaptive.sweep."rho=1e+03"]
+gap_pct = 33.01309698143816
+iters = 300
+objective = 2893.972037418836
+rho = 1000.0
+status = "did_not_converge"
+time_s = 4.36401104927063
+
+[std.socwr.tie_line_state.adaptive.sweep."rho=1e+04"]
+gap_pct = 30.737937544372485
+iters = 300
+objective = 2844.471289440188
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.9203040599823
+
+[std.socwr.tie_line_state.adaptive.sweep."rho=1e+05"]
+gap_pct = 39.26426733200633
+iters = 300
+objective = 3029.979036776279
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.4213340282440186
+
+[std.socwr.tie_line_state.adaptive.sweep."rho=1e+06"]
+gap_pct = 35.496394831033896
+iters = 272
+objective = 2948.0012623628672
+rho = 1.0e6
+status = "converged"
+time_s = 3.984591007232666
+
+[std.socwr.tie_line_state.fixed.best]
+gap_pct = nan
+hit_target = false
+iters = 0
+rho = nan
+time_s = 0.0
+
+[std.socwr.tie_line_state.fixed.sweep."rho=1e+01"]
+gap_pct = -99.9999976201599
+iters = 300
+objective = 5.177829010012752e-5
+rho = 10.0
+status = "did_not_converge"
+time_s = 4.2006120681762695
+
+[std.socwr.tie_line_state.fixed.sweep."rho=1e+02"]
+gap_pct = -99.99993872976427
+iters = 300
+objective = 0.0013330593223036874
+rho = 100.0
+status = "did_not_converge"
+time_s = 4.5174641609191895
+
+[std.socwr.tie_line_state.fixed.sweep."rho=1e+03"]
+gap_pct = -99.97361010964445
+iters = 300
+objective = 0.5741660520103785
+rho = 1000.0
+status = "did_not_converge"
+time_s = 8.90785813331604
+
+[std.socwr.tie_line_state.fixed.sweep."rho=1e+04"]
+gap_pct = 1.5957092206717498
+iters = 300
+objective = 2210.422494315643
+rho = 10000.0
+status = "did_not_converge"
+time_s = 4.143090009689331
+
+[std.socwr.tie_line_state.fixed.sweep."rho=1e+05"]
+gap_pct = -5.128875641673227
+iters = 300
+objective = 2064.11539376304
+rho = 100000.0
+status = "did_not_converge"
+time_s = 4.103013038635254
+
+[std.socwr.tie_line_state.fixed.sweep."rho=1e+06"]
+gap_pct = 34.240068713683065
+iters = 300
+objective = 2920.66731754088
+rho = 1.0e6
+status = "did_not_converge"
+time_s = 4.753432035446167
