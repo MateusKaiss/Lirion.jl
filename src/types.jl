@@ -597,7 +597,7 @@ function Base.setproperty!(c::ADMMConfig, s::Symbol, v)
 end
 
 Base.propertynames(c::ADMMConfig, private::Bool = false) =
-    (propertynames(typeof(c), private)..., :rho, :rho_v2)
+    (fieldnames(typeof(c))..., :rho, :rho_v2)
 
 # ============================================================
 # Diagnostics
