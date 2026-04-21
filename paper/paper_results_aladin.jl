@@ -120,12 +120,15 @@ const ALADIN_OVERRIDES = Dict{Tuple{String, String, Symbol, Symbol, Symbol}, Dic
     ("case14_ieee", "std", :socwr, :tie_line, :power) => Dict(:rho => 100, :mu => 10, :adaptive => false),  # fixed_1e2_mu1 gap=-0.001%, iters=293
     ("case14_ieee", "std", :socwr, :tie_line, :hybrid) => Dict(:rho => 100, :mu => 10, :adaptive => false),  # fixed_1e2_mu1 gap=+0.008%, iters=347
     ("case14_ieee", "std", :socwr, :split_bus, :hybrid) => Dict(:rho => 100, :mu => 100, :adaptive => false),  # fixed_mid gap=-0.005%, iters=436
+    ("case14_ieee", "api", :dc, :tie_line, :state) => Dict(:rho => 100.0, :mu => 100.0, :adaptive => true, :rho_growth => 1.02, :mu_growth => 1.05),  # wide-grid-search: adap ρ=μ=1e2 g=1.02/1.05 gap=-0.925%, iters=168
     ("case14_ieee", "api", :dc, :tie_line, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=-0.927%, iters=27
     ("case14_ieee", "api", :dc, :dummy_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=-0.925%, iters=29
     ("case14_ieee", "api", :dc, :split_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=-0.926%, iters=28
     ("case14_ieee", "api", :ac, :tie_line, :state) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=-0.040%, iters=86
     ("case14_ieee", "api", :ac, :tie_line, :power) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => false),  # fixed_1e3 gap=-0.113%, iters=580
     ("case14_ieee", "api", :ac, :tie_line, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => false),  # fixed_1e3 gap=-0.040%, iters=867
+    ("case14_ieee", "api", :ac, :dummy_bus, :power) => Dict(:rho => 1e+06, :mu => 1e+04, :adaptive => false),  # wide-grid-search: fixed ρ=1e6 μ=1e4 gap=+0.724%, iters=1325
+    ("case14_ieee", "api", :ac, :dummy_bus, :hybrid) => Dict(:rho => 100.0, :mu => 100.0, :adaptive => false),  # wide-grid-search: fixed ρ=μ=100 gap=-0.174%, iters=1180
     ("case14_ieee", "api", :ac, :split_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=-0.047%, iters=60
     ("case14_ieee", "api", :socwr, :tie_line, :state) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => false),  # fixed_1e3 gap=+0.017%, iters=411
     ("case14_ieee", "api", :socwr, :tie_line, :power) => Dict(:rho => 100, :mu => 10, :adaptive => false),  # fixed_1e2_mu1 gap=-0.078%, iters=985
