@@ -2,24 +2,59 @@
 # ADMM Rho Adaptation & Refresh — unified for DC · AC · SOCWR
 # ============================================================
 
-# Boyd et al. adaptive scheme:
-#   if r > mu_incr * s  →  rho *= tau_incr
-#   if s > mu_decr * r  →  rho *= tau_decr
+# Residual-balancing rule (Boyd et al. §3.4.1):
+#   if r > mu_incr * s  →  rho *= tau_incr      (primal stuck, push harder)
+#   if s > mu_decr * r  →  rho *= tau_decr      (dual stuck, relax)
+#
+# The rule compares `r` (primal mismatch in variable units) with `s`
+# (dual residual = ρ · ‖Δz‖ in units of ρ × variable). It implicitly
+# assumes r and s share a numerical scale. That assumption FAILS for
+# state-only couplings whose variables (θ, v_mag) live in narrow ranges
+# (rad, p.u. ~1), where r is naturally tiny while s = ρ · ‖Δz‖ starts
+# huge because ρ begins at a value chosen for the physical scale.
+# Wohlberg (2017) proposed dividing each residual by its own stopping
+# tolerance (which already embeds √n·eps_abs + eps_rel·‖·‖), turning
+# the ratio test into a balance of *how close each residual is to its
+# convergence threshold* instead of a raw magnitude ratio.
+#
+# `_adaptive_rho!` takes optional `eps_r`, `eps_s`; when both are
+# positive the normalised residuals drive the rule, otherwise it falls
+# back to the raw Boyd comparison (backward-compatible for hybrid /
+# per-component adaptations that don't yet carry per-block eps).
 function _adaptive_rho!(
-    rho::Base.RefValue{Float64}, r::Float64, s::Float64;
-    mu_incr::Float64 = 3.0, mu_decr::Float64 = 3.0,
-    tau_incr::Float64 = 1.05, tau_decr::Float64 = 0.98,
+    rho::Base.RefValue{Float64}, r::Float64, s::Float64,
+    eps_r::Float64 = 0.0, eps_s::Float64 = 0.0,
+    rho_floor::Float64 = 0.0;
+    mu_incr::Float64 = 10.0, mu_decr::Float64 = 10.0,
+    tau_incr::Float64 = 2.0, tau_decr::Float64 = 0.5,
 )
-    if r > mu_incr * s
+    r_n = (eps_r > 0.0 && eps_s > 0.0) ? r / eps_r : r
+    s_n = (eps_r > 0.0 && eps_s > 0.0) ? s / eps_s : s
+    if r_n > mu_incr * s_n
         rho[] *= tau_incr
-    elseif s > mu_decr * r
-        rho[] *= tau_decr
+    elseif s_n > mu_decr * r_n
+        # Guard against over-shrinking below `rho_floor`. State-only
+        # couplings carry a dual residual s = ρ·‖Δz‖ whose scale is
+        # persistently above the primal r even at convergence — the raw
+        # Boyd rule fires shrink after shrink once primal starts
+        # settling, dragging ρ below the threshold it needs to enforce
+        # consensus. Callers pass `rho_floor = rho_initial` so the rule
+        # can only shrink back to the user's chosen starting point.
+        new_rho = rho[] * tau_decr
+        rho[] = rho_floor > 0.0 ? max(new_rho, rho_floor) : new_rho
     end
     return nothing
 end
 
 @inline function _adapt!(rho, r, s, params::ADMMParams)
-    return _adaptive_rho!(rho, r, s;
+    return _adaptive_rho!(rho, r, s, 0.0, 0.0, params.rho_floor;
+        mu_incr = params.mu_incr, mu_decr = params.mu_decr,
+        tau_incr = params.tau_incr, tau_decr = params.tau_decr,
+    )
+end
+
+@inline function _adapt!(rho, r, s, eps_r, eps_s, params::ADMMParams)
+    return _adaptive_rho!(rho, r, s, eps_r, eps_s, params.rho_floor;
         mu_incr = params.mu_incr, mu_decr = params.mu_decr,
         tau_incr = params.tau_incr, tau_decr = params.tau_decr,
     )
@@ -353,9 +388,14 @@ end
 refresh_rho!(::AbstractADMMWorkspace) = nothing
 
 # ---- DC State ----
+# State couplings are the prototype case where Boyd's raw residual-
+# balancing rule misfires (angles live in [-π/2, π/2] → r is naturally
+# small regardless of convergence). We pass ws.eps_primal / ws.eps_dual
+# so the rule compares residuals scaled by their stopping tolerances.
 function rho_update!(ws::DCStateWorkspace, params::ADMMParams)
     params.adaptive || return nothing
-    _adapt!(ws.vars.theta.rho, ws.r_primal, ws.r_dual, params)
+    _adapt!(ws.vars.theta.rho, ws.r_primal, ws.r_dual,
+        ws.eps_primal, ws.eps_dual, params)
     return nothing
 end
 

@@ -24,15 +24,25 @@ function run_algorithm!(ws, params::ADMMParams)
             break
         end
 
-        # Skip adaptive-rho at iter 1: consensus_prev is initialized to
-        # zeros, so the dual residual s = ρ·‖z − 0‖ is artificially large
-        # compared to the primal residual r = ‖x − z‖. Firing the
-        # residual-balancing rule on that spurious s triggers a cascade
-        # of shrink steps that decays ρ by orders of magnitude over the
-        # remainder of the run (observed ρ: 1e3 → 1 in 500 iters on
-        # case14–case57). From iter 2 onwards consensus_prev holds a real
-        # previous consensus vector, so the rule measures genuine progress.
-        if iter >= 2
+        # Warm-up period for adaptive ρ. Two pathologies motivate this:
+        #
+        #  (a) At iter 1 `consensus_prev` is zeros, so the dual residual
+        #      s = ρ·‖z − 0‖ is artificially huge and would cascade a
+        #      chain of shrink steps (observed ρ: 1e3 → 1 in 500 iters
+        #      on case14–case57 before this guard was added).
+        #  (b) In iters 2..~5 the subproblems are still moving their
+        #      primals sharply; s ≈ ρ·‖Δz‖ is still an order of magnitude
+        #      above its eventual value while r has barely changed. The
+        #      rule fires "s ≫ r → shrink" repeatedly, again decaying ρ
+        #      into a region too small to enforce state consensus
+        #      (angles drift at tie-line interfaces).
+        #
+        # Waiting `adapt_warmup` iterations before the first adaptation
+        # lets the dual residual settle to its steady-state scale so the
+        # residual-balancing rule measures genuine imbalance rather than
+        # startup transients. Default 5 matches empirical convergence
+        # profiles on case14 / case30 / case57 DC-state.
+        if iter > params.adapt_warmup
             rho_update!(ws, params)
             refresh_rho!(ws)
         end

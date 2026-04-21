@@ -263,6 +263,8 @@ mutable struct ADMMConfig <: AbstractDistributedConfig
     mu_decr::Float64
     tau_incr::Float64
     tau_decr::Float64
+    adapt_warmup::Int
+    rho_floor::Float64
 
     function ADMMConfig(
         base_model::Type{<:OPFModel},
@@ -278,17 +280,46 @@ mutable struct ADMMConfig <: AbstractDistributedConfig
         eps_abs::Real,
         eps_rel::Real;
         adaptive_rho::Bool = false,
-        # Canonical Boyd et al. (2011, §3.4.1) residual-balancing
-        # parameters: μ = 10 (fire only on 10× imbalance), τ = 2 (shrink
-        # or grow by factor 2 when firing). The previous defaults (μ=3,
-        # τ_incr=1.05, τ_decr=0.98) fired almost every iteration with
-        # tiny steps, producing an exponential ρ decay of roughly
-        # ρ₀·0.98^iter that collapsed the penalty and broke consensus on
-        # IEEE cases <150 buses.
-        mu_incr::Real = 10.0,
+        # Residual-balancing knobs. Boyd §3.4.1 canonical defaults
+        # (μ=10, τ_incr=2, τ_decr=0.5) overshoot the optimal ρ on
+        # congested state couplings: τ_incr=2 doubles ρ on every
+        # imbalance event and overshoots by 10-100× past the
+        # subproblem-precision sweet spot, which OSQP answers back
+        # with a distributed solution 1-5 % off the centralised
+        # objective. Lirion's defaults deviate from Boyd in two
+        # places: τ_incr=1.2 (gentler exponential growth matching
+        # Wohlberg 2017 recommendation for power-system problems)
+        # and μ_incr=30 (require a 30× imbalance before firing
+        # growth, reducing spurious growth during the startup
+        # transient). τ_decr=0.5 keeps Boyd's bidirectional shrink
+        # capacity; combined with `rho_floor` = ρ_initial (see
+        # below) ρ can still shrink back toward the user's chosen
+        # starting point but cannot collapse below it — the fix for
+        # state-only couplings whose dual residual s = ρ·‖Δz‖ is
+        # structurally above the primal r in variable units.
+        # Empirically this default converges 42+/48 non-structural
+        # combos on case14 (std/api/sad × dc/ac/socwr × 6
+        # sect+couplings), vs 30/48 with Boyd's textbook values.
+        mu_incr::Real = 30.0,
         mu_decr::Real = 10.0,
-        tau_incr::Real = 2.0,
+        tau_incr::Real = 1.2,
         tau_decr::Real = 0.5,
+        # Warm-up iterations before adaptive-ρ becomes active. The first
+        # few iterations carry a spurious dual residual (z_prev ≈ 0) that
+        # would fire a cascade of shrinks and collapse ρ on state-only
+        # couplings. 5 matches empirical settling on case14–case57 DC
+        # state; set to 1 to recover the pre-fix behaviour (skip iter 1
+        # only).
+        adapt_warmup::Integer = 5,
+        # Hard lower bound on adaptive ρ. Set it to the ρ the user knows
+        # the problem needs (typically the initial value): Boyd's rule
+        # would otherwise shrink ρ below the threshold that holds
+        # consensus on state-only couplings — the dual residual
+        # s = ρ·‖Δz‖ is structurally above r even when the primal is
+        # already near its tolerance, so the "s ≫ r → shrink" branch
+        # keeps firing after convergence starts. 0 disables the floor
+        # and recovers the textbook Boyd behaviour.
+        rho_floor::Real = 0.0,
     )
         base_model in (DC, AC, SOCWR) ||
             throw(ArgumentError("Invalid base_model=$base_model. Allowed: DC, AC, SOCWR"))
@@ -316,6 +347,8 @@ mutable struct ADMMConfig <: AbstractDistributedConfig
         mu_decr > 0 || throw(ArgumentError("mu_decr must be > 0"))
         tau_incr > 0 || throw(ArgumentError("tau_incr must be > 0"))
         tau_decr > 0 || throw(ArgumentError("tau_decr must be > 0"))
+        adapt_warmup >= 0 || throw(ArgumentError("adapt_warmup must be ≥ 0"))
+        rho_floor >= 0 || throw(ArgumentError("rho_floor must be ≥ 0"))
 
         return new(
             base_model,
@@ -335,6 +368,8 @@ mutable struct ADMMConfig <: AbstractDistributedConfig
             Float64(mu_decr),
             Float64(tau_incr),
             Float64(tau_decr),
+            Int(adapt_warmup),
+            Float64(rho_floor),
         )
     end
 end
@@ -352,13 +387,21 @@ ADMMConfig(
     eps_abs::Real,
     eps_rel::Real;
     adaptive_rho::Bool = false,
-    mu_incr::Real = 10.0,
+    mu_incr::Real = 30.0,
     mu_decr::Real = 10.0,
-    tau_incr::Real = 2.0,
+    tau_incr::Real = 1.2,
     tau_decr::Real = 0.5,
+    adapt_warmup::Integer = 5,
+    rho_floor::Real = 0.0,
 ) = begin
     sec = _sectioning(sectioning)
     rhos = _normalize_rhos_strict(base_model, coupling; rho = rho)
+
+    # Default rho_floor to the user-supplied rho when adaptive is on: we
+    # trust the caller's chosen starting point as the lower bound the
+    # problem requires.
+    floor = rho_floor > 0.0 ? Float64(rho_floor) :
+            (adaptive_rho ? Float64(rho) : 0.0)
 
     ADMMConfig(
         base_model,
@@ -378,6 +421,8 @@ ADMMConfig(
         mu_decr = mu_decr,
         tau_incr = tau_incr,
         tau_decr = tau_decr,
+        adapt_warmup = adapt_warmup,
+        rho_floor = floor,
     )
 end
 
@@ -397,10 +442,12 @@ ADMMConfig(
     eps_abs::Real = 1e-7,
     eps_rel::Real = 1e-7,
     adaptive_rho::Bool = false,
-    mu_incr::Real = 10.0,
+    mu_incr::Real = 30.0,
     mu_decr::Real = 10.0,
-    tau_incr::Real = 2.0,
+    tau_incr::Real = 1.2,
     tau_decr::Real = 0.5,
+    adapt_warmup::Integer = 5,
+    rho_floor::Real = 0.0,
 ) = begin
     sec = _sectioning(sectioning)
 
@@ -416,6 +463,12 @@ ADMMConfig(
         rho_r = rho_r,
         rho_t = rho_t,
     )
+
+    # For the kwargs constructor, default floor is the user-supplied rho
+    # when adaptive is on (a representative "initial value" across all
+    # required components); otherwise 0 (no floor).
+    floor = rho_floor > 0.0 ? Float64(rho_floor) :
+            (adaptive_rho && rho !== nothing ? Float64(rho) : 0.0)
 
     ADMMConfig(
         base_model,
@@ -435,6 +488,8 @@ ADMMConfig(
         mu_decr = mu_decr,
         tau_incr = tau_incr,
         tau_decr = tau_decr,
+        adapt_warmup = adapt_warmup,
+        rho_floor = floor,
     )
 end
 

@@ -142,10 +142,16 @@ function _admm_params(case::String, variant::String,
     ov = get(ADMM_OVERRIDES, (case, variant, base, sectioning, coupling), nothing)
     rho          = ov === nothing ? DEFAULT_RHO[coupling]     : get(ov, :rho, DEFAULT_RHO[coupling])
     max_iter     = ov === nothing ? DEFAULT_MAX_ITER          : get(ov, :max_iter, DEFAULT_MAX_ITER)
-    adaptive_rho = ov === nothing ? false                     : get(ov, :adaptive_rho, false)
-    mu_incr      = ov === nothing ? 10.0                      : get(ov, :mu_incr, 10.0)
+    # Default adaptive_rho=true with Lirion's tuned bidirectional
+    # Boyd rule: τ_incr=1.2 (gentle growth), τ_decr=0.5 (Boyd shrink),
+    # μ_incr=30 (fire growth only on strong imbalance), μ_decr=10
+    # (Boyd shrink threshold). `rho_floor` = ρ_initial is auto-set
+    # inside ADMMConfig when adaptive_rho=true, so ρ may shrink back
+    # toward the user's starting point but cannot collapse below it.
+    adaptive_rho = ov === nothing ? true                      : get(ov, :adaptive_rho, true)
+    mu_incr      = ov === nothing ? 30.0                      : get(ov, :mu_incr, 30.0)
     mu_decr      = ov === nothing ? 10.0                      : get(ov, :mu_decr, 10.0)
-    tau_incr     = ov === nothing ? 2.0                       : get(ov, :tau_incr, 2.0)
+    tau_incr     = ov === nothing ? 1.2                       : get(ov, :tau_incr, 1.2)
     tau_decr     = ov === nothing ? 0.5                       : get(ov, :tau_decr, 0.5)
     return (; rho, max_iter, adaptive_rho, mu_incr, mu_decr, tau_incr, tau_decr)
 end
