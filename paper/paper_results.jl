@@ -127,7 +127,9 @@ end
 # Benchmark sweep
 # ------------------------------------------------------------
 const PAPER_DIR = @__DIR__
-const CASES = ["case14_ieee", "case30_ieee", "case57_ieee"]
+const CASES = ["case14_ieee", "case30_ieee", "case57_ieee",
+               "case73_ieee_rts", "case118_ieee"]
+const VARIANTS = ["std", "api", "sad"]
 
 # (base, model_ctor). `ac` is skipped if Ipopt is not available since
 # Lirion's AC formulation is a non-convex NLP.
@@ -151,14 +153,17 @@ const ALGO_VARIANTS = [
     (:split_bus, :hybrid),
 ]
 
-_partition_file(case::String, sectioning::Symbol) = begin
-    dir = joinpath(PAPER_DIR, "cases", case, "std")
+_partition_file(case::String, variant::String, sectioning::Symbol) = begin
+    dir = joinpath(PAPER_DIR, "cases", case, variant)
     if sectioning === :split_bus
-        joinpath(dir, "$(case)_std_splitbus.m")
+        joinpath(dir, "$(case)_$(variant)_splitbus.m")
     else
-        joinpath(dir, "$(case)_std_tie.m")
+        joinpath(dir, "$(case)_$(variant)_tie.m")
     end
 end
+
+_original_file(case::String, variant::String) =
+    joinpath(PAPER_DIR, "cases", case, variant, "$(case)_$(variant).m")
 
 function _classify(s::Symbol)
     s in (:optimal, :locally_solved, :local_optimal, :almost_optimal) && return "converged"
@@ -171,9 +176,10 @@ end
 # A single distributed run. Returns a NamedTuple that the driver prints
 # into the final table. Any exception is caught so one bad combo does
 # not abort the whole reproduction run.
-function _run_one(case::String, base::Symbol, base_ctor,
+function _run_one(case::String, variant::String,
+                  base::Symbol, base_ctor,
                   sectioning::Symbol, coupling::Symbol, ref_obj::Float64)
-    path = _partition_file(case, sectioning)
+    path = _partition_file(case, variant, sectioning)
     rho, max_iter = _rho_maxiter(case, base, coupling)
     t0 = time()
     status = "error"; obj = NaN; iters = 0
@@ -197,60 +203,80 @@ function _run_one(case::String, base::Symbol, base_ctor,
     dt = time() - t0
     gap = (isfinite(obj) && isfinite(ref_obj) && ref_obj > 0) ?
           100.0 * (obj - ref_obj) / ref_obj : NaN
-    (case = case, base = base, sectioning = sectioning, coupling = coupling,
+    (case = case, variant = variant, base = base,
+     sectioning = sectioning, coupling = coupling,
      rho = rho, max_iter = max_iter, status = status,
      objective = obj, gap_pct = gap, iters = iters, time_s = dt)
+end
+
+# Centralised reference for (case, variant, base). Returns NaN if the
+# model is infeasible (e.g. DC on small-angle-difference variants).
+function _central_reference(case::String, variant::String, base::Symbol, base_ctor)
+    opt = _solver_for_base(base)
+    opt === nothing && return NaN
+    src = _original_file(case, variant)
+    isfile(src) || return NaN
+    try
+        r = Lirion.solve(src; model = base_ctor(), algorithm = centralized(),
+            optimizer = opt, outputs = false, plots = false)
+        st = _classify(r.status)
+        if st == "converged" && isfinite(r.objective) && r.objective > 0
+            return float(r.objective)
+        end
+    catch
+    end
+    return NaN
 end
 
 function main()
     println("╔════════════════════════════════════════════════════════════╗")
     println("║  Lirion paper benchmark reproduction                       ║")
-    println("║  Cases: ", join(CASES, ", "), " (std)")
+    println("║  Cases: ", join(CASES, ", "))
+    println("║  Variants: ", join(VARIANTS, ", "))
     @printf("║  Solvers: Gurobi=%s  Ipopt=%s  Clarabel=%s  OSQP=%s\n",
             _HAVE_GUROBI, _HAVE_IPOPT, _HAVE_CLARABEL, _HAVE_OSQP)
     println("║  Started: ", now())
     println("╚════════════════════════════════════════════════════════════╝")
 
     rows = NamedTuple[]
-    for case in CASES
-        original = joinpath(PAPER_DIR, "cases", case, "std", "$(case)_std.m")
-
-        # Centralised references — one per base model. ADMM gaps are
-        # reported relative to these.
+    for case in CASES, variant in VARIANTS
+        # Centralised reference per base model. Returns NaN when the
+        # formulation is infeasible for this (case, variant), e.g. DC
+        # on the "sad" variant of several PGLib cases — the distributed
+        # run is skipped in that case.
         refs = Dict{Symbol, Float64}()
         for (base, base_ctor) in _base_specs()
-            opt = _solver_for_base(base)
-            opt === nothing && continue
-            r = Lirion.solve(original; model = base_ctor(), algorithm = centralized(),
-                optimizer = opt, outputs = false, plots = false)
-            refs[base] = r.objective
-            @printf("[%s / centralised / %-5s]  obj = %12.2f   t = %.2fs\n",
-                    case, base, r.objective, 0.0)
+            refs[base] = _central_reference(case, variant, base, base_ctor)
+            tag = isfinite(refs[base]) ? @sprintf("obj = %12.2f", refs[base]) :
+                  "INFEASIBLE / unavailable"
+            @printf("[%s / %-3s / centralised / %-5s]  %s\n",
+                    case, variant, base, tag)
         end
 
         for (base, base_ctor) in _base_specs()
-            haskey(refs, base) || continue
+            isfinite(get(refs, base, NaN)) || continue
             for (sectioning, coupling) in ALGO_VARIANTS
-                res = _run_one(case, base, base_ctor, sectioning, coupling, refs[base])
+                res = _run_one(case, variant, base, base_ctor,
+                               sectioning, coupling, refs[base])
                 push!(rows, res)
                 gap_str = isfinite(res.gap_pct) ?
                           @sprintf("%+6.3f %%", res.gap_pct) : "   NaN  "
-                @printf("[%s / %-5s / %-9s / %-6s]  ρ=%8.0e  iters=%5d  gap=%s  t=%6.2fs  %s\n",
-                        case, base, sectioning, coupling, res.rho, res.iters,
-                        gap_str, res.time_s, res.status)
+                @printf("[%s / %-3s / %-5s / %-9s / %-6s]  ρ=%8.0e  iters=%5d  gap=%s  t=%6.2fs  %s\n",
+                        case, variant, base, sectioning, coupling,
+                        res.rho, res.iters, gap_str, res.time_s, res.status)
             end
         end
     end
 
-    # Flatten into a compact summary table.
-    println("\n" * "="^80)
-    println(" SUMMARY")
-    println("="^80)
-    @printf("%-18s %-5s %-9s %-6s  %8s %5s %8s %7s\n",
-            "case", "base", "sect", "coup", "rho", "iters", "gap%", "t(s)")
+    # Compact summary table.
+    println("\n" * "="^90)
+    println(" SUMMARY (", length(rows), " distributed runs)")
+    println("="^90)
+    @printf("%-18s %-3s %-5s %-9s %-6s  %8s %5s %8s %7s\n",
+            "case", "var", "base", "sect", "coup", "rho", "iters", "gap%", "t(s)")
     for r in rows
-        @printf("%-18s %-5s %-9s %-6s  %8.0e %5d %+8.3f %7.2f\n",
-                r.case, r.base, r.sectioning, r.coupling,
+        @printf("%-18s %-3s %-5s %-9s %-6s  %8.0e %5d %+8.3f %7.2f\n",
+                r.case, r.variant, r.base, r.sectioning, r.coupling,
                 r.rho, r.iters, r.gap_pct, r.time_s)
     end
 
