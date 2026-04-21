@@ -269,7 +269,13 @@ function _require_optimal!(model::JuMP.Model; iter::Int, zone_id::Int)
     ps = JuMP.primal_status(model)
     ds = JuMP.dual_status(model)
 
-    acceptable = ts == MOI.OPTIMAL || ts == MOI.LOCALLY_SOLVED
+    # ALMOST_OPTIMAL / NEARLY_FEASIBLE_POINT arise from Clarabel (and OSQP)
+    # when the conic/QP solver reaches its tolerance-relaxed convergence
+    # criterion but not the tighter one — the solution is still usable
+    # for downstream ADMM iterations. Blocking on it aborted SOCWR
+    # dummy_bus/hybrid runs on case57/case73 after 1 iteration.
+    acceptable = ts == MOI.OPTIMAL || ts == MOI.LOCALLY_SOLVED ||
+                 ts == MOI.ALMOST_OPTIMAL || ts == MOI.ALMOST_LOCALLY_SOLVED
 
     if !acceptable
         raw = try
