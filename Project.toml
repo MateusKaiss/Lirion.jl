@@ -19,23 +19,15 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [weakdeps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
-GLPK = "60bf3e95-4087-53dc-ae20-288a0d20c6a6"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
-Gurobi = "2e9cd046-0924-5485-92f1-d5272153d98b"
-HiGHS = "87dc4568-4c63-4d18-b0c0-bb2238e4078b"
 Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
 PlotlyLight = "ca7969ec-10b3-423e-8d99-40f33abb42bf"
-SCS = "c946c3f1-0d1f-5ce8-9dea-7daa1f7e2d13"
 SimpleWeightedGraphs = "47aef6b3-ad0c-573a-a1e2-d07658019622"
 
 [extensions]
 CSVExt = ["CSV"]
-GLPKExt = "GLPK"
-GurobiExt = "Gurobi"
-HiGHSExt = "HiGHS"
 MetisExt = ["Metis", "Graphs", "SimpleWeightedGraphs"]
 PlotlyLightExt = "PlotlyLight"
-SCSExt = "SCS"
 
 [extras]
 Glob = "c27321d9-0574-5035-807b-f59d2c89b15c"
@@ -55,10 +47,7 @@ CSV = "0.10"
 Clarabel = "0.9, 0.10, 0.11"
 DataFrames = "1.7, 1.8"
 Dates = "1"
-GLPK = "1"
 Graphs = "1"
-Gurobi = "1"
-HiGHS = "1"
 Ipopt = "1"
 JuMP = "1"
 LinearAlgebra = "1"
@@ -68,7 +57,6 @@ Metis = "1"
 OSQP = "0.8"
 PlotlyLight = "0.11"
 Random = "1"
-SCS = "2"
 SimpleWeightedGraphs = "1"
 SparseArrays = "1"
 Statistics = "1"
