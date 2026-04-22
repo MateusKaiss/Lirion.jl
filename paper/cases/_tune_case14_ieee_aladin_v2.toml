@@ -7,7 +7,7 @@ max_iter = 1000
 script = "tune_case14_aladin_v2.jl"
 
 [api.ac.dummy_bus_hybrid]
-hit_target = false
+hit_target = true
 
     [api.ac.dummy_bus_hybrid.strategies.aggressive_adap]
     adaptive = true
@@ -86,8 +86,16 @@ hit_target = false
     status = "converged"
     time_s = 2.932133913040161
 
+    [api.ac.dummy_bus_hybrid.winner]
+    adaptive = false
+    gap_pct = -0.174
+    iters = 1180
+    mu = 100.0
+    rho = 100.0
+    strategy = "wide_grid_fixed"
+
 [api.ac.dummy_bus_power]
-hit_target = false
+hit_target = true
 
     [api.ac.dummy_bus_power.strategies.aggressive_adap]
     adaptive = true
@@ -165,6 +173,14 @@ hit_target = false
     rho_growth = 1.05
     status = "did_not_converge"
     time_s = 17.32923698425293
+
+    [api.ac.dummy_bus_power.winner]
+    adaptive = false
+    gap_pct = 0.724
+    iters = 1325
+    mu = 10000.0
+    rho = 1.0e6
+    strategy = "wide_grid_fixed"
 
 [api.ac.split_bus_hybrid]
 hit_target = true
@@ -583,7 +599,7 @@ hit_target = false
     time_s = 0.009431838989257812
 
 [api.dc.tie_line_state]
-hit_target = false
+hit_target = true
 
     [api.dc.tie_line_state.strategies.aggressive_adap]
     adaptive = true
@@ -661,6 +677,16 @@ hit_target = false
     rho_growth = 1.05
     status = "error"
     time_s = 0.008565902709960938
+
+    [api.dc.tie_line_state.winner]
+    adaptive = true
+    gap_pct = -0.925
+    iters = 168
+    mu = 100.0
+    mu_growth = 1.05
+    rho = 100.0
+    rho_growth = 1.02
+    strategy = "wide_grid"
 
 [api.socwr.dummy_bus_hybrid]
 hit_target = false

@@ -77,9 +77,11 @@ end
 # ---- Paths ------------------------------------------------------------
 const PAPER_DIR  = @__DIR__
 const CASES_DIR  = joinpath(PAPER_DIR, "cases")
-const CASE       = "case14_ieee"
-const OUT_ADMM   = joinpath(CASES_DIR, "_tune_case14_admm.toml")
-const OUT_ALADIN = joinpath(CASES_DIR, "_tune_case14_aladin.toml")
+# `LIRION_TUNE_CASE` env var chooses which PGLib-OPF case to tune.
+# Default case14_ieee keeps the historical entry point working.
+const CASE       = get(ENV, "LIRION_TUNE_CASE", "case14_ieee")
+const OUT_ADMM   = joinpath(CASES_DIR, "_tune_$(CASE)_admm.toml")
+const OUT_ALADIN = joinpath(CASES_DIR, "_tune_$(CASE)_aladin.toml")
 
 # ---- Tuning knobs -----------------------------------------------------
 const GAP_TARGET  = 1.0                       # percent, success criterion

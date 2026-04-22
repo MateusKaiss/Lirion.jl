@@ -1,20 +1,21 @@
 # ============================================================
 # _apply_aladin_v2.jl
 # ============================================================
-# Reads `_tune_case14_aladin_v2.toml` and rewrites the
-# `ALADIN_OVERRIDES` block in `paper_results_aladin.jl`. Each winner
-# entry records the full strategy kwargs (ρ, μ, rho_growth, mu_growth,
-# adaptive) so paper reproduction uses exactly the tuned config.
+# Reads `_tune_<CASE>_aladin_v2.toml` and merges the winner entries
+# into the `ALADIN_OVERRIDES` block in `paper_results_aladin.jl`.
+# Preserves entries for any other case already in the block.
+# Set `LIRION_TUNE_CASE` to target a case other than case14_ieee.
 # ============================================================
 
 using Printf
 using TOML
 
-const PAPER_DIR = @__DIR__
-const CASE = "case14_ieee"
-const TOML_IN = joinpath(PAPER_DIR, "cases", "_tune_case14_aladin_v2.toml")
+const PAPER_DIR  = @__DIR__
+const CASE       = get(ENV, "LIRION_TUNE_CASE", "case14_ieee")
+const TOML_IN    = joinpath(PAPER_DIR, "cases", "_tune_$(CASE)_aladin_v2.toml")
 const PAPER_FILE = joinpath(PAPER_DIR, "paper_results_aladin.jl")
-const MARKER = "const ALADIN_OVERRIDES = Dict"
+const MARKER     = "const ALADIN_OVERRIDES = Dict"
+const END_MARKER = "\n)\n"
 
 _variants() = ("std", "api", "sad")
 _bases()    = ("dc", "ac", "socwr")
@@ -23,20 +24,9 @@ _combos()   = (
     ("dummy_bus", "power"),  ("dummy_bus", "hybrid"), ("split_bus", "hybrid"),
 )
 
-function _format_kwarg(k::Symbol, v)
-    if v isa Bool
-        return @sprintf(":%s => %s", k, v)
-    elseif v isa AbstractFloat
-        return @sprintf(":%s => %.3g", k, v)
-    else
-        return @sprintf(":%s => %s", k, v)
-    end
-end
-
-function _format_block(toml::Dict)
+function _format_case_lines(toml::Dict)
     io = IOBuffer()
-    println(io, "const ALADIN_OVERRIDES = Dict{Tuple{String, String, Symbol, Symbol, Symbol}, Dict{Symbol, Any}}(")
-    println(io, "    # --- case14_ieee (from _tune_case14_aladin_v2.toml) --------------")
+    println(io, "    # --- $(CASE) (from _tune_$(CASE)_aladin_v2.toml) --------------")
     n_hit = 0
     for v in _variants(), b in _bases()
         haskey(toml, v) && haskey(toml[v], b) || continue
@@ -64,30 +54,55 @@ function _format_block(toml::Dict)
                     w["strategy"], Float64(w["gap_pct"]), Int(w["iters"]))
         end
     end
-    n_hit == 0 && println(io, "    # (no combos hit target)")
-    println(io, ")")
     return String(take!(io)), n_hit
 end
 
-function _splice!(file::String, block::String)
+function _merge!(file::String, new_case_lines::String)
     src = read(file, String)
     i = findfirst(MARKER, src)
     i === nothing && error("marker not found in $file")
     start = first(i)
     rest = SubString(src, start)
-    j = findfirst("\n)\n", rest)
+    j = findfirst(END_MARKER, rest)
     j === nothing && error("end marker not found")
     stop = start + last(j) - 1
-    new_src = src[1:start-1] * block * src[stop+1:end]
+
+    block = String(SubString(src, start, stop))
+    body_lines = split(block, '\n')
+    header = String(body_lines[1])
+
+    case_prefix = "(\"$(CASE)\","
+    case_banner = "--- $(CASE) "
+    kept = String[]
+    for line in body_lines[2:end]
+        s = String(line)
+        stripped = strip(s)
+        stripped == ")" && continue
+        occursin(case_prefix, s) && continue
+        occursin(case_banner, s) && continue
+        push!(kept, s)
+    end
+
+    io = IOBuffer()
+    println(io, header)
+    for ln in kept
+        isempty(strip(ln)) && continue
+        println(io, ln)
+    end
+    print(io, new_case_lines)
+    println(io, ")")
+    new_block = String(take!(io))
+
+    new_src = src[1:start-1] * new_block * src[stop+2:end]
     write(file, new_src)
 end
 
 function main()
     isfile(TOML_IN) || error("missing $TOML_IN")
     toml = TOML.parsefile(TOML_IN)
-    block, n_hit = _format_block(toml)
-    _splice!(PAPER_FILE, block)
-    println("ALADIN v2: wrote $n_hit overrides into $PAPER_FILE")
+    lines, n_hit = _format_case_lines(toml)
+    _merge!(PAPER_FILE, lines)
+    println("ALADIN v2: wrote $n_hit $(CASE) overrides into $PAPER_FILE")
 end
 
 main()

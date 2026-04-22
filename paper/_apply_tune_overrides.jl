@@ -20,7 +20,7 @@ using TOML
 
 const PAPER_DIR  = @__DIR__
 const CASES_DIR  = joinpath(PAPER_DIR, "cases")
-const CASE       = "case14_ieee"
+const CASE       = get(ENV, "LIRION_TUNE_CASE", "case14_ieee")
 const GAP_TARGET = 1.0
 
 _variants() = ("std", "api", "sad")
@@ -85,14 +85,11 @@ function _collect_admm(toml::Dict)
     return rows
 end
 
-function _format_admm_block(rows::Vector)
+function _format_admm_lines(rows::Vector)
     io = IOBuffer()
-    println(io, "const ADMM_OVERRIDES = Dict{Tuple{String, String, Symbol, Symbol, Symbol}, Dict{Symbol, Any}}(")
-    println(io, "    # --- case14_ieee (auto-generated from _tune_case14_admm.toml) -----")
-    any_entry = false
+    println(io, "    # --- $(CASE) (auto-generated from _tune_$(CASE)_admm.toml) -----")
     for (v, b, sect, coup, pick) in rows
         pick === nothing && continue
-        any_entry = true
         @printf(io, "    (\"%s\", \"%s\", :%s, :%s, :%s) => Dict(:rho => %.0e",
                 CASE, v, b, sect, coup, pick.rho)
         if pick.adaptive
@@ -100,19 +97,14 @@ function _format_admm_block(rows::Vector)
         end
         @printf(io, "),  # gap=%+6.3f%%, iters=%d\n", pick.gap, pick.iters)
     end
-    any_entry || println(io, "    # (no combo converged under gap target — see sweep TOML)")
-    println(io, ")")
     return String(take!(io))
 end
 
-function _format_aladin_block(rows::Vector)
+function _format_aladin_lines(rows::Vector)
     io = IOBuffer()
-    println(io, "const ALADIN_OVERRIDES = Dict{Tuple{String, String, Symbol, Symbol, Symbol}, Dict{Symbol, Any}}(")
-    println(io, "    # --- case14_ieee (auto-generated from _tune_case14_aladin.toml) ----")
-    any_entry = false
+    println(io, "    # --- $(CASE) (auto-generated from _tune_$(CASE)_aladin.toml) ----")
     for (v, b, sect, coup, pick) in rows
         pick === nothing && continue
-        any_entry = true
         mu = pick.rho / 10
         @printf(io, "    (\"%s\", \"%s\", :%s, :%s, :%s) => Dict(:rho => %.0e, :mu => %.0e",
                 CASE, v, b, sect, coup, pick.rho, mu)
@@ -123,8 +115,6 @@ function _format_aladin_block(rows::Vector)
         end
         @printf(io, "),  # gap=%+6.3f%%, iters=%d\n", pick.gap, pick.iters)
     end
-    any_entry || println(io, "    # (no combo converged under gap target — see sweep TOML)")
-    println(io, ")")
     return String(take!(io))
 end
 
@@ -132,34 +122,69 @@ const _ADMM_MARKER_START = "const ADMM_OVERRIDES = Dict"
 const _ALAD_MARKER_START = "const ALADIN_OVERRIDES = Dict"
 const _END_MARKER        = "\n)\n"
 
-function _splice_block!(path::String, marker::String, new_block::String)
+# Merge new case-specific lines into an existing Dict block, preserving
+# every entry for OTHER cases. The caller passes a line-generator that
+# returns just the lines for `CASE`; this function rebuilds the block
+# as: marker header + existing lines for other cases + new lines for
+# CASE + closing paren.
+function _merge_block!(path::String, marker::String, new_case_lines::String)
     src = read(path, String)
     i = findfirst(marker, src)
     i === nothing && error("marker $(repr(marker)) not found in $path")
     start = first(i)
-    # Find the matching closing ")\n" after start
-    rest = SubString(src, first(i))
+    rest = SubString(src, start)
     j = findfirst(_END_MARKER, rest)
     j === nothing && error("end marker not found after $(repr(marker)) in $path")
-    stop = first(i) + last(j) - 1
-    new_src = src[1:start-1] * new_block * src[stop+1:end]
+    stop = start + last(j) - 1
+
+    # Collect existing block body (between first "(" after marker and final ")")
+    block = String(SubString(src, start, stop))
+    body_lines = split(block, '\n')
+    header = body_lines[1]  # `const ... Dict{...}(`
+
+    # Keep every existing line whose tuple key does not mention CASE and
+    # whose comment banner does not mention CASE. Drop the block's own
+    # closing paren (we re-add it after splicing case lines).
+    case_prefix = "(\"$(CASE)\","
+    case_banner = "--- $(CASE) "
+    kept = String[]
+    for line in body_lines[2:end]
+        s = String(line)
+        stripped = strip(s)
+        stripped == ")" && continue
+        occursin(case_prefix, s) && continue
+        occursin(case_banner, s) && continue
+        push!(kept, s)
+    end
+
+    io = IOBuffer()
+    println(io, header)
+    for ln in kept
+        isempty(strip(ln)) && continue
+        println(io, ln)
+    end
+    print(io, new_case_lines)  # already ends with newline per _format_*
+    println(io, ")")
+    new_block = String(take!(io))
+
+    new_src = src[1:start-1] * new_block * src[stop+2:end]
     write(path, new_src)
     return nothing
 end
 
 function main()
-    out_admm   = joinpath(CASES_DIR, "_tune_case14_admm.toml")
-    out_aladin = joinpath(CASES_DIR, "_tune_case14_aladin.toml")
+    out_admm   = joinpath(CASES_DIR, "_tune_$(CASE)_admm.toml")
+    out_aladin = joinpath(CASES_DIR, "_tune_$(CASE)_aladin.toml")
     paper_admm = joinpath(PAPER_DIR, "paper_results_admm.jl")
     paper_aladin = joinpath(PAPER_DIR, "paper_results_aladin.jl")
 
     if isfile(out_admm)
         toml = TOML.parsefile(out_admm)
         rows = _collect_admm(toml)
-        blk  = _format_admm_block(rows)
-        _splice_block!(paper_admm, _ADMM_MARKER_START, blk)
+        lines = _format_admm_lines(rows)
+        _merge_block!(paper_admm, _ADMM_MARKER_START, lines)
         n_ok = count(r -> r[5] !== nothing, rows)
-        println("ADMM:   wrote ", n_ok, "/", length(rows), " overrides into ", paper_admm)
+        println("ADMM:   wrote ", n_ok, "/", length(rows), " $(CASE) overrides into ", paper_admm)
     else
         @warn "No ADMM tune file at $out_admm — skipping."
     end
@@ -167,10 +192,10 @@ function main()
     if isfile(out_aladin)
         toml = TOML.parsefile(out_aladin)
         rows = _collect_admm(toml)  # same shape
-        blk  = _format_aladin_block(rows)
-        _splice_block!(paper_aladin, _ALAD_MARKER_START, blk)
+        lines = _format_aladin_lines(rows)
+        _merge_block!(paper_aladin, _ALAD_MARKER_START, lines)
         n_ok = count(r -> r[5] !== nothing, rows)
-        println("ALADIN: wrote ", n_ok, "/", length(rows), " overrides into ", paper_aladin)
+        println("ALADIN: wrote ", n_ok, "/", length(rows), " $(CASE) overrides into ", paper_aladin)
     else
         @warn "No ALADIN tune file at $out_aladin — skipping."
     end

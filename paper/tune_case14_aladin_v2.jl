@@ -57,8 +57,9 @@ end
 
 const PAPER_DIR  = @__DIR__
 const CASES_DIR  = joinpath(PAPER_DIR, "cases")
-const CASE       = "case14_ieee"
-const OUT        = joinpath(CASES_DIR, "_tune_case14_aladin_v2.toml")
+# `LIRION_TUNE_CASE` env var chooses which PGLib-OPF case to tune.
+const CASE       = get(ENV, "LIRION_TUNE_CASE", "case14_ieee")
+const OUT        = joinpath(CASES_DIR, "_tune_$(CASE)_aladin_v2.toml")
 
 const VARIANTS = ["std", "api", "sad"]
 const ALGO_VARIANTS = [
