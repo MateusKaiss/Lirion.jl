@@ -182,6 +182,9 @@ function main()
             bkey = string(base)
             haskey(report[variant], bkey) || (report[variant][bkey] = Dict{String, Any}())
             for (sect, coup) in ALGO_VARIANTS
+                # SOCWR + DummyBus is unsupported in ALADIN (see
+                # ALADINConfig guard in src/types.jl) — skip.
+                base === :socwr && sect === :dummy_bus && continue
                 key = "$(sect)_$(coup)"
                 haskey(report[variant][bkey], key) &&
                     get(report[variant][bkey][key], "hit_target", false) &&

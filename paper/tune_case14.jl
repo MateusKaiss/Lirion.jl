@@ -399,6 +399,12 @@ function run_algo_sweep(algo::Symbol, out_path::AbstractString)
                     CASE, variant, base, ref_obj)
             flush(stdout)
             for (sectioning, coupling) in ALGO_VARIANTS
+                # SOCWR + DummyBus is unsupported in ALADIN (guard in
+                # ALADINConfig). Skip cleanly so the sweep does not
+                # invoke it and trip the error.
+                if algo === :aladin && base === :socwr && sectioning === :dummy_bus
+                    continue
+                end
                 res = _sweep_combo!(report, out_path, algo, variant, base, base_ctor,
                                     sectioning, coupling, ref_obj)
                 push!(winners, (variant, base, sectioning, coupling, res))

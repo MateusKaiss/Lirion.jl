@@ -558,6 +558,24 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
                     "Invalid coupling=$(coupling). Allowed: :state, :power, :hybrid",
                 ),
             )
+        # DummyBus on SOCWR is not supported in ALADIN (intentional — see
+        # paper's "structural limitation" discussion). Half-branches in
+        # DummyBus need independent R, T auxiliaries per zone and
+        # ALADIN's linearised coordinator QP cannot untangle them via
+        # flow-consensus alone — empirically converges to a relaxed
+        # solution -20 to -90 % below the centralised objective. ADMM
+        # tolerates this via averaged target consensus; ALADIN does
+        # not. Rather than silently producing a wrong answer, abort
+        # with a clear message.
+        base_model === SOCWR && sectioning isa DummyBus &&
+            throw(
+                ArgumentError(
+                    "ALADIN is not supported for SOCWR + DummyBus sectioning " *
+                    "(coordinator QP converges to a relaxed solution). " *
+                    "Use ADMM for this combination, or switch sectioning to " *
+                    ":tie_line / :split_bus for ALADIN on SOCWR.",
+                ),
+            )
         max_iter > 0 || throw(ArgumentError("max_iter must be > 0"))
         rho > 0 || throw(ArgumentError("rho must be > 0"))
         mu > 0 || throw(ArgumentError("mu must be > 0"))

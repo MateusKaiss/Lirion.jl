@@ -282,6 +282,27 @@ function main()
                 continue
             end
             for (sectioning, coupling) in ALGO_VARIANTS
+                # SOCWR + DummyBus is not supported in ALADIN — the
+                # coordinator QP cannot untangle the independent
+                # R/T/v² auxiliaries of the two half-branches via
+                # flow-consensus linearisation (documented paper
+                # limitation). Skip the combo cleanly.
+                if base === :socwr && sectioning === :dummy_bus
+                    key = "$(sectioning)_$(coupling)"
+                    haskey(report[case][variant][bkey], key) &&
+                        haskey(report[case][variant][bkey][key], "status") &&
+                        continue
+                    report[case][variant][bkey][key] = Dict(
+                        "status" => "unsupported_combo",
+                        "objective" => 0.0, "gap_pct" => NaN,
+                        "iters" => 0, "time_s" => 0.0,
+                    )
+                    _save_toml!(report, REPORT_ALAD)
+                    @printf("[%s/%-3s/%-5s/%-9s/%-6s] SKIP (SOCWR+DummyBus unsupported in ALADIN)\n",
+                            case, variant, base, sectioning, coupling)
+                    flush(stdout)
+                    continue
+                end
                 key = "$(sectioning)_$(coupling)"
                 if haskey(report[case][variant][bkey], key) &&
                    haskey(report[case][variant][bkey][key], "status")
