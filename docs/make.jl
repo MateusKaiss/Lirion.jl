@@ -16,6 +16,7 @@ Documenter.makedocs(
         "Introduction" => [
             "Introduction" => "index.md","installation.md","quick_start.md"
         ],
+        "Performance" => "performance.md",
     ],
 )
 

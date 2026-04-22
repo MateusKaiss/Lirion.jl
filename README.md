@@ -181,6 +181,64 @@ For a detailed explanation of the update rules and their theoretical motivation,
 
 ---
 
+## Performance & Threading
+
+Lirion has two very different workloads and each one has its own
+optimal threading configuration. The golden rule is **never nest
+parallelism**: either go *deep* (one solver, many BLAS threads) or
+*wide* (many zones, one BLAS thread each).
+
+### Centralized — leave the defaults
+
+One solver instance; give BLAS all the physical cores so matrix
+factorizations are fast. No environment variables needed.
+
+### Distributed — pin BLAS and set Julia threads
+
+Set these **before** launching Julia.
+
+**Linux (bash / zsh):**
+
+```bash
+export JULIA_NUM_THREADS=$(getconf _NPROCESSORS_ONLN)
+export OPENBLAS_NUM_THREADS=1
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+julia --project
+```
+
+**macOS (bash / zsh):**
+
+```bash
+export JULIA_NUM_THREADS=$(sysctl -n hw.ncpu)
+export OPENBLAS_NUM_THREADS=1
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+julia --project
+```
+
+**Windows (PowerShell):**
+
+```powershell
+$env:JULIA_NUM_THREADS   = $env:NUMBER_OF_PROCESSORS
+$env:OPENBLAS_NUM_THREADS = "1"
+$env:OMP_NUM_THREADS      = "1"
+$env:MKL_NUM_THREADS      = "1"
+julia --project
+```
+
+After loading, Lirion prints the active configuration:
+
+```
+[ Info: [Lirion] Threads: Julia=28 | BLAS=1
+```
+
+For the full rationale (why hyperthreads hurt BLAS, why Lirion
+auto-scopes BLAS during distributed runs, verification tips), see
+the **Performance & Threading** page in the documentation.
+
+---
+
 ## Documentation
 
 The full documentation is available online and includes:
