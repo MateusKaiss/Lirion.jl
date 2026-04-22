@@ -32,7 +32,7 @@ const TIME_LIMIT_S = 120.0
 const GAP_TARGET   = 1.0
 const EPS_ABS      = 1e-4
 const EPS_REL      = 1e-4
-const MAX_ITER     = 1000
+const MAX_ITER     = 20_000
 
 _gurobi_opt() = optimizer_with_attributes(
     () -> Gurobi.Optimizer(Gurobi.Env()),

@@ -82,7 +82,7 @@ const ALGO_VARIANTS = [
 # Lirion's ALADINConfig constructor in `src/types.jl`).
 # ------------------------------------------------------------
 const ALADIN_DEFAULTS = (
-    max_iter           = 200,
+    max_iter           = 20_000,
     rho                = 1e3,
     mu                 = 1e4,
     alpha1             = 1.0,

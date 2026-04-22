@@ -88,7 +88,7 @@ const ALGO_VARIANTS = [
 # present. Keys use the tuple form for O(1) lookup.
 # ------------------------------------------------------------
 const DEFAULT_RHO::Dict{Symbol, Float64} = Dict(:state => 1e5, :power => 1e3, :hybrid => 1e3)
-const DEFAULT_MAX_ITER::Int = 5000
+const DEFAULT_MAX_ITER::Int = 20_000
 
 const ADMM_OVERRIDES = Dict{Tuple{String, String, Symbol, Symbol, Symbol}, Dict{Symbol, Any}}(
     # --- case14_ieee (auto-generated from _tune_case14_admm.toml) -----

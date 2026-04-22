@@ -86,7 +86,7 @@ const OUT_ALADIN = joinpath(CASES_DIR, "_tune_$(CASE)_aladin.toml")
 # ---- Tuning knobs -----------------------------------------------------
 const GAP_TARGET  = 1.0                       # percent, success criterion
 const EXHAUSTIVE  = get(ENV, "LIRION_TUNE_EXHAUSTIVE", "0") == "1"
-const MAX_ITER    = 5_000
+const MAX_ITER    = 20_000
 const EPS_ABS     = 1e-4
 const EPS_REL     = 1e-4
 
@@ -228,7 +228,7 @@ function _probe_aladin(variant::String, base::Symbol, base_ctor,
     try
         alg = aladin(;
             coupling = coupling, sectioning = sectioning,
-            max_iter = 300, rho = rho, mu = mu_val,
+            max_iter = MAX_ITER, rho = rho, mu = mu_val,
             eps_abs = EPS_ABS, eps_rel = EPS_REL,
             adaptive = adaptive,
             rho_growth = 1.3, mu_growth = 2.0,
