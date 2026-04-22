@@ -1,6 +1,11 @@
+# ============================================================
+# Dispatch
+# ============================================================
+
 # ------------------------------------------------------------
-# Coupling -> Variant type
+# Coupling → variant type
 # ------------------------------------------------------------
+
 @inline function _variant_type(::Val{c}) where {c}
     c === :state && return State
     c === :power && return Power
@@ -9,10 +14,16 @@
 end
 
 # ------------------------------------------------------------
-# Algorithm display name 
+# Algorithm display name
 # ------------------------------------------------------------
-_algo_name(::ADMMConfig) = "ADMM"
+
+_algo_name(::ADMMConfig)   = "ADMM"
 _algo_name(::ALADINConfig) = "ALADIN"
+
+
+# ============================================================
+# Utilities
+# ============================================================
 
 function _with_scoped_blas_threads(f, n::Integer = 1)
     prev = LinearAlgebra.BLAS.get_num_threads()
@@ -24,9 +35,11 @@ function _with_scoped_blas_threads(f, n::Integer = 1)
     end
 end
 
-# ------------------------------------------------------------
-# Distributed runner — single generic entry point
-# ------------------------------------------------------------
+
+# ============================================================
+# Entry point
+# ============================================================
+
 function run_distributed(inputs::DistributedInputs)::LirionResult
     cfg = inputs.model_type
     sys = inputs.system
