@@ -1,49 +1,27 @@
 # ============================================================
-# Base-model → tag dispatch
+# Dispatch
 # ============================================================
+
 @inline base_model_tag(::Type{AC})    = Val(:ac)
 @inline base_model_tag(::Type{DC})    = Val(:dc)
 @inline base_model_tag(::Type{SOCWR}) = Val(:socwr)
 
+
 # ============================================================
 # Utilities
 # ============================================================
+
 is_gurobi(m::JuMP.Model)::Bool = occursin("Gurobi", MOI.get(m, MOI.SolverName()))
 
 
 # ============================================================
-# Feasibility check
+# Default factories
 # ============================================================
-function _require_optimal!(model::JuMP.Model; iter::Int, zone_id::Int)
-    ts = JuMP.termination_status(model)
-    ps = JuMP.primal_status(model)
-    ds = JuMP.dual_status(model)
-    
-    acceptable =
-        ts == MOI.OPTIMAL || ts == MOI.LOCALLY_SOLVED ||
-        ts == MOI.ALMOST_OPTIMAL || ts == MOI.ALMOST_LOCALLY_SOLVED
-
-    if !acceptable
-        raw = try
-            JuMP.raw_status(model)
-        catch
-            "raw_status unavailable"
-        end
-        error("""
-        iter=$iter zone=$zone_id
-          termination_status = $ts
-          primal_status       = $ps
-          dual_status         = $ds
-          raw_status          = $raw
-        """)
-    end
-
-    return nothing
-end
 
 # ------------------------------------------------------------
 # AC — Ipopt
 # ------------------------------------------------------------
+
 const _SILENT_FACTORY_AC = optimizer_with_attributes(
     Ipopt.Optimizer,
     # silent output
@@ -98,6 +76,7 @@ const _SILENT_FACTORY_AC = optimizer_with_attributes(
 # ------------------------------------------------------------
 # DC — OSQP
 # ------------------------------------------------------------
+
 const _SILENT_FACTORY_DC = optimizer_with_attributes(
     OSQP.Optimizer,
     "eps_abs" => 1e-6,
@@ -111,6 +90,7 @@ const _SILENT_FACTORY_DC = optimizer_with_attributes(
 # ------------------------------------------------------------
 # SOCWR — Clarabel
 # ------------------------------------------------------------
+
 const _SILENT_FACTORY_SOCWR = optimizer_with_attributes(
     Clarabel.Optimizer,
     "verbose" => false,
@@ -151,9 +131,10 @@ const _SILENT_FACTORY_SOCWR = optimizer_with_attributes(
 )
 
 
-# ------------------------------------------------------------
-# Silent
-# ------------------------------------------------------------
+# ============================================================
+# User-supplied optimizer
+# ============================================================
+
 function _silent_factory(opt::MOI.OptimizerWithAttributes)
     params = filter(p -> !(p.first isa MOI.Silent), opt.params)
     return optimizer_with_attributes(
@@ -191,4 +172,36 @@ resolve_optimizer(::Val{:socwr}, user = nothing) =
     user = nothing,
 )
     return resolve_optimizer(base_model_tag(config.base_model), user)
+end
+
+
+# ============================================================
+# Feasibility check
+# ============================================================
+
+function _require_optimal!(model::JuMP.Model; iter::Int, zone_id::Int)
+    ts = JuMP.termination_status(model)
+    ps = JuMP.primal_status(model)
+    ds = JuMP.dual_status(model)
+
+    acceptable =
+        ts == MOI.OPTIMAL || ts == MOI.LOCALLY_SOLVED ||
+        ts == MOI.ALMOST_OPTIMAL || ts == MOI.ALMOST_LOCALLY_SOLVED
+
+    if !acceptable
+        raw = try
+            JuMP.raw_status(model)
+        catch
+            "raw_status unavailable"
+        end
+        error("""
+        iter=$iter zone=$zone_id
+          termination_status = $ts
+          primal_status       = $ps
+          dual_status         = $ds
+          raw_status          = $raw
+        """)
+    end
+
+    return nothing
 end
