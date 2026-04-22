@@ -135,8 +135,53 @@ const ADMM_OVERRIDES = Dict{Tuple{String, String, Symbol, Symbol, Symbol}, Dict{
     ("case14_ieee", "sad", :socwr, :dummy_bus, :power) => Dict(:rho => 1e+03),  # gap=-0.033%, iters=94
     ("case14_ieee", "sad", :socwr, :dummy_bus, :hybrid) => Dict(:rho => 1e+03),  # gap=-0.012%, iters=88
     ("case14_ieee", "sad", :socwr, :split_bus, :hybrid) => Dict(:rho => 1e+03),  # gap=+0.001%, iters=117
+    # --- case30_ieee (auto-generated from _tune_case30_ieee_admm.toml) -----
+    ("case30_ieee", "std", :dc, :tie_line, :state) => Dict(:rho => 1e+05),  # gap=+0.739%, iters=2226
+    ("case30_ieee", "std", :dc, :tie_line, :hybrid) => Dict(:rho => 1e+03),  # gap=-0.211%, iters=111
+    ("case30_ieee", "std", :dc, :dummy_bus, :hybrid) => Dict(:rho => 1e+03),  # gap=-0.177%, iters=199
+    ("case30_ieee", "std", :dc, :split_bus, :hybrid) => Dict(:rho => 1e+03),  # gap=-0.175%, iters=196
+    ("case30_ieee", "std", :ac, :tie_line, :state) => Dict(:rho => 1e+06),  # gap=-0.202%, iters=884
+    ("case30_ieee", "std", :ac, :tie_line, :power) => Dict(:rho => 1e+03),  # gap=-0.476%, iters=55
+    ("case30_ieee", "std", :ac, :tie_line, :hybrid) => Dict(:rho => 1e+03),  # gap=+0.088%, iters=69
+    ("case30_ieee", "std", :ac, :dummy_bus, :power) => Dict(:rho => 1e+03),  # gap=-0.816%, iters=67
+    ("case30_ieee", "std", :ac, :dummy_bus, :hybrid) => Dict(:rho => 1e+03),  # gap=-0.107%, iters=100
+    ("case30_ieee", "std", :ac, :split_bus, :hybrid) => Dict(:rho => 1e+03),  # gap=+0.006%, iters=102
+    ("case30_ieee", "std", :socwr, :tie_line, :state) => Dict(:rho => 1e+05),  # gap=+0.006%, iters=582
+    ("case30_ieee", "std", :socwr, :tie_line, :power) => Dict(:rho => 1e+03),  # gap=-0.187%, iters=153
+    ("case30_ieee", "std", :socwr, :tie_line, :hybrid) => Dict(:rho => 1e+03),  # gap=-0.065%, iters=147
+    ("case30_ieee", "std", :socwr, :dummy_bus, :power) => Dict(:rho => 1e+03),  # gap=-0.413%, iters=154
+    ("case30_ieee", "std", :socwr, :dummy_bus, :hybrid) => Dict(:rho => 1e+03),  # gap=-0.438%, iters=152
+    ("case30_ieee", "std", :socwr, :split_bus, :hybrid) => Dict(:rho => 1e+03),  # gap=-0.057%, iters=103
+    ("case30_ieee", "api", :dc, :tie_line, :state) => Dict(:rho => 1e+05),  # gap=-0.394%, iters=1241
+    ("case30_ieee", "api", :dc, :tie_line, :power) => Dict(:rho => 1e+05),  # gap=-0.045%, iters=643
+    ("case30_ieee", "api", :dc, :tie_line, :hybrid) => Dict(:rho => 1e+03),  # gap=+0.128%, iters=292
+    ("case30_ieee", "api", :dc, :dummy_bus, :power) => Dict(:rho => 1e+04),  # gap=-0.498%, iters=31
+    ("case30_ieee", "api", :dc, :dummy_bus, :hybrid) => Dict(:rho => 1e+03),  # gap=+0.084%, iters=278
+    ("case30_ieee", "api", :dc, :split_bus, :hybrid) => Dict(:rho => 1e+03),  # gap=+0.085%, iters=240
+    ("case30_ieee", "api", :ac, :tie_line, :state) => Dict(:rho => 1e+06),  # gap=+0.616%, iters=147
+    ("case30_ieee", "api", :ac, :tie_line, :power) => Dict(:rho => 1e+04),  # gap=-0.599%, iters=101
+    ("case30_ieee", "api", :ac, :tie_line, :hybrid) => Dict(:rho => 1e+04),  # gap=-0.231%, iters=322
+    ("case30_ieee", "api", :ac, :dummy_bus, :hybrid) => Dict(:rho => 1e+04),  # gap=-0.710%, iters=980
+    ("case30_ieee", "api", :ac, :split_bus, :hybrid) => Dict(:rho => 1e+04),  # gap=-0.155%, iters=534
+    ("case30_ieee", "api", :socwr, :tie_line, :state) => Dict(:rho => 1e+05),  # gap=+0.007%, iters=614
+    ("case30_ieee", "api", :socwr, :tie_line, :power) => Dict(:rho => 1e+03),  # gap=-0.169%, iters=118
+    ("case30_ieee", "api", :socwr, :tie_line, :hybrid) => Dict(:rho => 1e+03),  # gap=-0.018%, iters=100
+    ("case30_ieee", "api", :socwr, :dummy_bus, :power) => Dict(:rho => 1e+03),  # gap=-0.384%, iters=104
+    ("case30_ieee", "api", :socwr, :dummy_bus, :hybrid) => Dict(:rho => 1e+03),  # gap=-0.335%, iters=101
+    ("case30_ieee", "api", :socwr, :split_bus, :hybrid) => Dict(:rho => 1e+03),  # gap=-0.009%, iters=118
+    ("case30_ieee", "sad", :ac, :tie_line, :state) => Dict(:rho => 1e+06),  # gap=-0.075%, iters=508
+    ("case30_ieee", "sad", :ac, :tie_line, :power) => Dict(:rho => 1e+03),  # gap=-0.476%, iters=55
+    ("case30_ieee", "sad", :ac, :tie_line, :hybrid) => Dict(:rho => 1e+03),  # gap=+0.088%, iters=69
+    ("case30_ieee", "sad", :ac, :dummy_bus, :power) => Dict(:rho => 1e+03),  # gap=-0.852%, iters=67
+    ("case30_ieee", "sad", :ac, :dummy_bus, :hybrid) => Dict(:rho => 1e+03),  # gap=-0.107%, iters=100
+    ("case30_ieee", "sad", :ac, :split_bus, :hybrid) => Dict(:rho => 1e+03),  # gap=+0.006%, iters=102
+    ("case30_ieee", "sad", :socwr, :tie_line, :state) => Dict(:rho => 1e+05),  # gap=+0.008%, iters=951
+    ("case30_ieee", "sad", :socwr, :tie_line, :power) => Dict(:rho => 1e+03),  # gap=-0.193%, iters=105
+    ("case30_ieee", "sad", :socwr, :tie_line, :hybrid) => Dict(:rho => 1e+03),  # gap=-0.299%, iters=92
+    ("case30_ieee", "sad", :socwr, :dummy_bus, :power) => Dict(:rho => 1e+03),  # gap=-0.374%, iters=105
+    ("case30_ieee", "sad", :socwr, :dummy_bus, :hybrid) => Dict(:rho => 1e+03),  # gap=-0.400%, iters=103
+    ("case30_ieee", "sad", :socwr, :split_bus, :hybrid) => Dict(:rho => 1e+03),  # gap=-0.013%, iters=78
 )
-
 function _admm_params(case::String, variant::String,
                       base::Symbol, sectioning::Symbol, coupling::Symbol)
     ov = get(ADMM_OVERRIDES, (case, variant, base, sectioning, coupling), nothing)

@@ -1,0 +1,2258 @@
+[_meta]
+eps_abs = 0.0001
+eps_rel = 0.0001
+gap_target = 1.0
+generated_at = "2026-04-21T23:41:37.002"
+max_iter = 1000
+script = "tune_case14_aladin_v2.jl"
+
+[api.ac.dummy_bus_hybrid]
+hit_target = false
+
+    [api.ac.dummy_bus_hybrid.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = 0.7443206966959545
+    iters = 1000
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "did_not_converge"
+    time_s = 32.499886989593506
+
+    [api.ac.dummy_bus_hybrid.strategies.fixed_1e2_mu1]
+    adaptive = false
+    gap_pct = -9.4807982382139
+    iters = 1000
+    mu = 10.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 31.7309467792511
+
+    [api.ac.dummy_bus_hybrid.strategies.fixed_1e3]
+    adaptive = false
+    gap_pct = -0.6024123620083172
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 31.85789179801941
+
+    [api.ac.dummy_bus_hybrid.strategies.fixed_1e4]
+    adaptive = false
+    gap_pct = -0.2045981393115672
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 30.621572017669678
+
+    [api.ac.dummy_bus_hybrid.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -1.2534245569008555
+    iters = 1000
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 31.686350107192993
+
+    [api.ac.dummy_bus_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 0.9628078835428548
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 32.62540102005005
+
+    [api.ac.dummy_bus_hybrid.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 0.6880754480818917
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 31.937915802001953
+
+[api.ac.dummy_bus_power]
+hit_target = false
+
+    [api.ac.dummy_bus_power.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "error"
+    time_s = 3.4688220024108887
+
+    [api.ac.dummy_bus_power.strategies.fixed_1e2_mu1]
+    adaptive = false
+    gap_pct = -10.149352330956198
+    iters = 1000
+    mu = 10.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 31.396026849746704
+
+    [api.ac.dummy_bus_power.strategies.fixed_1e3]
+    adaptive = false
+    gap_pct = -0.8565835294165023
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 31.922574043273926
+
+    [api.ac.dummy_bus_power.strategies.fixed_1e4]
+    adaptive = false
+    gap_pct = -1.1556303013480913
+    iters = 707
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    status = "converged"
+    time_s = 22.500602960586548
+
+    [api.ac.dummy_bus_power.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -1.1984821764064992
+    iters = 932
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "converged"
+    time_s = 31.25880002975464
+
+    [api.ac.dummy_bus_power.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "error"
+    time_s = 7.40815806388855
+
+    [api.ac.dummy_bus_power.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "error"
+    time_s = 11.80111312866211
+
+[api.ac.split_bus_hybrid]
+hit_target = true
+
+    [api.ac.split_bus_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 0.07974812227029708
+    iters = 92
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 2.2213339805603027
+
+    [api.ac.split_bus_hybrid.winner]
+    adaptive = true
+    gap_pct = 0.07974812227029708
+    iters = 92
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    strategy = "gentle_adaptive"
+
+[api.ac.tie_line_hybrid]
+hit_target = false
+
+    [api.ac.tie_line_hybrid.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "error"
+    time_s = 0.1856060028076172
+
+    [api.ac.tie_line_hybrid.strategies.fixed_1e2_mu1]
+    adaptive = false
+    gap_pct = -2.8504164106005883
+    iters = 1000
+    mu = 10.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 29.717761993408203
+
+    [api.ac.tie_line_hybrid.strategies.fixed_1e3]
+    adaptive = false
+    gap_pct = -0.4705101507799829
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 28.234843015670776
+
+    [api.ac.tie_line_hybrid.strategies.fixed_1e4]
+    adaptive = false
+    gap_pct = 0.15025054841738786
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 28.368566036224365
+
+    [api.ac.tie_line_hybrid.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -3.0168074728890297
+    iters = 1000
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 30.396888971328735
+
+    [api.ac.tie_line_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "error"
+    time_s = 2.0761008262634277
+
+    [api.ac.tie_line_hybrid.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 0.6155974626954035
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 29.161250829696655
+
+[api.ac.tie_line_power]
+hit_target = false
+
+    [api.ac.tie_line_power.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "error"
+    time_s = 0.1714329719543457
+
+    [api.ac.tie_line_power.strategies.fixed_1e2_mu1]
+    adaptive = false
+    gap_pct = nan
+    iters = 0
+    mu = 10.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "error"
+    time_s = 25.718935012817383
+
+    [api.ac.tie_line_power.strategies.fixed_1e3]
+    adaptive = false
+    gap_pct = -0.5633841641522971
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 27.070804119110107
+
+    [api.ac.tie_line_power.strategies.fixed_1e4]
+    adaptive = false
+    gap_pct = -0.26771859998745084
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 28.11016297340393
+
+    [api.ac.tie_line_power.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -1.1786139260514534
+    iters = 1000
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 29.48961114883423
+
+    [api.ac.tie_line_power.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "error"
+    time_s = 1.7396669387817383
+
+    [api.ac.tie_line_power.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "error"
+    time_s = 0.2860260009765625
+
+[api.ac.tie_line_state]
+hit_target = true
+
+    [api.ac.tie_line_state.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = -0.6340998926634629
+    iters = 191
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 4.922668933868408
+
+    [api.ac.tie_line_state.winner]
+    adaptive = true
+    gap_pct = -0.6340998926634629
+    iters = 191
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    strategy = "gentle_adaptive"
+
+[api.dc.dummy_bus_hybrid]
+hit_target = true
+
+    [api.dc.dummy_bus_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 0.08666266846204086
+    iters = 43
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 0.12149906158447266
+
+    [api.dc.dummy_bus_hybrid.winner]
+    adaptive = true
+    gap_pct = 0.08666266846204086
+    iters = 43
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    strategy = "gentle_adaptive"
+
+[api.dc.dummy_bus_power]
+hit_target = false
+
+    [api.dc.dummy_bus_power.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "error"
+    time_s = 0.010478973388671875
+
+    [api.dc.dummy_bus_power.strategies.fixed_1e2_mu1]
+    adaptive = false
+    gap_pct = nan
+    iters = 0
+    mu = 10.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "error"
+    time_s = 2.375584840774536
+
+    [api.dc.dummy_bus_power.strategies.fixed_1e3]
+    adaptive = false
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    status = "error"
+    time_s = 0.041871070861816406
+
+    [api.dc.dummy_bus_power.strategies.fixed_1e4]
+    adaptive = false
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    status = "error"
+    time_s = 0.009702920913696289
+
+    [api.dc.dummy_bus_power.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = nan
+    iters = 0
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "error"
+    time_s = 0.4059410095214844
+
+    [api.dc.dummy_bus_power.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "error"
+    time_s = 0.023051977157592773
+
+    [api.dc.dummy_bus_power.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "error"
+    time_s = 0.008780956268310547
+
+[api.dc.split_bus_hybrid]
+hit_target = true
+
+    [api.dc.split_bus_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 0.08654755424641093
+    iters = 20
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 0.04893302917480469
+
+    [api.dc.split_bus_hybrid.winner]
+    adaptive = true
+    gap_pct = 0.08654755424641093
+    iters = 20
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    strategy = "gentle_adaptive"
+
+[api.dc.tie_line_hybrid]
+hit_target = true
+
+    [api.dc.tie_line_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 0.08657588909529823
+    iters = 32
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 0.09193992614746094
+
+    [api.dc.tie_line_hybrid.winner]
+    adaptive = true
+    gap_pct = 0.08657588909529823
+    iters = 32
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    strategy = "gentle_adaptive"
+
+[api.dc.tie_line_power]
+hit_target = true
+
+    [api.dc.tie_line_power.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "error"
+    time_s = 0.06607913970947266
+
+    [api.dc.tie_line_power.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -0.04405156098986269
+    iters = 109
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "converged"
+    time_s = 0.28493595123291016
+
+    [api.dc.tie_line_power.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "error"
+    time_s = 0.03478288650512695
+
+    [api.dc.tie_line_power.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "error"
+    time_s = 0.00677800178527832
+
+    [api.dc.tie_line_power.winner]
+    adaptive = false
+    gap_pct = -0.04405156098986269
+    iters = 109
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    strategy = "fixed_mid"
+
+[api.dc.tie_line_state]
+hit_target = true
+
+    [api.dc.tie_line_state.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 0.08654626343826771
+    iters = 75
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 0.20018792152404785
+
+    [api.dc.tie_line_state.winner]
+    adaptive = true
+    gap_pct = 0.08654626343826771
+    iters = 75
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    strategy = "gentle_adaptive"
+
+[api.socwr.split_bus_hybrid]
+hit_target = true
+
+    [api.socwr.split_bus_hybrid.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = 1.7008168526189673
+    iters = 1000
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "did_not_converge"
+    time_s = 20.28166389465332
+
+    [api.socwr.split_bus_hybrid.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -0.004818345075381702
+    iters = 662
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "converged"
+    time_s = 14.100003957748413
+
+    [api.socwr.split_bus_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 1.7357529687349365
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 20.911575078964233
+
+    [api.socwr.split_bus_hybrid.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 0.9475803389630791
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 20.741271018981934
+
+    [api.socwr.split_bus_hybrid.winner]
+    adaptive = false
+    gap_pct = -0.004818345075381702
+    iters = 662
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    strategy = "fixed_mid"
+
+[api.socwr.tie_line_hybrid]
+hit_target = true
+
+    [api.socwr.tie_line_hybrid.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = 12.233208020487636
+    iters = 1000
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "did_not_converge"
+    time_s = 22.07565999031067
+
+    [api.socwr.tie_line_hybrid.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -0.020140751346096802
+    iters = 472
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "converged"
+    time_s = 10.91870903968811
+
+    [api.socwr.tie_line_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 11.068491437500729
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 22.42422580718994
+
+    [api.socwr.tie_line_hybrid.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 10.295538667219054
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 22.941296815872192
+
+    [api.socwr.tie_line_hybrid.winner]
+    adaptive = false
+    gap_pct = -0.020140751346096802
+    iters = 472
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    strategy = "fixed_mid"
+
+[api.socwr.tie_line_power]
+hit_target = true
+
+    [api.socwr.tie_line_power.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = 12.44852695650666
+    iters = 1000
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "did_not_converge"
+    time_s = 22.100980043411255
+
+    [api.socwr.tie_line_power.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -0.17494540238071682
+    iters = 355
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "converged"
+    time_s = 7.980108022689819
+
+    [api.socwr.tie_line_power.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 10.556338990304585
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 22.335108995437622
+
+    [api.socwr.tie_line_power.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 10.821976808764779
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 22.235522031784058
+
+    [api.socwr.tie_line_power.winner]
+    adaptive = false
+    gap_pct = -0.17494540238071682
+    iters = 355
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    strategy = "fixed_mid"
+
+[api.socwr.tie_line_state]
+hit_target = true
+
+    [api.socwr.tie_line_state.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = 1.6846248184941135
+    iters = 1000
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "did_not_converge"
+    time_s = 22.29519486427307
+
+    [api.socwr.tie_line_state.strategies.fixed_1e3]
+    adaptive = false
+    gap_pct = -0.36168740543419836
+    iters = 773
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    status = "converged"
+    time_s = 17.23277187347412
+
+    [api.socwr.tie_line_state.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -69.49535112684053
+    iters = 1000
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 22.683300971984863
+
+    [api.socwr.tie_line_state.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 1.7354569465793157
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 22.795318126678467
+
+    [api.socwr.tie_line_state.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 1.1705928146199445
+    iters = 392
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 8.94219708442688
+
+    [api.socwr.tie_line_state.winner]
+    adaptive = false
+    gap_pct = -0.36168740543419836
+    iters = 773
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    strategy = "fixed_1e3"
+
+[sad.ac.dummy_bus_hybrid]
+hit_target = false
+
+    [sad.ac.dummy_bus_hybrid.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "error"
+    time_s = 1.204392910003662
+
+    [sad.ac.dummy_bus_hybrid.strategies.fixed_1e2_mu1]
+    adaptive = false
+    gap_pct = -56.65626521458407
+    iters = 1000
+    mu = 10.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 30.22278118133545
+
+    [sad.ac.dummy_bus_hybrid.strategies.fixed_1e3]
+    adaptive = false
+    gap_pct = 0.8095785771728303
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 29.226031064987183
+
+    [sad.ac.dummy_bus_hybrid.strategies.fixed_1e4]
+    adaptive = false
+    gap_pct = 0.36390194439121454
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 27.567906856536865
+
+    [sad.ac.dummy_bus_hybrid.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -0.1457361206656186
+    iters = 1000
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 28.97614884376526
+
+    [sad.ac.dummy_bus_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 0.972565339736954
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 31.387671947479248
+
+    [sad.ac.dummy_bus_hybrid.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = -1.5795446329224359
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 30.309694051742554
+
+[sad.ac.dummy_bus_power]
+hit_target = true
+
+    [sad.ac.dummy_bus_power.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 2.450400278535514
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 32.30239701271057
+
+    [sad.ac.dummy_bus_power.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 0.3137375039780661
+    iters = 78
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 2.0546419620513916
+
+    [sad.ac.dummy_bus_power.winner]
+    adaptive = true
+    gap_pct = 0.3137375039780661
+    iters = 78
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    strategy = "gentle_hi_rho"
+
+[sad.ac.split_bus_hybrid]
+hit_target = true
+
+    [sad.ac.split_bus_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 0.027417834362684808
+    iters = 67
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 1.42364501953125
+
+    [sad.ac.split_bus_hybrid.winner]
+    adaptive = true
+    gap_pct = 0.027417834362684808
+    iters = 67
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    strategy = "gentle_adaptive"
+
+[sad.ac.tie_line_hybrid]
+hit_target = true
+
+    [sad.ac.tie_line_hybrid.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "error"
+    time_s = 0.15475201606750488
+
+    [sad.ac.tie_line_hybrid.strategies.fixed_1e3]
+    adaptive = false
+    gap_pct = -0.07293700747456444
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 26.08243203163147
+
+    [sad.ac.tie_line_hybrid.strategies.fixed_1e4]
+    adaptive = false
+    gap_pct = -0.03543363442300816
+    iters = 882
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    status = "converged"
+    time_s = 23.255786895751953
+
+    [sad.ac.tie_line_hybrid.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = 0.023381501350888685
+    iters = 1000
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 27.870679140090942
+
+    [sad.ac.tie_line_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "error"
+    time_s = 1.7700650691986084
+
+    [sad.ac.tie_line_hybrid.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = -0.5520426353759841
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 27.84476399421692
+
+    [sad.ac.tie_line_hybrid.winner]
+    adaptive = false
+    gap_pct = -0.03543363442300816
+    iters = 882
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    strategy = "fixed_1e4"
+
+[sad.ac.tie_line_power]
+hit_target = true
+
+    [sad.ac.tie_line_power.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "error"
+    time_s = 1.1406059265136719
+
+    [sad.ac.tie_line_power.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 0.7202110747581039
+    iters = 76
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 1.8503470420837402
+
+    [sad.ac.tie_line_power.winner]
+    adaptive = true
+    gap_pct = 0.7202110747581039
+    iters = 76
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    strategy = "gentle_hi_rho"
+
+[sad.ac.tie_line_state]
+hit_target = false
+
+    [sad.ac.tie_line_state.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = 3.4499995476642167
+    iters = 1000
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "did_not_converge"
+    time_s = 25.618895053863525
+
+    [sad.ac.tie_line_state.strategies.fixed_1e2_mu1]
+    adaptive = false
+    gap_pct = -100.00008600016092
+    iters = 1000
+    mu = 10.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 27.18537998199463
+
+    [sad.ac.tie_line_state.strategies.fixed_1e3]
+    adaptive = false
+    gap_pct = -57.570854654393806
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 25.93468403816223
+
+    [sad.ac.tie_line_state.strategies.fixed_1e4]
+    adaptive = false
+    gap_pct = -58.1784003816334
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 25.782747983932495
+
+    [sad.ac.tie_line_state.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -100.00008585306308
+    iters = 1000
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 28.320072889328003
+
+    [sad.ac.tie_line_state.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = -4.354855268974539
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 26.360383987426758
+
+    [sad.ac.tie_line_state.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "error"
+    time_s = 8.877158164978027
+
+[sad.socwr.split_bus_hybrid]
+hit_target = true
+
+    [sad.socwr.split_bus_hybrid.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = 1.3742509433554486
+    iters = 1000
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "did_not_converge"
+    time_s = 20.099419832229614
+
+    [sad.socwr.split_bus_hybrid.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -0.00938190312144711
+    iters = 423
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "converged"
+    time_s = 8.937242984771729
+
+    [sad.socwr.split_bus_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 0.762643032459867
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 20.610563039779663
+
+    [sad.socwr.split_bus_hybrid.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 0.7054767098754166
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 20.417335987091064
+
+    [sad.socwr.split_bus_hybrid.winner]
+    adaptive = false
+    gap_pct = -0.00938190312144711
+    iters = 423
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    strategy = "fixed_mid"
+
+[sad.socwr.tie_line_hybrid]
+hit_target = true
+
+    [sad.socwr.tie_line_hybrid.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = 20.942865781320826
+    iters = 1000
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "did_not_converge"
+    time_s = 22.610706090927124
+
+    [sad.socwr.tie_line_hybrid.strategies.fixed_1e3]
+    adaptive = false
+    gap_pct = 0.9085673212171297
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 22.892298936843872
+
+    [sad.socwr.tie_line_hybrid.strategies.fixed_1e4]
+    adaptive = false
+    gap_pct = 0.0991648240985387
+    iters = 846
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    status = "converged"
+    time_s = 19.194123029708862
+
+    [sad.socwr.tie_line_hybrid.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -0.06489798209103054
+    iters = 1000
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 22.833868980407715
+
+    [sad.socwr.tie_line_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 5.846056675926075
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 22.78839087486267
+
+    [sad.socwr.tie_line_hybrid.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 9.569845927767753
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 22.48096203804016
+
+    [sad.socwr.tie_line_hybrid.winner]
+    adaptive = false
+    gap_pct = 0.0991648240985387
+    iters = 846
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    strategy = "fixed_1e4"
+
+[sad.socwr.tie_line_power]
+hit_target = true
+
+    [sad.socwr.tie_line_power.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = 24.296735976852666
+    iters = 1000
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "did_not_converge"
+    time_s = 22.590882062911987
+
+    [sad.socwr.tie_line_power.strategies.fixed_1e3]
+    adaptive = false
+    gap_pct = 5.666884835054138
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 23.292474031448364
+
+    [sad.socwr.tie_line_power.strategies.fixed_1e4]
+    adaptive = false
+    gap_pct = -0.021913375585132275
+    iters = 384
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    status = "converged"
+    time_s = 8.49629521369934
+
+    [sad.socwr.tie_line_power.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = 0.29365954105598063
+    iters = 1000
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 22.694509029388428
+
+    [sad.socwr.tie_line_power.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 25.253231153923167
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 22.482913970947266
+
+    [sad.socwr.tie_line_power.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 21.47393473957288
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 22.28332805633545
+
+    [sad.socwr.tie_line_power.winner]
+    adaptive = false
+    gap_pct = -0.021913375585132275
+    iters = 384
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    strategy = "fixed_1e4"
+
+[sad.socwr.tie_line_state]
+hit_target = true
+
+    [sad.socwr.tie_line_state.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 0.7777698114544678
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 22.592589855194092
+
+    [sad.socwr.tie_line_state.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 0.35247588344875186
+    iters = 538
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 12.306384086608887
+
+    [sad.socwr.tie_line_state.winner]
+    adaptive = true
+    gap_pct = 0.35247588344875186
+    iters = 538
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    strategy = "gentle_hi_rho"
+
+[std.ac.dummy_bus_hybrid]
+hit_target = false
+
+    [std.ac.dummy_bus_hybrid.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "error"
+    time_s = 0.12953495979309082
+
+    [std.ac.dummy_bus_hybrid.strategies.fixed_1e2_mu1]
+    adaptive = false
+    gap_pct = -56.65762269623669
+    iters = 1000
+    mu = 10.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 29.880109786987305
+
+    [std.ac.dummy_bus_hybrid.strategies.fixed_1e3]
+    adaptive = false
+    gap_pct = 0.4819890158868388
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 28.452683925628662
+
+    [std.ac.dummy_bus_hybrid.strategies.fixed_1e4]
+    adaptive = false
+    gap_pct = 1.2492209760928374
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 27.812227964401245
+
+    [std.ac.dummy_bus_hybrid.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -0.12791819877618715
+    iters = 1000
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 29.17791199684143
+
+    [std.ac.dummy_bus_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 0.3142873056134082
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 29.720711946487427
+
+    [std.ac.dummy_bus_hybrid.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 0.23839502650915625
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 29.92313504219055
+
+[std.ac.dummy_bus_power]
+hit_target = true
+
+    [std.ac.dummy_bus_power.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 2.498392601065573
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 31.763169050216675
+
+    [std.ac.dummy_bus_power.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 0.32897377306552605
+    iters = 78
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 2.0030629634857178
+
+    [std.ac.dummy_bus_power.winner]
+    adaptive = true
+    gap_pct = 0.32897377306552605
+    iters = 78
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    strategy = "gentle_hi_rho"
+
+[std.ac.split_bus_hybrid]
+hit_target = true
+
+    [std.ac.split_bus_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 0.009189876354365883
+    iters = 63
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 1.5495989322662354
+
+    [std.ac.split_bus_hybrid.winner]
+    adaptive = true
+    gap_pct = 0.009189876354365883
+    iters = 63
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    strategy = "gentle_adaptive"
+
+[std.ac.tie_line_hybrid]
+hit_target = true
+
+    [std.ac.tie_line_hybrid.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "error"
+    time_s = 0.2534189224243164
+
+    [std.ac.tie_line_hybrid.strategies.fixed_1e3]
+    adaptive = false
+    gap_pct = -0.12079301106962136
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 26.259165048599243
+
+    [std.ac.tie_line_hybrid.strategies.fixed_1e4]
+    adaptive = false
+    gap_pct = -0.07150506183605622
+    iters = 844
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    status = "converged"
+    time_s = 21.530313968658447
+
+    [std.ac.tie_line_hybrid.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -0.0035302097811528714
+    iters = 1000
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 41.17449903488159
+
+    [std.ac.tie_line_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "error"
+    time_s = 3.482100009918213
+
+    [std.ac.tie_line_hybrid.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 1.2276898641501057
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 47.84240698814392
+
+    [std.ac.tie_line_hybrid.winner]
+    adaptive = false
+    gap_pct = -0.07150506183605622
+    iters = 844
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    strategy = "fixed_1e4"
+
+[std.ac.tie_line_power]
+hit_target = true
+
+    [std.ac.tie_line_power.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "error"
+    time_s = 2.9778170585632324
+
+    [std.ac.tie_line_power.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 0.7776174531674606
+    iters = 76
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 3.502995014190674
+
+    [std.ac.tie_line_power.winner]
+    adaptive = true
+    gap_pct = 0.7776174531674606
+    iters = 76
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    strategy = "gentle_hi_rho"
+
+[std.ac.tie_line_state]
+hit_target = true
+
+    [std.ac.tie_line_state.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = -0.6477913194746333
+    iters = 919
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 45.906952142715454
+
+    [std.ac.tie_line_state.winner]
+    adaptive = true
+    gap_pct = -0.6477913194746333
+    iters = 919
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    strategy = "gentle_adaptive"
+
+[std.dc.dummy_bus_hybrid]
+hit_target = true
+
+    [std.dc.dummy_bus_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = -0.17403172922283597
+    iters = 28
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 0.12435317039489746
+
+    [std.dc.dummy_bus_hybrid.winner]
+    adaptive = true
+    gap_pct = -0.17403172922283597
+    iters = 28
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    strategy = "gentle_adaptive"
+
+[std.dc.dummy_bus_power]
+hit_target = false
+
+    [std.dc.dummy_bus_power.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "error"
+    time_s = 0.17682099342346191
+
+    [std.dc.dummy_bus_power.strategies.fixed_1e2_mu1]
+    adaptive = false
+    gap_pct = -50.02622826006033
+    iters = 1000
+    mu = 10.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 5.289416074752808
+
+    [std.dc.dummy_bus_power.strategies.fixed_1e3]
+    adaptive = false
+    gap_pct = -2.010253869296793
+    iters = 39
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    status = "converged"
+    time_s = 0.1767740249633789
+
+    [std.dc.dummy_bus_power.strategies.fixed_1e4]
+    adaptive = false
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    status = "error"
+    time_s = 0.04438591003417969
+
+    [std.dc.dummy_bus_power.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -2.010095963105957
+    iters = 1000
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 9.532538890838623
+
+    [std.dc.dummy_bus_power.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = -2.010146920038518
+    iters = 19
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 4.468812942504883
+
+    [std.dc.dummy_bus_power.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "error"
+    time_s = 0.04845690727233887
+
+[std.dc.split_bus_hybrid]
+hit_target = true
+
+    [std.dc.split_bus_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = -0.17425319804886186
+    iters = 17
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 4.0550007820129395
+
+    [std.dc.split_bus_hybrid.winner]
+    adaptive = true
+    gap_pct = -0.17425319804886186
+    iters = 17
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    strategy = "gentle_adaptive"
+
+[std.dc.tie_line_hybrid]
+hit_target = true
+
+    [std.dc.tie_line_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = -0.17417037096165652
+    iters = 23
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 1.298417091369629
+
+    [std.dc.tie_line_hybrid.winner]
+    adaptive = true
+    gap_pct = -0.17417037096165652
+    iters = 23
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    strategy = "gentle_adaptive"
+
+[std.dc.tie_line_power]
+hit_target = false
+
+    [std.dc.tie_line_power.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "error"
+    time_s = 0.01804804801940918
+
+    [std.dc.tie_line_power.strategies.fixed_1e2_mu1]
+    adaptive = false
+    gap_pct = -51.498337332147415
+    iters = 1000
+    mu = 10.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 3.9606258869171143
+
+    [std.dc.tie_line_power.strategies.fixed_1e3]
+    adaptive = false
+    gap_pct = -52.0627784666007
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 6.181046009063721
+
+    [std.dc.tie_line_power.strategies.fixed_1e4]
+    adaptive = false
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    status = "error"
+    time_s = 0.353834867477417
+
+    [std.dc.tie_line_power.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -1.3761067330990349
+    iters = 223
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "converged"
+    time_s = 4.171035051345825
+
+    [std.dc.tie_line_power.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "error"
+    time_s = 0.8317000865936279
+
+    [std.dc.tie_line_power.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = nan
+    iters = 0
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "error"
+    time_s = 0.08191490173339844
+
+[std.dc.tie_line_state]
+hit_target = true
+
+    [std.dc.tie_line_state.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = -0.17425937027506172
+    iters = 74
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 14.299523115158081
+
+    [std.dc.tie_line_state.winner]
+    adaptive = true
+    gap_pct = -0.17425937027506172
+    iters = 74
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    strategy = "gentle_adaptive"
+
+[std.socwr.split_bus_hybrid]
+hit_target = true
+
+    [std.socwr.split_bus_hybrid.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = 1.9768873188505092
+    iters = 784
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "converged"
+    time_s = 15.9511239528656
+
+    [std.socwr.split_bus_hybrid.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -0.028141080692387795
+    iters = 679
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "converged"
+    time_s = 14.475875854492188
+
+    [std.socwr.split_bus_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 1.8951223451744195
+    iters = 809
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 16.669278860092163
+
+    [std.socwr.split_bus_hybrid.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 1.6194407608168193
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 20.54282808303833
+
+    [std.socwr.split_bus_hybrid.winner]
+    adaptive = false
+    gap_pct = -0.028141080692387795
+    iters = 679
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    strategy = "fixed_mid"
+
+[std.socwr.tie_line_hybrid]
+hit_target = true
+
+    [std.socwr.tie_line_hybrid.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = 21.215247061036738
+    iters = 1000
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "did_not_converge"
+    time_s = 21.87418508529663
+
+    [std.socwr.tie_line_hybrid.strategies.fixed_1e3]
+    adaptive = false
+    gap_pct = -6.159628293470109
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 22.061529874801636
+
+    [std.socwr.tie_line_hybrid.strategies.fixed_1e4]
+    adaptive = false
+    gap_pct = -0.014647197439515116
+    iters = 649
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    status = "converged"
+    time_s = 14.32340693473816
+
+    [std.socwr.tie_line_hybrid.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = 0.10787480288218726
+    iters = 1000
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 22.128495931625366
+
+    [std.socwr.tie_line_hybrid.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 34.44371175325262
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 22.91025400161743
+
+    [std.socwr.tie_line_hybrid.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 21.202398126793245
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 21.647116899490356
+
+    [std.socwr.tie_line_hybrid.winner]
+    adaptive = false
+    gap_pct = -0.014647197439515116
+    iters = 649
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    strategy = "fixed_1e4"
+
+[std.socwr.tie_line_power]
+hit_target = true
+
+    [std.socwr.tie_line_power.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = 34.97668083581534
+    iters = 1000
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "did_not_converge"
+    time_s = 22.17567014694214
+
+    [std.socwr.tie_line_power.strategies.fixed_1e3]
+    adaptive = false
+    gap_pct = 8.934878379440152
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 22.988549947738647
+
+    [std.socwr.tie_line_power.strategies.fixed_1e4]
+    adaptive = false
+    gap_pct = -0.00018732353905652789
+    iters = 387
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    status = "converged"
+    time_s = 8.72961688041687
+
+    [std.socwr.tie_line_power.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -0.210401168921901
+    iters = 1000
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 22.3281409740448
+
+    [std.socwr.tie_line_power.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 34.90698929011088
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 23.103075981140137
+
+    [std.socwr.tie_line_power.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 34.97659250570397
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 21.882091999053955
+
+    [std.socwr.tie_line_power.winner]
+    adaptive = false
+    gap_pct = -0.00018732353905652789
+    iters = 387
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    strategy = "fixed_1e4"
+
+[std.socwr.tie_line_state]
+hit_target = false
+
+    [std.socwr.tie_line_state.strategies.aggressive_adap]
+    adaptive = true
+    gap_pct = 2.6812844542051213
+    iters = 1000
+    mu = 10000.0
+    mu_growth = 2.0
+    rho = 1000.0
+    rho_growth = 1.3
+    status = "did_not_converge"
+    time_s = 22.29310393333435
+
+    [std.socwr.tie_line_state.strategies.fixed_1e2_mu1]
+    adaptive = false
+    gap_pct = -99.99996533026776
+    iters = 1000
+    mu = 10.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 22.67623496055603
+
+    [std.socwr.tie_line_state.strategies.fixed_1e3]
+    adaptive = false
+    gap_pct = -25.065930798262652
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 1000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 22.6564199924469
+
+    [std.socwr.tie_line_state.strategies.fixed_1e4]
+    adaptive = false
+    gap_pct = -25.063966093629706
+    iters = 1000
+    mu = 1000.0
+    mu_growth = nan
+    rho = 10000.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 22.15976309776306
+
+    [std.socwr.tie_line_state.strategies.fixed_mid]
+    adaptive = false
+    gap_pct = -83.12726518864422
+    iters = 1000
+    mu = 100.0
+    mu_growth = nan
+    rho = 100.0
+    rho_growth = nan
+    status = "did_not_converge"
+    time_s = 23.256332874298096
+
+    [std.socwr.tie_line_state.strategies.gentle_adaptive]
+    adaptive = true
+    gap_pct = 2.270110134643181
+    iters = 1000
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 1000.0
+    rho_growth = 1.05
+    status = "did_not_converge"
+    time_s = 25.968971014022827
+
+    [std.socwr.tie_line_state.strategies.gentle_hi_rho]
+    adaptive = true
+    gap_pct = 3.6701914560909823
+    iters = 358
+    mu = 1000.0
+    mu_growth = 1.1
+    rho = 10000.0
+    rho_growth = 1.05
+    status = "converged"
+    time_s = 7.643609046936035

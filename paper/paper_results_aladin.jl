@@ -143,8 +143,40 @@ const ALADIN_OVERRIDES = Dict{Tuple{String, String, Symbol, Symbol, Symbol}, Dic
     ("case14_ieee", "sad", :socwr, :tie_line, :power) => Dict(:rho => 100, :mu => 10, :adaptive => false),  # fixed_1e2_mu1 gap=-0.013%, iters=357
     ("case14_ieee", "sad", :socwr, :tie_line, :hybrid) => Dict(:rho => 100, :mu => 10, :adaptive => false),  # fixed_1e2_mu1 gap=-0.002%, iters=479
     ("case14_ieee", "sad", :socwr, :split_bus, :hybrid) => Dict(:rho => 100, :mu => 100, :adaptive => false),  # fixed_mid gap=+0.007%, iters=381
+    # --- case30_ieee (from _tune_case30_ieee_aladin_v2.toml) --------------
+    ("case30_ieee", "std", :dc, :tie_line, :state) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=-0.174%, iters=74
+    ("case30_ieee", "std", :dc, :tie_line, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=-0.174%, iters=23
+    ("case30_ieee", "std", :dc, :dummy_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=-0.174%, iters=28
+    ("case30_ieee", "std", :dc, :split_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=-0.174%, iters=17
+    ("case30_ieee", "std", :ac, :tie_line, :state) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=-0.648%, iters=919
+    ("case30_ieee", "std", :ac, :tie_line, :power) => Dict(:rho => 1e+04, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_hi_rho gap=+0.778%, iters=76
+    ("case30_ieee", "std", :ac, :tie_line, :hybrid) => Dict(:rho => 1e+04, :mu => 1e+03, :adaptive => false),  # fixed_1e4 gap=-0.072%, iters=844
+    ("case30_ieee", "std", :ac, :dummy_bus, :power) => Dict(:rho => 1e+04, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_hi_rho gap=+0.329%, iters=78
+    ("case30_ieee", "std", :ac, :split_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=+0.009%, iters=63
+    ("case30_ieee", "std", :socwr, :tie_line, :power) => Dict(:rho => 1e+04, :mu => 1e+03, :adaptive => false),  # fixed_1e4 gap=-0.000%, iters=387
+    ("case30_ieee", "std", :socwr, :tie_line, :hybrid) => Dict(:rho => 1e+04, :mu => 1e+03, :adaptive => false),  # fixed_1e4 gap=-0.015%, iters=649
+    ("case30_ieee", "std", :socwr, :split_bus, :hybrid) => Dict(:rho => 100, :mu => 100, :adaptive => false),  # fixed_mid gap=-0.028%, iters=679
+    ("case30_ieee", "api", :dc, :tie_line, :state) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=+0.087%, iters=75
+    ("case30_ieee", "api", :dc, :tie_line, :power) => Dict(:rho => 100, :mu => 100, :adaptive => false),  # fixed_mid gap=-0.044%, iters=109
+    ("case30_ieee", "api", :dc, :tie_line, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=+0.087%, iters=32
+    ("case30_ieee", "api", :dc, :dummy_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=+0.087%, iters=43
+    ("case30_ieee", "api", :dc, :split_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=+0.087%, iters=20
+    ("case30_ieee", "api", :ac, :tie_line, :state) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=-0.634%, iters=191
+    ("case30_ieee", "api", :ac, :split_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=+0.080%, iters=92
+    ("case30_ieee", "api", :socwr, :tie_line, :state) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => false),  # fixed_1e3 gap=-0.362%, iters=773
+    ("case30_ieee", "api", :socwr, :tie_line, :power) => Dict(:rho => 100, :mu => 100, :adaptive => false),  # fixed_mid gap=-0.175%, iters=355
+    ("case30_ieee", "api", :socwr, :tie_line, :hybrid) => Dict(:rho => 100, :mu => 100, :adaptive => false),  # fixed_mid gap=-0.020%, iters=472
+    ("case30_ieee", "api", :socwr, :split_bus, :hybrid) => Dict(:rho => 100, :mu => 100, :adaptive => false),  # fixed_mid gap=-0.005%, iters=662
+    ("case30_ieee", "sad", :ac, :tie_line, :power) => Dict(:rho => 1e+04, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_hi_rho gap=+0.720%, iters=76
+    ("case30_ieee", "sad", :ac, :tie_line, :hybrid) => Dict(:rho => 1e+04, :mu => 1e+03, :adaptive => false),  # fixed_1e4 gap=-0.035%, iters=882
+    ("case30_ieee", "sad", :ac, :dummy_bus, :power) => Dict(:rho => 1e+04, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_hi_rho gap=+0.314%, iters=78
+    ("case30_ieee", "sad", :ac, :split_bus, :hybrid) => Dict(:rho => 1e+03, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_adaptive gap=+0.027%, iters=67
+    ("case30_ieee", "sad", :socwr, :tie_line, :state) => Dict(:rho => 1e+04, :mu => 1e+03, :adaptive => true, :rho_growth => 1.05, :mu_growth => 1.1),  # gentle_hi_rho gap=+0.352%, iters=538
+    ("case30_ieee", "sad", :socwr, :tie_line, :power) => Dict(:rho => 1e+04, :mu => 1e+03, :adaptive => false),  # fixed_1e4 gap=-0.022%, iters=384
+    ("case30_ieee", "sad", :socwr, :tie_line, :hybrid) => Dict(:rho => 1e+04, :mu => 1e+03, :adaptive => false),  # fixed_1e4 gap=+0.099%, iters=846
+    ("case30_ieee", "sad", :socwr, :split_bus, :hybrid) => Dict(:rho => 100, :mu => 100, :adaptive => false),  # fixed_mid gap=-0.009%, iters=423
 )
-function _aladin_kwargs(case::String, variant::String,
+unction _aladin_kwargs(case::String, variant::String,
                         base::Symbol, sectioning::Symbol, coupling::Symbol)
     kw = Dict{Symbol, Any}(pairs(ALADIN_DEFAULTS))
     ov = get(ALADIN_OVERRIDES, (case, variant, base, sectioning, coupling), nothing)
