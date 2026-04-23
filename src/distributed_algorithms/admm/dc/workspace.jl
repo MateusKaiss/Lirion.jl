@@ -50,9 +50,11 @@ end
 # Hybrid
 # ------------------------------------------------------------
 
-Base.@kwdef mutable struct DCHybridWorkspace <: AbstractADMMWorkspace
+Base.@kwdef mutable struct DCHybridWorkspace{S<:Sectioning} <: AbstractADMMWorkspace
     partitions::Partitions{PartitionDC}
     id::Vector{Int}
+
+    sectioning::S
 
     interzonal::Vector{Int}
     branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[]
@@ -203,6 +205,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
     return DCHybridWorkspace(;
         partitions = partitions,
         id = id,
+        sectioning = sectioning,
         interzonal = inter,
         branch_pairs = pairs,
         pair_counts = fill(2, n_pairs),

@@ -32,7 +32,6 @@ struct SplitBusPairSOCWR
     qinj_col_j::Int
 end
 
-
 # ============================================================
 # Workspace structs
 # ============================================================
@@ -176,15 +175,13 @@ Base.@kwdef mutable struct SOCWRHybridWorkspaceALADIN <: AbstractALADINWorkspace
     hist::ALADINHistory = ALADINHistory()
 end
 
-
 # ============================================================
 # Rho accessors
 # ============================================================
 
-_get_rhos(ws::SOCWRStateWorkspaceALADIN)  = (rho = ws.rho[],)
-_get_rhos(ws::SOCWRPowerWorkspaceALADIN)  = (rho = ws.rho[],)
+_get_rhos(ws::SOCWRStateWorkspaceALADIN) = (rho = ws.rho[],)
+_get_rhos(ws::SOCWRPowerWorkspaceALADIN) = (rho = ws.rho[],)
 _get_rhos(ws::SOCWRHybridWorkspaceALADIN) = (rho = ws.rho[],)
-
 
 # ============================================================
 # Helpers
@@ -301,7 +298,6 @@ function _prepare_pq_inj_vars_socwr!(partitions, sys_bus_pairs, ::SplitBus)
     return p_inj_vars, q_inj_vars
 end
 
-
 # ============================================================
 # Builders
 # ============================================================
@@ -338,8 +334,8 @@ function build_workspace(
         edge_pairs = edge_pairs,
         vars = (
             v2 = LambdaState(n_bus),
-            r  = LambdaState(n_edge),
-            t  = LambdaState(n_edge),
+            r = LambdaState(n_edge),
+            t = LambdaState(n_edge),
         ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
         rho = Ref(cfg.rho),
@@ -434,13 +430,13 @@ function build_workspace(
         p_inj_vars = p_inj_vars,
         q_inj_vars = q_inj_vars,
         vars = (
-            v2     = LambdaState(n_bus),
+            v2 = LambdaState(n_bus),
             p_flow = LambdaState(n_edge),
             q_flow = LambdaState(n_edge),
-            r      = LambdaState(n_edge),
-            t      = LambdaState(n_edge),
-            p_inj  = LambdaState(n_split),
-            q_inj  = LambdaState(n_split),
+            r = LambdaState(n_edge),
+            t = LambdaState(n_edge),
+            p_inj = LambdaState(n_split),
+            q_inj = LambdaState(n_split),
         ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
         rho = Ref(cfg.rho),

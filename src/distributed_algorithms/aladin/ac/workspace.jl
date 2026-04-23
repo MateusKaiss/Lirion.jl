@@ -59,7 +59,6 @@ struct DummyBranchPairAC
     tap_angle_j::Float64
 end
 
-
 # ============================================================
 # Workspace structs
 # ============================================================
@@ -195,15 +194,13 @@ Base.@kwdef mutable struct ACHybridWorkspaceALADIN <: AbstractALADINWorkspace
     hist::ALADINHistory = ALADINHistory()
 end
 
-
 # ============================================================
 # Rho accessors
 # ============================================================
 
-_get_rhos(ws::ACStateWorkspaceALADIN)  = (rho = ws.rho[],)
-_get_rhos(ws::ACPowerWorkspaceALADIN)  = (rho = ws.rho[],)
+_get_rhos(ws::ACStateWorkspaceALADIN) = (rho = ws.rho[],)
+_get_rhos(ws::ACPowerWorkspaceALADIN) = (rho = ws.rho[],)
 _get_rhos(ws::ACHybridWorkspaceALADIN) = (rho = ws.rho[],)
-
 
 # ============================================================
 # Helpers
@@ -383,7 +380,6 @@ function _prepare_pq_inj_vars_ac!(partitions, sys, sys_bus_pairs, ::SplitBus)
     return p_inj_vars, q_inj_vars
 end
 
-
 # ============================================================
 # Builders
 # ============================================================
@@ -458,8 +454,8 @@ function build_workspace(
         edge_pairs = edge_pairs,
         dummy_branch_pairs = dummy_pairs,
         vars = (
-            p_flow  = LambdaState(n_edge),
-            q_flow  = LambdaState(n_edge),
+            p_flow = LambdaState(n_edge),
+            q_flow = LambdaState(n_edge),
             p_dummy = LambdaState(n_dummy),
             q_dummy = LambdaState(n_dummy),
         ),
@@ -517,12 +513,12 @@ function build_workspace(
         q_inj_vars = q_inj_vars,
         dummy_branch_pairs = dummy_pairs,
         vars = (
-            theta   = LambdaState(n_bus),
-            v_mag   = LambdaState(n_bus),
-            p_flow  = LambdaState(n_edge),
-            q_flow  = LambdaState(n_edge),
-            p_inj   = LambdaState(n_split),
-            q_inj   = LambdaState(n_split),
+            theta = LambdaState(n_bus),
+            v_mag = LambdaState(n_bus),
+            p_flow = LambdaState(n_edge),
+            q_flow = LambdaState(n_edge),
+            p_inj = LambdaState(n_split),
+            q_inj = LambdaState(n_split),
             p_dummy = LambdaState(n_dummy),
             q_dummy = LambdaState(n_dummy),
         ),

@@ -41,7 +41,6 @@ struct DummyBranchPairDC
     b_j::Float64
 end
 
-
 # ============================================================
 # Workspace structs
 # ============================================================
@@ -172,7 +171,6 @@ Base.@kwdef mutable struct DCHybridWorkspaceALADIN <: AbstractALADINWorkspace
     hist::ALADINHistory = ALADINHistory()
 end
 
-
 # ============================================================
 # Rho accessors
 # ============================================================
@@ -180,11 +178,10 @@ end
 _get_rhos(ws::DCStateWorkspaceALADIN) = (rho = ws.rho[],)
 _get_rhos(ws::DCPowerWorkspaceALADIN) = (rho = ws.rho[],)
 _get_rhos(ws::DCHybridWorkspaceALADIN) = (
-    rho_bus  = ws.rho_bus[],
+    rho_bus = ws.rho_bus[],
     rho_edge = ws.rho_edge[],
-    rho_inj  = ws.rho_inj[],
+    rho_inj = ws.rho_inj[],
 )
-
 
 # ============================================================
 # Helpers
@@ -332,7 +329,6 @@ function _prepare_p_inj_vars_dc!(partitions, sys_bus_pairs, ::SplitBus)
     return p_inj_vars
 end
 
-
 # ============================================================
 # Builders
 # ============================================================
@@ -406,7 +402,7 @@ function build_workspace(
         edge_pairs = edge_pairs,
         dummy_branch_pairs = dummy_pairs,
         vars = (
-            p_flow  = LambdaState(n_pairs),
+            p_flow = LambdaState(n_pairs),
             p_dummy = LambdaState(n_dummy),
         ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
@@ -462,15 +458,15 @@ function build_workspace(
         p_inj_vars = p_inj_vars,
         dummy_branch_pairs = dummy_pairs,
         vars = (
-            theta   = LambdaState(n_bus),
-            p_flow  = LambdaState(n_edge),
-            p_inj   = LambdaState(n_split),
+            theta = LambdaState(n_bus),
+            p_flow = LambdaState(n_edge),
+            p_inj = LambdaState(n_split),
             p_dummy = LambdaState(n_dummy),
         ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
-        rho_bus  = Ref(cfg.rho),
+        rho_bus = Ref(cfg.rho),
         rho_edge = Ref(cfg.rho),
-        rho_inj  = Ref(cfg.rho),
+        rho_inj = Ref(cfg.rho),
         mu = Ref(cfg.mu),
         alpha1 = cfg.alpha1,
         alpha2 = cfg.alpha2,

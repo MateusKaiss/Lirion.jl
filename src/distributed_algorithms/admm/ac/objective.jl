@@ -1,9 +1,9 @@
 # ============================================================
-# AC OBJECTIVE
+# Quadratic terms
 # ============================================================
 
 # ------------------------------------------------------------
-# QUADRATIC TERMS
+# State
 # ------------------------------------------------------------
 
 function build_quad_bus_expr!(
@@ -24,6 +24,10 @@ function build_quad_bus_expr!(
     return quad
 end
 
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
 function build_quad_branch_expr!(
     part::PartitionAC,
     rho_p::Float64,
@@ -33,7 +37,6 @@ function build_quad_branch_expr!(
 )
     quad = zero(JuMP.QuadExpr)
 
-    # Interzonal P/Q (TieLine)
     @inbounds for e in zone_edges
         l = part.branch_idx_full_to_zone[e]
         l == 0 && continue
@@ -42,7 +45,6 @@ function build_quad_branch_expr!(
         quad += 0.5 * rho_p * p^2 + 0.5 * rho_q * q^2
     end
 
-    # Branch pairs P/Q (DummyBus Method 2)
     pos = part.position
     @inbounds for (ga, za, gb, zb) in branch_pairs
         if za == pos
@@ -66,7 +68,45 @@ function build_quad_branch_expr!(
 end
 
 # ------------------------------------------------------------
-# LINEAR TERMS
+# Hybrid
+# ------------------------------------------------------------
+
+function build_quad_p_inj_expr_ac!(
+    part::PartitionAC,
+    rho::Float64,
+    p_inj_store::Union{Nothing, Dict{Int, JuMP.VariableRef}},
+)
+    quad = zero(JuMP.QuadExpr)
+    if p_inj_store !== nothing
+        for (_, v) in p_inj_store
+            quad += 0.5 * rho * v^2
+        end
+    end
+    part.quad_p_inj_expr = quad
+    return quad
+end
+
+function build_quad_q_inj_expr_ac!(
+    part::PartitionAC,
+    rho::Float64,
+    q_inj_store::Union{Nothing, Dict{Int, JuMP.VariableRef}},
+)
+    quad = zero(JuMP.QuadExpr)
+    if q_inj_store !== nothing
+        for (_, v) in q_inj_store
+            quad += 0.5 * rho * v^2
+        end
+    end
+    part.quad_q_inj_expr = quad
+    return quad
+end
+
+# ============================================================
+# Linear terms
+# ============================================================
+
+# ------------------------------------------------------------
+# State
 # ------------------------------------------------------------
 
 function build_linear_bus_term(
@@ -92,6 +132,10 @@ function build_linear_bus_term(
     return lin
 end
 
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
 function build_linear_branch_term(
     part::PartitionAC,
     zone_edges::Vector{Int},
@@ -107,7 +151,6 @@ function build_linear_branch_term(
     lin = zero(JuMP.AffExpr)
     n_inter = length(interzonal)
 
-    # Interzonal: consensus/duals indices 1..n_inter
     @inbounds for (k, e) in enumerate(interzonal)
         l = part.branch_idx_full_to_zone[e]
         l == 0 && continue
@@ -122,7 +165,6 @@ function build_linear_branch_term(
         lin += (p_dual - rho_p * p_cons) * p + (q_dual - rho_q * q_cons) * q
     end
 
-    # Branch pairs: indices n_inter+1..n_inter+n_pairs
     pos = part.position
     @inbounds for (k, (ga, za, gb, zb)) in enumerate(branch_pairs)
         idx = n_inter + k
@@ -152,105 +194,9 @@ function build_linear_branch_term(
 end
 
 # ------------------------------------------------------------
-# UPDATE OBJECTIVE
+# Hybrid
 # ------------------------------------------------------------
 
-function update_objective!(part::PartitionAC, ws::ACStateWorkspace)
-    lin = build_linear_bus_term(
-        part,
-        ws.vars.theta.consensus,
-        ws.vars.v_mag.consensus,
-        view(ws.vars.theta.duals, :, part.position),
-        view(ws.vars.v_mag.duals, :, part.position),
-        ws.vars.theta.rho[],
-        ws.vars.v_mag.rho[],
-    )
-
-    @objective(part.model, Min, part.obj_base + part.quad_bus_expr + lin)
-end
-
-function update_objective!(part::PartitionAC, ws::ACPowerWorkspace)
-    lin = build_linear_branch_term(
-        part,
-        part.zone_edges,
-        ws.vars.p_flow.consensus,
-        ws.vars.q_flow.consensus,
-        view(ws.vars.p_flow.duals, :, part.position),
-        view(ws.vars.q_flow.duals, :, part.position),
-        ws.interzonal,
-        ws.vars.p_flow.rho[],
-        ws.vars.q_flow.rho[],
-        ws.branch_pairs,
-    )
-
-    @objective(part.model, Min, part.obj_base + part.quad_branch_expr + lin)
-end
-
-function update_objective!(part::PartitionAC, ws::ACHybridWorkspace)
-    lin_bus = build_linear_bus_term(
-        part,
-        ws.vars.theta.consensus,
-        ws.vars.v_mag.consensus,
-        view(ws.vars.theta.duals, :, part.position),
-        view(ws.vars.v_mag.duals, :, part.position),
-        ws.vars.theta.rho[],
-        ws.vars.v_mag.rho[],
-    )
-
-    lin_branch = build_linear_branch_term(
-        part,
-        part.zone_edges,
-        ws.vars.p_flow.consensus,
-        ws.vars.q_flow.consensus,
-        view(ws.vars.p_flow.duals, :, part.position),
-        view(ws.vars.q_flow.duals, :, part.position),
-        ws.interzonal,
-        ws.vars.p_flow.rho[],
-        ws.vars.q_flow.rho[],
-        ws.branch_pairs,
-    )
-
-    # Fast path: pure TieLine (no split buses anywhere). Skip p_inj/q_inj
-    # machinery entirely so TieLine AC hybrid pays no extra per-iter cost.
-    if isempty(ws.bus_pairs)
-        @objective(
-            part.model, Min,
-            part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
-            lin_bus + lin_branch,
-        )
-        return nothing
-    end
-
-    lin_p_inj = build_linear_inj_term_ac(
-        part,
-        ws.bus_pairs,
-        ws.p_inj_vars,
-        ws.vars.p_inj.consensus,
-        view(ws.vars.p_inj.duals, :, part.position),
-        ws.vars.p_inj.rho[],
-    )
-    lin_q_inj = build_linear_inj_term_ac(
-        part,
-        ws.bus_pairs,
-        ws.q_inj_vars,
-        ws.vars.q_inj.consensus,
-        view(ws.vars.q_inj.duals, :, part.position),
-        ws.vars.q_inj.rho[],
-    )
-
-    @objective(
-        part.model, Min,
-        part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
-        part.quad_p_inj_expr + part.quad_q_inj_expr +
-        lin_bus + lin_branch + lin_p_inj + lin_q_inj,
-    )
-    return nothing
-end
-
-# ------------------------------------------------------------
-# Signed linear term for a generic virtual injection (p_inj or q_inj).
-# Zone A: (λ_A - ρz) * v;  Zone B: (λ_B + ρz) * v   (target -z).
-# ------------------------------------------------------------
 function build_linear_inj_term_ac(
     part::PartitionAC,
     bus_pairs::Vector{NTuple{3, Int}},
@@ -278,4 +224,139 @@ function build_linear_inj_term_ac(
         end
     end
     return lin
+end
+
+# ============================================================
+# Update objective
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
+
+function update_objective!(part::PartitionAC, ws::ACStateWorkspace)
+    lin = build_linear_bus_term(
+        part,
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        view(ws.vars.theta.duals, :, part.position),
+        view(ws.vars.v_mag.duals, :, part.position),
+        ws.vars.theta.rho[],
+        ws.vars.v_mag.rho[],
+    )
+
+    @objective(part.model, Min, part.obj_base + part.quad_bus_expr + lin)
+end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
+function update_objective!(part::PartitionAC, ws::ACPowerWorkspace)
+    lin = build_linear_branch_term(
+        part,
+        part.zone_edges,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        view(ws.vars.p_flow.duals, :, part.position),
+        view(ws.vars.q_flow.duals, :, part.position),
+        ws.interzonal,
+        ws.vars.p_flow.rho[],
+        ws.vars.q_flow.rho[],
+        ws.branch_pairs,
+    )
+
+    @objective(part.model, Min, part.obj_base + part.quad_branch_expr + lin)
+end
+
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
+
+function update_objective!(
+    part::PartitionAC,
+    ws::ACHybridWorkspace{<:Union{TieLine, DummyBus}},
+)
+    lin_bus = build_linear_bus_term(
+        part,
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        view(ws.vars.theta.duals, :, part.position),
+        view(ws.vars.v_mag.duals, :, part.position),
+        ws.vars.theta.rho[],
+        ws.vars.v_mag.rho[],
+    )
+
+    lin_branch = build_linear_branch_term(
+        part,
+        part.zone_edges,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        view(ws.vars.p_flow.duals, :, part.position),
+        view(ws.vars.q_flow.duals, :, part.position),
+        ws.interzonal,
+        ws.vars.p_flow.rho[],
+        ws.vars.q_flow.rho[],
+        ws.branch_pairs,
+    )
+
+    @objective(
+        part.model, Min,
+        part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
+        lin_bus + lin_branch,
+    )
+    return nothing
+end
+
+function update_objective!(
+    part::PartitionAC,
+    ws::ACHybridWorkspace{SplitBus},
+)
+    lin_bus = build_linear_bus_term(
+        part,
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        view(ws.vars.theta.duals, :, part.position),
+        view(ws.vars.v_mag.duals, :, part.position),
+        ws.vars.theta.rho[],
+        ws.vars.v_mag.rho[],
+    )
+
+    lin_branch = build_linear_branch_term(
+        part,
+        part.zone_edges,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        view(ws.vars.p_flow.duals, :, part.position),
+        view(ws.vars.q_flow.duals, :, part.position),
+        ws.interzonal,
+        ws.vars.p_flow.rho[],
+        ws.vars.q_flow.rho[],
+        ws.branch_pairs,
+    )
+
+    lin_p_inj = build_linear_inj_term_ac(
+        part,
+        ws.bus_pairs,
+        ws.p_inj_vars,
+        ws.vars.p_inj.consensus,
+        view(ws.vars.p_inj.duals, :, part.position),
+        ws.vars.p_inj.rho[],
+    )
+    lin_q_inj = build_linear_inj_term_ac(
+        part,
+        ws.bus_pairs,
+        ws.q_inj_vars,
+        ws.vars.q_inj.consensus,
+        view(ws.vars.q_inj.duals, :, part.position),
+        ws.vars.q_inj.rho[],
+    )
+
+    @objective(
+        part.model, Min,
+        part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
+        part.quad_p_inj_expr + part.quad_q_inj_expr +
+        lin_bus + lin_branch + lin_p_inj + lin_q_inj,
+    )
+    return nothing
 end

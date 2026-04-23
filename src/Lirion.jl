@@ -161,7 +161,7 @@ include("postprocessing/build_plots.jl")
 # Distributed methods
 # ------------------------------------------------------------------
 include("distributed_algorithms/optimizer.jl")
-include("distributed_algorithms/partitioning.jl")
+include("distributed_algorithms/local_models.jl")
 include("distributed_algorithms/shared/algorithms.jl")
 include("distributed_algorithms/shared/traits.jl")
 include("distributed_algorithms/shared/totals.jl")
@@ -169,7 +169,7 @@ include("distributed_algorithms/shared/logging.jl")
 include("distributed_algorithms/shared/local_solve.jl")
 
 include("distributed_algorithms/admm/core/support.jl")
-include("distributed_algorithms/admm/core/components.jl")
+include("distributed_algorithms/admm/core/var_state.jl")
 include("distributed_algorithms/admm/core/history.jl")
 include("distributed_algorithms/admm/core/snapshots.jl")
 include("distributed_algorithms/admm/core/flow_accessors.jl")

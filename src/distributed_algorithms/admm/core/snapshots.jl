@@ -1,5 +1,5 @@
 # ============================================================
-# Hotpath snapshots
+# Buffer preparation
 # ============================================================
 
 @inline _bus_dims(part) = (length(part.bus.id), length(part.zone_shared_bus_ids))
@@ -27,9 +27,9 @@ function prepare_hotpaths!(part::PartitionSOCWR)
     return nothing
 end
 
-# ------------------------------------------------------------
+# ============================================================
 # JuMP value helpers
-# ------------------------------------------------------------
+# ============================================================
 
 @inline function _val_or_start(
     model::JuMP.Model,
@@ -53,9 +53,9 @@ end
     has_vals::Bool,
 ) = _val_or_start(model, bus_var[b, t], default, has_vals)
 
-# ------------------------------------------------------------
+# ============================================================
 # Snapshot kernels
-# ------------------------------------------------------------
+# ============================================================
 
 @inline function _snapshot_bus_var!(
     buf::Vector{Float64},
@@ -94,9 +94,9 @@ end
     return buf
 end
 
-# ------------------------------------------------------------
-# Snapshot API — full bus
-# ------------------------------------------------------------
+# ============================================================
+# Full-bus snapshots
+# ============================================================
 
 @inline snapshot_theta!(part::PartitionDC) =
     _snapshot_bus_var!(part.theta_buf, part.model, part.theta_var, part.bus.id, 0.0)
@@ -110,9 +110,9 @@ end
 @inline snapshot_v2!(part::PartitionSOCWR) =
     _snapshot_bus_var!(part.v2_buf, part.model, part.v2_var, part.bus.id, 1.0)
 
-# ------------------------------------------------------------
-# Snapshot API — shared bus
-# ------------------------------------------------------------
+# ============================================================
+# Shared-bus snapshots
+# ============================================================
 
 @inline snapshot_theta_shared!(part::PartitionDC) =
     _snapshot_shared_var!(

@@ -1,9 +1,9 @@
 # ============================================================
-# DC OBJECTIVE
+# Quadratic terms
 # ============================================================
 
 # ------------------------------------------------------------
-# QUADRATIC TERMS
+# State
 # ------------------------------------------------------------
 
 function build_quad_bus_expr!(
@@ -20,6 +20,10 @@ function build_quad_bus_expr!(
     part.quad_bus_expr = quad
     return quad
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function build_quad_branch_expr!(
     part::PartitionDC,
@@ -61,7 +65,30 @@ function build_quad_branch_expr!(
 end
 
 # ------------------------------------------------------------
-# LINEAR TERMS
+# Hybrid
+# ------------------------------------------------------------
+
+function build_quad_p_inj_expr!(
+    part::PartitionDC,
+    rho::Float64,
+    p_inj_store::Union{Nothing, Dict{Int, JuMP.VariableRef}},
+)
+    quad = zero(JuMP.QuadExpr)
+    if p_inj_store !== nothing
+        for (_, v) in p_inj_store
+            quad += 0.5 * rho * v^2
+        end
+    end
+    part.quad_p_inj_expr = quad
+    return quad
+end
+
+# ============================================================
+# Linear terms
+# ============================================================
+
+# ------------------------------------------------------------
+# State
 # ------------------------------------------------------------
 
 function build_linear_bus_term(
@@ -80,6 +107,10 @@ function build_linear_bus_term(
     end
     return lin
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function build_linear_branch_term(
     part::PartitionDC,
@@ -126,7 +157,46 @@ function build_linear_branch_term(
 end
 
 # ------------------------------------------------------------
-# UPDATE OBJECTIVE
+# Hybrid
+# ------------------------------------------------------------
+
+function build_linear_p_inj_term(
+    part::PartitionDC,
+    bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+    p_inj_consensus::Vector{Float64},
+    p_inj_duals::AbstractVector{Float64},
+    rho::Float64,
+)::JuMP.AffExpr
+    lin = zero(JuMP.AffExpr)
+    isempty(bus_pairs) && return lin
+
+    pos = part.position
+    store = p_inj_vars[pos]
+    isempty(store) && return lin
+
+    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
+        z = p_inj_consensus[k]
+        lam = p_inj_duals[k]
+        if za == pos
+            v = get(store, bid, nothing)
+            v === nothing && continue
+            lin += (lam - rho * z) * v
+        elseif zb == pos
+            v = get(store, bid, nothing)
+            v === nothing && continue
+            lin += (lam + rho * z) * v
+        end
+    end
+    return lin
+end
+
+# ============================================================
+# Update objective
+# ============================================================
+
+# ------------------------------------------------------------
+# State
 # ------------------------------------------------------------
 
 function update_objective!(part::PartitionDC, ws::DCStateWorkspace)
@@ -139,6 +209,10 @@ function update_objective!(part::PartitionDC, ws::DCStateWorkspace)
 
     @objective(part.model, Min, part.obj_static + lin)
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function update_objective!(part::PartitionDC, ws::DCPowerWorkspace)
     lin = build_linear_branch_term(
@@ -154,7 +228,39 @@ function update_objective!(part::PartitionDC, ws::DCPowerWorkspace)
     @objective(part.model, Min, part.obj_static + lin)
 end
 
-function update_objective!(part::PartitionDC, ws::DCHybridWorkspace)
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
+
+function update_objective!(
+    part::PartitionDC,
+    ws::DCHybridWorkspace{<:Union{TieLine, DummyBus}},
+)
+    lin_bus = build_linear_bus_term(
+        part,
+        ws.vars.theta.consensus,
+        view(ws.vars.theta.duals, :, part.position),
+        ws.vars.theta.rho[],
+    )
+
+    lin_branch = build_linear_branch_term(
+        part,
+        part.zone_edges,
+        ws.vars.p_flow.consensus,
+        view(ws.vars.p_flow.duals, :, part.position),
+        ws.interzonal,
+        ws.vars.p_flow.rho[],
+        ws.branch_pairs,
+    )
+
+    @objective(part.model, Min, part.obj_static + lin_bus + lin_branch)
+    return nothing
+end
+
+function update_objective!(
+    part::PartitionDC,
+    ws::DCHybridWorkspace{SplitBus},
+)
     lin_bus = build_linear_bus_term(
         part,
         ws.vars.theta.consensus,
@@ -185,42 +291,5 @@ function update_objective!(part::PartitionDC, ws::DCHybridWorkspace)
         part.model, Min,
         part.obj_static + lin_bus + lin_branch + lin_p_inj,
     )
-end
-
-# ------------------------------------------------------------
-# Linear term for the sign-flipped p_inj consensus (SplitBus).
-# Zone A (natively owning the split bus) targets p_A = +z:
-#     (λ_A - ρ z) * p_A
-# Zone B (ghost side) targets p_B = -z, so the coupling flips sign:
-#     (λ_B + ρ z) * p_B
-# ------------------------------------------------------------
-function build_linear_p_inj_term(
-    part::PartitionDC,
-    bus_pairs::Vector{NTuple{3, Int}},
-    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
-    p_inj_consensus::Vector{Float64},
-    p_inj_duals::AbstractVector{Float64},
-    rho::Float64,
-)::JuMP.AffExpr
-    lin = zero(JuMP.AffExpr)
-    isempty(bus_pairs) && return lin
-
-    pos = part.position
-    store = p_inj_vars[pos]
-    isempty(store) && return lin
-
-    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
-        z = p_inj_consensus[k]
-        lam = p_inj_duals[k]
-        if za == pos
-            v = get(store, bid, nothing)
-            v === nothing && continue
-            lin += (lam - rho * z) * v
-        elseif zb == pos
-            v = get(store, bid, nothing)
-            v === nothing && continue
-            lin += (lam + rho * z) * v
-        end
-    end
-    return lin
+    return nothing
 end

@@ -1,9 +1,9 @@
 # ============================================================
-# SOCWR OBJECTIVE
+# Quadratic terms
 # ============================================================
 
 # ------------------------------------------------------------
-# QUADRATIC TERMS
+# State
 # ------------------------------------------------------------
 
 function build_quad_bus_expr!(part::PartitionSOCWR, rho_v2::Float64)
@@ -37,6 +37,10 @@ function build_quad_branch_rt_expr!(
     part.quad_rt_expr = quad
     return quad
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function build_quad_branch_pq_expr!(
     part::PartitionSOCWR,
@@ -77,7 +81,45 @@ function build_quad_branch_pq_expr!(
 end
 
 # ------------------------------------------------------------
-# LINEAR TERMS
+# Hybrid
+# ------------------------------------------------------------
+
+function build_quad_p_inj_expr_socwr!(
+    part::PartitionSOCWR,
+    rho::Float64,
+    p_inj_store::Union{Nothing, Dict{Int, JuMP.VariableRef}},
+)
+    quad = zero(JuMP.QuadExpr)
+    if p_inj_store !== nothing
+        for (_, v) in p_inj_store
+            quad += 0.5 * rho * v^2
+        end
+    end
+    part.quad_p_inj_expr = quad
+    return quad
+end
+
+function build_quad_q_inj_expr_socwr!(
+    part::PartitionSOCWR,
+    rho::Float64,
+    q_inj_store::Union{Nothing, Dict{Int, JuMP.VariableRef}},
+)
+    quad = zero(JuMP.QuadExpr)
+    if q_inj_store !== nothing
+        for (_, v) in q_inj_store
+            quad += 0.5 * rho * v^2
+        end
+    end
+    part.quad_q_inj_expr = quad
+    return quad
+end
+
+# ============================================================
+# Linear terms
+# ============================================================
+
+# ------------------------------------------------------------
+# State
 # ------------------------------------------------------------
 
 function build_linear_bus_term(
@@ -128,6 +170,10 @@ function build_linear_branch_rt_term(
     return lin
 end
 
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
 function build_linear_branch_pq_term(
     part::PartitionSOCWR,
     zone_edges::Vector{Int},
@@ -144,7 +190,6 @@ function build_linear_branch_pq_term(
     lin = zero(JuMP.AffExpr)
     n_inter = length(interzonal)
 
-    # Interzonal (TieLine): indices 1..n_inter in consensus/duals.
     @inbounds for (k, e) in enumerate(interzonal)
         l = part.branch_idx_full_to_zone[e]
         l == 0 && continue
@@ -158,7 +203,6 @@ function build_linear_branch_pq_term(
         lin += (p_dual - rho_p * p_cons) * p + (q_dual - rho_q * q_cons) * q
     end
 
-    # Branch pairs (DummyBus): indices n_inter+1..n_inter+n_pairs.
     pos = part.position
     @inbounds for (k, (ga, za, gb, zb)) in enumerate(branch_pairs)
         idx = n_inter + k
@@ -188,7 +232,44 @@ function build_linear_branch_pq_term(
 end
 
 # ------------------------------------------------------------
-# UPDATE OBJECTIVE
+# Hybrid
+# ------------------------------------------------------------
+
+function build_linear_inj_term_socwr(
+    part::PartitionSOCWR,
+    bus_pairs::Vector{NTuple{3, Int}},
+    inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+    consensus::Vector{Float64},
+    duals::AbstractVector{Float64},
+    rho::Float64,
+)::JuMP.AffExpr
+    lin = zero(JuMP.AffExpr)
+    isempty(bus_pairs) && return lin
+    pos = part.position
+    store = inj_vars[pos]
+    isempty(store) && return lin
+    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
+        z = consensus[k]
+        lam = duals[k]
+        if za == pos
+            v = get(store, bid, nothing)
+            v === nothing && continue
+            lin += (lam - rho * z) * v
+        elseif zb == pos
+            v = get(store, bid, nothing)
+            v === nothing && continue
+            lin += (lam + rho * z) * v
+        end
+    end
+    return lin
+end
+
+# ============================================================
+# Update objective
+# ============================================================
+
+# ------------------------------------------------------------
+# State
 # ------------------------------------------------------------
 
 function update_objective!(part::PartitionSOCWR, ws::SOCWRStateWorkspace)
@@ -216,6 +297,10 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRStateWorkspace)
     @objective(part.model, Min, part.obj_static + lin_bus + lin_rt)
 end
 
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
 function update_objective!(part::PartitionSOCWR, ws::SOCWRPowerWorkspace)
     p = part.position
 
@@ -235,7 +320,14 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRPowerWorkspace)
     @objective(part.model, Min, part.obj_static + lin)
 end
 
-function update_objective!(part::PartitionSOCWR, ws::SOCWRHybridWorkspace)
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
+
+function update_objective!(
+    part::PartitionSOCWR,
+    ws::SOCWRHybridWorkspace{<:Union{TieLine, DummyBus}},
+)
     p = part.position
 
     lin_bus = build_linear_bus_term(
@@ -270,11 +362,47 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRHybridWorkspace)
         ws.vars.t.rho[],
     )
 
-    # Fast path: TieLine has no split buses, skip p_inj/q_inj machinery.
-    if isempty(ws.bus_pairs)
-        @objective(part.model, Min, part.obj_static + lin_bus + lin_pq + lin_rt)
-        return nothing
-    end
+    @objective(part.model, Min, part.obj_static + lin_bus + lin_pq + lin_rt)
+    return nothing
+end
+
+function update_objective!(
+    part::PartitionSOCWR,
+    ws::SOCWRHybridWorkspace{SplitBus},
+)
+    p = part.position
+
+    lin_bus = build_linear_bus_term(
+        part,
+        ws.vars.v2.consensus,
+        view(ws.vars.v2.duals, :, p),
+        ws.vars.v2.rho[],
+    )
+
+    lin_pq = build_linear_branch_pq_term(
+        part,
+        part.zone_edges,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        view(ws.vars.p_flow.duals, :, p),
+        view(ws.vars.q_flow.duals, :, p),
+        ws.interzonal,
+        ws.vars.p_flow.rho[],
+        ws.vars.q_flow.rho[],
+        ws.branch_pairs,
+    )
+
+    lin_rt = build_linear_branch_rt_term(
+        part,
+        part.zone_edges,
+        ws.vars.r.consensus,
+        ws.vars.t.consensus,
+        view(ws.vars.r.duals, :, p),
+        view(ws.vars.t.duals, :, p),
+        ws.interzonal,
+        ws.vars.r.rho[],
+        ws.vars.t.rho[],
+    )
 
     lin_p_inj = build_linear_inj_term_socwr(
         part,
@@ -298,38 +426,4 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRHybridWorkspace)
         part.obj_static + lin_bus + lin_pq + lin_rt + lin_p_inj + lin_q_inj,
     )
     return nothing
-end
-
-# ------------------------------------------------------------
-# Signed linear term for virtual injection at split buses
-# (p_inj or q_inj). Zone A targets +z: (λ - ρz)·v.
-# Zone B targets -z:                   (λ + ρz)·v.
-# ------------------------------------------------------------
-function build_linear_inj_term_socwr(
-    part::PartitionSOCWR,
-    bus_pairs::Vector{NTuple{3, Int}},
-    inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
-    consensus::Vector{Float64},
-    duals::AbstractVector{Float64},
-    rho::Float64,
-)::JuMP.AffExpr
-    lin = zero(JuMP.AffExpr)
-    isempty(bus_pairs) && return lin
-    pos = part.position
-    store = inj_vars[pos]
-    isempty(store) && return lin
-    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
-        z = consensus[k]
-        lam = duals[k]
-        if za == pos
-            v = get(store, bid, nothing)
-            v === nothing && continue
-            lin += (lam - rho * z) * v
-        elseif zb == pos
-            v = get(store, bid, nothing)
-            v === nothing && continue
-            lin += (lam + rho * z) * v
-        end
-    end
-    return lin
 end

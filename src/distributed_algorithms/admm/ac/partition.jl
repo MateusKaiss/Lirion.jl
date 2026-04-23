@@ -179,36 +179,6 @@ function _attach_pq_inj_variables_ac!(
     return nothing
 end
 
-function build_quad_p_inj_expr_ac!(
-    part::PartitionAC,
-    rho::Float64,
-    p_inj_store::Union{Nothing, Dict{Int, JuMP.VariableRef}},
-)
-    quad = zero(JuMP.QuadExpr)
-    if p_inj_store !== nothing
-        for (_, v) in p_inj_store
-            quad += 0.5 * rho * v^2
-        end
-    end
-    part.quad_p_inj_expr = quad
-    return quad
-end
-
-function build_quad_q_inj_expr_ac!(
-    part::PartitionAC,
-    rho::Float64,
-    q_inj_store::Union{Nothing, Dict{Int, JuMP.VariableRef}},
-)
-    quad = zero(JuMP.QuadExpr)
-    if q_inj_store !== nothing
-        for (_, v) in q_inj_store
-            quad += 0.5 * rho * v^2
-        end
-    end
-    part.quad_q_inj_expr = quad
-    return quad
-end
-
 # ============================================================
 # Batch entry points
 # ============================================================
