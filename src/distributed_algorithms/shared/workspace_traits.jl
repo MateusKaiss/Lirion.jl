@@ -49,13 +49,6 @@
 @inline is_aladin(::AbstractADMMWorkspace) = false
 @inline is_aladin(::AbstractALADINWorkspace) = true
 
-# ----------------------------------------------------------------------
-# Tag reconstruction: workspace → `ADMM{C,F}()` / `ALADIN{C,F}()`
-# ----------------------------------------------------------------------
-# Useful for dispatching on the algorithm tag when only a workspace is
-# available. Example: `consensus!(ws)` delegates to
-# `_consensus_impl(ws, tag_of(ws))` which dispatches on the tag type.
-
 @inline function tag_of(ws::AbstractADMMWorkspace)
     return ADMM{coupling_of(ws), formulation_of(ws)}()
 end

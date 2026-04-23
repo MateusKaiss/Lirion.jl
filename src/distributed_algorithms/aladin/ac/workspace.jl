@@ -460,20 +460,9 @@ function build_workspace(
 
     build_local_model!(partitions, sys, Hybrid, optimizer_factory, inter)
 
-    # SplitBus: rebuild AC balance at each split bus with p_inj / q_inj folded
-    # in (reuses the ADMM helper, which handles the nonlinear case via
-    # delete+rebuild of the balance constraint).
-    n_zones = length(partitions.parts)
-    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
-    q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
-    if !isempty(sys_bus_pairs)
-        @inbounds for i in 1:n_zones
-            _attach_pq_inj_variables_ac!(
-                partitions.parts[i], sys.parts[i], sys_bus_pairs,
-                p_inj_vars[i], q_inj_vars[i],
-            )
-        end
-    end
+    p_inj_vars, q_inj_vars = _prepare_pq_inj_vars_ac!(
+        partitions, sys, sys_bus_pairs, cfg.sectioning,
+    )
 
     zones = _build_zone_data_vector_ac(partitions; include_edges = true)
     bus_pairs = _build_shared_bus_pairs_ac(partitions, zones)
@@ -515,4 +504,29 @@ function build_workspace(
         alpha2 = cfg.alpha2,
         alpha3 = cfg.alpha3,
     )
+end
+
+
+# ------------------------------------------------------------
+# p_inj / q_inj prep (dispatched on sectioning)
+# ------------------------------------------------------------
+
+function _prepare_pq_inj_vars_ac!(partitions, sys, sys_bus_pairs, ::Union{TieLine, DummyBus})
+    n_zones = length(partitions.parts)
+    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    return p_inj_vars, q_inj_vars
+end
+
+function _prepare_pq_inj_vars_ac!(partitions, sys, sys_bus_pairs, ::SplitBus)
+    n_zones = length(partitions.parts)
+    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    @inbounds for i in 1:n_zones
+        _attach_pq_inj_variables_ac!(
+            partitions.parts[i], sys.parts[i], sys_bus_pairs,
+            p_inj_vars[i], q_inj_vars[i],
+        )
+    end
+    return p_inj_vars, q_inj_vars
 end

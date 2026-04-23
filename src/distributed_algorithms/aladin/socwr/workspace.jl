@@ -359,20 +359,9 @@ function build_workspace(
 
     build_local_model!(partitions, sys, Hybrid, optimizer_factory, inter)
 
-    # SplitBus: attach p_inj / q_inj slacks into the AFFINE active/reactive
-    # balance at each split bus (reuses the ADMM helper) before snapshotting
-    # the variable layout.
-    n_zones = length(partitions.parts)
-    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
-    q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
-    if !isempty(sys_bus_pairs)
-        @inbounds for i in 1:n_zones
-            _attach_pq_inj_variables_socwr!(
-                partitions.parts[i], sys_bus_pairs,
-                p_inj_vars[i], q_inj_vars[i],
-            )
-        end
-    end
+    p_inj_vars, q_inj_vars = _prepare_pq_inj_vars_socwr!(
+        partitions, sys_bus_pairs, cfg.sectioning,
+    )
 
     zones = _build_zone_data_vector_socwr(partitions; include_edges = true)
     bus_pairs = _build_shared_bus_pairs_socwr(partitions, zones)
@@ -412,4 +401,29 @@ function build_workspace(
         alpha3 = cfg.alpha3,
         alpha2_init = cfg.alpha2,
     )
+end
+
+
+# ------------------------------------------------------------
+# p_inj / q_inj prep (dispatched on sectioning)
+# ------------------------------------------------------------
+
+function _prepare_pq_inj_vars_socwr!(partitions, sys_bus_pairs, ::TieLine)
+    n_zones = length(partitions.parts)
+    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    return p_inj_vars, q_inj_vars
+end
+
+function _prepare_pq_inj_vars_socwr!(partitions, sys_bus_pairs, ::SplitBus)
+    n_zones = length(partitions.parts)
+    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    @inbounds for i in 1:n_zones
+        _attach_pq_inj_variables_socwr!(
+            partitions.parts[i], sys_bus_pairs,
+            p_inj_vars[i], q_inj_vars[i],
+        )
+    end
+    return p_inj_vars, q_inj_vars
 end

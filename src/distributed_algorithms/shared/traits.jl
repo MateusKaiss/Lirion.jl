@@ -1,32 +1,3 @@
-# ======================================================================
-# Formulation / Coupling Traits
-# ======================================================================
-#
-# These traits are the single source of truth for *which primal
-# variables participate in the consensus* for each (formulation,
-# coupling) combination. All other code (dual updates, consensus
-# averaging, residual computation, workspace field layout) consumes
-# these traits instead of hard-coding per-variant dispatch.
-#
-# Canonical coupling vocabulary:
-#
-#   DC      ∋ :theta (bus angle), :p_flow (branch active flow)
-#   AC      ∋ :theta, :v_mag, :p_flow, :q_flow
-#   SOCWR   ∋ :v2 (|V|² relaxation), :p_flow, :q_flow, :r, :t
-#
-# The tuple order below is *load-bearing*: it dictates the storage
-# order in DualState / ConsensusState and the iteration order in the
-# unified dual_update! loop. Do not reorder without updating both.
-# ======================================================================
-
-# ----------------------------------------------------------------------
-# consensus_vars(F, C) :: NTuple{N, Symbol}
-# ----------------------------------------------------------------------
-# The primal quantities shared across the partition boundary for each
-# (formulation, coupling) pair. Each symbol identifies a *kind* of
-# variable, not a storage field — the storage-name mapping lives in
-# `admm_dual_field` / `aladin_dual_field` below.
-
 @inline consensus_vars(::Type{DC}, ::Type{State}) = (:theta,)
 @inline consensus_vars(::Type{DC}, ::Type{Power}) = (:p_flow,)
 @inline consensus_vars(::Type{DC}, ::Type{Hybrid}) = (:theta, :p_flow)
@@ -43,26 +14,10 @@
 @inline consensus_vars(tag::DistributedAlgorithm) =
     consensus_vars(formulation(tag), coupling(tag))
 
-# ----------------------------------------------------------------------
-# is_bus_var(sym) / is_branch_var(sym)
-# ----------------------------------------------------------------------
-# Classify a consensus variable by whether it lives on shared buses
-# (state coupling) or on interzonal branches (power coupling). This is
-# the single place to change the classification rule; consensus!,
-# dual_update! and residuals! all dispatch off it.
 
 @inline is_bus_var(sym::Symbol) = sym === :theta || sym === :v_mag || sym === :v2
 @inline is_branch_var(sym::Symbol) =
     sym === :p_flow || sym === :q_flow || sym === :r || sym === :t
-
-# ----------------------------------------------------------------------
-# ADMM storage-name mapping
-# ----------------------------------------------------------------------
-# Maps a canonical variable symbol to the field names used by ADMM
-# workspaces today. This is the only place that encodes the historical
-# naming (`duals_v_mag` vs `duals_v2`, etc.). Future workspace
-# parametrization (Phase 4) can drop this and store arrays in a
-# homogeneous `NamedTuple` keyed on the canonical symbols.
 
 @inline function admm_dual_field(sym::Symbol)
     sym === :theta && return :duals_theta
@@ -96,12 +51,6 @@ end
     sym === :t && return :rho_t
     return error("admm_rho_field: unknown consensus variable $(sym)")
 end
-
-# ----------------------------------------------------------------------
-# ALADIN storage-name mapping
-# ----------------------------------------------------------------------
-# ALADIN uses `lambda_*` instead of `duals_*` and `vm` instead of
-# `v_mag` (following HFD 2016 notation).
 
 @inline function aladin_dual_field(sym::Symbol)
     sym === :theta && return :lambda_theta

@@ -418,16 +418,7 @@ function build_workspace(
 
     build_local_model!(partitions, sys, Hybrid, optimizer_factory, inter)
 
-    # SplitBus: attach p_inj variables and wire them into active power balance
-    # before we snapshot the variable layout. Reuses ADMM's helper — the
-    # partition object is identical.
-    n_zones = length(partitions.parts)
-    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
-    if !isempty(sys_bus_pairs)
-        @inbounds for i in 1:n_zones
-            _attach_p_inj_variables!(partitions.parts[i], sys_bus_pairs, p_inj_vars[i])
-        end
-    end
+    p_inj_vars = _prepare_p_inj_vars_dc!(partitions, sys_bus_pairs, cfg.sectioning)
 
     zones = _build_zone_data_vector(partitions; include_edges = true)
     bus_pairs = _build_shared_bus_pairs(partitions, zones)
@@ -468,4 +459,21 @@ function build_workspace(
         sigma_pg = cfg.sigma_pg,
         sigma_other = cfg.sigma_other,
     )
+end
+
+
+# ------------------------------------------------------------
+# p_inj prep (dispatched on sectioning)
+# ------------------------------------------------------------
+
+_prepare_p_inj_vars_dc!(partitions, sys_bus_pairs, ::Union{TieLine, DummyBus}) =
+    [Dict{Int, JuMP.VariableRef}() for _ in 1:length(partitions.parts)]
+
+function _prepare_p_inj_vars_dc!(partitions, sys_bus_pairs, ::SplitBus)
+    n_zones = length(partitions.parts)
+    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    @inbounds for i in 1:n_zones
+        _attach_p_inj_variables!(partitions.parts[i], sys_bus_pairs, p_inj_vars[i])
+    end
+    return p_inj_vars
 end
