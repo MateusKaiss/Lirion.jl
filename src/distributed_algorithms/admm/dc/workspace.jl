@@ -50,7 +50,7 @@ end
 # Hybrid
 # ------------------------------------------------------------
 
-Base.@kwdef mutable struct DCHybridWorkspace{S<:Sectioning} <: AbstractADMMWorkspace
+Base.@kwdef mutable struct DCHybridWorkspace{S <: Sectioning} <: AbstractADMMWorkspace
     partitions::Partitions{PartitionDC}
     id::Vector{Int}
 

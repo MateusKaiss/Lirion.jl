@@ -63,7 +63,7 @@ end
 # Hybrid
 # ------------------------------------------------------------
 
-Base.@kwdef mutable struct ACHybridWorkspace{S<:Sectioning} <: AbstractADMMWorkspace
+Base.@kwdef mutable struct ACHybridWorkspace{S <: Sectioning} <: AbstractADMMWorkspace
     partitions::Partitions{PartitionAC}
     id::Vector{Int}
 

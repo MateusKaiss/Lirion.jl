@@ -65,7 +65,7 @@ end
 # Hybrid
 # ------------------------------------------------------------
 
-Base.@kwdef mutable struct SOCWRHybridWorkspace{S<:Sectioning} <: AbstractADMMWorkspace
+Base.@kwdef mutable struct SOCWRHybridWorkspace{S <: Sectioning} <: AbstractADMMWorkspace
     partitions::Partitions{PartitionSOCWR}
     id::Vector{Int}
 
