@@ -144,7 +144,6 @@ function init_hybrid_partition!(
     return nothing
 end
 
-
 # ============================================================
 # Helpers
 # ============================================================
@@ -213,7 +212,6 @@ function build_quad_q_inj_expr_socwr!(
     return quad
 end
 
-
 # ============================================================
 # Soft anchor regularization (Gurobi SOCP stability)
 # ============================================================
@@ -252,7 +250,6 @@ function soft_anchor_branch_expr!(
     part.soft_anchor_expr = quad
     return quad
 end
-
 
 # ============================================================
 # Batch entry points

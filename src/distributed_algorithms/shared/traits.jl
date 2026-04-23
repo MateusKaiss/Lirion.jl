@@ -14,7 +14,6 @@
 @inline consensus_vars(tag::DistributedAlgorithm) =
     consensus_vars(formulation(tag), coupling(tag))
 
-
 @inline is_bus_var(sym::Symbol) = sym === :theta || sym === :v_mag || sym === :v2
 @inline is_branch_var(sym::Symbol) =
     sym === :p_flow || sym === :q_flow || sym === :r || sym === :t

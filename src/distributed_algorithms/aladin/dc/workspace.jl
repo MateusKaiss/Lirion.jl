@@ -1,23 +1,25 @@
+# ============================================================
+# Pair descriptors
+# ============================================================
+
 struct SharedBusPair
-    consensus_idx::Int   # index into sys.full_shared_bus_ids (global)
+    consensus_idx::Int
     bus_id::Int
-    zone_i::Int          # position of zone i in partitions.parts
-    col_i::Int           # column of θ[bus_id] in zone i's flat variable layout
+    zone_i::Int
+    col_i::Int
     zone_j::Int
     col_j::Int
 end
 
 struct SharedEdgePair
-    consensus_idx::Int   # index into sys.interzonal_branches
-    edge_global::Int     # global branch index
+    consensus_idx::Int
+    edge_global::Int
     zone_i::Int
-    edge_local_i::Int    # position of this edge in zone_i's zone_edges vector
+    edge_local_i::Int
     zone_j::Int
     edge_local_j::Int
 end
 
-# SplitBus (Method 3) sign-flipped p_inj consensus: for each split bus, both
-# zones hold a `p_inj` slack variable and enforce p_inj_A + p_inj_B = 0.
 struct SplitBusPair
     consensus_idx::Int
     bus_id::Int
@@ -27,10 +29,6 @@ struct SplitBusPair
     pinj_col_j::Int
 end
 
-# DummyBus (Method 2) branch-pair descriptor: the two halves of a split tie-line
-# are DIFFERENT internal branches in each zone. Cache θ columns and susceptances
-# at build time so the consensus QP and residuals can be assembled without any
-# per-iteration lookups into the JuMP model.
 struct DummyBranchPairDC
     consensus_idx::Int
     zone_i::Int
@@ -43,40 +41,33 @@ struct DummyBranchPairDC
     b_j::Float64
 end
 
+
+# ============================================================
+# Workspace structs
+# ============================================================
+
 # ------------------------------------------------------------
-# DC State workspace
+# State
 # ------------------------------------------------------------
 
 Base.@kwdef mutable struct DCStateWorkspaceALADIN <: AbstractALADINWorkspace
     partitions::Partitions{PartitionDC}
     id::Vector{Int}
 
-    # Per-zone canonical ALADIN data (variable layout, sensitivities, etc.)
     zones::Vector{AladinZoneData}
-
-    # Pairwise bus consensus constraints (one per shared bus, for K=2).
     bus_pairs::Vector{SharedBusPair}
 
-    # Duals keyed on canonical variable symbol. DC State couples only θ,
-    # so `vars = (theta = LambdaState(n_pairs),)`. Legacy aliases
-    # `ws.vars.theta.lambda` / `ws.vars.theta.lambda_prev` forward to
-    # `vars.theta.lambda` / `vars.theta.lambda_prev` via the getproperty
-    # layer in `aladin/core/components.jl`.
     vars::NamedTuple{(:theta,), Tuple{LambdaState}}
 
-    # Phase-2 QP optimizer factory.
     qp_optimizer::Any
 
-    # Parameters (held as Refs so adaptive schemes can update them).
     rho::Base.RefValue{Float64}
     mu::Base.RefValue{Float64}
 
-    # Line-search parameters (default 1.0 → full step).
     alpha1::Float64 = 1.0
     alpha2::Float64 = 1.0
     alpha3::Float64 = 1.0
 
-    # HFD Σ_i diagonal weights (per variable class).
     sigma_theta_shared::Float64 = 10.0
     sigma_theta_other::Float64 = 10.0
     sigma_pg::Float64 = 1.0
@@ -92,7 +83,7 @@ Base.@kwdef mutable struct DCStateWorkspaceALADIN <: AbstractALADINWorkspace
 end
 
 # ------------------------------------------------------------
-# DC Power workspace
+# Power
 # ------------------------------------------------------------
 
 Base.@kwdef mutable struct DCPowerWorkspaceALADIN <: AbstractALADINWorkspace
@@ -102,11 +93,8 @@ Base.@kwdef mutable struct DCPowerWorkspaceALADIN <: AbstractALADINWorkspace
 
     zones::Vector{AladinZoneData}
     edge_pairs::Vector{SharedEdgePair}
-    # DummyBus (Method 2): symmetric p_flow consensus between the two halves of
-    # each split tie-line. Empty for TieLine/SplitBus.
     dummy_branch_pairs::Vector{DummyBranchPairDC} = DummyBranchPairDC[]
 
-    # Duals: branch p_flow (interzonal) + dummy half-branch flows.
     vars::NamedTuple{(:p_flow, :p_dummy), Tuple{LambdaState, LambdaState}}
 
     qp_optimizer::Any
@@ -133,7 +121,7 @@ Base.@kwdef mutable struct DCPowerWorkspaceALADIN <: AbstractALADINWorkspace
 end
 
 # ------------------------------------------------------------
-# DC Hybrid workspace — both bus and edge couplings simultaneously
+# Hybrid
 # ------------------------------------------------------------
 
 Base.@kwdef mutable struct DCHybridWorkspaceALADIN <: AbstractALADINWorkspace
@@ -144,16 +132,15 @@ Base.@kwdef mutable struct DCHybridWorkspaceALADIN <: AbstractALADINWorkspace
     zones::Vector{AladinZoneData}
     bus_pairs::Vector{SharedBusPair}
     edge_pairs::Vector{SharedEdgePair}
-    # SplitBus (Method 3): sign-flipped p_inj consensus per split bus.
     split_bus_pairs::Vector{SplitBusPair} = SplitBusPair[]
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
         Vector{Dict{Int, JuMP.VariableRef}}()
-    # DummyBus (Method 2): symmetric p_flow consensus on half-branch pairs.
     dummy_branch_pairs::Vector{DummyBranchPairDC} = DummyBranchPairDC[]
 
-    # Duals: bus θ + branch p_flow + split-bus p_inj + dummy half-branch p_flow.
-    vars::NamedTuple{(:theta, :p_flow, :p_inj, :p_dummy),
-        Tuple{LambdaState, LambdaState, LambdaState, LambdaState}}
+    vars::NamedTuple{
+        (:theta, :p_flow, :p_inj, :p_dummy),
+        Tuple{LambdaState, LambdaState, LambdaState, LambdaState},
+    }
 
     qp_optimizer::Any
 
@@ -171,7 +158,6 @@ Base.@kwdef mutable struct DCHybridWorkspaceALADIN <: AbstractALADINWorkspace
     sigma_pg::Float64 = 1.0
     sigma_other::Float64 = 1.0
 
-    # Per-component diagnostics (not part of the stopping rule)
     r_primal_bus::Float64 = 0.0
     r_primal_edge::Float64 = 0.0
     r_progress_bus::Float64 = 0.0
@@ -186,24 +172,30 @@ Base.@kwdef mutable struct DCHybridWorkspaceALADIN <: AbstractALADINWorkspace
     hist::ALADINHistory = ALADINHistory()
 end
 
-# ------------------------------------------------------------
-# Rho helpers (mirror ADMM's _get_rhos for history/logging)
-# ------------------------------------------------------------
+
+# ============================================================
+# Rho accessors
+# ============================================================
 
 _get_rhos(ws::DCStateWorkspaceALADIN) = (rho = ws.rho[],)
 _get_rhos(ws::DCPowerWorkspaceALADIN) = (rho = ws.rho[],)
 _get_rhos(ws::DCHybridWorkspaceALADIN) = (
-    rho_bus = ws.rho_bus[],
+    rho_bus  = ws.rho_bus[],
     rho_edge = ws.rho_edge[],
-    rho_inj = ws.rho_inj[],
+    rho_inj  = ws.rho_inj[],
 )
+
+
+# ============================================================
+# Helpers
+# ============================================================
 
 function _build_shared_bus_pairs(
     partitions::Partitions{PartitionDC},
     zones::Vector{AladinZoneData},
 )::Vector{SharedBusPair}
-    acc = Dict{Int, Vector{Tuple{Int, Int}}}()  # consensus_idx -> [(zone_pos, col)]
-    bus_of = Dict{Int, Int}()                   # consensus_idx -> bus_id
+    acc = Dict{Int, Vector{Tuple{Int, Int}}}()
+    bus_of = Dict{Int, Int}()
 
     for (zpos, part) in enumerate(partitions.parts)
         zdata = zones[zpos]
@@ -328,6 +320,27 @@ function _build_zone_data_vector(
     return zones
 end
 
+_prepare_p_inj_vars_dc!(partitions, sys_bus_pairs, ::Union{TieLine, DummyBus}) =
+    [Dict{Int, JuMP.VariableRef}() for _ in 1:length(partitions.parts)]
+
+function _prepare_p_inj_vars_dc!(partitions, sys_bus_pairs, ::SplitBus)
+    n_zones = length(partitions.parts)
+    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    @inbounds for i in 1:n_zones
+        _attach_p_inj_variables!(partitions.parts[i], sys_bus_pairs, p_inj_vars[i])
+    end
+    return p_inj_vars
+end
+
+
+# ============================================================
+# Builders
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
+
 function build_workspace(
     sys::DistributedSystem,
     cfg::ALADINConfig,
@@ -362,6 +375,10 @@ function build_workspace(
     )
 end
 
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
 function build_workspace(
     sys::DistributedSystem,
     cfg::ALADINConfig,
@@ -389,7 +406,7 @@ function build_workspace(
         edge_pairs = edge_pairs,
         dummy_branch_pairs = dummy_pairs,
         vars = (
-            p_flow = LambdaState(n_pairs),
+            p_flow  = LambdaState(n_pairs),
             p_dummy = LambdaState(n_dummy),
         ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
@@ -404,6 +421,10 @@ function build_workspace(
         sigma_other = cfg.sigma_other,
     )
 end
+
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
 
 function build_workspace(
     sys::DistributedSystem,
@@ -441,15 +462,15 @@ function build_workspace(
         p_inj_vars = p_inj_vars,
         dummy_branch_pairs = dummy_pairs,
         vars = (
-            theta = LambdaState(n_bus),
-            p_flow = LambdaState(n_edge),
-            p_inj = LambdaState(n_split),
+            theta   = LambdaState(n_bus),
+            p_flow  = LambdaState(n_edge),
+            p_inj   = LambdaState(n_split),
             p_dummy = LambdaState(n_dummy),
         ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
-        rho_bus = Ref(cfg.rho),
+        rho_bus  = Ref(cfg.rho),
         rho_edge = Ref(cfg.rho),
-        rho_inj = Ref(cfg.rho),
+        rho_inj  = Ref(cfg.rho),
         mu = Ref(cfg.mu),
         alpha1 = cfg.alpha1,
         alpha2 = cfg.alpha2,
@@ -459,21 +480,4 @@ function build_workspace(
         sigma_pg = cfg.sigma_pg,
         sigma_other = cfg.sigma_other,
     )
-end
-
-
-# ------------------------------------------------------------
-# p_inj prep (dispatched on sectioning)
-# ------------------------------------------------------------
-
-_prepare_p_inj_vars_dc!(partitions, sys_bus_pairs, ::Union{TieLine, DummyBus}) =
-    [Dict{Int, JuMP.VariableRef}() for _ in 1:length(partitions.parts)]
-
-function _prepare_p_inj_vars_dc!(partitions, sys_bus_pairs, ::SplitBus)
-    n_zones = length(partitions.parts)
-    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
-    @inbounds for i in 1:n_zones
-        _attach_p_inj_variables!(partitions.parts[i], sys_bus_pairs, p_inj_vars[i])
-    end
-    return p_inj_vars
 end

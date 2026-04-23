@@ -114,7 +114,6 @@ function init_hybrid_partition!(
     return nothing
 end
 
-
 # ============================================================
 # Helpers
 # ============================================================
@@ -159,7 +158,6 @@ function build_quad_p_inj_expr!(
     part.quad_p_inj_expr = quad
     return quad
 end
-
 
 # ============================================================
 # Batch entry points

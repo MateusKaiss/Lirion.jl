@@ -48,16 +48,12 @@ function build_quad_branch_pq_expr!(
     m = part.model::JuMP.Model
     quad = zero(JuMP.QuadExpr)
 
-    # Interzonal P/Q (TieLine)
     @inbounds for e in zone_edges
         l = part.branch_idx_full_to_zone[e]
         l == 0 && continue
         p, q = _pq_flow_from_exprs(m, l)
         quad += 0.5 * rho_p * p^2 + 0.5 * rho_q * q^2
     end
-
-    # Branch pairs P/Q (DummyBus Method 2): each half of a split tie-line
-    # contributes one quadratic term to the partition that owns it.
     pos = part.position
     @inbounds for (ga, za, gb, zb) in branch_pairs
         if za == pos

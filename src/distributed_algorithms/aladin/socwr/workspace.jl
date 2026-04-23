@@ -1,3 +1,7 @@
+# ============================================================
+# Pair descriptors
+# ============================================================
+
 struct SharedBusPairSOCWR
     consensus_idx::Int
     bus_id::Int
@@ -16,6 +20,7 @@ struct SharedEdgePairSOCWR
     edge_local_j::Int
 end
 
+# SplitBus (Method 3): sign-flipped p_inj / q_inj consensus per split bus.
 struct SplitBusPairSOCWR
     consensus_idx::Int
     bus_id::Int
@@ -26,6 +31,15 @@ struct SplitBusPairSOCWR
     pinj_col_j::Int
     qinj_col_j::Int
 end
+
+
+# ============================================================
+# Workspace structs
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 Base.@kwdef mutable struct SOCWRStateWorkspaceALADIN <: AbstractALADINWorkspace
     partitions::Partitions{PartitionSOCWR}
@@ -46,9 +60,9 @@ Base.@kwdef mutable struct SOCWRStateWorkspaceALADIN <: AbstractALADINWorkspace
     alpha1::Float64 = 1.0
     alpha2::Float64 = 1.0
     alpha3::Float64 = 1.0
-
     alpha2_init::Float64 = 1.0
     line_search::Bool = true
+
     sigma_v2::Float64 = 10.0
     sigma_r::Float64 = 5.0
     sigma_t::Float64 = 5.0
@@ -67,7 +81,7 @@ Base.@kwdef mutable struct SOCWRStateWorkspaceALADIN <: AbstractALADINWorkspace
 end
 
 # ------------------------------------------------------------
-# POWER workspace
+# Power
 # ------------------------------------------------------------
 
 Base.@kwdef mutable struct SOCWRPowerWorkspaceALADIN <: AbstractALADINWorkspace
@@ -76,7 +90,6 @@ Base.@kwdef mutable struct SOCWRPowerWorkspaceALADIN <: AbstractALADINWorkspace
     interzonal::Vector{Int}
 
     zones::Vector{AladinZoneDataSOCWR}
-
     edge_pairs::Vector{SharedEdgePairSOCWR}
 
     vars::NamedTuple{(:p_flow, :q_flow), Tuple{LambdaState, LambdaState}}
@@ -89,7 +102,6 @@ Base.@kwdef mutable struct SOCWRPowerWorkspaceALADIN <: AbstractALADINWorkspace
     alpha1::Float64 = 1.0
     alpha2::Float64 = 1.0
     alpha3::Float64 = 1.0
-
     alpha2_init::Float64 = 1.0
     line_search::Bool = true
 
@@ -111,7 +123,7 @@ Base.@kwdef mutable struct SOCWRPowerWorkspaceALADIN <: AbstractALADINWorkspace
 end
 
 # ------------------------------------------------------------
-# HYBRID workspace
+# Hybrid
 # ------------------------------------------------------------
 
 Base.@kwdef mutable struct SOCWRHybridWorkspaceALADIN <: AbstractALADINWorkspace
@@ -120,10 +132,8 @@ Base.@kwdef mutable struct SOCWRHybridWorkspaceALADIN <: AbstractALADINWorkspace
     interzonal::Vector{Int}
 
     zones::Vector{AladinZoneDataSOCWR}
-
     bus_pairs::Vector{SharedBusPairSOCWR}
     edge_pairs::Vector{SharedEdgePairSOCWR}
-    # SplitBus (Method 3): sign-flipped p_inj / q_inj consensus per split bus.
     split_bus_pairs::Vector{SplitBusPairSOCWR} = SplitBusPairSOCWR[]
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
         Vector{Dict{Int, JuMP.VariableRef}}()
@@ -166,13 +176,19 @@ Base.@kwdef mutable struct SOCWRHybridWorkspaceALADIN <: AbstractALADINWorkspace
     hist::ALADINHistory = ALADINHistory()
 end
 
-# ------------------------------------------------------------
-# helpers
-# ------------------------------------------------------------
 
-_get_rhos(ws::SOCWRStateWorkspaceALADIN) = (rho = ws.rho[],)
-_get_rhos(ws::SOCWRPowerWorkspaceALADIN) = (rho = ws.rho[],)
+# ============================================================
+# Rho accessors
+# ============================================================
+
+_get_rhos(ws::SOCWRStateWorkspaceALADIN)  = (rho = ws.rho[],)
+_get_rhos(ws::SOCWRPowerWorkspaceALADIN)  = (rho = ws.rho[],)
 _get_rhos(ws::SOCWRHybridWorkspaceALADIN) = (rho = ws.rho[],)
+
+
+# ============================================================
+# Helpers
+# ============================================================
 
 function _build_shared_bus_pairs_socwr(
     partitions::Partitions{PartitionSOCWR},
@@ -265,8 +281,33 @@ function _build_zone_data_vector_socwr(
     return zones
 end
 
-# ------------------------------------------------------------
+function _prepare_pq_inj_vars_socwr!(partitions, sys_bus_pairs, ::TieLine)
+    n_zones = length(partitions.parts)
+    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    return p_inj_vars, q_inj_vars
+end
+
+function _prepare_pq_inj_vars_socwr!(partitions, sys_bus_pairs, ::SplitBus)
+    n_zones = length(partitions.parts)
+    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    @inbounds for i in 1:n_zones
+        _attach_pq_inj_variables_socwr!(
+            partitions.parts[i], sys_bus_pairs,
+            p_inj_vars[i], q_inj_vars[i],
+        )
+    end
+    return p_inj_vars, q_inj_vars
+end
+
+
+# ============================================================
 # Builders
+# ============================================================
+
+# ------------------------------------------------------------
+# State
 # ------------------------------------------------------------
 
 function build_workspace(
@@ -297,8 +338,8 @@ function build_workspace(
         edge_pairs = edge_pairs,
         vars = (
             v2 = LambdaState(n_bus),
-            r = LambdaState(n_edge),
-            t = LambdaState(n_edge),
+            r  = LambdaState(n_edge),
+            t  = LambdaState(n_edge),
         ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
         rho = Ref(cfg.rho),
@@ -309,6 +350,10 @@ function build_workspace(
         alpha2_init = cfg.alpha2,
     )
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function build_workspace(
     sys::DistributedSystem,
@@ -345,6 +390,10 @@ function build_workspace(
         alpha2_init = cfg.alpha2,
     )
 end
+
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
 
 function build_workspace(
     sys::DistributedSystem,
@@ -385,13 +434,13 @@ function build_workspace(
         p_inj_vars = p_inj_vars,
         q_inj_vars = q_inj_vars,
         vars = (
-            v2 = LambdaState(n_bus),
+            v2     = LambdaState(n_bus),
             p_flow = LambdaState(n_edge),
             q_flow = LambdaState(n_edge),
-            r = LambdaState(n_edge),
-            t = LambdaState(n_edge),
-            p_inj = LambdaState(n_split),
-            q_inj = LambdaState(n_split),
+            r      = LambdaState(n_edge),
+            t      = LambdaState(n_edge),
+            p_inj  = LambdaState(n_split),
+            q_inj  = LambdaState(n_split),
         ),
         qp_optimizer = _resolve_qp_optimizer(optimizer_factory),
         rho = Ref(cfg.rho),
@@ -401,29 +450,4 @@ function build_workspace(
         alpha3 = cfg.alpha3,
         alpha2_init = cfg.alpha2,
     )
-end
-
-
-# ------------------------------------------------------------
-# p_inj / q_inj prep (dispatched on sectioning)
-# ------------------------------------------------------------
-
-function _prepare_pq_inj_vars_socwr!(partitions, sys_bus_pairs, ::TieLine)
-    n_zones = length(partitions.parts)
-    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
-    q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
-    return p_inj_vars, q_inj_vars
-end
-
-function _prepare_pq_inj_vars_socwr!(partitions, sys_bus_pairs, ::SplitBus)
-    n_zones = length(partitions.parts)
-    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
-    q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
-    @inbounds for i in 1:n_zones
-        _attach_pq_inj_variables_socwr!(
-            partitions.parts[i], sys_bus_pairs,
-            p_inj_vars[i], q_inj_vars[i],
-        )
-    end
-    return p_inj_vars, q_inj_vars
 end
