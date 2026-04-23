@@ -1,3 +1,7 @@
+# ============================================================
+# Params container
+# ============================================================
+
 Base.@kwdef struct ADMMParams
     max_iter::Int
     eps_abs::Float64
@@ -10,6 +14,10 @@ Base.@kwdef struct ADMMParams
     adapt_warmup::Int
     rho_floor::Float64
 end
+
+# ============================================================
+# Builder
+# ============================================================
 
 function build_params(config::ADMMConfig)
     return ADMMParams(;

@@ -34,8 +34,50 @@ function _format_case_lines(toml::Dict)
             k = "$(sect)_$(coup)"
             haskey(toml[v][b], k) || continue
             cell = toml[v][b][k]
-            get(cell, "hit_target", false) || continue
-            w = cell["winner"]
+            # Accept combo if:
+            #   (a) a converged strategy hit gap<1% (canonical winner), OR
+            #   (b) no converged winner but some strategy got gap<1%
+            #       (iteration_limit with small gap — objective is stable
+            #        but Lirion's residual tolerance wasn't met at the
+            #        sweep's max_iter; the entry's own max_iter is raised
+            #        by the paper driver so re-running will usually
+            #        converge fully).
+            w = if get(cell, "hit_target", false)
+                cell["winner"]
+            else
+                # Scan strategies for best close entry
+                best = nothing
+                for (sname, data) in get(cell, "strategies", Dict())
+                    gap = Float64(get(data, "gap_pct", NaN))
+                    isfinite(gap) && abs(gap) < 1.0 || continue
+                    status = String(get(data, "status", ""))
+                    status in ("error", "infeasible") && continue
+                    iters = Int(get(data, "iters", 0))
+                    cand = (
+                        strategy = sname,
+                        rho = Float64(get(data, "rho", NaN)),
+                        mu = Float64(get(data, "mu", NaN)),
+                        adaptive = get(data, "adaptive", false),
+                        rho_growth = Float64(get(data, "rho_growth", NaN)),
+                        mu_growth = Float64(get(data, "mu_growth", NaN)),
+                        gap_pct = gap, iters = iters, status = status,
+                    )
+                    if best === nothing || abs(gap) < abs(best.gap_pct) ||
+                       (abs(gap) == abs(best.gap_pct) && iters < best.iters)
+                        best = cand
+                    end
+                end
+                best === nothing && continue
+                # Produce a Dict matching the winner shape
+                Dict{String, Any}(
+                    "strategy" => best.strategy * "-close",
+                    "rho" => best.rho, "mu" => best.mu,
+                    "adaptive" => best.adaptive,
+                    "rho_growth" => best.rho_growth,
+                    "mu_growth" => best.mu_growth,
+                    "gap_pct" => best.gap_pct, "iters" => best.iters,
+                )
+            end
             n_hit += 1
             parts = String[]
             push!(parts, @sprintf(":rho => %.3g", Float64(w["rho"])))

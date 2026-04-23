@@ -1,5 +1,9 @@
 # ============================================================
-# DC WORKSPACES
+# Workspace structs
+# ============================================================
+
+# ------------------------------------------------------------
+# State
 # ------------------------------------------------------------
 
 Base.@kwdef mutable struct DCStateWorkspace <: AbstractADMMWorkspace
@@ -17,6 +21,10 @@ Base.@kwdef mutable struct DCStateWorkspace <: AbstractADMMWorkspace
     iter::Int = 0
     hist::ADMMHistory = ADMMHistory()
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 Base.@kwdef mutable struct DCPowerWorkspace <: AbstractADMMWorkspace
     partitions::Partitions{PartitionDC}
@@ -38,6 +46,10 @@ Base.@kwdef mutable struct DCPowerWorkspace <: AbstractADMMWorkspace
     hist::ADMMHistory = ADMMHistory()
 end
 
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
+
 Base.@kwdef mutable struct DCHybridWorkspace <: AbstractADMMWorkspace
     partitions::Partitions{PartitionDC}
     id::Vector{Int}
@@ -46,10 +58,7 @@ Base.@kwdef mutable struct DCHybridWorkspace <: AbstractADMMWorkspace
     branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[]
     pair_counts::Vector{Int} = Int[]
 
-    # SplitBus (Method 3) bookkeeping: sign-flipped p_inj consensus per split bus.
     bus_pairs::Vector{NTuple{3, Int}} = NTuple{3, Int}[]
-    # Per-partition container of p_inj variable references, indexed by bus_id.
-    # Filled by `init_hybrid_partition!` when bus_pairs is non-empty.
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
         Vector{Dict{Int, JuMP.VariableRef}}()
 
@@ -75,7 +84,7 @@ Base.@kwdef mutable struct DCHybridWorkspace <: AbstractADMMWorkspace
 end
 
 # ============================================================
-# RHO HELPERS
+# Rho accessors
 # ============================================================
 
 _get_rhos(ws::DCStateWorkspace) = (rho_theta = ws.vars.theta.rho[],)
@@ -87,8 +96,12 @@ _get_rhos(ws::DCHybridWorkspace) = (
 )
 
 # ============================================================
-# BUILDERS
+# Builders
 # ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 function build_workspace(sys, config, optimizer_factory, ::ADMM{State, DC})
     partitions = build_partitions(PartitionDC, sys)
@@ -109,6 +122,10 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{State, DC})
         bus_counts = zeros(Int, n_shared),
     )
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, DC})
     partitions = build_partitions(PartitionDC, sys)
@@ -137,6 +154,10 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, DC})
     )
 end
 
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
+
 function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
     partitions = build_partitions(PartitionDC, sys)
     id = partitions.zones
@@ -150,8 +171,6 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
     n_total = n_inter + n_pairs
     n_bus_pairs = length(bpairs)
 
-    # Pre-allocate per-partition p_inj variable containers (populated when
-    # bus_pairs is non-empty, by `init_hybrid_partition!`).
     p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
 
     init_hybrid_partition!(
@@ -169,7 +188,6 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
     vars = (
         theta = VarState(n_shared, n_zones, config.rho_theta),
         p_flow = VarState(n_total, n_zones, config.rho_p),
-        # Use rho_p for p_inj as well (both are active-power consensus).
         p_inj = VarState(n_bus_pairs, n_zones, config.rho_p),
     )
 

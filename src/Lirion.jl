@@ -97,7 +97,7 @@ include("partitioning/create_partition.jl")
 # Inputs structs (legacy CLI + shared input pipeline)
 # ------------------------------------------------------------------
 include("data/build_inputs.jl")
-include("data/admm_structs.jl")
+include("data/partition_structs.jl")
 
 # ------------------------------------------------------------------
 # Model construction and centralized solution

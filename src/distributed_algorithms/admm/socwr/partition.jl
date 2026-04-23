@@ -1,5 +1,10 @@
 # ============================================================
-# SOCWR PARTITION INITIALIZATION — ADMM
+# Per-partition initializers
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 function init_state_partition!(
     part::PartitionSOCWR,
@@ -17,6 +22,10 @@ function init_state_partition!(
     @objective(part.model, Min, part.obj_static)
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function init_power_partition!(
     part::PartitionSOCWR,
@@ -45,6 +54,10 @@ function init_power_partition!(
     return nothing
 end
 
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
+
 function init_hybrid_partition!(
     part::PartitionSOCWR,
     sys_zone::SystemData,
@@ -61,11 +74,6 @@ function init_hybrid_partition!(
     q_inj_store::Union{Nothing, Dict{Int, JuMP.VariableRef}} = nothing,
 )
     build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
-
-    # SplitBus (Method 3): introduce free p_inj[m] and q_inj[m] at every split
-    # bus in this zone, folded into the active / reactive balance. SOCWR uses
-    # `v_magnitude_sq` (a single variable, not v²), so both balances are AFFINE
-    # in the new injection — `set_normalized_coefficient` is sufficient.
     if !isempty(bus_pairs) && p_inj_store !== nothing && q_inj_store !== nothing
         _attach_pq_inj_variables_socwr!(
             part, bus_pairs, p_inj_store, q_inj_store,
@@ -85,10 +93,10 @@ function init_hybrid_partition!(
     return nothing
 end
 
-# ------------------------------------------------------------
-# Create p_inj / q_inj variables and fold them into the AFFINE
-# SOCWR active/reactive balance constraints at split buses.
-# ------------------------------------------------------------
+# ============================================================
+# Helpers
+# ============================================================
+
 function _attach_pq_inj_variables_socwr!(
     part::PartitionSOCWR,
     bus_pairs::Vector{NTuple{3, Int}},
@@ -154,85 +162,7 @@ function build_quad_q_inj_expr_socwr!(
 end
 
 # ============================================================
-# BATCH
-# ============================================================
-
-function init_state_partition!(
-    partitions::Partitions{PartitionSOCWR},
-    sys::DistributedSystem,
-    optimizer_factory,
-    rho_v2::Float64,
-    rho_r::Float64,
-    rho_t::Float64,
-    interzonal_branches,
-)
-    n = length(partitions.parts)
-    @assert length(sys.parts) == n
-    @inbounds for i in 1:n
-        init_state_partition!(
-            partitions.parts[i], sys.parts[i], optimizer_factory,
-            rho_v2, rho_r, rho_t, interzonal_branches,
-        )
-    end
-    return nothing
-end
-
-function init_power_partition!(
-    partitions::Partitions{PartitionSOCWR},
-    sys::DistributedSystem,
-    optimizer_factory,
-    rho_p::Float64,
-    rho_q::Float64,
-    interzonal_branches,
-    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
-)
-    n = length(partitions.parts)
-    @assert length(sys.parts) == n
-    @inbounds for i in 1:n
-        init_power_partition!(
-            partitions.parts[i], sys.parts[i], optimizer_factory,
-            rho_p, rho_q, interzonal_branches, branch_pairs,
-        )
-    end
-    return nothing
-end
-
-function init_hybrid_partition!(
-    partitions::Partitions{PartitionSOCWR},
-    sys::DistributedSystem,
-    optimizer_factory,
-    rho_v2::Float64,
-    rho_p::Float64,
-    rho_q::Float64,
-    rho_r::Float64,
-    rho_t::Float64,
-    interzonal_branches,
-    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
-    bus_pairs::Vector{NTuple{3, Int}} = NTuple{3, Int}[],
-    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
-    Dict{Int, JuMP.VariableRef}[],
-    q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
-    Dict{Int, JuMP.VariableRef}[],
-)
-    n = length(partitions.parts)
-    @assert length(sys.parts) == n
-    have_p_inj = length(p_inj_vars) == n
-    have_q_inj = length(q_inj_vars) == n
-    @inbounds for i in 1:n
-        init_hybrid_partition!(
-            partitions.parts[i], sys.parts[i], optimizer_factory,
-            rho_v2, rho_p, rho_q, rho_r, rho_t, interzonal_branches,
-            branch_pairs,
-            bus_pairs,
-            have_p_inj ? p_inj_vars[i] : nothing,
-            have_q_inj ? q_inj_vars[i] : nothing,
-        )
-    end
-    return nothing
-end
-
-# ============================================================
-# SOCWR EXTRAS — soft anchoring (Gurobi stabilization)
+# Soft anchor regularization (Gurobi SOCP stability)
 # ============================================================
 
 function soft_anchor_branch_expr!(
@@ -268,4 +198,94 @@ function soft_anchor_branch_expr!(
 
     part.soft_anchor_expr = quad
     return quad
+end
+
+# ============================================================
+# Batch entry points
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
+
+function init_state_partition!(
+    partitions::Partitions{PartitionSOCWR},
+    sys::DistributedSystem,
+    optimizer_factory,
+    rho_v2::Float64,
+    rho_r::Float64,
+    rho_t::Float64,
+    interzonal_branches,
+)
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n
+    @inbounds for i in 1:n
+        init_state_partition!(
+            partitions.parts[i], sys.parts[i], optimizer_factory,
+            rho_v2, rho_r, rho_t, interzonal_branches,
+        )
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
+function init_power_partition!(
+    partitions::Partitions{PartitionSOCWR},
+    sys::DistributedSystem,
+    optimizer_factory,
+    rho_p::Float64,
+    rho_q::Float64,
+    interzonal_branches,
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
+)
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n
+    @inbounds for i in 1:n
+        init_power_partition!(
+            partitions.parts[i], sys.parts[i], optimizer_factory,
+            rho_p, rho_q, interzonal_branches, branch_pairs,
+        )
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    partitions::Partitions{PartitionSOCWR},
+    sys::DistributedSystem,
+    optimizer_factory,
+    rho_v2::Float64,
+    rho_p::Float64,
+    rho_q::Float64,
+    rho_r::Float64,
+    rho_t::Float64,
+    interzonal_branches,
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
+    bus_pairs::Vector{NTuple{3, Int}} = NTuple{3, Int}[],
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
+    Dict{Int, JuMP.VariableRef}[],
+    q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
+    Dict{Int, JuMP.VariableRef}[],
+)
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n
+    have_p_inj = length(p_inj_vars) == n
+    have_q_inj = length(q_inj_vars) == n
+    @inbounds for i in 1:n
+        init_hybrid_partition!(
+            partitions.parts[i], sys.parts[i], optimizer_factory,
+            rho_v2, rho_p, rho_q, rho_r, rho_t, interzonal_branches,
+            branch_pairs,
+            bus_pairs,
+            have_p_inj ? p_inj_vars[i] : nothing,
+            have_q_inj ? q_inj_vars[i] : nothing,
+        )
+    end
+    return nothing
 end

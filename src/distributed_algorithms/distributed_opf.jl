@@ -3,7 +3,7 @@
 # ============================================================
 
 # ------------------------------------------------------------
-# Coupling → variant type
+# Coupling - variant type
 # ------------------------------------------------------------
 
 @inline function _variant_type(::Val{c}) where {c}
@@ -17,9 +17,8 @@ end
 # Algorithm display name
 # ------------------------------------------------------------
 
-_algo_name(::ADMMConfig)   = "ADMM"
+_algo_name(::ADMMConfig) = "ADMM"
 _algo_name(::ALADINConfig) = "ALADIN"
-
 
 # ============================================================
 # Utilities
@@ -34,7 +33,6 @@ function _with_scoped_blas_threads(f, n::Integer = 1)
         LinearAlgebra.BLAS.set_num_threads(prev)
     end
 end
-
 
 # ============================================================
 # Entry point

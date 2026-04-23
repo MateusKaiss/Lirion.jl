@@ -1,8 +1,10 @@
 # ============================================================
-# AC PARTITION INITIALIZATION — ADMM
-# ------------------------------------------------------------
-# See admm/dc/partition.jl header.
+# Per-partition initializers
 # ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 function init_state_partition!(
     part::PartitionAC,
@@ -16,6 +18,10 @@ function init_state_partition!(
     @objective(part.model, Min, part.obj_base + part.quad_bus_expr)
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function init_power_partition!(
     part::PartitionAC,
@@ -32,6 +38,10 @@ function init_power_partition!(
     return nothing
 end
 
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
+
 function init_hybrid_partition!(
     part::PartitionAC,
     sys_zone::SystemData,
@@ -47,13 +57,6 @@ function init_hybrid_partition!(
     q_inj_store::Union{Nothing, Dict{Int, JuMP.VariableRef}} = nothing,
 )
     build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
-
-    # SplitBus (Method 3): for every split bus in this zone, introduce free
-    # p_inj[m] and q_inj[m] scalars and fold them into the AC active /
-    # reactive balance at bus m. The AC balance is NONLINEAR (cos/sin/v²),
-    # so `set_normalized_coefficient` is not applicable — we delete the
-    # existing balance constraints at split buses and rebuild them with the
-    # virtual injection added.
     if !isempty(bus_pairs) && p_inj_store !== nothing && q_inj_store !== nothing
         _attach_pq_inj_variables_ac!(
             part, sys_zone, bus_pairs, p_inj_store, q_inj_store,
@@ -65,8 +68,6 @@ function init_hybrid_partition!(
     build_quad_p_inj_expr_ac!(part, rho_p, p_inj_store)
     build_quad_q_inj_expr_ac!(part, rho_q, q_inj_store)
 
-    # Initial @objective: only include the extra terms if this zone actually
-    # hosts split buses (avoids expression bloat on pure TieLine runs).
     if p_inj_store !== nothing && !isempty(p_inj_store)
         @objective(
             part.model, Min,
@@ -82,10 +83,10 @@ function init_hybrid_partition!(
     return nothing
 end
 
-# ------------------------------------------------------------
-# Delete + rebuild the AC active/reactive balance at each split bus with
-# virtual p_inj / q_inj variables folded in.
-# ------------------------------------------------------------
+# ============================================================
+# Helpers
+# ============================================================
+
 function _attach_pq_inj_variables_ac!(
     part::PartitionAC,
     sys_zone::SystemData,
@@ -169,8 +170,12 @@ function build_quad_q_inj_expr_ac!(
 end
 
 # ============================================================
-# BATCH
+# Batch entry points
 # ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 function init_state_partition!(
     partitions::Partitions{PartitionAC},
@@ -189,6 +194,10 @@ function init_state_partition!(
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function init_power_partition!(
     partitions::Partitions{PartitionAC},
@@ -209,6 +218,10 @@ function init_power_partition!(
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
 
 function init_hybrid_partition!(
     partitions::Partitions{PartitionAC},

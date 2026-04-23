@@ -16,10 +16,6 @@ struct SharedEdgePairSOCWR
     edge_local_j::Int
 end
 
-# SplitBus (Method 3) pairs for SOCWR: sign-flipped p_inj / q_inj consensus
-# at each split bus. Both zones host p_inj and q_inj slack variables folded
-# into the AFFINE active/reactive balance; consensus target is p_A + p_B = 0
-# (and similarly for q).
 struct SplitBusPairSOCWR
     consensus_idx::Int
     bus_id::Int

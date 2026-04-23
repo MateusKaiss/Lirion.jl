@@ -1,5 +1,9 @@
 # ============================================================
-# DC PARTITION INITIALIZATION — ADMM
+# Per-partition initializers
+# ============================================================
+
+# ------------------------------------------------------------
+# State
 # ------------------------------------------------------------
 
 function init_state_partition!(
@@ -14,6 +18,10 @@ function init_state_partition!(
     @objective(part.model, Min, part.obj_static)
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function init_power_partition!(
     part::PartitionDC,
@@ -30,6 +38,10 @@ function init_power_partition!(
     return nothing
 end
 
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
+
 function init_hybrid_partition!(
     part::PartitionDC,
     sys_zone::SystemData,
@@ -43,10 +55,6 @@ function init_hybrid_partition!(
 )
     build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
 
-    # SplitBus (Method 3): add one free variable p_inj[m] per split bus present
-    # in this zone and add it into the active power balance at that bus via
-    # `set_normalized_coefficient`. The bus itself is already marked
-    # non-virtual in the partitioning step, so the balance constraint exists.
     if !isempty(bus_pairs) && p_inj_store !== nothing
         _attach_p_inj_variables!(part, bus_pairs, p_inj_store)
     end
@@ -62,28 +70,10 @@ function init_hybrid_partition!(
     return nothing
 end
 
-# Build (or rebuild) the quadratic term 0.5·ρ · Σ p_inj[b]² for this zone.
-# Stored on `part.quad_p_inj_expr` so that rho refresh can regenerate obj_static
-# consistently with the existing `quad_bus_expr`/`quad_branch_expr` pattern.
-function build_quad_p_inj_expr!(
-    part::PartitionDC,
-    rho::Float64,
-    p_inj_store::Union{Nothing, Dict{Int, JuMP.VariableRef}},
-)
-    quad = zero(JuMP.QuadExpr)
-    if p_inj_store !== nothing
-        for (_, v) in p_inj_store
-            quad += 0.5 * rho * v^2
-        end
-    end
-    part.quad_p_inj_expr = quad
-    return quad
-end
+# ============================================================
+# Helpers
+# ============================================================
 
-# ------------------------------------------------------------
-# Helper: create p_inj variables in this partition and inject them into the
-# existing active power balance constraints at split buses.
-# ------------------------------------------------------------
 function _attach_p_inj_variables!(
     part::PartitionDC,
     bus_pairs::Vector{NTuple{3, Int}},
@@ -91,9 +81,6 @@ function _attach_p_inj_variables!(
 )
     model = part.model::JuMP.Model
     pos = part.position
-
-    # Buses in *this* zone that are split points (appear in bus_pairs either
-    # as zone_a_pos or zone_b_pos equal to this partition's position).
     zone_split_bus_ids = Int[]
     for (fbus, za, zb) in bus_pairs
         if za == pos || zb == pos
@@ -113,9 +100,28 @@ function _attach_p_inj_variables!(
     return nothing
 end
 
+function build_quad_p_inj_expr!(
+    part::PartitionDC,
+    rho::Float64,
+    p_inj_store::Union{Nothing, Dict{Int, JuMP.VariableRef}},
+)
+    quad = zero(JuMP.QuadExpr)
+    if p_inj_store !== nothing
+        for (_, v) in p_inj_store
+            quad += 0.5 * rho * v^2
+        end
+    end
+    part.quad_p_inj_expr = quad
+    return quad
+end
+
 # ============================================================
-# BATCH
+# Batch entry points
 # ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 function init_state_partition!(
     partitions::Partitions{PartitionDC},
@@ -132,6 +138,10 @@ function init_state_partition!(
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function init_power_partition!(
     partitions::Partitions{PartitionDC},
@@ -151,6 +161,10 @@ function init_power_partition!(
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
 
 function init_hybrid_partition!(
     partitions::Partitions{PartitionDC},

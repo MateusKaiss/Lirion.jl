@@ -1,4 +1,6 @@
-algorithm_tag(::ALADINAlgorithm) = :aladin
+# ============================================================
+# Core loop
+# ============================================================
 
 function run_algorithm!(ws::AbstractALADINWorkspace, params::ALADINParams)
     tag = _print_tag(ws)
@@ -30,9 +32,9 @@ function run_algorithm!(ws::AbstractALADINWorkspace, params::ALADINParams)
     return nothing
 end
 
-# ---------------------------------------------------------------
-# ENTRY POINT
-# ---------------------------------------------------------------
+# ============================================================
+# Entry point
+# ============================================================
 
 function run_algorithm(
     sys::DistributedSystem,

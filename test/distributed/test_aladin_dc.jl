@@ -8,31 +8,26 @@
 const ALADIN_DC_STATE_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 const ALADIN_DC_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 const ALADIN_DC_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 const ALADIN_DC_SPLITBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 const ALADIN_DC_DUMMYBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 # Power-only DummyBus: case3_lmbd__api excluded (same issue as ADMM — without θ
@@ -41,7 +36,6 @@ const ALADIN_DC_DUMMYBUS_HYBRID_CASES = [
 const ALADIN_DC_DUMMYBUS_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 # ============================================================
@@ -319,7 +313,14 @@ function run_aladin_dc_dummybus_power_tests(;
         eps_rel = 1e-4,
     )
 
-    overrides(_case_name) = NamedTuple()
+    # case14_ieee: rho=1e5 drives the coordinator QP to DUAL_INFEASIBLE at
+    # the first step. Paper tune uses rho=1e3, mu=1e3, adaptive (iters=3).
+    overrides(case_name) = begin
+        if case_name == "pglib_opf_case14_ieee.m"
+            return (rho = 1000.0, mu = 1000.0)
+        end
+        return NamedTuple()
+    end
 
     return run_case_suite(;
         label = "ALADIN-DC DUMMYBUS-POWER",

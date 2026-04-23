@@ -2,17 +2,15 @@
 # Dispatch
 # ============================================================
 
-@inline base_model_tag(::Type{AC})    = Val(:ac)
-@inline base_model_tag(::Type{DC})    = Val(:dc)
+@inline base_model_tag(::Type{AC}) = Val(:ac)
+@inline base_model_tag(::Type{DC}) = Val(:dc)
 @inline base_model_tag(::Type{SOCWR}) = Val(:socwr)
-
 
 # ============================================================
 # Utilities
 # ============================================================
 
 is_gurobi(m::JuMP.Model)::Bool = occursin("Gurobi", MOI.get(m, MOI.SolverName()))
-
 
 # ============================================================
 # Default factories
@@ -130,7 +128,6 @@ const _SILENT_FACTORY_SOCWR = optimizer_with_attributes(
     "reduced_tol_ktratio" => 1e-4,
 )
 
-
 # ============================================================
 # User-supplied optimizer
 # ============================================================
@@ -155,15 +152,14 @@ function _silent_factory(opt)
     return opt
 end
 
-
 # ============================================================
 # Entry point
 # ============================================================
 
-resolve_optimizer(::Val{:ac},    user = nothing) =
-    user === nothing ? _SILENT_FACTORY_AC    : _silent_factory(user)
-resolve_optimizer(::Val{:dc},    user = nothing) =
-    user === nothing ? _SILENT_FACTORY_DC    : _silent_factory(user)
+resolve_optimizer(::Val{:ac}, user = nothing) =
+    user === nothing ? _SILENT_FACTORY_AC : _silent_factory(user)
+resolve_optimizer(::Val{:dc}, user = nothing) =
+    user === nothing ? _SILENT_FACTORY_DC : _silent_factory(user)
 resolve_optimizer(::Val{:socwr}, user = nothing) =
     user === nothing ? _SILENT_FACTORY_SOCWR : _silent_factory(user)
 
@@ -173,7 +169,6 @@ resolve_optimizer(::Val{:socwr}, user = nothing) =
 )
     return resolve_optimizer(base_model_tag(config.base_model), user)
 end
-
 
 # ============================================================
 # Feasibility check

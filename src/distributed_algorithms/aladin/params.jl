@@ -1,18 +1,21 @@
-# =======================================================================
-# ALADIN — Parameter container
-# =======================================================================
+# ============================================================
+# Params container
+# ============================================================
+
 struct ALADINParams
     max_iter::Int
-
     eps_abs::Float64
     eps_rel::Float64
-
     adaptive::Bool
     rho_growth::Float64
     rho_upper::Float64
     mu_growth::Float64
     mu_upper::Float64
 end
+
+# ============================================================
+# Builder
+# ============================================================
 
 @inline function build_params(cfg::ALADINConfig)::ALADINParams
     return ALADINParams(

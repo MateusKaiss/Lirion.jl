@@ -9,7 +9,6 @@ function _solve_zones_parallel!(ws, post_solve_hook)
         JuMP.optimize!(model)
         _require_optimal!(model; iter = ws.iter, zone_id = part.id)
 
-        part.has_solution = true
         part.generation_cost = JuMP.value(model[:generation_cost])
 
         post_solve_hook(ws, i, part)

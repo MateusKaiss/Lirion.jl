@@ -1,6 +1,6 @@
-# ----------------------------------------------------------------------
-# Type-level accessors — extract (F, C) from any distributed tag
-# ----------------------------------------------------------------------
+# ============================================================
+# Type accessors
+# ============================================================
 
 @inline formulation(::ADMM{C, F}) where {C, F} = F
 @inline formulation(::ALADIN{C, F}) where {C, F} = F
@@ -10,18 +10,16 @@
 @inline algorithm_family(::ADMM) = :admm
 @inline algorithm_family(::ALADIN) = :aladin
 
-# ----------------------------------------------------------------------
-# Short diagnostic tags used by logging and history modules
-# ----------------------------------------------------------------------
-# `algorithm_tag(::ALADINAlgorithm) = :aladin` is added in
-# aladin/run.jl so this file doesn't need to know about the
-# ALADIN subtree types.
+# ============================================================
+# Algorithm tags
+# ============================================================
 
 algorithm_tag(::ADMMAlgorithm) = :admm
+algorithm_tag(::ALADINAlgorithm) = :aladin
 
-# ----------------------------------------------------------------------
-# Timing utilities shared by both ADMM and ALADIN run_algorithm methods
-# ----------------------------------------------------------------------
+# ============================================================
+# Time utilities
+# ============================================================
 
 @inline _elapsed_s(t0_ns::Integer) = (time_ns() - t0_ns) / 1e9
 

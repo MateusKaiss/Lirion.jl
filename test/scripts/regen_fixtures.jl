@@ -32,7 +32,6 @@ const BASE_CASES = [
     "pglib_opf_case24_ieee_rts.m",
     "pglib_opf_case30_as.m",
     "pglib_opf_case30_ieee.m",
-    "pglib_opf_case39_epri.m",
     "pglib_opf_case57_ieee.m",
     "pglib_opf_case60_c.m",
     "pglib_opf_case73_ieee_rts.m",

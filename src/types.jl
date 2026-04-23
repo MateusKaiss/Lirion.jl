@@ -467,8 +467,9 @@ ADMMConfig(
     # For the kwargs constructor, default floor is the user-supplied rho
     # when adaptive is on (a representative "initial value" across all
     # required components); otherwise 0 (no floor).
-    floor = rho_floor > 0.0 ? Float64(rho_floor) :
-            (adaptive_rho && rho !== nothing ? Float64(rho) : 0.0)
+    floor =
+        rho_floor > 0.0 ? Float64(rho_floor) :
+        (adaptive_rho && rho !== nothing ? Float64(rho) : 0.0)
 
     ADMMConfig(
         base_model,
@@ -540,7 +541,7 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
         eps_abs::Real = 1e-4,
         eps_rel::Real = 1e-4,
         active_set_tol::Real = 1e-6,
-        adaptive::Bool = true,
+        adaptive::Bool = false,
         rho_growth::Real = 1.3,
         mu_growth::Real = 2.0,
         rho_upper::Real = 1e6,

@@ -1,4 +1,12 @@
+# ============================================================
+# Abstract type
+# ============================================================
+
 abstract type AbstractPartition end
+
+# ============================================================
+# Container
+# ============================================================
 
 struct Partitions{P <: AbstractPartition}
     parts::Vector{P}
@@ -12,143 +20,158 @@ end
     @inbounds return (ps.parts[st], st + 1)
 end
 
+# ============================================================
+# Partition structs
+# ============================================================
+
+# ------------------------------------------------------------
+# DC
+# ------------------------------------------------------------
+
 Base.@kwdef mutable struct PartitionDC <: AbstractPartition
+    # identity
     id::Int
     position::Int = 0
 
+    # source data
     bus::BusData
     branch::BranchData
+    objective_params::ObjectiveData
 
+    # index maps
     zone_branch_idx_in_full::Vector{Int} = Int[]
-    zone_shared_bus_ids::Vector{Int} = Int[]
     branch_idx_full_to_zone::Vector{Int} = Int[]
-
+    zone_shared_bus_ids::Vector{Int} = Int[]
     shared_bus_local_idx::Vector{Int} = Int[]
     shared_bus_consensus_idx::Vector{Int} = Int[]
+    zone_edges::Vector{Int} = Int[]
 
+    # buffers
     theta_buf::Vector{Float64} = Float64[]
     theta_shared_buf::Vector{Float64} = Float64[]
 
+    # JuMP model
     model::Union{Nothing, JuMP.Model} = nothing
     theta_var::Union{Nothing, JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}} = nothing
 
+    # objective expressions
     obj_base::Union{Nothing, Float64, JuMP.AffExpr, JuMP.QuadExpr} = nothing
     obj_static::JuMP.QuadExpr = zero(JuMP.QuadExpr)
     quad_bus_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
     quad_branch_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
-    # Populated by SplitBus (Method 3) only; zero otherwise.
     quad_p_inj_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
 
-    objective_params::ObjectiveData
-    has_solution::Bool = false
-
+    # solution status
     generation_cost::Float64 = 0.0
-
-    zone_edges::Vector{Int} = Int[]
 end
 
+# ------------------------------------------------------------
+# AC
+# ------------------------------------------------------------
+
 Base.@kwdef mutable struct PartitionAC <: AbstractPartition
+    # identity
     id::Int
     position::Int = 0
 
+    # source data
     bus::BusData
     branch::BranchData
+    objective_params::ObjectiveData
 
+    # index maps
     zone_branch_idx_in_full::Vector{Int} = Int[]
-    zone_shared_bus_ids::Vector{Int} = Int[]
     branch_idx_full_to_zone::Vector{Int} = Int[]
-
+    zone_shared_bus_ids::Vector{Int} = Int[]
     shared_bus_local_idx::Vector{Int} = Int[]
     shared_bus_consensus_idx::Vector{Int} = Int[]
+    zone_edges::Vector{Int} = Int[]
 
+    # buffers
     theta_buf::Vector{Float64} = Float64[]
-    v_mag_buf::Vector{Float64} = Float64[]
     theta_shared_buf::Vector{Float64} = Float64[]
+    v_mag_buf::Vector{Float64} = Float64[]
     v_mag_shared_buf::Vector{Float64} = Float64[]
 
+    # JuMP model
     model::Union{Nothing, JuMP.Model} = nothing
     theta_var::Union{Nothing, JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}} = nothing
     v_mag_var::Union{Nothing, JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}} = nothing
 
+    # objective expressions
     obj_base::Union{Nothing, Float64, JuMP.AffExpr, JuMP.QuadExpr, JuMP.NonlinearExpr} =
         nothing
     quad_bus_expr::Union{Nothing, JuMP.QuadExpr, JuMP.NonlinearExpr} = nothing
     quad_branch_expr::Union{Nothing, JuMP.QuadExpr, JuMP.NonlinearExpr} = nothing
-    # Populated by SplitBus (Method 3) only; zero otherwise.
     quad_p_inj_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
     quad_q_inj_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
 
-    objective_params::ObjectiveData
-    has_solution::Bool = false
-
+    # solution status
     generation_cost::Float64 = 0.0
-
-    zone_edges::Vector{Int} = Int[]
 end
 
+# ------------------------------------------------------------
+# SOCWR
+# ------------------------------------------------------------
+
 Base.@kwdef mutable struct PartitionSOCWR <: AbstractPartition
+    # identity
     id::Int
     position::Int = 0
 
+    # source data
     bus::BusData
     branch::BranchData
+    objective_params::ObjectiveData
 
+    # index maps
     zone_branch_idx_in_full::Vector{Int} = Int[]
-    zone_shared_bus_ids::Vector{Int} = Int[]
     branch_idx_full_to_zone::Vector{Int} = Int[]
-
+    zone_shared_bus_ids::Vector{Int} = Int[]
     shared_bus_local_idx::Vector{Int} = Int[]
     shared_bus_consensus_idx::Vector{Int} = Int[]
+    zone_edges::Vector{Int} = Int[]
 
+    # buffers
     v2_buf::Vector{Float64} = Float64[]
     v2_shared_buf::Vector{Float64} = Float64[]
 
+    # JuMP model
     model::Union{Nothing, JuMP.Model} = nothing
     v2_var::Union{Nothing, JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}} = nothing
 
+    # objective expressions
     obj_base::Union{Nothing, Float64, JuMP.AffExpr, JuMP.QuadExpr, JuMP.NonlinearExpr} =
         nothing
     obj_static::JuMP.QuadExpr = zero(JuMP.QuadExpr)
-
     quad_bus_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
     quad_rt_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
     quad_pq_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
-    # Populated by SplitBus (Method 3) only; zero otherwise.
     quad_p_inj_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
     quad_q_inj_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
-
     soft_anchor_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
 
-    objective_params::ObjectiveData
-    has_solution::Bool = false
-
+    # solution status
     generation_cost::Float64 = 0.0
-
-    zone_edges::Vector{Int} = Int[]
 end
 
-# =======================================================================
-# ADMM Partitions Builder
-# -----------------------------------------------------------------------
-# Precomputes `shared_bus_local_idx` and `shared_bus_consensus_idx` at
-# build time using the dense Vector index map already available in
-# `BusData` and the canonical `full_shared_bus_ids` order.
-# =======================================================================
+# ============================================================
+# Builder
+# ============================================================
 
 function build_partitions(::Type{P}, sys::DistributedSystem) where {P <: AbstractPartition}
-    n = length(sys.zones)
-    parts = Vector{P}(undef, n)
+    n_zones = length(sys.zones)
+    parts = Vector{P}(undef, n_zones)
 
-    # Global lookup: bus_id -> position in full_shared_bus_ids (0 if absent).
     full_shared = sys.full_shared_bus_ids
     n_shared_global = length(full_shared)
     max_shared_id = n_shared_global == 0 ? 0 : maximum(full_shared)
-    full_shared_lookup = zeros(Int, max_shared_id)
+    bus_id_to_consensus_idx = zeros(Int, max_shared_id)
     @inbounds for (j, b) in enumerate(full_shared)
-        full_shared_lookup[b] = j
+        bus_id_to_consensus_idx[b] = j
     end
 
-    @inbounds for i in 1:n
+    @inbounds for i in 1:n_zones
         zone = sys.zones[i]
         s = sys.parts[i]
         zone_shared_ids = sys.zone_shared_bus_ids[i]
@@ -156,11 +179,11 @@ function build_partitions(::Type{P}, sys::DistributedSystem) where {P <: Abstrac
         n_sh = length(zone_shared_ids)
         shared_local_idx = Vector{Int}(undef, n_sh)
         shared_cons_idx = Vector{Int}(undef, n_sh)
-        bus_id_to_idx = s.bus.id_to_idx
+        bus_id_to_local_idx = s.bus.id_to_idx
         for k in 1:n_sh
             b = zone_shared_ids[k]
-            shared_local_idx[k] = bus_id_to_idx[b]
-            shared_cons_idx[k] = full_shared_lookup[b]
+            shared_local_idx[k] = bus_id_to_local_idx[b]
+            shared_cons_idx[k] = bus_id_to_consensus_idx[b]
         end
 
         parts[i] = P(;

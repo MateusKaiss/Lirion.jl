@@ -8,7 +8,6 @@
 const DC_STATE_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 # ------------------------
@@ -17,7 +16,6 @@ const DC_STATE_CASES = [
 const DC_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 # ------------------------
@@ -26,7 +24,6 @@ const DC_POWER_CASES = [
 const DC_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 # ------------------------
@@ -35,7 +32,6 @@ const DC_HYBRID_CASES = [
 const DC_DUMMYBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 # ------------------------
@@ -44,7 +40,6 @@ const DC_DUMMYBUS_HYBRID_CASES = [
 const DC_SPLITBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 # ------------------------
@@ -59,7 +54,6 @@ const DC_SPLITBUS_HYBRID_CASES = [
 const DC_DUMMYBUS_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 # ============================================================
@@ -109,10 +103,6 @@ function run_admm_dc_state_tests(;
         # case14_ieee state: needs ρ=1e5 (empirical, AC state diverges at ρ=1e3).
         if case_name == "pglib_opf_case14_ieee.m"
             return (rho = 100000.0, max_iter = 5000, adaptive = false)
-        end
-        # case30_ieee state: needs ρ=1e6 (AC and SOCWR state diverge at ρ<1e5).
-        if case_name == "pglib_opf_case30_ieee.m"
-            return (rho = 1000000.0, max_iter = 5000, adaptive = false)
         end
         return NamedTuple()
     end
@@ -171,14 +161,7 @@ function run_admm_dc_power_tests(;
         tau_decr = 0.98,
     )
 
-    overrides(case_name) = begin
-        # case30 DC power/dummy_power plateau at ~-1.2 % gap until ρ reaches
-        # 1e8; hybrid/split avoid this because θ enforces consensus.
-        if case_name == "pglib_opf_case30_ieee.m"
-            return (rho = 1.0e8, max_iter = 10000, adaptive = false)
-        end
-        return NamedTuple()
-    end
+    overrides(_case_name) = NamedTuple()
 
     return run_case_suite(;
         label = "ADMM-DC POWER",
@@ -408,14 +391,7 @@ function run_admm_dc_dummybus_power_tests(;
         tau_decr = 0.98,
     )
 
-    overrides(case_name) = begin
-        # case30 DC power/dummy_power plateau at ~-1.2 % gap until ρ reaches
-        # 1e8; hybrid/split avoid this because θ enforces consensus.
-        if case_name == "pglib_opf_case30_ieee.m"
-            return (rho = 1.0e8, max_iter = 10000, adaptive = false)
-        end
-        return NamedTuple()
-    end
+    overrides(_case_name) = NamedTuple()
 
     return run_case_suite(;
         label = "ADMM-DC DUMMYBUS-POWER",

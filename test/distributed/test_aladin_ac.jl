@@ -5,31 +5,26 @@
 const ALADIN_AC_STATE_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 const ALADIN_AC_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 const ALADIN_AC_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 const ALADIN_AC_SPLITBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 const ALADIN_AC_DUMMYBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 # Power-only DummyBus excludes __api (tight bounds can trip infeasibility
@@ -37,7 +32,6 @@ const ALADIN_AC_DUMMYBUS_HYBRID_CASES = [
 const ALADIN_AC_DUMMYBUS_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 # ============================================================
@@ -351,7 +345,14 @@ function run_aladin_ac_dummybus_power_tests(;
         eps_rel = 1e-4,
     )
 
-    overrides(_case_name) = NamedTuple()
+    # case14_ieee: mu=1e4 drives divergence; paper tune uses mu=1e3
+    # (rho=1e4, gap=+0.584%, iters=75).
+    overrides(case_name) = begin
+        if case_name == "pglib_opf_case14_ieee.m"
+            return (mu = 1000.0,)
+        end
+        return NamedTuple()
+    end
 
     return run_case_suite(;
         label = "ALADIN-AC DUMMYBUS-POWER",

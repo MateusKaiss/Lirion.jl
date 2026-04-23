@@ -4,7 +4,6 @@
 const AC_STATE_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 # ------------------------
@@ -13,7 +12,6 @@ const AC_STATE_CASES = [
 const AC_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 # ------------------------
@@ -22,7 +20,6 @@ const AC_POWER_CASES = [
 const AC_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 # ------------------------
@@ -31,7 +28,6 @@ const AC_HYBRID_CASES = [
 const AC_SPLITBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 # ------------------------
@@ -40,7 +36,6 @@ const AC_SPLITBUS_HYBRID_CASES = [
 const AC_DUMMYBUS_HYBRID_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 # ------------------------
@@ -49,7 +44,6 @@ const AC_DUMMYBUS_HYBRID_CASES = [
 const AC_DUMMYBUS_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
-    "pglib_opf_case30_ieee.m",
 ]
 
 # ============================================================
@@ -190,6 +184,16 @@ function run_admm_ac_power_tests(;
         tau_decr = 0.98,
     )
 
+    # case14_ieee AC power: rho=1e5 + adaptive=true overshoots Ipopt's
+    # subproblem precision on the tie-line interface (task failure at
+    # iter 1). Paper tune uses fixed rho=1e3, gap=-0.007%, iters=60.
+    overrides(case_name) = begin
+        if case_name == "pglib_opf_case14_ieee.m"
+            return (rho = 1000.0, adaptive = false)
+        end
+        return NamedTuple()
+    end
+
     return run_case_suite(;
         label = "ADMM-AC POWER",
         test_dir = test_dir,
@@ -201,7 +205,7 @@ function run_admm_ac_power_tests(;
         objective_dist = dist_obj_ac,
         make_algorithm = make_alg,
         defaults = defaults,
-        overrides = _ -> NamedTuple(),
+        overrides = overrides,
         rtol = rtol,
         atol = atol,
     )

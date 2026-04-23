@@ -1,25 +1,3 @@
-# ======================================================================
-# Workspace Type Traits
-# ======================================================================
-#
-# Maps each concrete ADMM / ALADIN workspace type to its canonical
-# `(formulation, coupling)` pair. These traits let generic algorithm
-# code dispatch on `formulation_of(ws)` / `coupling_of(ws)` without
-# having to know the specific workspace type.
-#
-# The per-workspace dispatch is enumerated explicitly (18 methods, one
-# per {algorithm, formulation, coupling} combination) so that Julia can
-# specialise the caller at compile time with zero runtime dispatch
-# cost. Future Phase 4 (parametric workspace) will collapse this into
-# a single method on `ADMMWorkspace{F,C}`.
-#
-# This file must be loaded AFTER all concrete workspace structs are
-# declared — see src/Lirion.jl include order.
-# ======================================================================
-
-# ----------------------------------------------------------------------
-# ADMM workspaces
-# ----------------------------------------------------------------------
 
 @inline formulation_of(::DCStateWorkspace) = DC
 @inline formulation_of(::DCPowerWorkspace) = DC
@@ -40,10 +18,6 @@
 @inline coupling_of(::SOCWRStateWorkspace) = State
 @inline coupling_of(::SOCWRPowerWorkspace) = Power
 @inline coupling_of(::SOCWRHybridWorkspace) = Hybrid
-
-# ----------------------------------------------------------------------
-# ALADIN workspaces
-# ----------------------------------------------------------------------
 
 @inline formulation_of(::DCStateWorkspaceALADIN) = DC
 @inline formulation_of(::DCPowerWorkspaceALADIN) = DC

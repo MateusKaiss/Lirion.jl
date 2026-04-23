@@ -1,10 +1,10 @@
 # ============================================================
-# SOCWR WORKSPACES
+# Workspace structs
 # ============================================================
 
-# ============================================================
-# STATE (V² + R/T)
-# ============================================================
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 Base.@kwdef mutable struct SOCWRStateWorkspace <: AbstractADMMWorkspace
     partitions::Partitions{PartitionSOCWR}
@@ -17,7 +17,6 @@ Base.@kwdef mutable struct SOCWRStateWorkspace <: AbstractADMMWorkspace
     bus_counts::Vector{Int}
     branch_counts::Vector{Int}
 
-    # Per-component residuals (cached for rho_update! without recomputation)
     r_primal_bus::Float64 = 0.0
     r_dual_bus::Float64 = 0.0
     r_primal_r::Float64 = 0.0
@@ -33,17 +32,15 @@ Base.@kwdef mutable struct SOCWRStateWorkspace <: AbstractADMMWorkspace
     hist::ADMMHistory = ADMMHistory()
 end
 
-# ============================================================
-# POWER (P/Q)
-# ============================================================
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 Base.@kwdef mutable struct SOCWRPowerWorkspace <: AbstractADMMWorkspace
     partitions::Partitions{PartitionSOCWR}
     id::Vector{Int}
 
     interzonal::Vector{Int}
-    # DummyBus (Method 2) bookkeeping: symmetric P/Q consensus on the two
-    # halves of each split tie-line. Empty for TieLine.
     branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[]
     pair_counts::Vector{Int} = Int[]
 
@@ -51,7 +48,6 @@ Base.@kwdef mutable struct SOCWRPowerWorkspace <: AbstractADMMWorkspace
 
     branch_counts::Vector{Int}
 
-    # Per-component residuals (cached for rho_update! without recomputation)
     r_primal_p::Float64 = 0.0
     r_primal_q::Float64 = 0.0
     r_dual_p::Float64 = 0.0
@@ -65,22 +61,18 @@ Base.@kwdef mutable struct SOCWRPowerWorkspace <: AbstractADMMWorkspace
     hist::ADMMHistory = ADMMHistory()
 end
 
-# ============================================================
-# HYBRID (V² + P/Q + R/T)
-# ============================================================
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
 
 Base.@kwdef mutable struct SOCWRHybridWorkspace <: AbstractADMMWorkspace
     partitions::Partitions{PartitionSOCWR}
     id::Vector{Int}
 
     interzonal::Vector{Int}
-    # DummyBus (Method 2) bookkeeping: symmetric P / Q flow consensus on the
-    # two halves of each split tie-line. Empty for TieLine/SplitBus.
     branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[]
     pair_counts::Vector{Int} = Int[]
 
-    # SplitBus (Method 3) bookkeeping: sign-flipped p_inj / q_inj consensus
-    # per split bus. Empty for TieLine/DummyBus.
     bus_pairs::Vector{NTuple{3, Int}} = NTuple{3, Int}[]
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
         Vector{Dict{Int, JuMP.VariableRef}}()
@@ -97,7 +89,6 @@ Base.@kwdef mutable struct SOCWRHybridWorkspace <: AbstractADMMWorkspace
     bus_counts::Vector{Int}
     branch_counts::Vector{Int}
 
-    # Per-component residuals (cached for rho_update! without recomputation)
     r_primal_bus::Float64 = 0.0
     r_dual_bus::Float64 = 0.0
     r_primal_p::Float64 = 0.0
@@ -122,7 +113,7 @@ Base.@kwdef mutable struct SOCWRHybridWorkspace <: AbstractADMMWorkspace
 end
 
 # ============================================================
-# RHO HELPERS
+# Rho accessors
 # ============================================================
 
 _get_rhos(ws::SOCWRStateWorkspace) = (
@@ -147,8 +138,12 @@ _get_rhos(ws::SOCWRHybridWorkspace) = (
 )
 
 # ============================================================
-# BUILDERS — STATE
+# Builders
 # ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 function build_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCWR})
     partitions = build_partitions(PartitionSOCWR, sys)
@@ -184,9 +179,9 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCWR})
     )
 end
 
-# ============================================================
-# BUILDERS — POWER
-# ============================================================
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWR})
     partitions = build_partitions(PartitionSOCWR, sys)
@@ -224,9 +219,9 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWR})
     )
 end
 
-# ============================================================
-# BUILDERS — HYBRID
-# ============================================================
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
 
 function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
     partitions = build_partitions(PartitionSOCWR, sys)
@@ -239,10 +234,8 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
     n_inter = length(inter)
     n_pairs = length(brpairs)
     n_bus_pairs = length(bpairs)
-    n_total = n_inter + n_pairs   # p_flow / q_flow consensus length
+    n_total = n_inter + n_pairs
 
-    # Per-zone p_inj / q_inj containers: populated by init_hybrid_partition!
-    # only when bus_pairs is non-empty (SplitBus sectioning).
     p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
     q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
 
@@ -264,13 +257,10 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
 
     vars = (
         v2 = VarState(n_shared, n_zones, config.rho_v2; init_value = 1.0),
-        # p_flow / q_flow cover interzonal (TieLine) and branch_pairs (DummyBus)
-        # in the same VarState: first n_inter slots, then n_pairs slots.
         p_flow = VarState(n_total, n_zones, config.rho_p),
         q_flow = VarState(n_total, n_zones, config.rho_q),
         r = VarState(n_inter, n_zones, config.rho_r),
         t = VarState(n_inter, n_zones, config.rho_t),
-        # Virtual injections at split buses (SplitBus Method 3).
         p_inj = VarState(n_bus_pairs, n_zones, config.rho_p),
         q_inj = VarState(n_bus_pairs, n_zones, config.rho_q),
     )
