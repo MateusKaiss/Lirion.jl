@@ -173,17 +173,26 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
 
     p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
 
-    init_hybrid_partition!(
-        partitions,
-        sys,
-        optimizer_factory,
-        config.rho_theta,
-        config.rho_p,
-        inter,
-        pairs,
-        bpairs,
-        p_inj_vars,
-    )
+    sectioning = config.sectioning
+    if sectioning isa TieLine
+        init_hybrid_partition!(
+            partitions, sys, optimizer_factory,
+            config.rho_theta, config.rho_p, sectioning, inter,
+        )
+    elseif sectioning isa DummyBus
+        init_hybrid_partition!(
+            partitions, sys, optimizer_factory,
+            config.rho_theta, config.rho_p, sectioning, inter, pairs,
+        )
+    elseif sectioning isa SplitBus
+        init_hybrid_partition!(
+            partitions, sys, optimizer_factory,
+            config.rho_theta, config.rho_p, sectioning, inter,
+            bpairs, p_inj_vars,
+        )
+    else
+        error("ADMM{Hybrid, DC}: unsupported sectioning $(sectioning)")
+    end
 
     vars = (
         theta = VarState(n_shared, n_zones, config.rho_theta),

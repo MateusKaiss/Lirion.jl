@@ -239,21 +239,28 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
     p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
     q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
 
-    init_hybrid_partition!(
-        partitions,
-        sys,
-        optimizer_factory,
-        config.rho_v2,
-        config.rho_p,
-        config.rho_q,
-        config.rho_r,
-        config.rho_t,
-        inter,
-        brpairs,
-        bpairs,
-        p_inj_vars,
-        q_inj_vars,
-    )
+    sectioning = config.sectioning
+    if sectioning isa TieLine
+        init_hybrid_partition!(
+            partitions, sys, optimizer_factory,
+            config.rho_v2, config.rho_p, config.rho_q, config.rho_r, config.rho_t,
+            sectioning, inter,
+        )
+    elseif sectioning isa DummyBus
+        init_hybrid_partition!(
+            partitions, sys, optimizer_factory,
+            config.rho_v2, config.rho_p, config.rho_q, config.rho_r, config.rho_t,
+            sectioning, inter, brpairs,
+        )
+    elseif sectioning isa SplitBus
+        init_hybrid_partition!(
+            partitions, sys, optimizer_factory,
+            config.rho_v2, config.rho_p, config.rho_q, config.rho_r, config.rho_t,
+            sectioning, inter, bpairs, p_inj_vars, q_inj_vars,
+        )
+    else
+        error("ADMM{Hybrid, SOCWR}: unsupported sectioning $(sectioning)")
+    end
 
     vars = (
         v2 = VarState(n_shared, n_zones, config.rho_v2; init_value = 1.0),

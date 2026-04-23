@@ -55,7 +55,7 @@ function init_power_partition!(
 end
 
 # ------------------------------------------------------------
-# Hybrid
+# Hybrid — TieLine
 # ------------------------------------------------------------
 
 function init_hybrid_partition!(
@@ -67,31 +67,83 @@ function init_hybrid_partition!(
     rho_q::Float64,
     rho_r::Float64,
     rho_t::Float64,
+    ::TieLine,
     interzonal_branches,
-    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
-    bus_pairs::Vector{NTuple{3, Int}} = NTuple{3, Int}[],
-    p_inj_store::Union{Nothing, Dict{Int, JuMP.VariableRef}} = nothing,
-    q_inj_store::Union{Nothing, Dict{Int, JuMP.VariableRef}} = nothing,
 )
     build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
-    if !isempty(bus_pairs) && p_inj_store !== nothing && q_inj_store !== nothing
-        _attach_pq_inj_variables_socwr!(
-            part, bus_pairs, p_inj_store, q_inj_store,
-        )
-    end
+    build_quad_bus_expr!(part, rho_v2)
+    build_quad_branch_pq_expr!(part, rho_p, rho_q, part.zone_edges, NTuple{4, Int}[])
+    build_quad_branch_rt_expr!(part, rho_r, rho_t, part.zone_edges)
+    part.obj_static =
+        part.obj_base + part.quad_bus_expr + part.quad_pq_expr +
+        part.quad_rt_expr
+    @objective(part.model, Min, part.obj_static)
+    return nothing
+end
 
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    part::PartitionSOCWR,
+    sys_zone::SystemData,
+    optimizer_factory,
+    rho_v2::Float64,
+    rho_p::Float64,
+    rho_q::Float64,
+    rho_r::Float64,
+    rho_t::Float64,
+    ::DummyBus,
+    interzonal_branches,
+    branch_pairs::Vector{NTuple{4, Int}},
+)
+    build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
     build_quad_bus_expr!(part, rho_v2)
     build_quad_branch_pq_expr!(part, rho_p, rho_q, part.zone_edges, branch_pairs)
     build_quad_branch_rt_expr!(part, rho_r, rho_t, part.zone_edges)
+    part.obj_static =
+        part.obj_base + part.quad_bus_expr + part.quad_pq_expr +
+        part.quad_rt_expr
+    @objective(part.model, Min, part.obj_static)
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    part::PartitionSOCWR,
+    sys_zone::SystemData,
+    optimizer_factory,
+    rho_v2::Float64,
+    rho_p::Float64,
+    rho_q::Float64,
+    rho_r::Float64,
+    rho_t::Float64,
+    ::SplitBus,
+    interzonal_branches,
+    bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_store::Dict{Int, JuMP.VariableRef},
+    q_inj_store::Dict{Int, JuMP.VariableRef},
+)
+    build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
+    _attach_pq_inj_variables_socwr!(
+        part, bus_pairs, p_inj_store, q_inj_store,
+    )
+    build_quad_bus_expr!(part, rho_v2)
+    build_quad_branch_pq_expr!(part, rho_p, rho_q, part.zone_edges, NTuple{4, Int}[])
+    build_quad_branch_rt_expr!(part, rho_r, rho_t, part.zone_edges)
     build_quad_p_inj_expr_socwr!(part, rho_p, p_inj_store)
     build_quad_q_inj_expr_socwr!(part, rho_q, q_inj_store)
-
     part.obj_static =
         part.obj_base + part.quad_bus_expr + part.quad_pq_expr +
         part.quad_rt_expr + part.quad_p_inj_expr + part.quad_q_inj_expr
     @objective(part.model, Min, part.obj_static)
     return nothing
 end
+
 
 # ============================================================
 # Helpers
@@ -161,6 +213,7 @@ function build_quad_q_inj_expr_socwr!(
     return quad
 end
 
+
 # ============================================================
 # Soft anchor regularization (Gurobi SOCP stability)
 # ============================================================
@@ -199,6 +252,7 @@ function soft_anchor_branch_expr!(
     part.soft_anchor_expr = quad
     return quad
 end
+
 
 # ============================================================
 # Batch entry points
@@ -253,7 +307,7 @@ function init_power_partition!(
 end
 
 # ------------------------------------------------------------
-# Hybrid
+# Hybrid — TieLine
 # ------------------------------------------------------------
 
 function init_hybrid_partition!(
@@ -265,26 +319,77 @@ function init_hybrid_partition!(
     rho_q::Float64,
     rho_r::Float64,
     rho_t::Float64,
+    sectioning::TieLine,
     interzonal_branches,
-    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
-    bus_pairs::Vector{NTuple{3, Int}} = NTuple{3, Int}[],
-    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
-    Dict{Int, JuMP.VariableRef}[],
-    q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
-    Dict{Int, JuMP.VariableRef}[],
 )
     n = length(partitions.parts)
     @assert length(sys.parts) == n
-    have_p_inj = length(p_inj_vars) == n
-    have_q_inj = length(q_inj_vars) == n
     @inbounds for i in 1:n
         init_hybrid_partition!(
             partitions.parts[i], sys.parts[i], optimizer_factory,
-            rho_v2, rho_p, rho_q, rho_r, rho_t, interzonal_branches,
-            branch_pairs,
-            bus_pairs,
-            have_p_inj ? p_inj_vars[i] : nothing,
-            have_q_inj ? q_inj_vars[i] : nothing,
+            rho_v2, rho_p, rho_q, rho_r, rho_t, sectioning, interzonal_branches,
+        )
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    partitions::Partitions{PartitionSOCWR},
+    sys::DistributedSystem,
+    optimizer_factory,
+    rho_v2::Float64,
+    rho_p::Float64,
+    rho_q::Float64,
+    rho_r::Float64,
+    rho_t::Float64,
+    sectioning::DummyBus,
+    interzonal_branches,
+    branch_pairs::Vector{NTuple{4, Int}},
+)
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n
+    @inbounds for i in 1:n
+        init_hybrid_partition!(
+            partitions.parts[i], sys.parts[i], optimizer_factory,
+            rho_v2, rho_p, rho_q, rho_r, rho_t, sectioning,
+            interzonal_branches, branch_pairs,
+        )
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    partitions::Partitions{PartitionSOCWR},
+    sys::DistributedSystem,
+    optimizer_factory,
+    rho_v2::Float64,
+    rho_p::Float64,
+    rho_q::Float64,
+    rho_r::Float64,
+    rho_t::Float64,
+    sectioning::SplitBus,
+    interzonal_branches,
+    bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+    q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+)
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n
+    @assert length(p_inj_vars) == n
+    @assert length(q_inj_vars) == n
+    @inbounds for i in 1:n
+        init_hybrid_partition!(
+            partitions.parts[i], sys.parts[i], optimizer_factory,
+            rho_v2, rho_p, rho_q, rho_r, rho_t, sectioning,
+            interzonal_branches, bus_pairs, p_inj_vars[i], q_inj_vars[i],
         )
     end
     return nothing
