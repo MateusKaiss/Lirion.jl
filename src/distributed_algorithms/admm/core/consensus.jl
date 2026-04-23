@@ -333,7 +333,7 @@ function consensus!(ws::DCPowerWorkspace)
     return nothing
 end
 
-function consensus!(ws::DCHybridWorkspace)
+function consensus!(ws::DCHybridWorkspace{<:Union{TieLine, DummyBus}})
     _consensus_bus_single!(
         ws.vars.theta.consensus,
         ws.bus_counts,
@@ -360,14 +360,32 @@ function consensus!(ws::DCHybridWorkspace)
             _dc_flow_value,
         )
     end
-    if !isempty(ws.bus_pairs)
-        _consensus_bus_pairs_signed!(
-            ws.vars.p_inj.consensus,
+    return nothing
+end
+
+function consensus!(ws::DCHybridWorkspace{SplitBus})
+    _consensus_bus_single!(
+        ws.vars.theta.consensus,
+        ws.bus_counts,
+        ws.partitions,
+        snapshot_theta_shared!,
+    )
+    n_inter = length(ws.interzonal)
+    if n_inter > 0
+        _consensus_branch_single!(
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            ws.branch_counts,
             ws.partitions,
-            ws.bus_pairs,
-            ws.p_inj_vars,
+            ws.interzonal,
+            _dc_flow_value,
         )
     end
+    _consensus_bus_pairs_signed!(
+        ws.vars.p_inj.consensus,
+        ws.partitions,
+        ws.bus_pairs,
+        ws.p_inj_vars,
+    )
     return nothing
 end
 
@@ -408,7 +426,7 @@ function consensus!(ws::ACPowerWorkspace)
     return nothing
 end
 
-function consensus!(ws::ACHybridWorkspace)
+function consensus!(ws::ACHybridWorkspace{<:Union{TieLine, DummyBus}})
     n_inter = length(ws.interzonal)
     n_pairs = length(ws.branch_pairs)
 
@@ -439,16 +457,38 @@ function consensus!(ws::ACHybridWorkspace)
             ws.branch_pairs,
         )
     end
-    if !isempty(ws.bus_pairs)
-        _consensus_bus_pairs_signed!(
-            ws.vars.p_inj.consensus, ws.partitions,
-            ws.bus_pairs, ws.p_inj_vars,
-        )
-        _consensus_bus_pairs_signed!(
-            ws.vars.q_inj.consensus, ws.partitions,
-            ws.bus_pairs, ws.q_inj_vars,
+    return nothing
+end
+
+function consensus!(ws::ACHybridWorkspace{SplitBus})
+    n_inter = length(ws.interzonal)
+
+    _consensus_bus_ac!(
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        ws.sin_sum,
+        ws.cos_sum,
+        ws.bus_counts,
+        ws.partitions,
+    )
+    if n_inter > 0
+        _consensus_branch_ac!(
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            view(ws.vars.q_flow.consensus, 1:n_inter),
+            ws.p_branch_counts,
+            ws.q_branch_counts,
+            ws.partitions,
+            ws.interzonal,
         )
     end
+    _consensus_bus_pairs_signed!(
+        ws.vars.p_inj.consensus, ws.partitions,
+        ws.bus_pairs, ws.p_inj_vars,
+    )
+    _consensus_bus_pairs_signed!(
+        ws.vars.q_inj.consensus, ws.partitions,
+        ws.bus_pairs, ws.q_inj_vars,
+    )
     return nothing
 end
 
@@ -504,7 +544,7 @@ function consensus!(ws::SOCWRPowerWorkspace)
     return nothing
 end
 
-function consensus!(ws::SOCWRHybridWorkspace)
+function consensus!(ws::SOCWRHybridWorkspace{<:Union{TieLine, DummyBus}})
     n_inter = length(ws.interzonal)
     n_pairs = length(ws.branch_pairs)
 
@@ -548,15 +588,43 @@ function consensus!(ws::SOCWRHybridWorkspace)
             _socwr_q_value,
         )
     end
-    if !isempty(ws.bus_pairs)
-        _consensus_bus_pairs_signed!(
-            ws.vars.p_inj.consensus, ws.partitions,
-            ws.bus_pairs, ws.p_inj_vars,
+    return nothing
+end
+
+function consensus!(ws::SOCWRHybridWorkspace{SplitBus})
+    n_inter = length(ws.interzonal)
+
+    _consensus_bus_single!(
+        ws.vars.v2.consensus,
+        ws.bus_counts,
+        ws.partitions,
+        snapshot_v2_shared!,
+    )
+    if n_inter > 0
+        _consensus_branch_paired!(
+            view(ws.vars.p_flow.consensus, 1:n_inter),
+            view(ws.vars.q_flow.consensus, 1:n_inter),
+            ws.branch_counts,
+            ws.partitions,
+            ws.interzonal,
+            _socwr_pq_values,
         )
-        _consensus_bus_pairs_signed!(
-            ws.vars.q_inj.consensus, ws.partitions,
-            ws.bus_pairs, ws.q_inj_vars,
+        _consensus_branch_paired!(
+            ws.vars.r.consensus,
+            ws.vars.t.consensus,
+            ws.branch_counts,
+            ws.partitions,
+            ws.interzonal,
+            _socwr_rt_values,
         )
     end
+    _consensus_bus_pairs_signed!(
+        ws.vars.p_inj.consensus, ws.partitions,
+        ws.bus_pairs, ws.p_inj_vars,
+    )
+    _consensus_bus_pairs_signed!(
+        ws.vars.q_inj.consensus, ws.partitions,
+        ws.bus_pairs, ws.q_inj_vars,
+    )
     return nothing
 end
