@@ -1,26 +1,11 @@
 # ============================================================
-# ADMM Rho Adaptation & Refresh — unified for DC · AC · SOCWR
+# Helpers
 # ============================================================
 
-# Residual-balancing rule (Boyd et al. §3.4.1):
-#   if r > mu_incr * s  →  rho *= tau_incr      (primal stuck, push harder)
-#   if s > mu_decr * r  →  rho *= tau_decr      (dual stuck, relax)
-#
-# The rule compares `r` (primal mismatch in variable units) with `s`
-# (dual residual = ρ · ‖Δz‖ in units of ρ × variable). It implicitly
-# assumes r and s share a numerical scale. That assumption FAILS for
-# state-only couplings whose variables (θ, v_mag) live in narrow ranges
-# (rad, p.u. ~1), where r is naturally tiny while s = ρ · ‖Δz‖ starts
-# huge because ρ begins at a value chosen for the physical scale.
-# Wohlberg (2017) proposed dividing each residual by its own stopping
-# tolerance (which already embeds √n·eps_abs + eps_rel·‖·‖), turning
-# the ratio test into a balance of *how close each residual is to its
-# convergence threshold* instead of a raw magnitude ratio.
-#
-# `_adaptive_rho!` takes optional `eps_r`, `eps_s`; when both are
-# positive the normalised residuals drive the rule, otherwise it falls
-# back to the raw Boyd comparison (backward-compatible for hybrid /
-# per-component adaptations that don't yet carry per-block eps).
+# ------------------------------------------------------------
+# Adaptive rule
+# ------------------------------------------------------------
+
 function _adaptive_rho!(
     rho::Base.RefValue{Float64}, r::Float64, s::Float64,
     eps_r::Float64 = 0.0, eps_s::Float64 = 0.0,
@@ -33,13 +18,6 @@ function _adaptive_rho!(
     if r_n > mu_incr * s_n
         rho[] *= tau_incr
     elseif s_n > mu_decr * r_n
-        # Guard against over-shrinking below `rho_floor`. State-only
-        # couplings carry a dual residual s = ρ·‖Δz‖ whose scale is
-        # persistently above the primal r even at convergence — the raw
-        # Boyd rule fires shrink after shrink once primal starts
-        # settling, dragging ρ below the threshold it needs to enforce
-        # consensus. Callers pass `rho_floor = rho_initial` so the rule
-        # can only shrink back to the user's chosen starting point.
         new_rho = rho[] * tau_decr
         rho[] = rho_floor > 0.0 ? max(new_rho, rho_floor) : new_rho
     end
@@ -60,7 +38,10 @@ end
     )
 end
 
-# ---- DC bus ----
+# ------------------------------------------------------------
+# DC
+# ------------------------------------------------------------
+
 function _refresh_rho_bus_dc!(parts::Partitions{PartitionDC}, rho, prev_rho)::Bool
     rho_val = rho[]
     rho_val == prev_rho[] && return false
@@ -71,7 +52,6 @@ function _refresh_rho_bus_dc!(parts::Partitions{PartitionDC}, rho, prev_rho)::Bo
     return true
 end
 
-# ---- DC branch ----
 function _refresh_rho_branch_dc!(
     parts::Partitions{PartitionDC},
     rho,
@@ -87,7 +67,10 @@ function _refresh_rho_branch_dc!(
     return true
 end
 
-# ---- AC bus ----
+# ------------------------------------------------------------
+# AC
+# ------------------------------------------------------------
+
 function _refresh_rho_bus_ac!(
     parts::Partitions{PartitionAC},
     rho_theta,
@@ -107,7 +90,6 @@ function _refresh_rho_bus_ac!(
     return nothing
 end
 
-# ---- AC branch ----
 function _refresh_rho_branch_ac!(
     parts::Partitions{PartitionAC},
     rho_p,
@@ -129,7 +111,10 @@ function _refresh_rho_branch_ac!(
     return nothing
 end
 
-# ---- SOCWR bus (V²) ----
+# ------------------------------------------------------------
+# SOCWR
+# ------------------------------------------------------------
+
 function _refresh_rho_bus_socwr!(parts::Partitions{PartitionSOCWR}, rho, prev_rho)
     rho_val = rho[]
     if rho_val != prev_rho[]
@@ -143,7 +128,6 @@ function _refresh_rho_bus_socwr!(parts::Partitions{PartitionSOCWR}, rho, prev_rh
     return nothing
 end
 
-# ---- SOCWR branch RT ----
 function _refresh_rho_branch_rt_socwr!(
     parts::Partitions{PartitionSOCWR},
     rho_r,
@@ -165,7 +149,6 @@ function _refresh_rho_branch_rt_socwr!(
     return nothing
 end
 
-# ---- SOCWR branch PQ ----
 function _refresh_rho_branch_pq_socwr!(
     parts::Partitions{PartitionSOCWR},
     rho_p,
@@ -181,7 +164,7 @@ function _refresh_rho_branch_pq_socwr!(
             build_quad_branch_pq_expr!(part, rho_p_val, rho_q_val,
                 part.zone_edges, branch_pairs)
             part.obj_static =
-                part.obj_base + part.quad_pq_expr + part.soft_anchor_expr
+                part.obj_base + part.quad_pq_expr + part.tikhonov_reg_expr
         end
         prev_rho_p[] = rho_p_val
         prev_rho_q[] = rho_q_val
@@ -189,7 +172,6 @@ function _refresh_rho_branch_pq_socwr!(
     return nothing
 end
 
-# ---- SOCWR Hybrid (all groups) ----
 function _refresh_rho_hybrid_socwr!(
     parts,
     rho_v2, prev_rho_v2,
@@ -220,11 +202,9 @@ function _refresh_rho_hybrid_socwr!(
                 part.zone_edges, branch_pairs)
         (rho_r_val != prev_rho_r[] || rho_t_val != prev_rho_t[]) &&
             build_quad_branch_rt_expr!(part, rho_r_val, rho_t_val, part.zone_edges)
-        # `quad_p_inj_expr` / `quad_q_inj_expr` are zero for TieLine/DummyBus,
-        # so including them unconditionally is safe and keeps SplitBus intact.
         part.obj_static =
             part.obj_base + part.quad_bus_expr + part.quad_pq_expr +
-            part.quad_rt_expr + part.quad_p_inj_expr + part.quad_q_inj_expr
+            part.quad_rt_expr
     end
 
     prev_rho_v2[] = rho_v2_val
@@ -235,7 +215,14 @@ function _refresh_rho_hybrid_socwr!(
     return nothing
 end
 
-# ---- DC ----
+# ============================================================
+# Refresh rho
+# ============================================================
+
+# ------------------------------------------------------------
+# DC
+# ------------------------------------------------------------
+
 function refresh_rho!(ws::DCStateWorkspace)
     if _refresh_rho_bus_dc!(ws.partitions, ws.vars.theta.rho, ws.vars.theta.prev_rho)
         @inbounds for part in ws.partitions.parts
@@ -257,7 +244,7 @@ function refresh_rho!(ws::DCPowerWorkspace)
     return nothing
 end
 
-function refresh_rho!(ws::DCHybridWorkspace)
+function refresh_rho!(ws::DCHybridWorkspace{<:Union{TieLine, DummyBus}})
     bus_changed =
         _refresh_rho_bus_dc!(ws.partitions, ws.vars.theta.rho, ws.vars.theta.prev_rho)
     branch_changed =
@@ -265,29 +252,40 @@ function refresh_rho!(ws::DCHybridWorkspace)
             ws.partitions, ws.vars.p_flow.rho, ws.vars.p_flow.prev_rho,
             ws.branch_pairs,
         )
-    # SplitBus (Method 3): if p_inj rho changed, rebuild its quadratic term too.
-    p_inj_changed = false
-    if !isempty(ws.bus_pairs)
-        rho_pi = ws.vars.p_inj.rho[]
-        if rho_pi != ws.vars.p_inj.prev_rho[]
-            @inbounds for (i, part) in enumerate(ws.partitions.parts)
-                build_quad_p_inj_expr!(part, rho_pi, ws.p_inj_vars[i])
-            end
-            ws.vars.p_inj.prev_rho[] = rho_pi
-            p_inj_changed = true
-        end
-    end
-    if bus_changed || branch_changed || p_inj_changed
+    if bus_changed || branch_changed
         @inbounds for part in ws.partitions.parts
             part.obj_static =
-                part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
-                part.quad_p_inj_expr
+                part.obj_base + part.quad_bus_expr + part.quad_branch_expr
         end
     end
     return nothing
 end
 
-# ---- AC ----
+function refresh_rho!(ws::DCHybridWorkspace{SplitBus})
+    bus_changed =
+        _refresh_rho_bus_dc!(ws.partitions, ws.vars.theta.rho, ws.vars.theta.prev_rho)
+    p_inj_changed = false
+    rho_pi = ws.vars.p_inj.rho[]
+    if rho_pi != ws.vars.p_inj.prev_rho[]
+        @inbounds for (i, part) in enumerate(ws.partitions.parts)
+            build_quad_p_inj_expr!(part, rho_pi, ws.p_inj_vars[i])
+        end
+        ws.vars.p_inj.prev_rho[] = rho_pi
+        p_inj_changed = true
+    end
+    if bus_changed || p_inj_changed
+        @inbounds for part in ws.partitions.parts
+            part.obj_static =
+                part.obj_base + part.quad_bus_expr + part.quad_p_inj_expr
+        end
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# AC
+# ------------------------------------------------------------
+
 refresh_rho!(ws::ACStateWorkspace) = _refresh_rho_bus_ac!(
     ws.partitions,
     ws.vars.theta.rho, ws.vars.theta.prev_rho,
@@ -301,7 +299,7 @@ refresh_rho!(ws::ACPowerWorkspace) = _refresh_rho_branch_ac!(
     ws.branch_pairs,
 )
 
-function refresh_rho!(ws::ACHybridWorkspace)
+function refresh_rho!(ws::ACHybridWorkspace{<:Union{TieLine, DummyBus}})
     _refresh_rho_bus_ac!(
         ws.partitions,
         ws.vars.theta.rho, ws.vars.theta.prev_rho,
@@ -313,26 +311,36 @@ function refresh_rho!(ws::ACHybridWorkspace)
         ws.vars.q_flow.rho, ws.vars.q_flow.prev_rho,
         ws.branch_pairs,
     )
-    if !isempty(ws.bus_pairs)
-        rho_pi = ws.vars.p_inj.rho[]
-        if rho_pi != ws.vars.p_inj.prev_rho[]
-            @inbounds for (i, part) in enumerate(ws.partitions.parts)
-                build_quad_p_inj_expr_ac!(part, rho_pi, ws.p_inj_vars[i])
-            end
-            ws.vars.p_inj.prev_rho[] = rho_pi
+    return nothing
+end
+
+function refresh_rho!(ws::ACHybridWorkspace{SplitBus})
+    _refresh_rho_bus_ac!(
+        ws.partitions,
+        ws.vars.theta.rho, ws.vars.theta.prev_rho,
+        ws.vars.v_mag.rho, ws.vars.v_mag.prev_rho,
+    )
+    rho_pi = ws.vars.p_inj.rho[]
+    if rho_pi != ws.vars.p_inj.prev_rho[]
+        @inbounds for (i, part) in enumerate(ws.partitions.parts)
+            build_quad_p_inj_expr_ac!(part, rho_pi, ws.p_inj_vars[i])
         end
-        rho_qi = ws.vars.q_inj.rho[]
-        if rho_qi != ws.vars.q_inj.prev_rho[]
-            @inbounds for (i, part) in enumerate(ws.partitions.parts)
-                build_quad_q_inj_expr_ac!(part, rho_qi, ws.q_inj_vars[i])
-            end
-            ws.vars.q_inj.prev_rho[] = rho_qi
+        ws.vars.p_inj.prev_rho[] = rho_pi
+    end
+    rho_qi = ws.vars.q_inj.rho[]
+    if rho_qi != ws.vars.q_inj.prev_rho[]
+        @inbounds for (i, part) in enumerate(ws.partitions.parts)
+            build_quad_q_inj_expr_ac!(part, rho_qi, ws.q_inj_vars[i])
         end
+        ws.vars.q_inj.prev_rho[] = rho_qi
     end
     return nothing
 end
 
-# ---- SOCWR ----
+# ------------------------------------------------------------
+# SOCWR
+# ------------------------------------------------------------
+
 function refresh_rho!(ws::SOCWRStateWorkspace)
     _refresh_rho_bus_socwr!(ws.partitions, ws.vars.v2.rho, ws.vars.v2.prev_rho)
     _refresh_rho_branch_rt_socwr!(
@@ -350,7 +358,7 @@ refresh_rho!(ws::SOCWRPowerWorkspace) = _refresh_rho_branch_pq_socwr!(
     ws.branch_pairs,
 )
 
-function refresh_rho!(ws::SOCWRHybridWorkspace)
+function refresh_rho!(ws::SOCWRHybridWorkspace{<:Union{TieLine, DummyBus}})
     _refresh_rho_hybrid_socwr!(
         ws.partitions,
         ws.vars.v2.rho, ws.vars.v2.prev_rho,
@@ -360,38 +368,52 @@ function refresh_rho!(ws::SOCWRHybridWorkspace)
         ws.vars.t.rho, ws.vars.t.prev_rho,
         ws.branch_pairs,
     )
-    if !isempty(ws.bus_pairs)
-        rho_pi = ws.vars.p_inj.rho[]
-        rho_qi = ws.vars.q_inj.rho[]
-        pi_changed = rho_pi != ws.vars.p_inj.prev_rho[]
-        qi_changed = rho_qi != ws.vars.q_inj.prev_rho[]
-        if pi_changed || qi_changed
-            @inbounds for (i, part) in enumerate(ws.partitions.parts)
-                pi_changed && build_quad_p_inj_expr_socwr!(
-                    part, rho_pi, ws.p_inj_vars[i],
-                )
-                qi_changed && build_quad_q_inj_expr_socwr!(
-                    part, rho_qi, ws.q_inj_vars[i],
-                )
-                part.obj_static =
-                    part.obj_base + part.quad_bus_expr + part.quad_pq_expr +
-                    part.quad_rt_expr + part.quad_p_inj_expr +
-                    part.quad_q_inj_expr
-            end
-            pi_changed && (ws.vars.p_inj.prev_rho[] = rho_pi)
-            qi_changed && (ws.vars.q_inj.prev_rho[] = rho_qi)
+    return nothing
+end
+
+function refresh_rho!(ws::SOCWRHybridWorkspace{SplitBus})
+    rho_v2 = ws.vars.v2.rho[]
+    bus_changed = rho_v2 != ws.vars.v2.prev_rho[]
+    if bus_changed
+        @inbounds for part in ws.partitions.parts
+            build_quad_bus_expr!(part, rho_v2)
         end
+        ws.vars.v2.prev_rho[] = rho_v2
+    end
+
+    rho_pi = ws.vars.p_inj.rho[]
+    rho_qi = ws.vars.q_inj.rho[]
+    pi_changed = rho_pi != ws.vars.p_inj.prev_rho[]
+    qi_changed = rho_qi != ws.vars.q_inj.prev_rho[]
+
+    if bus_changed || pi_changed || qi_changed
+        @inbounds for (i, part) in enumerate(ws.partitions.parts)
+            pi_changed && build_quad_p_inj_expr_socwr!(
+                part, rho_pi, ws.p_inj_vars[i],
+            )
+            qi_changed && build_quad_q_inj_expr_socwr!(
+                part, rho_qi, ws.q_inj_vars[i],
+            )
+            part.obj_static =
+                part.obj_base + part.quad_bus_expr +
+                part.quad_p_inj_expr + part.quad_q_inj_expr
+        end
+        pi_changed && (ws.vars.p_inj.prev_rho[] = rho_pi)
+        qi_changed && (ws.vars.q_inj.prev_rho[] = rho_qi)
     end
     return nothing
 end
 
 refresh_rho!(::AbstractADMMWorkspace) = nothing
 
-# ---- DC State ----
-# State couplings are the prototype case where Boyd's raw residual-
-# balancing rule misfires (angles live in [-π/2, π/2] → r is naturally
-# small regardless of convergence). We pass ws.eps_primal / ws.eps_dual
-# so the rule compares residuals scaled by their stopping tolerances.
+# ============================================================
+# Rho update
+# ============================================================
+
+# ------------------------------------------------------------
+# DC
+# ------------------------------------------------------------
+
 function rho_update!(ws::DCStateWorkspace, params::ADMMParams)
     params.adaptive || return nothing
     _adapt!(ws.vars.theta.rho, ws.r_primal, ws.r_dual,
@@ -399,91 +421,100 @@ function rho_update!(ws::DCStateWorkspace, params::ADMMParams)
     return nothing
 end
 
-# ---- DC Power ----
 function rho_update!(ws::DCPowerWorkspace, params::ADMMParams)
     params.adaptive || return nothing
     _adapt!(ws.vars.p_flow.rho, ws.r_primal, ws.r_dual, params)
     return nothing
 end
 
-# ---- DC Hybrid (per-component adaptation) ----
-function rho_update!(ws::DCHybridWorkspace, params::ADMMParams)
+function rho_update!(ws::DCHybridWorkspace{<:Union{TieLine, DummyBus}}, params::ADMMParams)
     params.adaptive || return nothing
-
     _adapt!(ws.vars.theta.rho, ws.r_primal_bus, ws.r_dual_bus, params)
     _adapt!(ws.vars.p_flow.rho, ws.r_primal_branch, ws.r_dual_branch, params)
-    if !isempty(ws.bus_pairs)
-        _adapt!(
-            ws.vars.p_inj.rho, ws.r_primal_bus_pair, ws.r_dual_bus_pair, params,
-        )
-    end
     return nothing
 end
 
-# ---- AC State (per-component theta/V adaptation) ----
+function rho_update!(ws::DCHybridWorkspace{SplitBus}, params::ADMMParams)
+    params.adaptive || return nothing
+    _adapt!(ws.vars.theta.rho, ws.r_primal_bus, ws.r_dual_bus, params)
+    _adapt!(
+        ws.vars.p_inj.rho, ws.r_primal_bus_pair, ws.r_dual_bus_pair, params,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# AC
+# ------------------------------------------------------------
+
 function rho_update!(ws::ACStateWorkspace, params::ADMMParams)
     params.adaptive || return nothing
-
     _adapt!(ws.vars.theta.rho, ws.r_primal_theta, ws.r_dual_theta, params)
     _adapt!(ws.vars.v_mag.rho, ws.r_primal_v_mag, ws.r_dual_v_mag, params)
     return nothing
 end
 
-# ---- AC Power (P/Q adaptation) ----
 function rho_update!(ws::ACPowerWorkspace, params::ADMMParams)
     params.adaptive || return nothing
-
     _adapt!(ws.vars.p_flow.rho, ws.r_primal_p, ws.r_dual_p, params)
     _adapt!(ws.vars.q_flow.rho, ws.r_primal_q, ws.r_dual_q, params)
     return nothing
 end
 
-# ---- AC Hybrid ----
-function rho_update!(ws::ACHybridWorkspace, params::ADMMParams)
+function rho_update!(ws::ACHybridWorkspace{<:Union{TieLine, DummyBus}}, params::ADMMParams)
     params.adaptive || return nothing
-
     _adapt!(ws.vars.theta.rho, ws.r_primal_theta, ws.r_dual_theta, params)
     _adapt!(ws.vars.v_mag.rho, ws.r_primal_v_mag, ws.r_dual_v_mag, params)
     _adapt!(ws.vars.p_flow.rho, ws.r_primal_p, ws.r_dual_p, params)
     _adapt!(ws.vars.q_flow.rho, ws.r_primal_q, ws.r_dual_q, params)
-    if !isempty(ws.bus_pairs)
-        _adapt!(ws.vars.p_inj.rho, ws.r_primal_p_inj, ws.r_dual_p_inj, params)
-        _adapt!(ws.vars.q_inj.rho, ws.r_primal_q_inj, ws.r_dual_q_inj, params)
-    end
     return nothing
 end
 
-# ---- SOCWR State (V² + RT) ----
+function rho_update!(ws::ACHybridWorkspace{SplitBus}, params::ADMMParams)
+    params.adaptive || return nothing
+    _adapt!(ws.vars.theta.rho, ws.r_primal_theta, ws.r_dual_theta, params)
+    _adapt!(ws.vars.v_mag.rho, ws.r_primal_v_mag, ws.r_dual_v_mag, params)
+    _adapt!(ws.vars.p_inj.rho, ws.r_primal_p_inj, ws.r_dual_p_inj, params)
+    _adapt!(ws.vars.q_inj.rho, ws.r_primal_q_inj, ws.r_dual_q_inj, params)
+    return nothing
+end
+
+# ------------------------------------------------------------
+# SOCWR
+# ------------------------------------------------------------
+
 function rho_update!(ws::SOCWRStateWorkspace, params::ADMMParams)
     params.adaptive || return nothing
-
     _adapt!(ws.vars.v2.rho, ws.r_primal_bus, ws.r_dual_bus, params)
     _adapt!(ws.vars.r.rho, ws.r_primal_r, ws.r_dual_r, params)
     _adapt!(ws.vars.t.rho, ws.r_primal_t, ws.r_dual_t, params)
     return nothing
 end
 
-# ---- SOCWR Power (PQ) ----
 function rho_update!(ws::SOCWRPowerWorkspace, params::ADMMParams)
     params.adaptive || return nothing
-
     _adapt!(ws.vars.p_flow.rho, ws.r_primal_p, ws.r_dual_p, params)
     _adapt!(ws.vars.q_flow.rho, ws.r_primal_q, ws.r_dual_q, params)
     return nothing
 end
 
-# ---- SOCWR Hybrid (V² + PQ + RT) ----
-function rho_update!(ws::SOCWRHybridWorkspace, params::ADMMParams)
+function rho_update!(
+    ws::SOCWRHybridWorkspace{<:Union{TieLine, DummyBus}},
+    params::ADMMParams,
+)
     params.adaptive || return nothing
-
     _adapt!(ws.vars.v2.rho, ws.r_primal_bus, ws.r_dual_bus, params)
     _adapt!(ws.vars.p_flow.rho, ws.r_primal_p, ws.r_dual_p, params)
     _adapt!(ws.vars.q_flow.rho, ws.r_primal_q, ws.r_dual_q, params)
     _adapt!(ws.vars.r.rho, ws.r_primal_r, ws.r_dual_r, params)
     _adapt!(ws.vars.t.rho, ws.r_primal_t, ws.r_dual_t, params)
-    if !isempty(ws.bus_pairs)
-        _adapt!(ws.vars.p_inj.rho, ws.r_primal_p_inj, ws.r_dual_p_inj, params)
-        _adapt!(ws.vars.q_inj.rho, ws.r_primal_q_inj, ws.r_dual_q_inj, params)
-    end
+    return nothing
+end
+
+function rho_update!(ws::SOCWRHybridWorkspace{SplitBus}, params::ADMMParams)
+    params.adaptive || return nothing
+    _adapt!(ws.vars.v2.rho, ws.r_primal_bus, ws.r_dual_bus, params)
+    _adapt!(ws.vars.p_inj.rho, ws.r_primal_p_inj, ws.r_dual_p_inj, params)
+    _adapt!(ws.vars.q_inj.rho, ws.r_primal_q_inj, ws.r_dual_q_inj, params)
     return nothing
 end

@@ -84,10 +84,8 @@ function init_hybrid_partition!(
     build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
     build_quad_bus_expr!(part, rho_theta)
     build_quad_branch_expr!(part, rho, part.zone_edges, NTuple{4, Int}[])
-    build_quad_p_inj_expr!(part, rho, nothing)
     part.obj_static =
-        part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
-        part.quad_p_inj_expr
+        part.obj_base + part.quad_bus_expr + part.quad_branch_expr
     @objective(part.model, Min, part.obj_static)
     return nothing
 end
@@ -109,10 +107,8 @@ function init_hybrid_partition!(
     build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
     build_quad_bus_expr!(part, rho_theta)
     build_quad_branch_expr!(part, rho, part.zone_edges, branch_pairs)
-    build_quad_p_inj_expr!(part, rho, nothing)
     part.obj_static =
-        part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
-        part.quad_p_inj_expr
+        part.obj_base + part.quad_bus_expr + part.quad_branch_expr
     @objective(part.model, Min, part.obj_static)
     return nothing
 end
@@ -135,11 +131,9 @@ function init_hybrid_partition!(
     build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
     _attach_p_inj_variables!(part, bus_pairs, p_inj_store)
     build_quad_bus_expr!(part, rho_theta)
-    build_quad_branch_expr!(part, rho, part.zone_edges, NTuple{4, Int}[])
     build_quad_p_inj_expr!(part, rho, p_inj_store)
     part.obj_static =
-        part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
-        part.quad_p_inj_expr
+        part.obj_base + part.quad_bus_expr + part.quad_p_inj_expr
     @objective(part.model, Min, part.obj_static)
     return nothing
 end

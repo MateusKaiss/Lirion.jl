@@ -379,31 +379,6 @@ function update_objective!(
         ws.vars.v2.rho[],
     )
 
-    lin_pq = build_linear_branch_pq_term(
-        part,
-        part.zone_edges,
-        ws.vars.p_flow.consensus,
-        ws.vars.q_flow.consensus,
-        view(ws.vars.p_flow.duals, :, p),
-        view(ws.vars.q_flow.duals, :, p),
-        ws.interzonal,
-        ws.vars.p_flow.rho[],
-        ws.vars.q_flow.rho[],
-        ws.branch_pairs,
-    )
-
-    lin_rt = build_linear_branch_rt_term(
-        part,
-        part.zone_edges,
-        ws.vars.r.consensus,
-        ws.vars.t.consensus,
-        view(ws.vars.r.duals, :, p),
-        view(ws.vars.t.duals, :, p),
-        ws.interzonal,
-        ws.vars.r.rho[],
-        ws.vars.t.rho[],
-    )
-
     lin_p_inj = build_linear_inj_term_socwr(
         part,
         ws.bus_pairs,
@@ -423,7 +398,7 @@ function update_objective!(
 
     @objective(
         part.model, Min,
-        part.obj_static + lin_bus + lin_pq + lin_rt + lin_p_inj + lin_q_inj,
+        part.obj_static + lin_bus + lin_p_inj + lin_q_inj,
     )
     return nothing
 end

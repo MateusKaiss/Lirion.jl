@@ -1,4 +1,60 @@
 # ============================================================
+# Helpers
+# ============================================================
+
+function _attach_pq_inj_variables_ac!(
+    part::PartitionAC,
+    sys_zone::SystemData,
+    bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_store::Dict{Int, JuMP.VariableRef},
+    q_inj_store::Dict{Int, JuMP.VariableRef},
+)
+    model = part.model::JuMP.Model
+    pos = part.position
+    pf = sys_zone.powerflow
+    bus_idx_map = pf.bus_idx_map
+    gs = pf.shunt_conductance
+    bs = pf.shunt_susceptance
+
+    zone_split_bus_ids = Int[]
+    for (fbus, za, zb) in bus_pairs
+        if za == pos || zb == pos
+            push!(zone_split_bus_ids, fbus)
+        end
+    end
+    isempty(zone_split_bus_ids) && return nothing
+
+    bal_p = model[:active_power_balance]
+    bal_q = model[:reactive_power_balance]
+    v_mag = model[:v_magnitude]
+
+    for b in zone_split_bus_ids
+        vp = @variable(model, base_name = "p_inj_$(b)")
+        JuMP.set_start_value(vp, 0.0)
+        p_inj_store[b] = vp
+
+        vq = @variable(model, base_name = "q_inj_$(b)")
+        JuMP.set_start_value(vq, 0.0)
+        q_inj_store[b] = vq
+
+        JuMP.delete(model, bal_p[b, 1])
+        @constraint(
+            model,
+            compute_active_power_balance(model, sys_zone, b, 1) -
+            gs[bus_idx_map[b]] * v_mag[b, 1]^2 + vp == 0
+        )
+
+        JuMP.delete(model, bal_q[b, 1])
+        @constraint(
+            model,
+            compute_reactive_power_balance(model, sys_zone, b, 1) +
+            bs[bus_idx_map[b]] * v_mag[b, 1]^2 + vq == 0
+        )
+    end
+    return nothing
+end
+
+# ============================================================
 # Per-partition initializers
 # ============================================================
 
@@ -112,70 +168,13 @@ function init_hybrid_partition!(
         part, sys_zone, bus_pairs, p_inj_store, q_inj_store,
     )
     build_quad_bus_expr!(part, rho_theta, rho_v_mag)
-    build_quad_branch_expr!(part, rho_p, rho_q, part.zone_edges, NTuple{4, Int}[])
     build_quad_p_inj_expr_ac!(part, rho_p, p_inj_store)
     build_quad_q_inj_expr_ac!(part, rho_q, q_inj_store)
     @objective(
         part.model, Min,
-        part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
+        part.obj_base + part.quad_bus_expr +
         part.quad_p_inj_expr + part.quad_q_inj_expr,
     )
-    return nothing
-end
-
-# ============================================================
-# Helpers
-# ============================================================
-
-function _attach_pq_inj_variables_ac!(
-    part::PartitionAC,
-    sys_zone::SystemData,
-    bus_pairs::Vector{NTuple{3, Int}},
-    p_inj_store::Dict{Int, JuMP.VariableRef},
-    q_inj_store::Dict{Int, JuMP.VariableRef},
-)
-    model = part.model::JuMP.Model
-    pos = part.position
-    pf = sys_zone.powerflow
-    bus_idx_map = pf.bus_idx_map
-    gs = pf.shunt_conductance
-    bs = pf.shunt_susceptance
-
-    zone_split_bus_ids = Int[]
-    for (fbus, za, zb) in bus_pairs
-        if za == pos || zb == pos
-            push!(zone_split_bus_ids, fbus)
-        end
-    end
-    isempty(zone_split_bus_ids) && return nothing
-
-    bal_p = model[:active_power_balance]
-    bal_q = model[:reactive_power_balance]
-    v_mag = model[:v_magnitude]
-
-    for b in zone_split_bus_ids
-        vp = @variable(model, base_name = "p_inj_$(b)")
-        JuMP.set_start_value(vp, 0.0)
-        p_inj_store[b] = vp
-
-        vq = @variable(model, base_name = "q_inj_$(b)")
-        JuMP.set_start_value(vq, 0.0)
-        q_inj_store[b] = vq
-
-        JuMP.delete(model, bal_p[b, 1])
-        @constraint(
-            model,
-            compute_active_power_balance(model, sys_zone, b, 1) -
-            gs[bus_idx_map[b]] * v_mag[b, 1]^2 + vp == 0
-        )
-
-        JuMP.delete(model, bal_q[b, 1])
-        @constraint(
-            model,
-            compute_reactive_power_balance(model, sys_zone, b, 1) +
-            bs[bus_idx_map[b]] * v_mag[b, 1]^2 + vq == 0
-        )
-    end
     return nothing
 end
 

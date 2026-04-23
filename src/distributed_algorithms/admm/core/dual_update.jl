@@ -1,10 +1,11 @@
 # ============================================================
-# ADMM Dual Update — unified for DC · AC · SOCWR
+# Helpers
 # ============================================================
 
 # ------------------------------------------------------------
-# Bus duals: single variable, linear (DC theta, SOCWR V²)
+# Bus
 # ------------------------------------------------------------
+
 function _update_bus_duals_single!(
     duals::Matrix{Float64},
     partitions::Partitions,
@@ -23,9 +24,6 @@ function _update_bus_duals_single!(
     return nothing
 end
 
-# ------------------------------------------------------------
-# Bus duals: AC (angle-wrapped theta + linear |V|)
-# ------------------------------------------------------------
 function _update_bus_duals_ac!(
     duals_theta::Matrix{Float64},
     duals_v_mag::Matrix{Float64},
@@ -50,15 +48,16 @@ function _update_bus_duals_ac!(
 end
 
 # ------------------------------------------------------------
-# Branch duals: single variable (DC P)
+# Branch
 # ------------------------------------------------------------
+
 function _update_branch_duals_single!(
     duals::AbstractMatrix{Float64},
     partitions::Partitions,
     consensus::AbstractVector{Float64},
     rho::Float64,
     interzonal::Vector{Int},
-    extract_fn,    # (part, l) -> Float64
+    extract_fn,
 )
     for part in partitions
         p = part.position
@@ -72,13 +71,65 @@ function _update_branch_duals_single!(
     return nothing
 end
 
-# ------------------------------------------------------------
-# Branch pair duals (DummyBus Method 2)
-# ------------------------------------------------------------
-function _update_branch_pairs_duals_single!(
-    duals::AbstractMatrix{Float64},         # rows = pair region, cols = zones
+function _update_branch_duals_paired!(
+    duals_a::AbstractMatrix{Float64},
+    duals_b::AbstractMatrix{Float64},
     partitions::Partitions,
-    consensus::AbstractVector{Float64},     # length == n_pairs
+    consensus_a::AbstractVector{Float64},
+    consensus_b::AbstractVector{Float64},
+    rho_a::Float64,
+    rho_b::Float64,
+    interzonal::Vector{Int},
+    extract_fn,
+)
+    for part in partitions
+        p = part.position
+        @inbounds for (k, e) in enumerate(interzonal)
+            l = part.branch_idx_full_to_zone[e]
+            l == 0 && continue
+            a, b = extract_fn(part, l)
+            duals_a[k, p] += rho_a * (a - consensus_a[k])
+            duals_b[k, p] += rho_b * (b - consensus_b[k])
+        end
+    end
+    return nothing
+end
+
+function _update_branch_duals_ac!(
+    duals_p::AbstractMatrix{Float64},
+    duals_q::AbstractMatrix{Float64},
+    partitions::Partitions{PartitionAC},
+    p_consensus::AbstractVector{Float64},
+    q_consensus::AbstractVector{Float64},
+    rho_p::Float64,
+    rho_q::Float64,
+    interzonal::Vector{Int},
+)
+    for part in partitions
+        p = part.position
+        @inbounds for (k, e) in enumerate(interzonal)
+            l = part.branch_idx_full_to_zone[e]
+            l == 0 && continue
+            p_expr, q_expr = _pq_flow_from_exprs(part, l)
+            p_val = JuMP.value(p_expr)
+            q_val = JuMP.value(q_expr)
+            isfinite(p_val) &&
+                (duals_p[k, p] += rho_p * (p_val - p_consensus[k]))
+            isfinite(q_val) &&
+                (duals_q[k, p] += rho_q * (q_val - q_consensus[k]))
+        end
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Branch pairs
+# ------------------------------------------------------------
+
+function _update_branch_pairs_duals_single!(
+    duals::AbstractMatrix{Float64},
+    partitions::Partitions,
+    consensus::AbstractVector{Float64},
     rho::Float64,
     pairs::Vector{NTuple{4, Int}},
     extract_fn,
@@ -101,63 +152,6 @@ function _update_branch_pairs_duals_single!(
     return nothing
 end
 
-# ------------------------------------------------------------
-# Bus pair duals (SplitBus Method 3): sign-flipped consensus.
-# Zone A: λ_A += ρ · (p_A - z)
-# Zone B: λ_B += ρ · (p_B + z)   (target is -z ⇒ residual is p_B + z)
-# ------------------------------------------------------------
-function _update_bus_pairs_duals_signed!(
-    duals::AbstractMatrix{Float64},       # rows = bus_pairs, cols = zones
-    partitions::Partitions,
-    consensus::AbstractVector{Float64},   # length == n_bus_pairs
-    rho::Float64,
-    bus_pairs::Vector{NTuple{3, Int}},
-    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
-)
-    isempty(bus_pairs) && return nothing
-    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
-        z = consensus[k]
-        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], bid)
-        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], bid)
-        duals[k, za] += rho * (va - z)
-        duals[k, zb] += rho * (vb + z)
-    end
-    return nothing
-end
-
-# ------------------------------------------------------------
-# Branch duals: paired variables (SOCWR PQ, SOCWR RT)
-# ------------------------------------------------------------
-function _update_branch_duals_paired!(
-    duals_a::AbstractMatrix{Float64},
-    duals_b::AbstractMatrix{Float64},
-    partitions::Partitions,
-    consensus_a::AbstractVector{Float64},
-    consensus_b::AbstractVector{Float64},
-    rho_a::Float64,
-    rho_b::Float64,
-    interzonal::Vector{Int},
-    extract_fn,    # (part, l) -> (Float64, Float64)
-)
-    for part in partitions
-        p = part.position
-        @inbounds for (k, e) in enumerate(interzonal)
-            l = part.branch_idx_full_to_zone[e]
-            l == 0 && continue
-            a, b = extract_fn(part, l)
-            duals_a[k, p] += rho_a * (a - consensus_a[k])
-            duals_b[k, p] += rho_b * (b - consensus_b[k])
-        end
-    end
-    return nothing
-end
-
-# ------------------------------------------------------------
-# Branch duals: AC P/Q (with isfinite checks for NLP)
-# ------------------------------------------------------------
-# Specialized variant because AC flow expressions can return NaN; a bad
-# P must NOT skip a good Q update (and vice versa).
-# NaN-safe branch_pairs dual update for AC (DummyBus).
 function _update_branch_pairs_duals_ac!(
     duals_p::AbstractMatrix{Float64},
     duals_q::AbstractMatrix{Float64},
@@ -196,38 +190,36 @@ function _update_branch_pairs_duals_ac!(
     return nothing
 end
 
-function _update_branch_duals_ac!(
-    duals_p::AbstractMatrix{Float64},
-    duals_q::AbstractMatrix{Float64},
-    partitions::Partitions{PartitionAC},
-    p_consensus::AbstractVector{Float64},
-    q_consensus::AbstractVector{Float64},
-    rho_p::Float64,
-    rho_q::Float64,
-    interzonal::Vector{Int},
+# ------------------------------------------------------------
+# Bus pairs
+# ------------------------------------------------------------
+
+function _update_bus_pairs_duals_signed!(
+    duals::AbstractMatrix{Float64},
+    partitions::Partitions,
+    consensus::AbstractVector{Float64},
+    rho::Float64,
+    bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
 )
-    for part in partitions
-        p = part.position
-        @inbounds for (k, e) in enumerate(interzonal)
-            l = part.branch_idx_full_to_zone[e]
-            l == 0 && continue
-            p_expr, q_expr = _pq_flow_from_exprs(part, l)
-            p_val = JuMP.value(p_expr)
-            q_val = JuMP.value(q_expr)
-            isfinite(p_val) &&
-                (duals_p[k, p] += rho_p * (p_val - p_consensus[k]))
-            isfinite(q_val) &&
-                (duals_q[k, p] += rho_q * (q_val - q_consensus[k]))
-        end
+    isempty(bus_pairs) && return nothing
+    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
+        z = consensus[k]
+        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], bid)
+        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], bid)
+        duals[k, za] += rho * (va - z)
+        duals[k, zb] += rho * (vb + z)
     end
     return nothing
 end
 
 # ============================================================
-# Dispatch: dual_update!(ws)
+# DC
 # ============================================================
 
-# ---- DC ----
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 function dual_update!(ws::DCStateWorkspace)
     _update_bus_duals_single!(
@@ -239,6 +231,10 @@ function dual_update!(ws::DCStateWorkspace)
     )
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function dual_update!(ws::DCPowerWorkspace)
     n_inter = length(ws.interzonal)
@@ -265,6 +261,10 @@ function dual_update!(ws::DCPowerWorkspace)
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Hybrid — TieLine/DummyBus
+# ------------------------------------------------------------
 
 function dual_update!(ws::DCHybridWorkspace{<:Union{TieLine, DummyBus}})
     _update_bus_duals_single!(
@@ -299,6 +299,10 @@ function dual_update!(ws::DCHybridWorkspace{<:Union{TieLine, DummyBus}})
     return nothing
 end
 
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
 function dual_update!(ws::DCHybridWorkspace{SplitBus})
     _update_bus_duals_single!(
         ws.vars.theta.duals,
@@ -329,7 +333,13 @@ function dual_update!(ws::DCHybridWorkspace{SplitBus})
     return nothing
 end
 
-# ---- AC ----
+# ============================================================
+# AC
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 function dual_update!(ws::ACStateWorkspace)
     _update_bus_duals_ac!(
@@ -343,6 +353,10 @@ function dual_update!(ws::ACStateWorkspace)
     )
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function dual_update!(ws::ACPowerWorkspace)
     n_inter = length(ws.interzonal)
@@ -374,6 +388,10 @@ function dual_update!(ws::ACPowerWorkspace)
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Hybrid — TieLine/DummyBus
+# ------------------------------------------------------------
 
 function dual_update!(ws::ACHybridWorkspace{<:Union{TieLine, DummyBus}})
     n_inter = length(ws.interzonal)
@@ -415,6 +433,10 @@ function dual_update!(ws::ACHybridWorkspace{<:Union{TieLine, DummyBus}})
     return nothing
 end
 
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
 function dual_update!(ws::ACHybridWorkspace{SplitBus})
     n_inter = length(ws.interzonal)
     rho_p = ws.vars.p_flow.rho[]
@@ -453,7 +475,13 @@ function dual_update!(ws::ACHybridWorkspace{SplitBus})
     return nothing
 end
 
-# ---- SOCWR ----
+# ============================================================
+# SOCWR
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 function dual_update!(ws::SOCWRStateWorkspace)
     _update_bus_duals_single!(
@@ -476,6 +504,10 @@ function dual_update!(ws::SOCWRStateWorkspace)
     )
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function dual_update!(ws::SOCWRPowerWorkspace)
     n_inter = length(ws.interzonal)
@@ -515,6 +547,10 @@ function dual_update!(ws::SOCWRPowerWorkspace)
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Hybrid — TieLine/DummyBus
+# ------------------------------------------------------------
 
 function dual_update!(ws::SOCWRHybridWorkspace{<:Union{TieLine, DummyBus}})
     n_inter = length(ws.interzonal)
@@ -572,6 +608,10 @@ function dual_update!(ws::SOCWRHybridWorkspace{<:Union{TieLine, DummyBus}})
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
 
 function dual_update!(ws::SOCWRHybridWorkspace{SplitBus})
     n_inter = length(ws.interzonal)

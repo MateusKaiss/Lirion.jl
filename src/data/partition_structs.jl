@@ -149,7 +149,7 @@ Base.@kwdef mutable struct PartitionSOCWR <: AbstractPartition
     quad_pq_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
     quad_p_inj_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
     quad_q_inj_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
-    soft_anchor_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
+    tikhonov_reg_expr::JuMP.QuadExpr = zero(JuMP.QuadExpr)
 
     # solution status
     generation_cost::Float64 = 0.0

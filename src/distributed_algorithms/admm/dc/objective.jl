@@ -229,7 +229,7 @@ function update_objective!(part::PartitionDC, ws::DCPowerWorkspace)
 end
 
 # ------------------------------------------------------------
-# Hybrid
+# Hybrid - TieLine/DummyBus
 # ------------------------------------------------------------
 
 function update_objective!(
@@ -257,6 +257,10 @@ function update_objective!(
     return nothing
 end
 
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
 function update_objective!(
     part::PartitionDC,
     ws::DCHybridWorkspace{SplitBus},
@@ -268,16 +272,6 @@ function update_objective!(
         ws.vars.theta.rho[],
     )
 
-    lin_branch = build_linear_branch_term(
-        part,
-        part.zone_edges,
-        ws.vars.p_flow.consensus,
-        view(ws.vars.p_flow.duals, :, part.position),
-        ws.interzonal,
-        ws.vars.p_flow.rho[],
-        ws.branch_pairs,
-    )
-
     lin_p_inj = build_linear_p_inj_term(
         part,
         ws.bus_pairs,
@@ -287,9 +281,6 @@ function update_objective!(
         ws.vars.p_inj.rho[],
     )
 
-    @objective(
-        part.model, Min,
-        part.obj_static + lin_bus + lin_branch + lin_p_inj,
-    )
+    @objective(part.model, Min, part.obj_static + lin_bus + lin_p_inj)
     return nothing
 end

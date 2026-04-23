@@ -1,10 +1,11 @@
 # ============================================================
-# ADMM Consensus — unified for DC · AC · SOCWR
+# Helpers
 # ============================================================
 
 # ------------------------------------------------------------
-# Bus consensus: single variable, linear averaging (DC theta, SOCWR V²)
+# Bus
 # ------------------------------------------------------------
+
 function _consensus_bus_single!(
     consensus::Vector{Float64},
     counts::Vector{Int},
@@ -30,9 +31,6 @@ function _consensus_bus_single!(
     return nothing
 end
 
-# ------------------------------------------------------------
-# Bus consensus: AC (circular theta + linear |V|)
-# ------------------------------------------------------------
 function _consensus_bus_ac!(
     theta_consensus::Vector{Float64},
     v_mag_consensus::Vector{Float64},
@@ -69,14 +67,15 @@ function _consensus_bus_ac!(
 end
 
 # ------------------------------------------------------------
-# Branch consensus: single variable (DC P)
+# Branch
 # ------------------------------------------------------------
+
 function _consensus_branch_single!(
     consensus::AbstractVector{Float64},
     counts::AbstractVector{Int},
     partitions::Partitions,
     interzonal::Vector{Int},
-    extract_fn,    # (part, l) -> Float64
+    extract_fn,
 )
     fill!(consensus, 0.0)
     fill!(counts, 0)
@@ -97,80 +96,13 @@ function _consensus_branch_single!(
     return nothing
 end
 
-# ------------------------------------------------------------
-# Branch pairs consensus (DummyBus Method 2): two DIFFERENT
-# branches (one per zone) must share the same p_flow value.
-# ------------------------------------------------------------
-function _consensus_branch_pairs!(
-    consensus::AbstractVector{Float64},  # length == n_pairs
-    counts::AbstractVector{Int},
-    partitions::Partitions,
-    pairs::Vector{NTuple{4, Int}},
-    extract_fn,    # (part, l) -> Float64
-)
-    isempty(pairs) && return nothing
-    fill!(consensus, 0.0)
-    fill!(counts, 0)
-    @inbounds for (k, (ga, za, gb, zb)) in enumerate(pairs)
-        pa = partitions.parts[za]
-        la = pa.branch_idx_full_to_zone[ga]
-        pb = partitions.parts[zb]
-        lb = pb.branch_idx_full_to_zone[gb]
-        if la != 0
-            consensus[k] += extract_fn(pa, la)
-            counts[k] += 1
-        end
-        if lb != 0
-            consensus[k] += extract_fn(pb, lb)
-            counts[k] += 1
-        end
-        counts[k] > 0 && (consensus[k] /= counts[k])
-    end
-    return nothing
-end
-
-# ------------------------------------------------------------
-# Bus pairs consensus (SplitBus Method 3): sign-flipped injection.
-# Zone A targets p_A = +z, zone B targets p_B = -z, so the closed-form
-# minimizer of Σ (p_A - z)² + (p_B + z)²  is  z = (p_A - p_B) / 2.
-# ------------------------------------------------------------
-function _consensus_bus_pairs_signed!(
-    consensus::AbstractVector{Float64},   # length == n_bus_pairs
-    partitions::Partitions,
-    bus_pairs::Vector{NTuple{3, Int}},
-    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
-)
-    isempty(bus_pairs) && return nothing
-    fill!(consensus, 0.0)
-    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
-        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], bid)
-        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], bid)
-        consensus[k] = 0.5 * (va - vb)
-    end
-    return nothing
-end
-
-@inline function _p_inj_value(
-    part::AbstractPartition,
-    store::Dict{Int, JuMP.VariableRef},
-    bid::Int,
-)
-    v = get(store, bid, nothing)
-    v === nothing && return 0.0
-    m = part.model::JuMP.Model
-    return JuMP.has_values(m) ? JuMP.value(v) : 0.0
-end
-
-# ------------------------------------------------------------
-# Branch consensus: paired variables (SOCWR PQ, SOCWR RT)
-# ------------------------------------------------------------
 function _consensus_branch_paired!(
     consensus_a::AbstractVector{Float64},
     consensus_b::AbstractVector{Float64},
     counts::AbstractVector{Int},
     partitions::Partitions,
     interzonal::Vector{Int},
-    extract_fn,    # (part, l) -> (Float64, Float64)
+    extract_fn,
 )
     fill!(consensus_a, 0.0)
     fill!(consensus_b, 0.0)
@@ -197,13 +129,78 @@ function _consensus_branch_paired!(
     return nothing
 end
 
+function _consensus_branch_ac!(
+    p_consensus::AbstractVector{Float64},
+    q_consensus::AbstractVector{Float64},
+    p_counts::AbstractVector{Int},
+    q_counts::AbstractVector{Int},
+    partitions::Partitions{PartitionAC},
+    interzonal::Vector{Int},
+)
+    fill!(p_consensus, 0.0)
+    fill!(q_consensus, 0.0)
+    fill!(p_counts, 0)
+    fill!(q_counts, 0)
+
+    for part in partitions
+        @inbounds for (k, e) in enumerate(interzonal)
+            l = part.branch_idx_full_to_zone[e]
+            l == 0 && continue
+            p, q = _pq_flow_from_exprs(part, l)
+            p_val = JuMP.value(p)
+            q_val = JuMP.value(q)
+            if isfinite(p_val)
+                p_consensus[k] += p_val
+                p_counts[k] += 1
+            end
+            if isfinite(q_val)
+                q_consensus[k] += q_val
+                q_counts[k] += 1
+            end
+        end
+    end
+
+    @inbounds for k in eachindex(p_consensus)
+        np = p_counts[k]
+        nq = q_counts[k]
+        np > 0 && (p_consensus[k] /= np)
+        nq > 0 && (q_consensus[k] /= nq)
+    end
+    return nothing
+end
+
 # ------------------------------------------------------------
-# Branch consensus: AC P/Q (with isfinite checks for NLP)
+# Branch pairs
 # ------------------------------------------------------------
-# ------------------------------------------------------------
-# Branch pairs consensus AC (DummyBus Method 2): NaN-safe P/Q consensus on
-# the two halves of each split tie-line.
-# ------------------------------------------------------------
+
+function _consensus_branch_pairs!(
+    consensus::AbstractVector{Float64},
+    counts::AbstractVector{Int},
+    partitions::Partitions,
+    pairs::Vector{NTuple{4, Int}},
+    extract_fn,
+)
+    isempty(pairs) && return nothing
+    fill!(consensus, 0.0)
+    fill!(counts, 0)
+    @inbounds for (k, (ga, za, gb, zb)) in enumerate(pairs)
+        pa = partitions.parts[za]
+        la = pa.branch_idx_full_to_zone[ga]
+        pb = partitions.parts[zb]
+        lb = pb.branch_idx_full_to_zone[gb]
+        if la != 0
+            consensus[k] += extract_fn(pa, la)
+            counts[k] += 1
+        end
+        if lb != 0
+            consensus[k] += extract_fn(pb, lb)
+            counts[k] += 1
+        end
+        counts[k] > 0 && (consensus[k] /= counts[k])
+    end
+    return nothing
+end
+
 function _consensus_branch_pairs_ac!(
     p_consensus::AbstractVector{Float64},
     q_consensus::AbstractVector{Float64},
@@ -255,51 +252,44 @@ function _consensus_branch_pairs_ac!(
     return nothing
 end
 
-function _consensus_branch_ac!(
-    p_consensus::AbstractVector{Float64},
-    q_consensus::AbstractVector{Float64},
-    p_counts::AbstractVector{Int},
-    q_counts::AbstractVector{Int},
-    partitions::Partitions{PartitionAC},
-    interzonal::Vector{Int},
+# ------------------------------------------------------------
+# Bus pairs
+# ------------------------------------------------------------
+
+function _consensus_bus_pairs_signed!(
+    consensus::AbstractVector{Float64},
+    partitions::Partitions,
+    bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
 )
-    fill!(p_consensus, 0.0)
-    fill!(q_consensus, 0.0)
-    fill!(p_counts, 0)
-    fill!(q_counts, 0)
-
-    for part in partitions
-        @inbounds for (k, e) in enumerate(interzonal)
-            l = part.branch_idx_full_to_zone[e]
-            l == 0 && continue
-            p, q = _pq_flow_from_exprs(part, l)
-            p_val = JuMP.value(p)
-            q_val = JuMP.value(q)
-            if isfinite(p_val)
-                p_consensus[k] += p_val
-                p_counts[k] += 1
-            end
-            if isfinite(q_val)
-                q_consensus[k] += q_val
-                q_counts[k] += 1
-            end
-        end
-    end
-
-    @inbounds for k in eachindex(p_consensus)
-        np = p_counts[k]
-        nq = q_counts[k]
-        np > 0 && (p_consensus[k] /= np)
-        nq > 0 && (q_consensus[k] /= nq)
+    isempty(bus_pairs) && return nothing
+    fill!(consensus, 0.0)
+    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
+        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], bid)
+        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], bid)
+        consensus[k] = 0.5 * (va - vb)
     end
     return nothing
 end
 
+@inline function _p_inj_value(
+    part::AbstractPartition,
+    store::Dict{Int, JuMP.VariableRef},
+    bid::Int,
+)
+    v = get(store, bid, nothing)
+    v === nothing && return 0.0
+    m = part.model::JuMP.Model
+    return JuMP.has_values(m) ? JuMP.value(v) : 0.0
+end
+
 # ============================================================
-# Dispatch: consensus!(ws)
+# DC
 # ============================================================
 
-# ---- DC ----
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 consensus!(ws::DCStateWorkspace) =
     _consensus_bus_single!(
@@ -308,6 +298,10 @@ consensus!(ws::DCStateWorkspace) =
         ws.partitions,
         snapshot_theta_shared!,
     )
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function consensus!(ws::DCPowerWorkspace)
     n_inter = length(ws.interzonal)
@@ -332,6 +326,10 @@ function consensus!(ws::DCPowerWorkspace)
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Hybrid — TieLine/DummyBus
+# ------------------------------------------------------------
 
 function consensus!(ws::DCHybridWorkspace{<:Union{TieLine, DummyBus}})
     _consensus_bus_single!(
@@ -363,6 +361,10 @@ function consensus!(ws::DCHybridWorkspace{<:Union{TieLine, DummyBus}})
     return nothing
 end
 
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
 function consensus!(ws::DCHybridWorkspace{SplitBus})
     _consensus_bus_single!(
         ws.vars.theta.consensus,
@@ -389,7 +391,13 @@ function consensus!(ws::DCHybridWorkspace{SplitBus})
     return nothing
 end
 
-# ---- AC ----
+# ============================================================
+# AC
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 consensus!(ws::ACStateWorkspace) =
     _consensus_bus_ac!(
@@ -400,6 +408,10 @@ consensus!(ws::ACStateWorkspace) =
         ws.bus_counts,
         ws.partitions,
     )
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function consensus!(ws::ACPowerWorkspace)
     n_inter = length(ws.interzonal)
@@ -425,6 +437,10 @@ function consensus!(ws::ACPowerWorkspace)
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Hybrid — TieLine/DummyBus
+# ------------------------------------------------------------
 
 function consensus!(ws::ACHybridWorkspace{<:Union{TieLine, DummyBus}})
     n_inter = length(ws.interzonal)
@@ -460,6 +476,10 @@ function consensus!(ws::ACHybridWorkspace{<:Union{TieLine, DummyBus}})
     return nothing
 end
 
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
 function consensus!(ws::ACHybridWorkspace{SplitBus})
     n_inter = length(ws.interzonal)
 
@@ -492,7 +512,13 @@ function consensus!(ws::ACHybridWorkspace{SplitBus})
     return nothing
 end
 
-# ---- SOCWR ----
+# ============================================================
+# SOCWR
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 function consensus!(ws::SOCWRStateWorkspace)
     _consensus_bus_single!(
@@ -511,6 +537,10 @@ function consensus!(ws::SOCWRStateWorkspace)
     )
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function consensus!(ws::SOCWRPowerWorkspace)
     n_inter = length(ws.interzonal)
@@ -543,6 +573,10 @@ function consensus!(ws::SOCWRPowerWorkspace)
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Hybrid — TieLine/DummyBus
+# ------------------------------------------------------------
 
 function consensus!(ws::SOCWRHybridWorkspace{<:Union{TieLine, DummyBus}})
     n_inter = length(ws.interzonal)
@@ -590,6 +624,10 @@ function consensus!(ws::SOCWRHybridWorkspace{<:Union{TieLine, DummyBus}})
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
 
 function consensus!(ws::SOCWRHybridWorkspace{SplitBus})
     n_inter = length(ws.interzonal)
