@@ -236,37 +236,35 @@ end
 # Power
 # ------------------------------------------------------------
 
-function dual_update!(ws::DCPowerWorkspace)
-    n_inter = length(ws.interzonal)
-    n_pairs = length(ws.branch_pairs)
-    if n_inter > 0
-        _update_branch_duals_single!(
-            view(ws.vars.p_flow.duals, 1:n_inter, :),
-            ws.partitions,
-            view(ws.vars.p_flow.consensus, 1:n_inter),
-            ws.vars.p_flow.rho[],
-            ws.interzonal,
-            _dc_flow_value,
-        )
-    end
-    if n_pairs > 0
-        _update_branch_pairs_duals_single!(
-            view(ws.vars.p_flow.duals, n_inter+1:n_inter+n_pairs, :),
-            ws.partitions,
-            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
-            ws.vars.p_flow.rho[],
-            ws.branch_pairs,
-            _dc_flow_value,
-        )
-    end
+function dual_update!(ws::DCPowerWorkspace{TieLine})
+    _update_branch_duals_single!(
+        ws.vars.p_flow.duals,
+        ws.partitions,
+        ws.vars.p_flow.consensus,
+        ws.vars.p_flow.rho[],
+        ws.interzonal,
+        _dc_flow_value,
+    )
+    return nothing
+end
+
+function dual_update!(ws::DCPowerWorkspace{DummyBus})
+    _update_branch_pairs_duals_single!(
+        ws.vars.p_flow.duals,
+        ws.partitions,
+        ws.vars.p_flow.consensus,
+        ws.vars.p_flow.rho[],
+        ws.branch_pairs,
+        _dc_flow_value,
+    )
     return nothing
 end
 
 # ------------------------------------------------------------
-# Hybrid — TieLine/DummyBus
+# Hybrid — TieLine
 # ------------------------------------------------------------
 
-function dual_update!(ws::DCHybridWorkspace{<:Union{TieLine, DummyBus}})
+function dual_update!(ws::DCHybridWorkspace{TieLine})
     _update_bus_duals_single!(
         ws.vars.theta.duals,
         ws.partitions,
@@ -274,28 +272,37 @@ function dual_update!(ws::DCHybridWorkspace{<:Union{TieLine, DummyBus}})
         ws.vars.theta.rho[],
         snapshot_theta_shared!,
     )
-    n_inter = length(ws.interzonal)
-    n_pairs = length(ws.branch_pairs)
-    if n_inter > 0
-        _update_branch_duals_single!(
-            view(ws.vars.p_flow.duals, 1:n_inter, :),
-            ws.partitions,
-            view(ws.vars.p_flow.consensus, 1:n_inter),
-            ws.vars.p_flow.rho[],
-            ws.interzonal,
-            _dc_flow_value,
-        )
-    end
-    if n_pairs > 0
-        _update_branch_pairs_duals_single!(
-            view(ws.vars.p_flow.duals, n_inter+1:n_inter+n_pairs, :),
-            ws.partitions,
-            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
-            ws.vars.p_flow.rho[],
-            ws.branch_pairs,
-            _dc_flow_value,
-        )
-    end
+    _update_branch_duals_single!(
+        ws.vars.p_flow.duals,
+        ws.partitions,
+        ws.vars.p_flow.consensus,
+        ws.vars.p_flow.rho[],
+        ws.interzonal,
+        _dc_flow_value,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
+function dual_update!(ws::DCHybridWorkspace{DummyBus})
+    _update_bus_duals_single!(
+        ws.vars.theta.duals,
+        ws.partitions,
+        ws.vars.theta.consensus,
+        ws.vars.theta.rho[],
+        snapshot_theta_shared!,
+    )
+    _update_branch_pairs_duals_single!(
+        ws.vars.p_flow.duals,
+        ws.partitions,
+        ws.vars.p_flow.consensus,
+        ws.vars.p_flow.rho[],
+        ws.branch_pairs,
+        _dc_flow_value,
+    )
     return nothing
 end
 
@@ -311,17 +318,6 @@ function dual_update!(ws::DCHybridWorkspace{SplitBus})
         ws.vars.theta.rho[],
         snapshot_theta_shared!,
     )
-    n_inter = length(ws.interzonal)
-    if n_inter > 0
-        _update_branch_duals_single!(
-            view(ws.vars.p_flow.duals, 1:n_inter, :),
-            ws.partitions,
-            view(ws.vars.p_flow.consensus, 1:n_inter),
-            ws.vars.p_flow.rho[],
-            ws.interzonal,
-            _dc_flow_value,
-        )
-    end
     _update_bus_pairs_duals_signed!(
         ws.vars.p_inj.duals,
         ws.partitions,
@@ -358,44 +354,43 @@ end
 # Power
 # ------------------------------------------------------------
 
-function dual_update!(ws::ACPowerWorkspace)
-    n_inter = length(ws.interzonal)
-    n_pairs = length(ws.branch_pairs)
+function dual_update!(ws::ACPowerWorkspace{TieLine})
     rho_p = ws.vars.p_flow.rho[]
     rho_q = ws.vars.q_flow.rho[]
 
-    if n_inter > 0
-        _update_branch_duals_ac!(
-            view(ws.vars.p_flow.duals, 1:n_inter, :),
-            view(ws.vars.q_flow.duals, 1:n_inter, :),
-            ws.partitions,
-            view(ws.vars.p_flow.consensus, 1:n_inter),
-            view(ws.vars.q_flow.consensus, 1:n_inter),
-            rho_p, rho_q,
-            ws.interzonal,
-        )
-    end
-    if n_pairs > 0
-        _update_branch_pairs_duals_ac!(
-            view(ws.vars.p_flow.duals, n_inter+1:n_inter+n_pairs, :),
-            view(ws.vars.q_flow.duals, n_inter+1:n_inter+n_pairs, :),
-            ws.partitions,
-            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
-            view(ws.vars.q_flow.consensus, n_inter+1:n_inter+n_pairs),
-            rho_p, rho_q,
-            ws.branch_pairs,
-        )
-    end
+    _update_branch_duals_ac!(
+        ws.vars.p_flow.duals,
+        ws.vars.q_flow.duals,
+        ws.partitions,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        rho_p, rho_q,
+        ws.interzonal,
+    )
+    return nothing
+end
+
+function dual_update!(ws::ACPowerWorkspace{DummyBus})
+    rho_p = ws.vars.p_flow.rho[]
+    rho_q = ws.vars.q_flow.rho[]
+
+    _update_branch_pairs_duals_ac!(
+        ws.vars.p_flow.duals,
+        ws.vars.q_flow.duals,
+        ws.partitions,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        rho_p, rho_q,
+        ws.branch_pairs,
+    )
     return nothing
 end
 
 # ------------------------------------------------------------
-# Hybrid — TieLine/DummyBus
+# Hybrid — TieLine
 # ------------------------------------------------------------
 
-function dual_update!(ws::ACHybridWorkspace{<:Union{TieLine, DummyBus}})
-    n_inter = length(ws.interzonal)
-    n_pairs = length(ws.branch_pairs)
+function dual_update!(ws::ACHybridWorkspace{TieLine})
     rho_p = ws.vars.p_flow.rho[]
     rho_q = ws.vars.q_flow.rho[]
 
@@ -408,28 +403,44 @@ function dual_update!(ws::ACHybridWorkspace{<:Union{TieLine, DummyBus}})
         ws.vars.theta.rho[],
         ws.vars.v_mag.rho[],
     )
-    if n_inter > 0
-        _update_branch_duals_ac!(
-            view(ws.vars.p_flow.duals, 1:n_inter, :),
-            view(ws.vars.q_flow.duals, 1:n_inter, :),
-            ws.partitions,
-            view(ws.vars.p_flow.consensus, 1:n_inter),
-            view(ws.vars.q_flow.consensus, 1:n_inter),
-            rho_p, rho_q,
-            ws.interzonal,
-        )
-    end
-    if n_pairs > 0
-        _update_branch_pairs_duals_ac!(
-            view(ws.vars.p_flow.duals, n_inter+1:n_inter+n_pairs, :),
-            view(ws.vars.q_flow.duals, n_inter+1:n_inter+n_pairs, :),
-            ws.partitions,
-            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
-            view(ws.vars.q_flow.consensus, n_inter+1:n_inter+n_pairs),
-            rho_p, rho_q,
-            ws.branch_pairs,
-        )
-    end
+    _update_branch_duals_ac!(
+        ws.vars.p_flow.duals,
+        ws.vars.q_flow.duals,
+        ws.partitions,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        rho_p, rho_q,
+        ws.interzonal,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
+function dual_update!(ws::ACHybridWorkspace{DummyBus})
+    rho_p = ws.vars.p_flow.rho[]
+    rho_q = ws.vars.q_flow.rho[]
+
+    _update_bus_duals_ac!(
+        ws.vars.theta.duals,
+        ws.vars.v_mag.duals,
+        ws.partitions,
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        ws.vars.theta.rho[],
+        ws.vars.v_mag.rho[],
+    )
+    _update_branch_pairs_duals_ac!(
+        ws.vars.p_flow.duals,
+        ws.vars.q_flow.duals,
+        ws.partitions,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        rho_p, rho_q,
+        ws.branch_pairs,
+    )
     return nothing
 end
 
@@ -438,10 +449,6 @@ end
 # ------------------------------------------------------------
 
 function dual_update!(ws::ACHybridWorkspace{SplitBus})
-    n_inter = length(ws.interzonal)
-    rho_p = ws.vars.p_flow.rho[]
-    rho_q = ws.vars.q_flow.rho[]
-
     _update_bus_duals_ac!(
         ws.vars.theta.duals,
         ws.vars.v_mag.duals,
@@ -451,17 +458,6 @@ function dual_update!(ws::ACHybridWorkspace{SplitBus})
         ws.vars.theta.rho[],
         ws.vars.v_mag.rho[],
     )
-    if n_inter > 0
-        _update_branch_duals_ac!(
-            view(ws.vars.p_flow.duals, 1:n_inter, :),
-            view(ws.vars.q_flow.duals, 1:n_inter, :),
-            ws.partitions,
-            view(ws.vars.p_flow.consensus, 1:n_inter),
-            view(ws.vars.q_flow.consensus, 1:n_inter),
-            rho_p, rho_q,
-            ws.interzonal,
-        )
-    end
     _update_bus_pairs_duals_signed!(
         ws.vars.p_inj.duals, ws.partitions,
         ws.vars.p_inj.consensus, ws.vars.p_inj.rho[],
@@ -509,52 +505,51 @@ end
 # Power
 # ------------------------------------------------------------
 
-function dual_update!(ws::SOCWRPowerWorkspace)
-    n_inter = length(ws.interzonal)
-    n_pairs = length(ws.branch_pairs)
+function dual_update!(ws::SOCWRPowerWorkspace{TieLine})
     rho_p = ws.vars.p_flow.rho[]
     rho_q = ws.vars.q_flow.rho[]
 
-    if n_inter > 0
-        _update_branch_duals_paired!(
-            view(ws.vars.p_flow.duals, 1:n_inter, :),
-            view(ws.vars.q_flow.duals, 1:n_inter, :),
-            ws.partitions,
-            view(ws.vars.p_flow.consensus, 1:n_inter),
-            view(ws.vars.q_flow.consensus, 1:n_inter),
-            rho_p, rho_q,
-            ws.interzonal,
-            _socwr_pq_values,
-        )
-    end
-    if n_pairs > 0
-        _update_branch_pairs_duals_single!(
-            view(ws.vars.p_flow.duals, n_inter+1:n_inter+n_pairs, :),
-            ws.partitions,
-            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
-            rho_p,
-            ws.branch_pairs,
-            _socwr_p_value,
-        )
-        _update_branch_pairs_duals_single!(
-            view(ws.vars.q_flow.duals, n_inter+1:n_inter+n_pairs, :),
-            ws.partitions,
-            view(ws.vars.q_flow.consensus, n_inter+1:n_inter+n_pairs),
-            rho_q,
-            ws.branch_pairs,
-            _socwr_q_value,
-        )
-    end
+    _update_branch_duals_paired!(
+        ws.vars.p_flow.duals,
+        ws.vars.q_flow.duals,
+        ws.partitions,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        rho_p, rho_q,
+        ws.interzonal,
+        _socwr_pq_values,
+    )
+    return nothing
+end
+
+function dual_update!(ws::SOCWRPowerWorkspace{DummyBus})
+    rho_p = ws.vars.p_flow.rho[]
+    rho_q = ws.vars.q_flow.rho[]
+
+    _update_branch_pairs_duals_single!(
+        ws.vars.p_flow.duals,
+        ws.partitions,
+        ws.vars.p_flow.consensus,
+        rho_p,
+        ws.branch_pairs,
+        _socwr_p_value,
+    )
+    _update_branch_pairs_duals_single!(
+        ws.vars.q_flow.duals,
+        ws.partitions,
+        ws.vars.q_flow.consensus,
+        rho_q,
+        ws.branch_pairs,
+        _socwr_q_value,
+    )
     return nothing
 end
 
 # ------------------------------------------------------------
-# Hybrid — TieLine/DummyBus
+# Hybrid — TieLine
 # ------------------------------------------------------------
 
-function dual_update!(ws::SOCWRHybridWorkspace{<:Union{TieLine, DummyBus}})
-    n_inter = length(ws.interzonal)
-    n_pairs = length(ws.branch_pairs)
+function dual_update!(ws::SOCWRHybridWorkspace{TieLine})
     rho_p = ws.vars.p_flow.rho[]
     rho_q = ws.vars.q_flow.rho[]
 
@@ -565,47 +560,61 @@ function dual_update!(ws::SOCWRHybridWorkspace{<:Union{TieLine, DummyBus}})
         ws.vars.v2.rho[],
         snapshot_v2_shared!,
     )
-    if n_inter > 0
-        _update_branch_duals_paired!(
-            view(ws.vars.p_flow.duals, 1:n_inter, :),
-            view(ws.vars.q_flow.duals, 1:n_inter, :),
-            ws.partitions,
-            view(ws.vars.p_flow.consensus, 1:n_inter),
-            view(ws.vars.q_flow.consensus, 1:n_inter),
-            rho_p, rho_q,
-            ws.interzonal,
-            _socwr_pq_values,
-        )
-        _update_branch_duals_paired!(
-            ws.vars.r.duals,
-            ws.vars.t.duals,
-            ws.partitions,
-            ws.vars.r.consensus,
-            ws.vars.t.consensus,
-            ws.vars.r.rho[],
-            ws.vars.t.rho[],
-            ws.interzonal,
-            _socwr_rt_values,
-        )
-    end
-    if n_pairs > 0
-        _update_branch_pairs_duals_single!(
-            view(ws.vars.p_flow.duals, n_inter+1:n_inter+n_pairs, :),
-            ws.partitions,
-            view(ws.vars.p_flow.consensus, n_inter+1:n_inter+n_pairs),
-            rho_p,
-            ws.branch_pairs,
-            _socwr_p_value,
-        )
-        _update_branch_pairs_duals_single!(
-            view(ws.vars.q_flow.duals, n_inter+1:n_inter+n_pairs, :),
-            ws.partitions,
-            view(ws.vars.q_flow.consensus, n_inter+1:n_inter+n_pairs),
-            rho_q,
-            ws.branch_pairs,
-            _socwr_q_value,
-        )
-    end
+    _update_branch_duals_paired!(
+        ws.vars.p_flow.duals,
+        ws.vars.q_flow.duals,
+        ws.partitions,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        rho_p, rho_q,
+        ws.interzonal,
+        _socwr_pq_values,
+    )
+    _update_branch_duals_paired!(
+        ws.vars.r.duals,
+        ws.vars.t.duals,
+        ws.partitions,
+        ws.vars.r.consensus,
+        ws.vars.t.consensus,
+        ws.vars.r.rho[],
+        ws.vars.t.rho[],
+        ws.interzonal,
+        _socwr_rt_values,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
+function dual_update!(ws::SOCWRHybridWorkspace{DummyBus})
+    rho_p = ws.vars.p_flow.rho[]
+    rho_q = ws.vars.q_flow.rho[]
+
+    _update_bus_duals_single!(
+        ws.vars.v2.duals,
+        ws.partitions,
+        ws.vars.v2.consensus,
+        ws.vars.v2.rho[],
+        snapshot_v2_shared!,
+    )
+    _update_branch_pairs_duals_single!(
+        ws.vars.p_flow.duals,
+        ws.partitions,
+        ws.vars.p_flow.consensus,
+        rho_p,
+        ws.branch_pairs,
+        _socwr_p_value,
+    )
+    _update_branch_pairs_duals_single!(
+        ws.vars.q_flow.duals,
+        ws.partitions,
+        ws.vars.q_flow.consensus,
+        rho_q,
+        ws.branch_pairs,
+        _socwr_q_value,
+    )
     return nothing
 end
 
@@ -614,10 +623,6 @@ end
 # ------------------------------------------------------------
 
 function dual_update!(ws::SOCWRHybridWorkspace{SplitBus})
-    n_inter = length(ws.interzonal)
-    rho_p = ws.vars.p_flow.rho[]
-    rho_q = ws.vars.q_flow.rho[]
-
     _update_bus_duals_single!(
         ws.vars.v2.duals,
         ws.partitions,
@@ -625,29 +630,6 @@ function dual_update!(ws::SOCWRHybridWorkspace{SplitBus})
         ws.vars.v2.rho[],
         snapshot_v2_shared!,
     )
-    if n_inter > 0
-        _update_branch_duals_paired!(
-            view(ws.vars.p_flow.duals, 1:n_inter, :),
-            view(ws.vars.q_flow.duals, 1:n_inter, :),
-            ws.partitions,
-            view(ws.vars.p_flow.consensus, 1:n_inter),
-            view(ws.vars.q_flow.consensus, 1:n_inter),
-            rho_p, rho_q,
-            ws.interzonal,
-            _socwr_pq_values,
-        )
-        _update_branch_duals_paired!(
-            ws.vars.r.duals,
-            ws.vars.t.duals,
-            ws.partitions,
-            ws.vars.r.consensus,
-            ws.vars.t.consensus,
-            ws.vars.r.rho[],
-            ws.vars.t.rho[],
-            ws.interzonal,
-            _socwr_rt_values,
-        )
-    end
     _update_bus_pairs_duals_signed!(
         ws.vars.p_inj.duals, ws.partitions,
         ws.vars.p_inj.consensus, ws.vars.p_inj.rho[],

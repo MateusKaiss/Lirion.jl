@@ -26,9 +26,11 @@ end
 # Power
 # ------------------------------------------------------------
 
-Base.@kwdef mutable struct DCPowerWorkspace <: AbstractADMMWorkspace
+Base.@kwdef mutable struct DCPowerWorkspace{S <: Sectioning} <: AbstractADMMWorkspace
     partitions::Partitions{PartitionDC}
     id::Vector{Int}
+
+    sectioning::S
 
     interzonal::Vector{Int}
     branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[]
@@ -137,17 +139,26 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, DC})
     n_zones = length(partitions)
     n_inter = length(inter)
     n_pairs = length(pairs)
-    n_total = n_inter + n_pairs
+
+    sectioning = config.sectioning
+    if sectioning isa TieLine
+        n_flow = n_inter
+    elseif sectioning isa DummyBus
+        n_flow = n_pairs
+    else
+        error("ADMM{Power, DC}: unsupported sectioning $(sectioning)")
+    end
 
     init_power_partition!(partitions, sys, optimizer_factory, config.rho_p, inter, pairs)
 
     vars = (
-        p_flow = VarState(n_total, n_zones, config.rho_p),
+        p_flow = VarState(n_flow, n_zones, config.rho_p),
     )
 
     return DCPowerWorkspace(;
         partitions = partitions,
         id = id,
+        sectioning = sectioning,
         interzonal = inter,
         branch_pairs = pairs,
         pair_counts = fill(2, n_pairs),
@@ -170,23 +181,25 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
     n_shared = length(sys.full_shared_bus_ids)
     n_inter = length(inter)
     n_pairs = length(pairs)
-    n_total = n_inter + n_pairs
     n_bus_pairs = length(bpairs)
 
     p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
 
     sectioning = config.sectioning
     if sectioning isa TieLine
+        n_p_flow = n_inter
         init_hybrid_partition!(
             partitions, sys, optimizer_factory,
             config.rho_theta, config.rho_p, sectioning, inter,
         )
     elseif sectioning isa DummyBus
+        n_p_flow = n_pairs
         init_hybrid_partition!(
             partitions, sys, optimizer_factory,
             config.rho_theta, config.rho_p, sectioning, inter, pairs,
         )
     elseif sectioning isa SplitBus
+        n_p_flow = 0
         init_hybrid_partition!(
             partitions, sys, optimizer_factory,
             config.rho_theta, config.rho_p, sectioning, inter,
@@ -198,7 +211,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
 
     vars = (
         theta = VarState(n_shared, n_zones, config.rho_theta),
-        p_flow = VarState(n_total, n_zones, config.rho_p),
+        p_flow = VarState(n_p_flow, n_zones, config.rho_p),
         p_inj = VarState(n_bus_pairs, n_zones, config.rho_p),
     )
 

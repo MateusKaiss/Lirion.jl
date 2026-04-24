@@ -1,9 +1,9 @@
 # ============================================================
-# Flow expression accessors
+# Expressions
 # ============================================================
 
 # ------------------------------------------------------------
-# Active power flow (DC + generic)
+# DC
 # ------------------------------------------------------------
 
 @inline _p_flow_from_exprs(model::JuMP.Model, l::Int, t::Int = 1) =
@@ -13,7 +13,7 @@
     _p_flow_from_exprs(part.model, l, t)
 
 # ------------------------------------------------------------
-# Active + reactive power flow (AC / SOCWR)
+# AC
 # ------------------------------------------------------------
 
 @inline _pq_flow_from_exprs(model::JuMP.Model, l::Int, t::Int = 1) =
@@ -22,24 +22,32 @@
 @inline _pq_flow_from_exprs(part::PartitionAC, l::Int; t::Int = 1) =
     _pq_flow_from_exprs(part.model, l, t)
 
+# ------------------------------------------------------------
+# SOCWR
+# ------------------------------------------------------------
+
 @inline _pq_flow_from_exprs(part::PartitionSOCWR, l::Int; t::Int = 1) =
     _pq_flow_from_exprs(part.model, l, t)
-
-# ------------------------------------------------------------
-# Second-order cone auxiliary variables (SOCWR)
-# ------------------------------------------------------------
 
 @inline _rt_from_exprs(model::JuMP.Model, l::Int, t::Int = 1) =
     (model[:R][l, t], model[:T_var][l, t])
 
+# ============================================================
+# Values
+# ============================================================
+
 # ------------------------------------------------------------
-# Evaluated flow values (used by consensus, dual updates, residuals)
+# DC
 # ------------------------------------------------------------
 
 @inline function _dc_flow_value(part::PartitionDC, l::Int)
     p = _p_flow_from_exprs(part, l)
     return JuMP.value(p)
 end
+
+# ------------------------------------------------------------
+# SOCWR
+# ------------------------------------------------------------
 
 @inline function _socwr_pq_values(part::PartitionSOCWR, l::Int)
     p, q = _pq_flow_from_exprs(part.model, l)
