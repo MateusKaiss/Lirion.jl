@@ -16,7 +16,13 @@ function save_prev!(ws::DCPowerWorkspace)
     return nothing
 end
 
-function save_prev!(ws::DCHybridWorkspace)
+function save_prev!(ws::DCHybridWorkspace{<:Union{TieLine, DummyBus}})
+    copyto!(ws.vars.theta.consensus_prev, ws.vars.theta.consensus)
+    copyto!(ws.vars.p_flow.consensus_prev, ws.vars.p_flow.consensus)
+    return nothing
+end
+
+function save_prev!(ws::DCHybridWorkspace{SplitBus})
     copyto!(ws.vars.theta.consensus_prev, ws.vars.theta.consensus)
     copyto!(ws.vars.p_flow.consensus_prev, ws.vars.p_flow.consensus)
     copyto!(ws.vars.p_inj.consensus_prev, ws.vars.p_inj.consensus)
@@ -39,15 +45,21 @@ function save_prev!(ws::ACPowerWorkspace)
     return nothing
 end
 
-function save_prev!(ws::ACHybridWorkspace)
+function save_prev!(ws::ACHybridWorkspace{<:Union{TieLine, DummyBus}})
     copyto!(ws.vars.theta.consensus_prev, ws.vars.theta.consensus)
     copyto!(ws.vars.v_mag.consensus_prev, ws.vars.v_mag.consensus)
     copyto!(ws.vars.p_flow.consensus_prev, ws.vars.p_flow.consensus)
     copyto!(ws.vars.q_flow.consensus_prev, ws.vars.q_flow.consensus)
-    if !isempty(ws.bus_pairs)
-        copyto!(ws.vars.p_inj.consensus_prev, ws.vars.p_inj.consensus)
-        copyto!(ws.vars.q_inj.consensus_prev, ws.vars.q_inj.consensus)
-    end
+    return nothing
+end
+
+function save_prev!(ws::ACHybridWorkspace{SplitBus})
+    copyto!(ws.vars.theta.consensus_prev, ws.vars.theta.consensus)
+    copyto!(ws.vars.v_mag.consensus_prev, ws.vars.v_mag.consensus)
+    copyto!(ws.vars.p_flow.consensus_prev, ws.vars.p_flow.consensus)
+    copyto!(ws.vars.q_flow.consensus_prev, ws.vars.q_flow.consensus)
+    copyto!(ws.vars.p_inj.consensus_prev, ws.vars.p_inj.consensus)
+    copyto!(ws.vars.q_inj.consensus_prev, ws.vars.q_inj.consensus)
     return nothing
 end
 
@@ -68,15 +80,22 @@ function save_prev!(ws::SOCWRPowerWorkspace)
     return nothing
 end
 
-function save_prev!(ws::SOCWRHybridWorkspace)
+function save_prev!(ws::SOCWRHybridWorkspace{<:Union{TieLine, DummyBus}})
     copyto!(ws.vars.v2.consensus_prev, ws.vars.v2.consensus)
     copyto!(ws.vars.p_flow.consensus_prev, ws.vars.p_flow.consensus)
     copyto!(ws.vars.q_flow.consensus_prev, ws.vars.q_flow.consensus)
     copyto!(ws.vars.r.consensus_prev, ws.vars.r.consensus)
     copyto!(ws.vars.t.consensus_prev, ws.vars.t.consensus)
-    if !isempty(ws.bus_pairs)
-        copyto!(ws.vars.p_inj.consensus_prev, ws.vars.p_inj.consensus)
-        copyto!(ws.vars.q_inj.consensus_prev, ws.vars.q_inj.consensus)
-    end
+    return nothing
+end
+
+function save_prev!(ws::SOCWRHybridWorkspace{SplitBus})
+    copyto!(ws.vars.v2.consensus_prev, ws.vars.v2.consensus)
+    copyto!(ws.vars.p_flow.consensus_prev, ws.vars.p_flow.consensus)
+    copyto!(ws.vars.q_flow.consensus_prev, ws.vars.q_flow.consensus)
+    copyto!(ws.vars.r.consensus_prev, ws.vars.r.consensus)
+    copyto!(ws.vars.t.consensus_prev, ws.vars.t.consensus)
+    copyto!(ws.vars.p_inj.consensus_prev, ws.vars.p_inj.consensus)
+    copyto!(ws.vars.q_inj.consensus_prev, ws.vars.q_inj.consensus)
     return nothing
 end

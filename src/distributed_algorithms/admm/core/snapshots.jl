@@ -75,17 +75,15 @@ end
     buf::Vector{Float64},
     model::JuMP.Model,
     bus_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2},
-    zone_bus_ids::Vector{Int},
-    shared_bus_local_idx::Vector{Int},
+    shared_bus_ids::Vector{Int},
     default::Float64,
 )
     has_vals = JuMP.has_values(model)
-    @inbounds for i in eachindex(shared_bus_local_idx)
-        local_idx = shared_bus_local_idx[i]
+    @inbounds for i in eachindex(shared_bus_ids)
         buf[i] = _val_at(
             model,
             bus_var,
-            zone_bus_ids[local_idx],
+            shared_bus_ids[i],
             1,
             default,
             has_vals,
@@ -117,23 +115,23 @@ end
 @inline snapshot_theta_shared!(part::PartitionDC) =
     _snapshot_shared_var!(
         part.theta_shared_buf, part.model, part.theta_var,
-        part.bus.id, part.shared_bus_local_idx, 0.0,
+        part.zone_shared_bus_ids, 0.0,
     )
 
 @inline snapshot_theta_shared!(part::PartitionAC) =
     _snapshot_shared_var!(
         part.theta_shared_buf, part.model, part.theta_var,
-        part.bus.id, part.shared_bus_local_idx, 0.0,
+        part.zone_shared_bus_ids, 0.0,
     )
 
 @inline snapshot_v_mag_shared!(part::PartitionAC) =
     _snapshot_shared_var!(
         part.v_mag_shared_buf, part.model, part.v_mag_var,
-        part.bus.id, part.shared_bus_local_idx, 1.0,
+        part.zone_shared_bus_ids, 1.0,
     )
 
 @inline snapshot_v2_shared!(part::PartitionSOCWR) =
     _snapshot_shared_var!(
         part.v2_shared_buf, part.model, part.v2_var,
-        part.bus.id, part.shared_bus_local_idx, 1.0,
+        part.zone_shared_bus_ids, 1.0,
     )

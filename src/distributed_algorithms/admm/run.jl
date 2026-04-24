@@ -7,7 +7,6 @@ function run_algorithm!(ws, params::ADMMParams)
 
     for iter in 1:params.max_iter
         ws.iter = iter
-
         _print_iter_header!(tag, iter)
 
         local_solve!(ws)
