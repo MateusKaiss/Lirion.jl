@@ -233,7 +233,7 @@ function dual_update!(ws::DCStateWorkspace)
 end
 
 # ------------------------------------------------------------
-# Power
+# Power — TieLine
 # ------------------------------------------------------------
 
 function dual_update!(ws::DCPowerWorkspace{TieLine})
@@ -247,6 +247,10 @@ function dual_update!(ws::DCPowerWorkspace{TieLine})
     )
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power — DummyBus
+# ------------------------------------------------------------
 
 function dual_update!(ws::DCPowerWorkspace{DummyBus})
     _update_branch_pairs_duals_single!(
@@ -351,7 +355,7 @@ function dual_update!(ws::ACStateWorkspace)
 end
 
 # ------------------------------------------------------------
-# Power
+# Power — TieLine
 # ------------------------------------------------------------
 
 function dual_update!(ws::ACPowerWorkspace{TieLine})
@@ -369,6 +373,10 @@ function dual_update!(ws::ACPowerWorkspace{TieLine})
     )
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power — DummyBus
+# ------------------------------------------------------------
 
 function dual_update!(ws::ACPowerWorkspace{DummyBus})
     rho_p = ws.vars.p_flow.rho[]
@@ -502,7 +510,7 @@ function dual_update!(ws::SOCWRStateWorkspace)
 end
 
 # ------------------------------------------------------------
-# Power
+# Power — TieLine
 # ------------------------------------------------------------
 
 function dual_update!(ws::SOCWRPowerWorkspace{TieLine})
@@ -521,6 +529,10 @@ function dual_update!(ws::SOCWRPowerWorkspace{TieLine})
     )
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power — DummyBus
+# ------------------------------------------------------------
 
 function dual_update!(ws::SOCWRPowerWorkspace{DummyBus})
     rho_p = ws.vars.p_flow.rho[]

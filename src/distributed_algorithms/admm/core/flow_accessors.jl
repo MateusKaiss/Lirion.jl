@@ -68,3 +68,18 @@ end
     r, t = _rt_from_exprs(part.model, l)
     return JuMP.value(r), JuMP.value(t)
 end
+
+# ------------------------------------------------------------
+# Bus injection
+# ------------------------------------------------------------
+
+@inline function _p_inj_value(
+    part::AbstractPartition,
+    store::Dict{Int, JuMP.VariableRef},
+    bid::Int,
+)
+    v = get(store, bid, nothing)
+    v === nothing && return 0.0
+    m = part.model::JuMP.Model
+    return JuMP.has_values(m) ? JuMP.value(v) : 0.0
+end

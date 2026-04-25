@@ -43,6 +43,43 @@ function _primal_residual_bus_ac_components(
     return sqrt(r_theta), sqrt(r_v_mag)
 end
 
+function _dual_residual_bus_single(
+    partitions::Partitions,
+    consensus::Vector{Float64},
+    consensus_prev::Vector{Float64},
+    rho::Float64,
+)
+    s = 0.0
+    for part in partitions
+        @inbounds for i in eachindex(part.zone_shared_bus_ids)
+            j = part.shared_bus_consensus_idx[i]
+            s += (consensus[j] - consensus_prev[j])^2
+        end
+    end
+    return rho * sqrt(s)
+end
+
+function _dual_residual_bus_ac_components(
+    partitions::Partitions{PartitionAC},
+    theta_consensus::Vector{Float64},
+    v_mag_consensus::Vector{Float64},
+    theta_consensus_prev::Vector{Float64},
+    v_mag_consensus_prev::Vector{Float64},
+    rho_theta::Float64,
+    rho_v_mag::Float64,
+)
+    s_theta = 0.0
+    s_v_mag = 0.0
+    for part in partitions
+        @inbounds for i in eachindex(part.zone_shared_bus_ids)
+            j = part.shared_bus_consensus_idx[i]
+            s_theta += _wrap_angle_diff(theta_consensus[j] - theta_consensus_prev[j])^2
+            s_v_mag += (v_mag_consensus[j] - v_mag_consensus_prev[j])^2
+        end
+    end
+    return rho_theta * sqrt(s_theta), rho_v_mag * sqrt(s_v_mag)
+end
+
 # ------------------------------------------------------------
 # Branch
 # ------------------------------------------------------------
@@ -62,6 +99,92 @@ function _primal_residual_branch_single(
         end
     end
     return sqrt(acc)
+end
+
+function _primal_residual_branch_paired_components(
+    partitions::Partitions,
+    consensus_a::AbstractVector{Float64},
+    consensus_b::AbstractVector{Float64},
+    interzonal::Vector{Int},
+    extract_fn,
+)
+    acc_a = 0.0
+    acc_b = 0.0
+    for part in partitions
+        @inbounds for (k, e) in enumerate(interzonal)
+            l = part.branch_idx_full_to_zone[e]
+            l == 0 && continue
+            a, b = extract_fn(part, l)
+            acc_a += (a - consensus_a[k])^2
+            acc_b += (b - consensus_b[k])^2
+        end
+    end
+    return sqrt(acc_a), sqrt(acc_b)
+end
+
+function _primal_residual_branch_ac_components(
+    partitions::Partitions{PartitionAC},
+    p_consensus::AbstractVector{Float64},
+    q_consensus::AbstractVector{Float64},
+    interzonal::Vector{Int},
+)
+    acc_p = 0.0
+    acc_q = 0.0
+    for part in partitions
+        @inbounds for (k, e) in enumerate(interzonal)
+            l = part.branch_idx_full_to_zone[e]
+            l == 0 && continue
+            p, q = _pq_flow_from_exprs(part, l; t = 1)
+            p_val = JuMP.value(p)
+            q_val = JuMP.value(q)
+            isfinite(p_val) && (acc_p += (p_val - p_consensus[k])^2)
+            isfinite(q_val) && (acc_q += (q_val - q_consensus[k])^2)
+        end
+    end
+    return sqrt(acc_p), sqrt(acc_q)
+end
+
+function _dual_residual_branch_single(
+    partitions::Partitions,
+    consensus::AbstractVector{Float64},
+    consensus_prev::AbstractVector{Float64},
+    interzonal::Vector{Int},
+    rho::Float64,
+)
+    s = 0.0
+    for part in partitions
+        @inbounds for (k, e) in enumerate(interzonal)
+            l = part.branch_idx_full_to_zone[e]
+            l == 0 && continue
+            s += (consensus[k] - consensus_prev[k])^2
+        end
+    end
+    return rho * sqrt(s)
+end
+
+function _dual_residual_branch_paired_components(
+    partitions::Partitions,
+    consensus_a::AbstractVector{Float64},
+    consensus_b::AbstractVector{Float64},
+    consensus_a_prev::AbstractVector{Float64},
+    consensus_b_prev::AbstractVector{Float64},
+    interzonal::Vector{Int},
+    rho_a::Float64,
+    rho_b::Float64,
+)
+    s_a = 0.0
+    s_b = 0.0
+    for part in partitions
+        @inbounds for (k, e) in enumerate(interzonal)
+            l = part.branch_idx_full_to_zone[e]
+            l == 0 && continue
+            diff_a = consensus_a[k] - consensus_a_prev[k]
+            diff_b = consensus_b[k] - consensus_b_prev[k]
+            s_a += diff_a^2
+            s_b += diff_b^2
+        end
+    end
+    return rho_a * sqrt(s_a), rho_b * sqrt(s_b)
 end
 
 # ------------------------------------------------------------
@@ -89,6 +212,38 @@ function _primal_residual_branch_pairs(
         end
     end
     return sqrt(acc)
+end
+
+function _primal_residual_branch_pairs_ac(
+    partitions::Partitions{PartitionAC},
+    p_consensus::AbstractVector{Float64},
+    q_consensus::AbstractVector{Float64},
+    pairs::Vector{NTuple{4, Int}},
+)
+    isempty(pairs) && return (0.0, 0.0)
+    acc_p = 0.0
+    acc_q = 0.0
+    @inbounds for (k, (ga, za, gb, zb)) in enumerate(pairs)
+        pa = partitions.parts[za]
+        pb = partitions.parts[zb]
+        la = pa.branch_idx_full_to_zone[ga]
+        lb = pb.branch_idx_full_to_zone[gb]
+        if la != 0
+            p_expr, q_expr = _pq_flow_from_exprs(pa, la)
+            p_val = JuMP.value(p_expr)
+            q_val = JuMP.value(q_expr)
+            isfinite(p_val) && (acc_p += (p_val - p_consensus[k])^2)
+            isfinite(q_val) && (acc_q += (q_val - q_consensus[k])^2)
+        end
+        if lb != 0
+            p_expr, q_expr = _pq_flow_from_exprs(pb, lb)
+            p_val = JuMP.value(p_expr)
+            q_val = JuMP.value(q_expr)
+            isfinite(p_val) && (acc_p += (p_val - p_consensus[k])^2)
+            isfinite(q_val) && (acc_q += (q_val - q_consensus[k])^2)
+        end
+    end
+    return sqrt(acc_p), sqrt(acc_q)
 end
 
 function _dual_residual_branch_pairs(
@@ -142,161 +297,6 @@ function _dual_residual_bus_pairs_signed(
     return rho * sqrt(s)
 end
 
-function _primal_residual_branch_paired_components(
-    partitions::Partitions,
-    consensus_a::AbstractVector{Float64},
-    consensus_b::AbstractVector{Float64},
-    interzonal::Vector{Int},
-    extract_fn,
-)
-    acc_a = 0.0
-    acc_b = 0.0
-    for part in partitions
-        @inbounds for (k, e) in enumerate(interzonal)
-            l = part.branch_idx_full_to_zone[e]
-            l == 0 && continue
-            a, b = extract_fn(part, l)
-            acc_a += (a - consensus_a[k])^2
-            acc_b += (b - consensus_b[k])^2
-        end
-    end
-    return sqrt(acc_a), sqrt(acc_b)
-end
-
-function _primal_residual_branch_pairs_ac(
-    partitions::Partitions{PartitionAC},
-    p_consensus::AbstractVector{Float64},
-    q_consensus::AbstractVector{Float64},
-    pairs::Vector{NTuple{4, Int}},
-)
-    isempty(pairs) && return (0.0, 0.0)
-    acc_p = 0.0
-    acc_q = 0.0
-    @inbounds for (k, (ga, za, gb, zb)) in enumerate(pairs)
-        pa = partitions.parts[za]
-        pb = partitions.parts[zb]
-        la = pa.branch_idx_full_to_zone[ga]
-        lb = pb.branch_idx_full_to_zone[gb]
-        if la != 0
-            p_expr, q_expr = _pq_flow_from_exprs(pa, la)
-            p_val = JuMP.value(p_expr)
-            q_val = JuMP.value(q_expr)
-            isfinite(p_val) && (acc_p += (p_val - p_consensus[k])^2)
-            isfinite(q_val) && (acc_q += (q_val - q_consensus[k])^2)
-        end
-        if lb != 0
-            p_expr, q_expr = _pq_flow_from_exprs(pb, lb)
-            p_val = JuMP.value(p_expr)
-            q_val = JuMP.value(q_expr)
-            isfinite(p_val) && (acc_p += (p_val - p_consensus[k])^2)
-            isfinite(q_val) && (acc_q += (q_val - q_consensus[k])^2)
-        end
-    end
-    return sqrt(acc_p), sqrt(acc_q)
-end
-
-function _primal_residual_branch_ac_components(
-    partitions::Partitions{PartitionAC},
-    p_consensus::AbstractVector{Float64},
-    q_consensus::AbstractVector{Float64},
-    interzonal::Vector{Int},
-)
-    acc_p = 0.0
-    acc_q = 0.0
-    for part in partitions
-        @inbounds for (k, e) in enumerate(interzonal)
-            l = part.branch_idx_full_to_zone[e]
-            l == 0 && continue
-            p, q = _pq_flow_from_exprs(part, l; t = 1)
-            p_val = JuMP.value(p)
-            q_val = JuMP.value(q)
-            isfinite(p_val) && (acc_p += (p_val - p_consensus[k])^2)
-            isfinite(q_val) && (acc_q += (q_val - q_consensus[k])^2)
-        end
-    end
-    return sqrt(acc_p), sqrt(acc_q)
-end
-
-function _dual_residual_bus_single(
-    partitions::Partitions,
-    consensus::Vector{Float64},
-    consensus_prev::Vector{Float64},
-    rho::Float64,
-)
-    s = 0.0
-    for part in partitions
-        @inbounds for i in eachindex(part.zone_shared_bus_ids)
-            j = part.shared_bus_consensus_idx[i]
-            s += (consensus[j] - consensus_prev[j])^2
-        end
-    end
-    return rho * sqrt(s)
-end
-
-function _dual_residual_bus_ac_components(
-    partitions::Partitions{PartitionAC},
-    theta_consensus::Vector{Float64},
-    v_mag_consensus::Vector{Float64},
-    theta_consensus_prev::Vector{Float64},
-    v_mag_consensus_prev::Vector{Float64},
-    rho_theta::Float64,
-    rho_v_mag::Float64,
-)
-    s_theta = 0.0
-    s_v_mag = 0.0
-    for part in partitions
-        @inbounds for i in eachindex(part.zone_shared_bus_ids)
-            j = part.shared_bus_consensus_idx[i]
-            s_theta += _wrap_angle_diff(theta_consensus[j] - theta_consensus_prev[j])^2
-            s_v_mag += (v_mag_consensus[j] - v_mag_consensus_prev[j])^2
-        end
-    end
-    return rho_theta * sqrt(s_theta), rho_v_mag * sqrt(s_v_mag)
-end
-
-function _dual_residual_branch_single(
-    partitions::Partitions,
-    consensus::AbstractVector{Float64},
-    consensus_prev::AbstractVector{Float64},
-    interzonal::Vector{Int},
-    rho::Float64,
-)
-    s = 0.0
-    for part in partitions
-        @inbounds for (k, e) in enumerate(interzonal)
-            l = part.branch_idx_full_to_zone[e]
-            l == 0 && continue
-            s += (consensus[k] - consensus_prev[k])^2
-        end
-    end
-    return rho * sqrt(s)
-end
-
-function _dual_residual_branch_paired_components(
-    partitions::Partitions,
-    consensus_a::AbstractVector{Float64},
-    consensus_b::AbstractVector{Float64},
-    consensus_a_prev::AbstractVector{Float64},
-    consensus_b_prev::AbstractVector{Float64},
-    interzonal::Vector{Int},
-    rho_a::Float64,
-    rho_b::Float64,
-)
-    s_a = 0.0
-    s_b = 0.0
-    for part in partitions
-        @inbounds for (k, e) in enumerate(interzonal)
-            l = part.branch_idx_full_to_zone[e]
-            l == 0 && continue
-            diff_a = consensus_a[k] - consensus_a_prev[k]
-            diff_b = consensus_b[k] - consensus_b_prev[k]
-            s_a += diff_a^2
-            s_b += diff_b^2
-        end
-    end
-    return rho_a * sqrt(s_a), rho_b * sqrt(s_b)
-end
-
 # ============================================================
 # DC
 # ============================================================
@@ -323,7 +323,7 @@ function compute_residuals!(ws::DCStateWorkspace)
 end
 
 # ------------------------------------------------------------
-# Power
+# Power — TieLine
 # ------------------------------------------------------------
 
 function compute_residuals!(ws::DCPowerWorkspace{TieLine})
@@ -343,6 +343,10 @@ function compute_residuals!(ws::DCPowerWorkspace{TieLine})
     )
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power — DummyBus
+# ------------------------------------------------------------
 
 function compute_residuals!(ws::DCPowerWorkspace{DummyBus})
     rho = ws.vars.p_flow.rho[]
@@ -393,9 +397,6 @@ function compute_residuals!(ws::DCHybridWorkspace{TieLine})
         rho,
     )
 
-    ws.r_primal_bus_pair = 0.0
-    ws.r_dual_bus_pair = 0.0
-
     ws.r_primal = hypot(ws.r_primal_bus, ws.r_primal_branch)
     ws.r_dual = hypot(ws.r_dual_bus, ws.r_dual_branch)
     return nothing
@@ -432,9 +433,6 @@ function compute_residuals!(ws::DCHybridWorkspace{DummyBus})
         rho,
     )
 
-    ws.r_primal_bus_pair = 0.0
-    ws.r_dual_bus_pair = 0.0
-
     ws.r_primal = hypot(ws.r_primal_bus, ws.r_primal_branch)
     ws.r_dual = hypot(ws.r_dual_bus, ws.r_dual_branch)
     return nothing
@@ -456,9 +454,6 @@ function compute_residuals!(ws::DCHybridWorkspace{SplitBus})
         ws.vars.theta.consensus_prev,
         ws.vars.theta.rho[],
     )
-
-    ws.r_primal_branch = 0.0
-    ws.r_dual_branch = 0.0
 
     rho_pi = ws.vars.p_inj.rho[]
     ws.r_primal_bus_pair = _primal_residual_bus_pairs_signed(
@@ -506,7 +501,7 @@ function compute_residuals!(ws::ACStateWorkspace)
 end
 
 # ------------------------------------------------------------
-# Power
+# Power — TieLine
 # ------------------------------------------------------------
 
 function compute_residuals!(ws::ACPowerWorkspace{TieLine})
@@ -532,6 +527,10 @@ function compute_residuals!(ws::ACPowerWorkspace{TieLine})
     ws.r_dual = hypot(ws.r_dual_p, ws.r_dual_q)
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power — DummyBus
+# ------------------------------------------------------------
 
 function compute_residuals!(ws::ACPowerWorkspace{DummyBus})
     rho_p = ws.vars.p_flow.rho[]
@@ -670,11 +669,6 @@ function compute_residuals!(ws::ACHybridWorkspace{SplitBus})
         ws.vars.theta.rho[], ws.vars.v_mag.rho[],
     )
 
-    ws.r_primal_p = 0.0
-    ws.r_primal_q = 0.0
-    ws.r_dual_p = 0.0
-    ws.r_dual_q = 0.0
-
     ws.r_primal_p_inj = _primal_residual_bus_pairs_signed(
         ws.partitions, ws.vars.p_inj.consensus, ws.bus_pairs, ws.p_inj_vars,
     )
@@ -741,7 +735,7 @@ function compute_residuals!(ws::SOCWRStateWorkspace)
 end
 
 # ------------------------------------------------------------
-# Power
+# Power — TieLine
 # ------------------------------------------------------------
 
 function compute_residuals!(ws::SOCWRPowerWorkspace{TieLine})
@@ -768,6 +762,10 @@ function compute_residuals!(ws::SOCWRPowerWorkspace{TieLine})
     ws.r_dual = hypot(ws.r_dual_p, ws.r_dual_q)
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power — DummyBus
+# ------------------------------------------------------------
 
 function compute_residuals!(ws::SOCWRPowerWorkspace{DummyBus})
     rho_p = ws.vars.p_flow.rho[]
@@ -907,11 +905,6 @@ function compute_residuals!(ws::SOCWRHybridWorkspace{DummyBus})
         ws.branch_pairs, rho_q,
     )
 
-    ws.r_primal_r = 0.0
-    ws.r_primal_t = 0.0
-    ws.r_dual_r = 0.0
-    ws.r_dual_t = 0.0
-
     ws.r_primal = sqrt(
         ws.r_primal_bus^2 +
         ws.r_primal_p^2 + ws.r_primal_q^2,
@@ -939,15 +932,6 @@ function compute_residuals!(ws::SOCWRHybridWorkspace{SplitBus})
         ws.vars.v2.consensus_prev,
         ws.vars.v2.rho[],
     )
-
-    ws.r_primal_p = 0.0
-    ws.r_primal_q = 0.0
-    ws.r_dual_p = 0.0
-    ws.r_dual_q = 0.0
-    ws.r_primal_r = 0.0
-    ws.r_primal_t = 0.0
-    ws.r_dual_r = 0.0
-    ws.r_dual_t = 0.0
 
     ws.r_primal_p_inj = _primal_residual_bus_pairs_signed(
         ws.partitions, ws.vars.p_inj.consensus, ws.bus_pairs, ws.p_inj_vars,

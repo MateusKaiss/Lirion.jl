@@ -1,3 +1,11 @@
+# ============================================================
+# Helpers
+# ============================================================
+
+# ------------------------------------------------------------
+# Bus
+# ------------------------------------------------------------
+
 function _eps_primal_bus(
     partitions::Partitions,
     consensus_vecs,
@@ -46,6 +54,10 @@ function _eps_dual_bus(
     n = max(n, 1)
     return sqrt(n) * eps_abs + eps_rel * sqrt(norm_y_sq)
 end
+
+# ------------------------------------------------------------
+# Branch
+# ------------------------------------------------------------
 
 function _eps_primal_branch(
     partitions::Partitions,
@@ -103,6 +115,10 @@ function _eps_dual_branch(
     return sqrt(n) * eps_abs + eps_rel * sqrt(norm_y_sq)
 end
 
+# ------------------------------------------------------------
+# Branch pairs
+# ------------------------------------------------------------
+
 function _eps_primal_branch_pairs(
     partitions::Partitions,
     consensus::AbstractVector{Float64},
@@ -159,6 +175,10 @@ function _eps_dual_branch_pairs(
     return sqrt(max(1, n)) * eps_abs + eps_rel * sqrt(norm_y_sq)
 end
 
+# ------------------------------------------------------------
+# Bus pairs
+# ------------------------------------------------------------
+
 function _eps_primal_bus_pairs_signed(
     partitions::Partitions,
     consensus::AbstractVector{Float64},
@@ -198,6 +218,14 @@ function _eps_dual_bus_pairs_signed(
     return sqrt(max(1, n)) * eps_abs + eps_rel * sqrt(norm_y_sq)
 end
 
+# ============================================================
+# DC
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
+
 function compute_tolerances!(ws::DCStateWorkspace, eps_abs::Float64, eps_rel::Float64)
     eps_r = _eps_primal_bus(
         ws.partitions,
@@ -216,6 +244,10 @@ function compute_tolerances!(ws::DCStateWorkspace, eps_abs::Float64, eps_rel::Fl
     ws.eps_dual = eps_s
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power — TieLine
+# ------------------------------------------------------------
 
 function compute_tolerances!(
     ws::DCPowerWorkspace{TieLine},
@@ -240,6 +272,10 @@ function compute_tolerances!(
     return nothing
 end
 
+# ------------------------------------------------------------
+# Power — DummyBus
+# ------------------------------------------------------------
+
 function compute_tolerances!(
     ws::DCPowerWorkspace{DummyBus},
     eps_abs::Float64,
@@ -261,6 +297,10 @@ function compute_tolerances!(
     )
     return nothing
 end
+
+# ------------------------------------------------------------
+# Hybrid — TieLine
+# ------------------------------------------------------------
 
 function compute_tolerances!(
     ws::DCHybridWorkspace{TieLine},
@@ -302,6 +342,10 @@ function compute_tolerances!(
     return nothing
 end
 
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
 function compute_tolerances!(
     ws::DCHybridWorkspace{DummyBus},
     eps_abs::Float64,
@@ -340,6 +384,10 @@ function compute_tolerances!(
     ws.eps_dual = sqrt(eps_s_bus^2 + eps_s_pair^2)
     return nothing
 end
+
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
 
 function compute_tolerances!(
     ws::DCHybridWorkspace{SplitBus},
@@ -380,6 +428,14 @@ function compute_tolerances!(
     return nothing
 end
 
+# ============================================================
+# AC
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
+
 function compute_tolerances!(ws::ACStateWorkspace, eps_abs::Float64, eps_rel::Float64)
     eps_r = _eps_primal_bus(
         ws.partitions,
@@ -398,6 +454,10 @@ function compute_tolerances!(ws::ACStateWorkspace, eps_abs::Float64, eps_rel::Fl
     ws.eps_dual = eps_s
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power — TieLine
+# ------------------------------------------------------------
 
 function compute_tolerances!(
     ws::ACPowerWorkspace{TieLine},
@@ -421,6 +481,10 @@ function compute_tolerances!(
     )
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power — DummyBus
+# ------------------------------------------------------------
 
 function compute_tolerances!(
     ws::ACPowerWorkspace{DummyBus},
@@ -461,6 +525,10 @@ function compute_tolerances!(
     return nothing
 end
 
+# ------------------------------------------------------------
+# Hybrid — TieLine
+# ------------------------------------------------------------
+
 function compute_tolerances!(
     ws::ACHybridWorkspace{TieLine},
     eps_abs::Float64,
@@ -500,6 +568,10 @@ function compute_tolerances!(
     ws.eps_dual = hypot(eps_s_bus, eps_s_branch)
     return nothing
 end
+
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
 
 function compute_tolerances!(
     ws::ACHybridWorkspace{DummyBus},
@@ -557,6 +629,10 @@ function compute_tolerances!(
     return nothing
 end
 
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
 function compute_tolerances!(
     ws::ACHybridWorkspace{SplitBus},
     eps_abs::Float64,
@@ -596,6 +672,14 @@ function compute_tolerances!(
     return nothing
 end
 
+# ============================================================
+# SOCWR
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
+
 function compute_tolerances!(ws::SOCWRStateWorkspace, eps_abs::Float64, eps_rel::Float64)
     eps_r = hypot(
         _eps_primal_bus(
@@ -634,6 +718,10 @@ function compute_tolerances!(ws::SOCWRStateWorkspace, eps_abs::Float64, eps_rel:
     return nothing
 end
 
+# ------------------------------------------------------------
+# Power — TieLine
+# ------------------------------------------------------------
+
 function compute_tolerances!(
     ws::SOCWRPowerWorkspace{TieLine},
     eps_abs::Float64,
@@ -656,6 +744,10 @@ function compute_tolerances!(
     )
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power — DummyBus
+# ------------------------------------------------------------
 
 function compute_tolerances!(
     ws::SOCWRPowerWorkspace{DummyBus},
@@ -695,6 +787,10 @@ function compute_tolerances!(
     ws.eps_dual = hypot(eps_s_p, eps_s_q)
     return nothing
 end
+
+# ------------------------------------------------------------
+# Hybrid — TieLine
+# ------------------------------------------------------------
 
 function compute_tolerances!(
     ws::SOCWRHybridWorkspace{TieLine},
@@ -752,6 +848,10 @@ function compute_tolerances!(
     return nothing
 end
 
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
 function compute_tolerances!(
     ws::SOCWRHybridWorkspace{DummyBus},
     eps_abs::Float64,
@@ -807,6 +907,10 @@ function compute_tolerances!(
     ws.eps_dual = sqrt(eps_s_bus^2 + eps_s_pq^2)
     return nothing
 end
+
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
 
 function compute_tolerances!(
     ws::SOCWRHybridWorkspace{SplitBus},

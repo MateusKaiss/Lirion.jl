@@ -13,6 +13,7 @@ Base.@kwdef struct ADMMParams
     tau_decr::Float64
     adapt_warmup::Int
     rho_floor::Float64
+    adapt_freeze::Float64
 end
 
 # ============================================================
@@ -31,5 +32,6 @@ function build_params(config::ADMMConfig)
         tau_decr = config.tau_decr,
         adapt_warmup = config.adapt_warmup,
         rho_floor = config.rho_floor,
+        adapt_freeze = config.adapt_freeze,
     )
 end
