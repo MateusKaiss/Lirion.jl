@@ -4,12 +4,20 @@
 
 @inline _bus_dims(part) = (length(part.bus.id), length(part.zone_shared_bus_ids))
 
+# ------------------------------------------------------------
+# DC
+# ------------------------------------------------------------
+
 function prepare_hotpaths!(part::PartitionDC)
     n_bus, n_shared = _bus_dims(part)
     part.theta_buf = zeros(n_bus)
     part.theta_shared_buf = zeros(n_shared)
     return nothing
 end
+
+# ------------------------------------------------------------
+# AC
+# ------------------------------------------------------------
 
 function prepare_hotpaths!(part::PartitionAC)
     n_bus, n_shared = _bus_dims(part)
@@ -19,6 +27,10 @@ function prepare_hotpaths!(part::PartitionAC)
     part.v_mag_shared_buf = ones(n_shared)
     return nothing
 end
+
+# ------------------------------------------------------------
+# SOCWR
+# ------------------------------------------------------------
 
 function prepare_hotpaths!(part::PartitionSOCWR)
     n_bus, n_shared = _bus_dims(part)
@@ -96,14 +108,26 @@ end
 # Full-bus snapshots
 # ============================================================
 
+# ------------------------------------------------------------
+# DC
+# ------------------------------------------------------------
+
 @inline snapshot_theta!(part::PartitionDC) =
     _snapshot_bus_var!(part.theta_buf, part.model, part.theta_var, part.bus.id, 0.0)
+
+# ------------------------------------------------------------
+# AC
+# ------------------------------------------------------------
 
 @inline snapshot_theta!(part::PartitionAC) =
     _snapshot_bus_var!(part.theta_buf, part.model, part.theta_var, part.bus.id, 0.0)
 
 @inline snapshot_v_mag!(part::PartitionAC) =
     _snapshot_bus_var!(part.v_mag_buf, part.model, part.v_mag_var, part.bus.id, 1.0)
+
+# ------------------------------------------------------------
+# SOCWR
+# ------------------------------------------------------------
 
 @inline snapshot_v2!(part::PartitionSOCWR) =
     _snapshot_bus_var!(part.v2_buf, part.model, part.v2_var, part.bus.id, 1.0)
@@ -112,11 +136,19 @@ end
 # Shared-bus snapshots
 # ============================================================
 
+# ------------------------------------------------------------
+# DC
+# ------------------------------------------------------------
+
 @inline snapshot_theta_shared!(part::PartitionDC) =
     _snapshot_shared_var!(
         part.theta_shared_buf, part.model, part.theta_var,
         part.zone_shared_bus_ids, 0.0,
     )
+
+# ------------------------------------------------------------
+# AC
+# ------------------------------------------------------------
 
 @inline snapshot_theta_shared!(part::PartitionAC) =
     _snapshot_shared_var!(
@@ -129,6 +161,10 @@ end
         part.v_mag_shared_buf, part.model, part.v_mag_var,
         part.zone_shared_bus_ids, 1.0,
     )
+
+# ------------------------------------------------------------
+# SOCWR
+# ------------------------------------------------------------
 
 @inline snapshot_v2_shared!(part::PartitionSOCWR) =
     _snapshot_shared_var!(

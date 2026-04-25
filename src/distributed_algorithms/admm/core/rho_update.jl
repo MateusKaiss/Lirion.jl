@@ -1,3 +1,7 @@
+# ============================================================
+# Adaptive rule
+# ============================================================
+
 function _adaptive_rho!(
     rho::Base.RefValue{Float64}, r::Float64, s::Float64,
     rho_floor::Float64 = 0.0;
@@ -24,6 +28,14 @@ end
     ws.r_primal < params.adapt_freeze * ws.eps_primal &&
     ws.r_dual < params.adapt_freeze * ws.eps_dual
 
+# ============================================================
+# Refresh kernels
+# ============================================================
+
+# ------------------------------------------------------------
+# DC
+# ------------------------------------------------------------
+
 function _refresh_rho_bus_dc!(parts::Partitions{PartitionDC}, rho, prev_rho)::Bool
     rho_val = rho[]
     rho_val == prev_rho[] && return false
@@ -48,6 +60,10 @@ function _refresh_rho_branch_dc!(
     prev_rho[] = rho_val
     return true
 end
+
+# ------------------------------------------------------------
+# AC
+# ------------------------------------------------------------
 
 function _refresh_rho_bus_ac!(
     parts::Partitions{PartitionAC},
@@ -88,6 +104,10 @@ function _refresh_rho_branch_ac!(
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# SOCWR
+# ------------------------------------------------------------
 
 function _refresh_rho_bus_socwr!(parts::Partitions{PartitionSOCWR}, rho, prev_rho)
     rho_val = rho[]
@@ -189,6 +209,14 @@ function _refresh_rho_hybrid_socwr!(
     return nothing
 end
 
+# ============================================================
+# Refresh rho
+# ============================================================
+
+# ------------------------------------------------------------
+# DC
+# ------------------------------------------------------------
+
 function refresh_rho!(ws::DCStateWorkspace)
     if _refresh_rho_bus_dc!(ws.partitions, ws.vars.theta.rho, ws.vars.theta.prev_rho)
         @inbounds for part in ws.partitions.parts
@@ -248,6 +276,10 @@ function refresh_rho!(ws::DCHybridWorkspace{SplitBus})
     return nothing
 end
 
+# ------------------------------------------------------------
+# AC
+# ------------------------------------------------------------
+
 refresh_rho!(ws::ACStateWorkspace) = _refresh_rho_bus_ac!(
     ws.partitions,
     ws.vars.theta.rho, ws.vars.theta.prev_rho,
@@ -298,6 +330,10 @@ function refresh_rho!(ws::ACHybridWorkspace{SplitBus})
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# SOCWR
+# ------------------------------------------------------------
 
 function refresh_rho!(ws::SOCWRStateWorkspace)
     _refresh_rho_bus_socwr!(ws.partitions, ws.vars.v2.rho, ws.vars.v2.prev_rho)
@@ -364,6 +400,14 @@ end
 
 refresh_rho!(::AbstractADMMWorkspace) = nothing
 
+# ============================================================
+# Rho update
+# ============================================================
+
+# ------------------------------------------------------------
+# DC
+# ------------------------------------------------------------
+
 function rho_update!(ws::DCStateWorkspace, params::ADMMParams)
     params.adaptive || return nothing
     _should_freeze(ws, params) && return nothing
@@ -395,6 +439,10 @@ function rho_update!(ws::DCHybridWorkspace{SplitBus}, params::ADMMParams)
     )
     return nothing
 end
+
+# ------------------------------------------------------------
+# AC
+# ------------------------------------------------------------
 
 function rho_update!(ws::ACStateWorkspace, params::ADMMParams)
     params.adaptive || return nothing
@@ -431,6 +479,10 @@ function rho_update!(ws::ACHybridWorkspace{SplitBus}, params::ADMMParams)
     _adapt!(ws.vars.q_inj.rho, ws.r_primal_q_inj, ws.r_dual_q_inj, params)
     return nothing
 end
+
+# ------------------------------------------------------------
+# SOCWR
+# ------------------------------------------------------------
 
 function rho_update!(ws::SOCWRStateWorkspace, params::ADMMParams)
     params.adaptive || return nothing
