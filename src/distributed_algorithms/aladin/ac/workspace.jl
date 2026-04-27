@@ -1,3 +1,11 @@
+# ============================================================
+# Pair types (consensus structures)
+# ============================================================
+
+# ------------------------------------------------------------
+# Shared bus pair
+# ------------------------------------------------------------
+
 struct SharedBusPairAC
     consensus_idx::Int
     bus_id::Int
@@ -9,6 +17,10 @@ struct SharedBusPairAC
     vm_col_j::Int
 end
 
+# ------------------------------------------------------------
+# Shared edge pair
+# ------------------------------------------------------------
+
 struct SharedEdgePairAC
     consensus_idx::Int
     edge_global::Int
@@ -17,6 +29,10 @@ struct SharedEdgePairAC
     zone_j::Int
     edge_local_j::Int
 end
+
+# ------------------------------------------------------------
+# Split bus pair
+# ------------------------------------------------------------
 
 struct SplitBusPairAC
     consensus_idx::Int
@@ -28,6 +44,10 @@ struct SplitBusPairAC
     pinj_col_j::Int
     qinj_col_j::Int
 end
+
+# ------------------------------------------------------------
+# Dummy branch pair
+# ------------------------------------------------------------
 
 struct DummyBranchPairAC
     consensus_idx::Int
@@ -54,6 +74,14 @@ struct DummyBranchPairAC
     inv_tap_j::Float64
     tap_angle_j::Float64
 end
+
+# ============================================================
+# Workspace structs
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 Base.@kwdef mutable struct ACStateWorkspaceALADIN <: AbstractALADINWorkspace
     partitions::Partitions{PartitionAC}
@@ -89,6 +117,10 @@ Base.@kwdef mutable struct ACStateWorkspaceALADIN <: AbstractALADINWorkspace
     hist::ALADINHistory = ALADINHistory()
 end
 
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
 Base.@kwdef mutable struct ACPowerWorkspaceALADIN <: AbstractALADINWorkspace
     partitions::Partitions{PartitionAC}
     id::Vector{Int}
@@ -117,6 +149,10 @@ Base.@kwdef mutable struct ACPowerWorkspaceALADIN <: AbstractALADINWorkspace
     sigma_pg::Float64 = 1.0
     sigma_qg::Float64 = 1.0
     sigma_other::Float64 = 1.0
+    sigma_pflow::Float64 = 10.0
+    sigma_qflow::Float64 = 10.0
+
+    proximal_mode::Symbol = :primal
 
     r_primal::Float64 = 0.0
     r_progress::Float64 = 0.0
@@ -126,6 +162,10 @@ Base.@kwdef mutable struct ACPowerWorkspaceALADIN <: AbstractALADINWorkspace
     iter::Int = 0
     hist::ALADINHistory = ALADINHistory()
 end
+
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
 
 Base.@kwdef mutable struct ACHybridWorkspaceALADIN <: AbstractALADINWorkspace
     partitions::Partitions{PartitionAC}
@@ -174,9 +214,21 @@ Base.@kwdef mutable struct ACHybridWorkspaceALADIN <: AbstractALADINWorkspace
     hist::ALADINHistory = ALADINHistory()
 end
 
+# ============================================================
+# Rho accessors
+# ============================================================
+
 _get_rhos(ws::ACStateWorkspaceALADIN) = (rho = ws.rho[],)
 _get_rhos(ws::ACPowerWorkspaceALADIN) = (rho = ws.rho[],)
 _get_rhos(ws::ACHybridWorkspaceALADIN) = (rho = ws.rho[],)
+
+# ============================================================
+# Pair builders
+# ============================================================
+
+# ------------------------------------------------------------
+# Shared bus pairs
+# ------------------------------------------------------------
 
 function _build_shared_bus_pairs_ac(
     partitions::Partitions{PartitionAC},
@@ -209,6 +261,10 @@ function _build_shared_bus_pairs_ac(
     return pairs
 end
 
+# ------------------------------------------------------------
+# Shared edge pairs
+# ------------------------------------------------------------
+
 function _build_shared_edge_pairs_ac(
     partitions::Partitions{PartitionAC},
     interzonal::Vector{Int},
@@ -229,6 +285,10 @@ function _build_shared_edge_pairs_ac(
     end
     return pairs
 end
+
+# ------------------------------------------------------------
+# Dummy branch pairs
+# ------------------------------------------------------------
 
 function _build_dummy_branch_pairs_ac(
     partitions::Partitions{PartitionAC},
@@ -287,6 +347,10 @@ function _build_dummy_branch_pairs_ac(
     return pairs
 end
 
+# ------------------------------------------------------------
+# Split bus pairs
+# ------------------------------------------------------------
+
 function _build_split_bus_pairs_ac(
     zones::Vector{AladinZoneDataAC},
     sys_bus_pairs::Vector{NTuple{3, Int}},
@@ -314,6 +378,10 @@ function _build_split_bus_pairs_ac(
     end
     return pairs
 end
+
+# ============================================================
+# Zone data & injection helpers
+# ============================================================
 
 function _build_zone_data_vector_ac(
     partitions::Partitions{PartitionAC};
@@ -352,6 +420,14 @@ function _prepare_pq_inj_vars_ac!(partitions, sys, sys_bus_pairs, ::SplitBus)
     return p_inj_vars, q_inj_vars
 end
 
+# ============================================================
+# Builders
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
+
 function build_workspace(
     sys::DistributedSystem,
     cfg::ALADINConfig,
@@ -386,6 +462,10 @@ function build_workspace(
         alpha3 = cfg.alpha3,
     )
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function build_workspace(
     sys::DistributedSystem,
@@ -425,8 +505,15 @@ function build_workspace(
         alpha1 = cfg.alpha1,
         alpha2 = cfg.alpha2,
         alpha3 = cfg.alpha3,
+        sigma_pflow = cfg.sigma_pflow,
+        sigma_qflow = cfg.sigma_qflow,
+        proximal_mode = cfg.proximal_mode,
     )
 end
+
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
 
 function build_workspace(
     sys::DistributedSystem,

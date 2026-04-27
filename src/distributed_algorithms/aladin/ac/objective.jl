@@ -37,6 +37,69 @@
     return quad
 end
 
+@inline function _prox_pflow_ac!(
+    quad::JuMP.QuadExpr,
+    zone::AladinZoneDataAC,
+    model::JuMP.Model,
+    edge_pairs::Vector{SharedEdgePairAC},
+    branch_map::Vector{Int},
+    zone_pos::Int,
+    rho::Float64;
+    sigma_pflow::Float64 = 10.0,
+    sigma_qflow::Float64 = 10.0,
+    sigma_pg::Float64 = 1.0,
+    sigma_qg::Float64 = 1.0,
+    sigma_other::Float64 = 1.0,
+)
+    is_pg = falses(zone.n_vars)
+    @inbounds for c in zone.pg_cols
+        is_pg[c] = true
+    end
+    is_qg = falses(zone.n_vars)
+    @inbounds for c in zone.qg_cols
+        is_qg[c] = true
+    end
+
+    # Baseline regularisation on every primal direction.
+    @inbounds for k in 1:zone.n_vars
+        sig = is_pg[k] ? sigma_pg : (is_qg[k] ? sigma_qg : sigma_other)
+        sig == 0.0 && continue
+        v = zone.all_vars[k]
+        x_prev = zone.x_prev[k]
+        JuMP.add_to_expression!(quad, 0.5 * rho * sig, v, v)
+        JuMP.add_to_expression!(quad, -rho * sig * x_prev, v)
+    end
+
+    # Strong proximal on interzonal pflow/qflow.
+    part_pf = model[:p_flow_branches]
+    part_qf = model[:q_flow_branches]
+    @inbounds for pair in edge_pairs
+        if pair.zone_i != zone_pos && pair.zone_j != zone_pos
+            continue
+        end
+        edge_global = pair.edge_global
+        l = branch_map[edge_global]
+        l == 0 && continue
+
+        v_p = part_pf[l, 1]
+        v_q = part_qf[l, 1]
+        col_p = get(zone.var_to_col, v_p, 0)
+        col_q = get(zone.var_to_col, v_q, 0)
+
+        if col_p > 0
+            p_prev = zone.x_prev[col_p]
+            JuMP.add_to_expression!(quad, 0.5 * rho * sigma_pflow, v_p, v_p)
+            JuMP.add_to_expression!(quad, -rho * sigma_pflow * p_prev, v_p)
+        end
+        if col_q > 0
+            q_prev = zone.x_prev[col_q]
+            JuMP.add_to_expression!(quad, 0.5 * rho * sigma_qflow, v_q, v_q)
+            JuMP.add_to_expression!(quad, -rho * sigma_qflow * q_prev, v_q)
+        end
+    end
+    return quad
+end
+
 # ------------------------------------------------------------
 # Linear coupling terms (λᵀ · A_i · x)
 # ------------------------------------------------------------
@@ -128,14 +191,26 @@ function update_objective!(part::PartitionAC, ws::ACPowerWorkspaceALADIN)
     model = part.model
 
     quad = zero(JuMP.QuadExpr)
-    _ac_prox_quadexpr!(
-        quad, zdata, ws.rho[];
-        sigma_theta = ws.sigma_theta,
-        sigma_vm = ws.sigma_vm,
-        sigma_pg = ws.sigma_pg,
-        sigma_qg = ws.sigma_qg,
-        sigma_other = ws.sigma_other,
-    )
+    if ws.proximal_mode == :pflow
+        branch_map = ws.partitions.parts[zone_pos].branch_idx_full_to_zone
+        _prox_pflow_ac!(
+            quad, zdata, model, ws.edge_pairs, branch_map, zone_pos, ws.rho[];
+            sigma_pflow = ws.sigma_pflow,
+            sigma_qflow = ws.sigma_qflow,
+            sigma_pg = ws.sigma_pg,
+            sigma_qg = ws.sigma_qg,
+            sigma_other = ws.sigma_other,
+        )
+    else
+        _ac_prox_quadexpr!(
+            quad, zdata, ws.rho[];
+            sigma_theta = ws.sigma_theta,
+            sigma_vm = ws.sigma_vm,
+            sigma_pg = ws.sigma_pg,
+            sigma_qg = ws.sigma_qg,
+            sigma_other = ws.sigma_other,
+        )
+    end
 
     obj_expr = part.obj_base + quad
     obj_expr = _lambda_edge_pq_ac!(model, obj_expr, ws, zone_pos)

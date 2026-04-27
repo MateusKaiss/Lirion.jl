@@ -58,6 +58,94 @@ const _SOCWRLocalWorkspace = Union{
     return quad
 end
 
+@inline function _prox_pflow_socwr!(
+    quad::JuMP.QuadExpr,
+    zone::AladinZoneDataSOCWR,
+    edge_pairs::Vector{SharedEdgePairSOCWR},
+    zone_pos::Int,
+    rho::Float64;
+    sigma_pflow::Float64 = 10.0,
+    sigma_qflow::Float64 = 10.0,
+    sigma_pg::Float64 = 1.0,
+    sigma_qg::Float64 = 1.0,
+    sigma_other::Float64 = 1.0,
+)
+    is_pg = falses(zone.n_vars)
+    @inbounds for c in zone.pg_cols
+        is_pg[c] = true
+    end
+    is_qg = falses(zone.n_vars)
+    @inbounds for c in zone.qg_cols
+        is_qg[c] = true
+    end
+
+    @inbounds for k in 1:zone.n_vars
+        sig = is_pg[k] ? sigma_pg : (is_qg[k] ? sigma_qg : sigma_other)
+        sig == 0.0 && continue
+        v = zone.all_vars[k]
+        x_prev = zone.x_prev[k]
+        JuMP.add_to_expression!(quad, 0.5 * rho * sig, v, v)
+        JuMP.add_to_expression!(quad, -rho * sig * x_prev, v)
+    end
+
+    @inbounds for pair in edge_pairs
+        if pair.zone_i == zone_pos
+            le = pair.edge_local_i
+        elseif pair.zone_j == zone_pos
+            le = pair.edge_local_j
+        else
+            continue
+        end
+        cols = zone.edge_flow_cols[le]
+        cp = zone.edge_pflow_coefs[le]
+        cq = zone.edge_qflow_coefs[le]
+
+        D_p = 0.0
+        D_q = 0.0
+        for i in eachindex(cols)
+            D_p += cp[i] * zone.x_prev[cols[i]]
+            D_q += cq[i] * zone.x_prev[cols[i]]
+        end
+
+        # 0.5·ρ·σ_p·(Σ cp[i]·(x[i]−x_prev[i]))² → quadratic + linear
+        for i in eachindex(cols)
+            ci_p = cp[i]
+            ci_q = cq[i]
+            v_i = zone.all_vars[cols[i]]
+            if ci_p != 0.0
+                JuMP.add_to_expression!(
+                    quad,
+                    0.5 * rho * sigma_pflow * ci_p * ci_p,
+                    v_i,
+                    v_i,
+                )
+                JuMP.add_to_expression!(quad, -rho * sigma_pflow * D_p * ci_p, v_i)
+            end
+            if ci_q != 0.0
+                JuMP.add_to_expression!(
+                    quad,
+                    0.5 * rho * sigma_qflow * ci_q * ci_q,
+                    v_i,
+                    v_i,
+                )
+                JuMP.add_to_expression!(quad, -rho * sigma_qflow * D_q * ci_q, v_i)
+            end
+            for j in (i+1):length(cols)
+                cj_p = cp[j]
+                cj_q = cq[j]
+                v_j = zone.all_vars[cols[j]]
+                if ci_p != 0.0 && cj_p != 0.0
+                    JuMP.add_to_expression!(quad, rho * sigma_pflow * ci_p * cj_p, v_i, v_j)
+                end
+                if ci_q != 0.0 && cj_q != 0.0
+                    JuMP.add_to_expression!(quad, rho * sigma_qflow * ci_q * cj_q, v_i, v_j)
+                end
+            end
+        end
+    end
+    return quad
+end
+
 # ------------------------------------------------------------
 # Linear coupling terms (λᵀ · A_i · x)
 # ------------------------------------------------------------
@@ -185,7 +273,20 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRPowerWorkspaceALADIN)
     lin = zero(JuMP.AffExpr)
     _lambda_edge_pq_socwr!(lin, ws, zone_pos)
 
-    quad = _socwr_prox_quad(zdata, ws)
+    quad = if ws.proximal_mode == :pflow
+        q = zero(JuMP.QuadExpr)
+        _prox_pflow_socwr!(
+            q, zdata, ws.edge_pairs, zone_pos, ws.rho[];
+            sigma_pflow = ws.sigma_pflow,
+            sigma_qflow = ws.sigma_qflow,
+            sigma_pg = ws.sigma_pg,
+            sigma_qg = ws.sigma_qg,
+            sigma_other = ws.sigma_other,
+        )
+        q
+    else
+        _socwr_prox_quad(zdata, ws)
+    end
 
     @objective(part.model, Min, part.obj_base + lin + quad)
     return nothing

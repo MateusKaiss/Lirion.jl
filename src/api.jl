@@ -58,6 +58,30 @@ end
         throw(ArgumentError("Invalid coupling=$coupling. Allowed: :state, :power, :hybrid"))
     max_iter > 0 || throw(ArgumentError("max_iter must be > 0"))
 
+    if haskey(kwargs, :proximal_mode)
+        pm = kwargs[:proximal_mode]
+        pm in (:primal, :pflow) ||
+            throw(ArgumentError(
+                "Invalid proximal_mode=$pm. Allowed: :primal, :pflow",
+            ))
+        pm === :pflow && coupling !== :power &&
+            throw(
+                ArgumentError(
+                    "proximal_mode=:pflow is only supported with coupling=:power " *
+                    "(got coupling=$(coupling)). Use coupling=:power or " *
+                    "proximal_mode=:primal.",
+                ),
+            )
+    end
+    if haskey(kwargs, :sigma_pflow)
+        kwargs[:sigma_pflow] > 0 ||
+            throw(ArgumentError("sigma_pflow must be > 0"))
+    end
+    if haskey(kwargs, :sigma_qflow)
+        kwargs[:sigma_qflow] > 0 ||
+            throw(ArgumentError("sigma_qflow must be > 0"))
+    end
+
     return ALADINAlgorithm(coupling, _sectioning(sectioning), max_iter, (; kwargs...))
 end
 

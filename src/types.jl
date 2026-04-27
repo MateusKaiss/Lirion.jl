@@ -475,6 +475,8 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
     sigma_theta_shared::Float64
     sigma_pg::Float64
     sigma_other::Float64
+    sigma_pflow::Float64
+    sigma_qflow::Float64
     eps_abs::Float64
     eps_rel::Float64
     active_set_tol::Float64
@@ -483,6 +485,7 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
     mu_growth::Float64
     rho_upper::Float64
     mu_upper::Float64
+    proximal_mode::Symbol
 
     function ALADINConfig(
         base_model::Type{<:OPFModel},
@@ -497,6 +500,8 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
         sigma_theta_shared::Real = 10.0,
         sigma_pg::Real = 1.0,
         sigma_other::Real = 1.0,
+        sigma_pflow::Real = 10.0,
+        sigma_qflow::Real = 10.0,
         eps_abs::Real = 1e-4,
         eps_rel::Real = 1e-4,
         active_set_tol::Real = 1e-6,
@@ -505,6 +510,7 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
         mu_growth::Real = 2.0,
         rho_upper::Real = 1e6,
         mu_upper::Real = 1e6,
+        proximal_mode::Symbol = :primal,
     )
         base_model in (DC, AC, SOCWR) ||
             throw(
@@ -518,15 +524,7 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
                     "Invalid coupling=$(coupling). Allowed: :state, :power, :hybrid",
                 ),
             )
-        # DummyBus on SOCWR is not supported in ALADIN (intentional — see
-        # paper's "structural limitation" discussion). Half-branches in
-        # DummyBus need independent R, T auxiliaries per zone and
-        # ALADIN's linearised coordinator QP cannot untangle them via
-        # flow-consensus alone — empirically converges to a relaxed
-        # solution -20 to -90 % below the centralised objective. ADMM
-        # tolerates this via averaged target consensus; ALADIN does
-        # not. Rather than silently producing a wrong answer, abort
-        # with a clear message.
+
         base_model === SOCWR && sectioning isa DummyBus &&
             throw(
                 ArgumentError(
@@ -553,6 +551,22 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
             throw(ArgumentError("rho_upper must be ≥ rho"))
         mu_upper >= mu ||
             throw(ArgumentError("mu_upper must be ≥ mu"))
+        sigma_pflow > 0 || throw(ArgumentError("sigma_pflow must be > 0"))
+        sigma_qflow > 0 || throw(ArgumentError("sigma_qflow must be > 0"))
+        proximal_mode in (:primal, :pflow) ||
+            throw(
+                ArgumentError(
+                    "Invalid proximal_mode=$proximal_mode. Allowed: :primal, :pflow",
+                ),
+            )
+        proximal_mode === :pflow && coupling !== :power &&
+            throw(
+                ArgumentError(
+                    "proximal_mode=:pflow is only supported with coupling=:power " *
+                    "(got coupling=$(coupling)). Use coupling=:power or " *
+                    "proximal_mode=:primal.",
+                ),
+            )
 
         return new(
             base_model,
@@ -567,6 +581,8 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
             Float64(sigma_theta_shared),
             Float64(sigma_pg),
             Float64(sigma_other),
+            Float64(sigma_pflow),
+            Float64(sigma_qflow),
             Float64(eps_abs),
             Float64(eps_rel),
             Float64(active_set_tol),
@@ -575,6 +591,7 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
             Float64(mu_growth),
             Float64(rho_upper),
             Float64(mu_upper),
+            proximal_mode,
         )
     end
 end
