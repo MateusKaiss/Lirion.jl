@@ -1,7 +1,3 @@
-# ============================================================
-# Pair descriptors
-# ============================================================
-
 struct SharedBusPairAC
     consensus_idx::Int
     bus_id::Int
@@ -59,14 +55,6 @@ struct DummyBranchPairAC
     tap_angle_j::Float64
 end
 
-# ============================================================
-# Workspace structs
-# ============================================================
-
-# ------------------------------------------------------------
-# State
-# ------------------------------------------------------------
-
 Base.@kwdef mutable struct ACStateWorkspaceALADIN <: AbstractALADINWorkspace
     partitions::Partitions{PartitionAC}
     id::Vector{Int}
@@ -100,10 +88,6 @@ Base.@kwdef mutable struct ACStateWorkspaceALADIN <: AbstractALADINWorkspace
     iter::Int = 0
     hist::ALADINHistory = ALADINHistory()
 end
-
-# ------------------------------------------------------------
-# Power
-# ------------------------------------------------------------
 
 Base.@kwdef mutable struct ACPowerWorkspaceALADIN <: AbstractALADINWorkspace
     partitions::Partitions{PartitionAC}
@@ -142,10 +126,6 @@ Base.@kwdef mutable struct ACPowerWorkspaceALADIN <: AbstractALADINWorkspace
     iter::Int = 0
     hist::ALADINHistory = ALADINHistory()
 end
-
-# ------------------------------------------------------------
-# Hybrid
-# ------------------------------------------------------------
 
 Base.@kwdef mutable struct ACHybridWorkspaceALADIN <: AbstractALADINWorkspace
     partitions::Partitions{PartitionAC}
@@ -194,17 +174,9 @@ Base.@kwdef mutable struct ACHybridWorkspaceALADIN <: AbstractALADINWorkspace
     hist::ALADINHistory = ALADINHistory()
 end
 
-# ============================================================
-# Rho accessors
-# ============================================================
-
 _get_rhos(ws::ACStateWorkspaceALADIN) = (rho = ws.rho[],)
 _get_rhos(ws::ACPowerWorkspaceALADIN) = (rho = ws.rho[],)
 _get_rhos(ws::ACHybridWorkspaceALADIN) = (rho = ws.rho[],)
-
-# ============================================================
-# Helpers
-# ============================================================
 
 function _build_shared_bus_pairs_ac(
     partitions::Partitions{PartitionAC},
@@ -380,14 +352,6 @@ function _prepare_pq_inj_vars_ac!(partitions, sys, sys_bus_pairs, ::SplitBus)
     return p_inj_vars, q_inj_vars
 end
 
-# ============================================================
-# Builders
-# ============================================================
-
-# ------------------------------------------------------------
-# State
-# ------------------------------------------------------------
-
 function build_workspace(
     sys::DistributedSystem,
     cfg::ALADINConfig,
@@ -422,10 +386,6 @@ function build_workspace(
         alpha3 = cfg.alpha3,
     )
 end
-
-# ------------------------------------------------------------
-# Power
-# ------------------------------------------------------------
 
 function build_workspace(
     sys::DistributedSystem,
@@ -467,10 +427,6 @@ function build_workspace(
         alpha3 = cfg.alpha3,
     )
 end
-
-# ------------------------------------------------------------
-# Hybrid
-# ------------------------------------------------------------
 
 function build_workspace(
     sys::DistributedSystem,

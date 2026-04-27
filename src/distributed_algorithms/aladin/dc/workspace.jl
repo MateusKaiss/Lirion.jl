@@ -1,7 +1,3 @@
-# ============================================================
-# Pair descriptors
-# ============================================================
-
 struct SharedBusPair
     consensus_idx::Int
     bus_id::Int
@@ -41,14 +37,6 @@ struct DummyBranchPairDC
     b_j::Float64
 end
 
-# ============================================================
-# Workspace structs
-# ============================================================
-
-# ------------------------------------------------------------
-# State
-# ------------------------------------------------------------
-
 Base.@kwdef mutable struct DCStateWorkspaceALADIN <: AbstractALADINWorkspace
     partitions::Partitions{PartitionDC}
     id::Vector{Int}
@@ -68,7 +56,6 @@ Base.@kwdef mutable struct DCStateWorkspaceALADIN <: AbstractALADINWorkspace
     alpha3::Float64 = 1.0
 
     sigma_theta_shared::Float64 = 10.0
-    sigma_theta_other::Float64 = 10.0
     sigma_pg::Float64 = 1.0
     sigma_other::Float64 = 1.0
 
@@ -80,10 +67,6 @@ Base.@kwdef mutable struct DCStateWorkspaceALADIN <: AbstractALADINWorkspace
     iter::Int = 0
     hist::ALADINHistory = ALADINHistory()
 end
-
-# ------------------------------------------------------------
-# Power
-# ------------------------------------------------------------
 
 Base.@kwdef mutable struct DCPowerWorkspaceALADIN <: AbstractALADINWorkspace
     partitions::Partitions{PartitionDC}
@@ -106,7 +89,6 @@ Base.@kwdef mutable struct DCPowerWorkspaceALADIN <: AbstractALADINWorkspace
     alpha3::Float64 = 1.0
 
     sigma_theta_shared::Float64 = 10.0
-    sigma_theta_other::Float64 = 10.0
     sigma_pg::Float64 = 1.0
     sigma_other::Float64 = 1.0
 
@@ -118,10 +100,6 @@ Base.@kwdef mutable struct DCPowerWorkspaceALADIN <: AbstractALADINWorkspace
     iter::Int = 0
     hist::ALADINHistory = ALADINHistory()
 end
-
-# ------------------------------------------------------------
-# Hybrid
-# ------------------------------------------------------------
 
 Base.@kwdef mutable struct DCHybridWorkspaceALADIN <: AbstractALADINWorkspace
     partitions::Partitions{PartitionDC}
@@ -153,7 +131,6 @@ Base.@kwdef mutable struct DCHybridWorkspaceALADIN <: AbstractALADINWorkspace
     alpha3::Float64 = 1.0
 
     sigma_theta_shared::Float64 = 10.0
-    sigma_theta_other::Float64 = 10.0
     sigma_pg::Float64 = 1.0
     sigma_other::Float64 = 1.0
 
@@ -171,10 +148,6 @@ Base.@kwdef mutable struct DCHybridWorkspaceALADIN <: AbstractALADINWorkspace
     hist::ALADINHistory = ALADINHistory()
 end
 
-# ============================================================
-# Rho accessors
-# ============================================================
-
 _get_rhos(ws::DCStateWorkspaceALADIN) = (rho = ws.rho[],)
 _get_rhos(ws::DCPowerWorkspaceALADIN) = (rho = ws.rho[],)
 _get_rhos(ws::DCHybridWorkspaceALADIN) = (
@@ -182,10 +155,6 @@ _get_rhos(ws::DCHybridWorkspaceALADIN) = (
     rho_edge = ws.rho_edge[],
     rho_inj = ws.rho_inj[],
 )
-
-# ============================================================
-# Helpers
-# ============================================================
 
 function _build_shared_bus_pairs(
     partitions::Partitions{PartitionDC},
@@ -329,14 +298,6 @@ function _prepare_p_inj_vars_dc!(partitions, sys_bus_pairs, ::SplitBus)
     return p_inj_vars
 end
 
-# ============================================================
-# Builders
-# ============================================================
-
-# ------------------------------------------------------------
-# State
-# ------------------------------------------------------------
-
 function build_workspace(
     sys::DistributedSystem,
     cfg::ALADINConfig,
@@ -365,15 +326,10 @@ function build_workspace(
         alpha2 = cfg.alpha2,
         alpha3 = cfg.alpha3,
         sigma_theta_shared = cfg.sigma_theta_shared,
-        sigma_theta_other = cfg.sigma_theta_other,
         sigma_pg = cfg.sigma_pg,
         sigma_other = cfg.sigma_other,
     )
 end
-
-# ------------------------------------------------------------
-# Power
-# ------------------------------------------------------------
 
 function build_workspace(
     sys::DistributedSystem,
@@ -412,15 +368,10 @@ function build_workspace(
         alpha2 = cfg.alpha2,
         alpha3 = cfg.alpha3,
         sigma_theta_shared = cfg.sigma_theta_shared,
-        sigma_theta_other = cfg.sigma_theta_other,
         sigma_pg = cfg.sigma_pg,
         sigma_other = cfg.sigma_other,
     )
 end
-
-# ------------------------------------------------------------
-# Hybrid
-# ------------------------------------------------------------
 
 function build_workspace(
     sys::DistributedSystem,
@@ -472,7 +423,6 @@ function build_workspace(
         alpha2 = cfg.alpha2,
         alpha3 = cfg.alpha3,
         sigma_theta_shared = cfg.sigma_theta_shared,
-        sigma_theta_other = cfg.sigma_theta_other,
         sigma_pg = cfg.sigma_pg,
         sigma_other = cfg.sigma_other,
     )

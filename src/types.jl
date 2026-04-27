@@ -473,7 +473,6 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
     alpha3::Float64
 
     sigma_theta_shared::Float64
-    sigma_theta_other::Float64
     sigma_pg::Float64
     sigma_other::Float64
     eps_abs::Float64
@@ -496,7 +495,6 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
         alpha2::Real = 1.0,
         alpha3::Real = 1.0,
         sigma_theta_shared::Real = 10.0,
-        sigma_theta_other::Real = 10.0,
         sigma_pg::Real = 1.0,
         sigma_other::Real = 1.0,
         eps_abs::Real = 1e-4,
@@ -567,7 +565,6 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
             Float64(alpha2),
             Float64(alpha3),
             Float64(sigma_theta_shared),
-            Float64(sigma_theta_other),
             Float64(sigma_pg),
             Float64(sigma_other),
             Float64(eps_abs),

@@ -1,7 +1,3 @@
-# ============================================================
-# Pair descriptors
-# ============================================================
-
 struct SharedBusPairSOCWR
     consensus_idx::Int
     bus_id::Int
@@ -20,7 +16,6 @@ struct SharedEdgePairSOCWR
     edge_local_j::Int
 end
 
-# SplitBus (Method 3): sign-flipped p_inj / q_inj consensus per split bus.
 struct SplitBusPairSOCWR
     consensus_idx::Int
     bus_id::Int
@@ -31,14 +26,6 @@ struct SplitBusPairSOCWR
     pinj_col_j::Int
     qinj_col_j::Int
 end
-
-# ============================================================
-# Workspace structs
-# ============================================================
-
-# ------------------------------------------------------------
-# State
-# ------------------------------------------------------------
 
 Base.@kwdef mutable struct SOCWRStateWorkspaceALADIN <: AbstractALADINWorkspace
     partitions::Partitions{PartitionSOCWR}
@@ -79,10 +66,6 @@ Base.@kwdef mutable struct SOCWRStateWorkspaceALADIN <: AbstractALADINWorkspace
     hist::ALADINHistory = ALADINHistory()
 end
 
-# ------------------------------------------------------------
-# Power
-# ------------------------------------------------------------
-
 Base.@kwdef mutable struct SOCWRPowerWorkspaceALADIN <: AbstractALADINWorkspace
     partitions::Partitions{PartitionSOCWR}
     id::Vector{Int}
@@ -120,10 +103,6 @@ Base.@kwdef mutable struct SOCWRPowerWorkspaceALADIN <: AbstractALADINWorkspace
     iter::Int = 0
     hist::ALADINHistory = ALADINHistory()
 end
-
-# ------------------------------------------------------------
-# Hybrid
-# ------------------------------------------------------------
 
 Base.@kwdef mutable struct SOCWRHybridWorkspaceALADIN <: AbstractALADINWorkspace
     partitions::Partitions{PartitionSOCWR}
@@ -175,17 +154,9 @@ Base.@kwdef mutable struct SOCWRHybridWorkspaceALADIN <: AbstractALADINWorkspace
     hist::ALADINHistory = ALADINHistory()
 end
 
-# ============================================================
-# Rho accessors
-# ============================================================
-
 _get_rhos(ws::SOCWRStateWorkspaceALADIN) = (rho = ws.rho[],)
 _get_rhos(ws::SOCWRPowerWorkspaceALADIN) = (rho = ws.rho[],)
 _get_rhos(ws::SOCWRHybridWorkspaceALADIN) = (rho = ws.rho[],)
-
-# ============================================================
-# Helpers
-# ============================================================
 
 function _build_shared_bus_pairs_socwr(
     partitions::Partitions{PartitionSOCWR},
@@ -298,14 +269,6 @@ function _prepare_pq_inj_vars_socwr!(partitions, sys_bus_pairs, ::SplitBus)
     return p_inj_vars, q_inj_vars
 end
 
-# ============================================================
-# Builders
-# ============================================================
-
-# ------------------------------------------------------------
-# State
-# ------------------------------------------------------------
-
 function build_workspace(
     sys::DistributedSystem,
     cfg::ALADINConfig,
@@ -347,10 +310,6 @@ function build_workspace(
     )
 end
 
-# ------------------------------------------------------------
-# Power
-# ------------------------------------------------------------
-
 function build_workspace(
     sys::DistributedSystem,
     cfg::ALADINConfig,
@@ -386,10 +345,6 @@ function build_workspace(
         alpha2_init = cfg.alpha2,
     )
 end
-
-# ------------------------------------------------------------
-# Hybrid
-# ------------------------------------------------------------
 
 function build_workspace(
     sys::DistributedSystem,

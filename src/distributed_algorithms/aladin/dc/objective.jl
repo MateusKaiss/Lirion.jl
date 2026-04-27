@@ -1,7 +1,3 @@
-# ============================================================
-# ALADIN-DC — Local (Phase 1) objective builder
-# ============================================================
-
 @inline function _prox_quadexpr_cols!(
     quad::JuMP.QuadExpr,
     zone::AladinZoneData,
@@ -17,14 +13,11 @@
     return quad
 end
 
-# Canonical HFD proximal penalty: weighted quadratic around x_prev on ALL
-# local variables of the zone. Weights are differentiated per variable class
 @inline function _prox_all_quadexpr!(
     quad::JuMP.QuadExpr,
     zone::AladinZoneData,
     rho::Float64;
     sigma_theta_shared::Float64 = 10.0,
-    sigma_theta_other::Float64 = 10.0,
     sigma_pg::Float64 = 1.0,
     sigma_other::Float64 = 1.0,
 )
@@ -40,8 +33,8 @@ end
     @inbounds for k in 1:zone.n_vars
         sig =
             is_shared_theta[k] ? sigma_theta_shared :
-            is_pg[k] ? sigma_pg :
-            sigma_other
+            is_pg[k]            ? sigma_pg :
+                                  sigma_other
         v = zone.all_vars[k]
         x_prev = zone.x_prev[k]
         JuMP.add_to_expression!(quad, 0.5 * rho * sig, v, v)
@@ -75,10 +68,6 @@ end
     lambda_dummy::Vector{Float64},
     zone_pos::Int,
 )
-    # For each dummy half-branch pair touching this zone, contribute
-    #   zone_i : +λ · b_i · (θ_f - θ_t)
-    #   zone_j : -λ · b_j · (θ_f - θ_t)
-    # The sign comes from the consensus residual p_i - p_j → 0.
     for (k, pair) in enumerate(dummy_pairs)
         if pair.zone_i == zone_pos
             fcol, tcol, bval = pair.from_col_i, pair.to_col_i, pair.b_i
@@ -104,7 +93,6 @@ end
     lambda_edge::Vector{Float64},
     zone_pos::Int,
 )
-    # For each interzonal edge e touching this zone, add λ_e · sign · (b·(θ_from - θ_to))
     zdata = ws_zones[zone_pos]
     for (k, pair) in enumerate(edge_pairs)
         if pair.zone_i == zone_pos
@@ -137,7 +125,6 @@ function update_objective!(part::PartitionDC, ws::DCStateWorkspaceALADIN)
     _prox_all_quadexpr!(
         quad, zdata, ws.rho[];
         sigma_theta_shared = ws.sigma_theta_shared,
-        sigma_theta_other = ws.sigma_theta_other,
         sigma_pg = ws.sigma_pg,
         sigma_other = ws.sigma_other,
     )
@@ -160,7 +147,6 @@ function update_objective!(part::PartitionDC, ws::DCPowerWorkspaceALADIN)
     _prox_all_quadexpr!(
         quad, zdata, ws.rho[];
         sigma_theta_shared = ws.sigma_theta_shared,
-        sigma_theta_other = ws.sigma_theta_other,
         sigma_pg = ws.sigma_pg,
         sigma_other = ws.sigma_other,
     )
@@ -188,8 +174,6 @@ function update_objective!(part::PartitionDC, ws::DCHybridWorkspaceALADIN)
         lin, ws.zones, ws.dummy_branch_pairs, ws.vars.p_dummy.lambda, zone_pos,
     )
 
-    # SplitBus p_inj consensus: residual is p_inj_i + p_inj_j (sign-flipped), so
-    # both zones contribute +λ_k · p_inj term to the local objective.
     for (k, pair) in enumerate(ws.split_bus_pairs)
         if pair.zone_i == zone_pos
             col = pair.pinj_col_i
@@ -204,7 +188,6 @@ function update_objective!(part::PartitionDC, ws::DCHybridWorkspaceALADIN)
     _prox_all_quadexpr!(
         quad, zdata, ws.rho_bus[];
         sigma_theta_shared = ws.sigma_theta_shared,
-        sigma_theta_other = ws.sigma_theta_other,
         sigma_pg = ws.sigma_pg,
         sigma_other = ws.sigma_other,
     )
