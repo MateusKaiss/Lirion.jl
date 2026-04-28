@@ -198,11 +198,13 @@ include("distributed_algorithms/aladin/dc/sensitivities.jl")
 include("distributed_algorithms/aladin/dc/workspace.jl")
 include("distributed_algorithms/aladin/dc/objective.jl")
 include("distributed_algorithms/aladin/dc/coordinator_qp.jl")
+include("distributed_algorithms/aladin/dc/line_search.jl")
 
 include("distributed_algorithms/aladin/ac/sensitivities.jl")
 include("distributed_algorithms/aladin/ac/workspace.jl")
 include("distributed_algorithms/aladin/ac/objective.jl")
 include("distributed_algorithms/aladin/ac/coordinator_qp.jl")
+include("distributed_algorithms/aladin/ac/line_search.jl")
 
 include("distributed_algorithms/aladin/socwr/sensitivities.jl")
 include("distributed_algorithms/aladin/socwr/workspace.jl")

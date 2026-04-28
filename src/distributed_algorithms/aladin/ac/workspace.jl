@@ -101,6 +101,8 @@ Base.@kwdef mutable struct ACStateWorkspaceALADIN <: AbstractALADINWorkspace
     alpha1::Float64 = 1.0
     alpha2::Float64 = 1.0
     alpha3::Float64 = 1.0
+    alpha2_init::Float64 = 1.0
+    line_search::Bool = true
 
     sigma_theta::Float64 = 10.0
     sigma_vm::Float64 = 5.0
@@ -143,6 +145,8 @@ Base.@kwdef mutable struct ACPowerWorkspaceALADIN <: AbstractALADINWorkspace
     alpha1::Float64 = 1.0
     alpha2::Float64 = 1.0
     alpha3::Float64 = 1.0
+    alpha2_init::Float64 = 1.0
+    line_search::Bool = true
 
     sigma_theta::Float64 = 10.0
     sigma_vm::Float64 = 5.0
@@ -198,6 +202,8 @@ Base.@kwdef mutable struct ACHybridWorkspaceALADIN <: AbstractALADINWorkspace
     alpha1::Float64 = 1.0
     alpha2::Float64 = 1.0
     alpha3::Float64 = 1.0
+    alpha2_init::Float64 = 1.0
+    line_search::Bool = true
 
     sigma_theta::Float64 = 10.0
     sigma_vm::Float64 = 5.0
@@ -253,10 +259,15 @@ function _build_shared_bus_pairs_ac(
     pairs = SharedBusPairAC[]
     for cidx in sort!(collect(keys(acc)))
         entries = acc[cidx]
-        length(entries) == 2 || continue
-        zi, ti, vi = entries[1]
-        zj, tj, vj = entries[2]
-        push!(pairs, SharedBusPairAC(cidx, bus_of[cidx], zi, ti, vi, zj, tj, vj))
+        length(entries) >= 2 || continue
+        # Spanning tree (star): pair every other zone with the lowest-zpos
+        # zone as root. N zones → N-1 pairs, LICQ preserved.
+        sort!(entries, by = first)
+        zr, tr, vr = entries[1]
+        for k in 2:length(entries)
+            zk, tk, vk = entries[k]
+            push!(pairs, SharedBusPairAC(cidx, bus_of[cidx], zr, tr, vr, zk, tk, vk))
+        end
     end
     return pairs
 end
@@ -460,6 +471,7 @@ function build_workspace(
         alpha1 = cfg.alpha1,
         alpha2 = cfg.alpha2,
         alpha3 = cfg.alpha3,
+        alpha2_init = cfg.alpha2,
     )
 end
 
@@ -505,6 +517,7 @@ function build_workspace(
         alpha1 = cfg.alpha1,
         alpha2 = cfg.alpha2,
         alpha3 = cfg.alpha3,
+        alpha2_init = cfg.alpha2,
         sigma_pflow = cfg.sigma_pflow,
         sigma_qflow = cfg.sigma_qflow,
         proximal_mode = cfg.proximal_mode,
@@ -571,5 +584,6 @@ function build_workspace(
         alpha1 = cfg.alpha1,
         alpha2 = cfg.alpha2,
         alpha3 = cfg.alpha3,
+        alpha2_init = cfg.alpha2,
     )
 end

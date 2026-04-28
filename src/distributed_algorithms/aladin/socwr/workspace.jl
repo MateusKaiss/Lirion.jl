@@ -228,10 +228,15 @@ function _build_shared_bus_pairs_socwr(
     pairs = SharedBusPairSOCWR[]
     for cidx in sort!(collect(keys(acc)))
         entries = acc[cidx]
-        length(entries) == 2 || continue
-        zi, ci = entries[1]
-        zj, cj = entries[2]
-        push!(pairs, SharedBusPairSOCWR(cidx, bus_of[cidx], zi, ci, zj, cj))
+        length(entries) >= 2 || continue
+        # Spanning tree (star): pair every other zone with the lowest-zpos
+        # zone as root. N zones → N-1 pairs, LICQ preserved.
+        sort!(entries, by = first)
+        zr, cr = entries[1]
+        for k in 2:length(entries)
+            zk, ck = entries[k]
+            push!(pairs, SharedBusPairSOCWR(cidx, bus_of[cidx], zr, cr, zk, ck))
+        end
     end
     return pairs
 end

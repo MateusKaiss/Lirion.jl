@@ -1,6 +1,18 @@
 # ============================================================
 # ALADIN — Adaptive ρ/μ schedule
 # ============================================================
+#
+# EXTENSION OUTSIDE THE CANONICAL PAPER. Houska-Frasch-Diehl 2016
+# specifies a single fixed ρ "sufficiently large" (Lemma 3 / Theorem 4
+# hypotheses); no schedule is prescribed. The monotonic growth here is a
+# practical heuristic borrowed from augmented Lagrangian / penalty
+# methods. It remains compatible with the paper's local convergence
+# guarantee provided ρ_upper < ∞ (so ρ stabilises in finite iterations).
+#
+# Default in `ALADINConfig` is `adaptive = false`. Enable explicitly
+# (`adaptive = true`) with caution; the choice of `rho_growth`,
+# `mu_growth` and the upper bounds is empirical and may need tuning per
+# case. The adaptive schedule is NOT covered by the convergence proofs.
 
 @inline function _grow_ref!(
     ref::Base.RefValue{Float64},

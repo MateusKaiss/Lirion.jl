@@ -567,6 +567,19 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
                     "proximal_mode=:primal.",
                 ),
             )
+        # :pflow requires p_flow to be an affine function of primal variables
+        # (so that (p_flow − p_prev)² is quadratic in primals). True in DC
+        # (p = b·(θ_f − θ_t)) and SOCWR (p affine in v², R, T), but NOT in AC
+        # where p_flow_branches is a non-linear expression in (V, θ).
+        proximal_mode === :pflow && base_model === AC &&
+            throw(
+                ArgumentError(
+                    "proximal_mode=:pflow is not supported in AC: p_flow_branches " *
+                    "is a non-linear expression in (V, θ), so (p_flow − p_prev)² " *
+                    "is not quadratic in primal variables. Use base_model=DC or " *
+                    "SOCWR with :pflow, or proximal_mode=:primal in AC.",
+                ),
+            )
 
         return new(
             base_model,

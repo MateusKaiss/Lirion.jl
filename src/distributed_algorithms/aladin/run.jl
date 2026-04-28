@@ -11,10 +11,8 @@ function run_algorithm!(ws::AbstractALADINWorkspace, params::ALADINParams)
 
         local_solve!(ws)
         solve_coordinator_qp!(ws)
-
         compute_residuals!(ws)
         compute_tolerances!(ws, params.eps_abs, params.eps_rel)
-
         _record_iter!(ws)
         _print_aladin_residuals!(ws)
 

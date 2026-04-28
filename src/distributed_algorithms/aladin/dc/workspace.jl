@@ -82,6 +82,8 @@ Base.@kwdef mutable struct DCStateWorkspaceALADIN <: AbstractALADINWorkspace
     alpha1::Float64 = 1.0
     alpha2::Float64 = 1.0
     alpha3::Float64 = 1.0
+    alpha2_init::Float64 = 1.0
+    line_search::Bool = true
 
     sigma_theta_shared::Float64 = 10.0
     sigma_pg::Float64 = 1.0
@@ -120,6 +122,8 @@ Base.@kwdef mutable struct DCPowerWorkspaceALADIN <: AbstractALADINWorkspace
     alpha1::Float64 = 1.0
     alpha2::Float64 = 1.0
     alpha3::Float64 = 1.0
+    alpha2_init::Float64 = 1.0
+    line_search::Bool = true
 
     sigma_theta_shared::Float64 = 10.0
     sigma_pg::Float64 = 1.0
@@ -169,6 +173,8 @@ Base.@kwdef mutable struct DCHybridWorkspaceALADIN <: AbstractALADINWorkspace
     alpha1::Float64 = 1.0
     alpha2::Float64 = 1.0
     alpha3::Float64 = 1.0
+    alpha2_init::Float64 = 1.0
+    line_search::Bool = true
 
     sigma_theta_shared::Float64 = 10.0
     sigma_pg::Float64 = 1.0
@@ -231,10 +237,15 @@ function _build_shared_bus_pairs(
     pairs = SharedBusPair[]
     for cidx in sort!(collect(keys(acc)))
         entries = acc[cidx]
-        length(entries) == 2 || continue
-        zi, ci = entries[1]
-        zj, cj = entries[2]
-        push!(pairs, SharedBusPair(cidx, bus_of[cidx], zi, ci, zj, cj))
+        length(entries) >= 2 || continue
+        # Spanning tree (star): pair every other zone with the lowest-zpos
+        # zone as root. N zones → N-1 pairs, LICQ preserved.
+        sort!(entries, by = first)
+        zr, cr = entries[1]
+        for k in 2:length(entries)
+            zk, ck = entries[k]
+            push!(pairs, SharedBusPair(cidx, bus_of[cidx], zr, cr, zk, ck))
+        end
     end
     return pairs
 end
@@ -402,6 +413,7 @@ function build_workspace(
         alpha1 = cfg.alpha1,
         alpha2 = cfg.alpha2,
         alpha3 = cfg.alpha3,
+        alpha2_init = cfg.alpha2,
         sigma_theta_shared = cfg.sigma_theta_shared,
         sigma_pg = cfg.sigma_pg,
         sigma_other = cfg.sigma_other,
@@ -449,6 +461,7 @@ function build_workspace(
         alpha1 = cfg.alpha1,
         alpha2 = cfg.alpha2,
         alpha3 = cfg.alpha3,
+        alpha2_init = cfg.alpha2,
         sigma_theta_shared = cfg.sigma_theta_shared,
         sigma_pg = cfg.sigma_pg,
         sigma_other = cfg.sigma_other,
@@ -511,6 +524,7 @@ function build_workspace(
         alpha1 = cfg.alpha1,
         alpha2 = cfg.alpha2,
         alpha3 = cfg.alpha3,
+        alpha2_init = cfg.alpha2,
         sigma_theta_shared = cfg.sigma_theta_shared,
         sigma_pg = cfg.sigma_pg,
         sigma_other = cfg.sigma_other,

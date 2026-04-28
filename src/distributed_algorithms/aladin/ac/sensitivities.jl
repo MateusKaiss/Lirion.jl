@@ -432,16 +432,15 @@ function refresh_sensitivities_ac!(
         add!(zone.curt_cols, sigma_other)
     end
 
+    # Levenberg-Marquardt regularisation: add δ on the diagonal so the
+    # Hessian satisfies the H_i + ρΣ_i ≻ 0 hypothesis of HFD Theorem 4.
+    # This replaces the previous dense eigendecomposition (O(n³)/iter) with
+    # an O(n) shift; the perturbation is bounded by δ in operator norm and
+    # matches SOCWR's convention (`_refresh_hess_diag!`, δ=1e-6).
     if n_vars > 0
-        H_dense = Matrix(H_full)
-        H_dense = 0.5 * (H_dense + H_dense')   # numerical symmetry
-        λ_min = LinearAlgebra.eigvals(LinearAlgebra.Symmetric(H_dense))[1]
         δ = 1e-6
-        if λ_min < δ
-            shift = δ - λ_min
-            @inbounds for c in 1:n_vars
-                H_full[c, c] += shift
-            end
+        @inbounds for c in 1:n_vars
+            H_full[c, c] += δ
         end
     end
 
