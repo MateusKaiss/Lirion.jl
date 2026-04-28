@@ -218,19 +218,23 @@ function _dc_dΦ0(ws::DCPowerWorkspaceALADIN)
     @inbounds for (k, pair) in enumerate(ws.edge_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        r0 = _dc_pflow_at(zi, pair.edge_local_i, 0.0) -
-             _dc_pflow_at(zj, pair.edge_local_j, 0.0)
-        Δr = _dc_pflow_dir_deriv(zi, pair.edge_local_i) -
-             _dc_pflow_dir_deriv(zj, pair.edge_local_j)
+        r0 =
+            _dc_pflow_at(zi, pair.edge_local_i, 0.0) -
+            _dc_pflow_at(zj, pair.edge_local_j, 0.0)
+        Δr =
+            _dc_pflow_dir_deriv(zi, pair.edge_local_i) -
+            _dc_pflow_dir_deriv(zj, pair.edge_local_j)
         dΦ += (ws.vars.p_flow.lambda[k] + mu * r0) * Δr
     end
     @inbounds for (k, pair) in enumerate(ws.dummy_branch_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        r0 = _dc_dummy_pflow_at(zi, pair.from_col_i, pair.to_col_i, pair.b_i, 0.0) -
-             _dc_dummy_pflow_at(zj, pair.from_col_j, pair.to_col_j, pair.b_j, 0.0)
-        Δr = _dc_dummy_pflow_dir_deriv(zi, pair.from_col_i, pair.to_col_i, pair.b_i) -
-             _dc_dummy_pflow_dir_deriv(zj, pair.from_col_j, pair.to_col_j, pair.b_j)
+        r0 =
+            _dc_dummy_pflow_at(zi, pair.from_col_i, pair.to_col_i, pair.b_i, 0.0) -
+            _dc_dummy_pflow_at(zj, pair.from_col_j, pair.to_col_j, pair.b_j, 0.0)
+        Δr =
+            _dc_dummy_pflow_dir_deriv(zi, pair.from_col_i, pair.to_col_i, pair.b_i) -
+            _dc_dummy_pflow_dir_deriv(zj, pair.from_col_j, pair.to_col_j, pair.b_j)
         dΦ += (ws.vars.p_dummy.lambda[k] + mu * r0) * Δr
     end
     return dΦ
@@ -252,19 +256,23 @@ function _dc_dΦ0(ws::DCHybridWorkspaceALADIN)
     @inbounds for (k, pair) in enumerate(ws.edge_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        r0 = _dc_pflow_at(zi, pair.edge_local_i, 0.0) -
-             _dc_pflow_at(zj, pair.edge_local_j, 0.0)
-        Δr = _dc_pflow_dir_deriv(zi, pair.edge_local_i) -
-             _dc_pflow_dir_deriv(zj, pair.edge_local_j)
+        r0 =
+            _dc_pflow_at(zi, pair.edge_local_i, 0.0) -
+            _dc_pflow_at(zj, pair.edge_local_j, 0.0)
+        Δr =
+            _dc_pflow_dir_deriv(zi, pair.edge_local_i) -
+            _dc_pflow_dir_deriv(zj, pair.edge_local_j)
         dΦ += (ws.vars.p_flow.lambda[k] + mu * r0) * Δr
     end
     @inbounds for (k, pair) in enumerate(ws.dummy_branch_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        r0 = _dc_dummy_pflow_at(zi, pair.from_col_i, pair.to_col_i, pair.b_i, 0.0) -
-             _dc_dummy_pflow_at(zj, pair.from_col_j, pair.to_col_j, pair.b_j, 0.0)
-        Δr = _dc_dummy_pflow_dir_deriv(zi, pair.from_col_i, pair.to_col_i, pair.b_i) -
-             _dc_dummy_pflow_dir_deriv(zj, pair.from_col_j, pair.to_col_j, pair.b_j)
+        r0 =
+            _dc_dummy_pflow_at(zi, pair.from_col_i, pair.to_col_i, pair.b_i, 0.0) -
+            _dc_dummy_pflow_at(zj, pair.from_col_j, pair.to_col_j, pair.b_j, 0.0)
+        Δr =
+            _dc_dummy_pflow_dir_deriv(zi, pair.from_col_i, pair.to_col_i, pair.b_i) -
+            _dc_dummy_pflow_dir_deriv(zj, pair.from_col_j, pair.to_col_j, pair.b_j)
         dΦ += (ws.vars.p_dummy.lambda[k] + mu * r0) * Δr
     end
     @inbounds for (k, pair) in enumerate(ws.split_bus_pairs)

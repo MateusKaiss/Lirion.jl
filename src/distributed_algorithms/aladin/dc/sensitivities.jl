@@ -251,6 +251,7 @@ function build_aladin_zone_data(
     @inbounds for (k, col) in enumerate(pg_cols)
         hess_diag[col] += pg_c2_sbase2[k]
     end
+    @assert all(isfinite, hess_diag) "DC Hessian diagonal has non-finite entries"
     C_eq = _extract_equality_jacobian(model, var_to_col, n_vars)
 
     return AladinZoneData(
@@ -382,6 +383,13 @@ function _delete_dependent_rows(
     n_rows <= 1 && return C
 
     # Dense transpose: columns of A correspond to rows of C.
+    # Sparse QR with column pivoting is not available in Julia stdlib
+    # (`LinearAlgebra.qr(::SparseMatrixCSC, ::ColumnNorm)` is unsupported);
+    # for robust LICQ rank detection we therefore densify here. This is
+    # O(n_rows · n_vars) memory and O(n_rows²) time per call. Acceptable
+    # for case ≤ 200 buses; for larger cases this is a known performance
+    # ceiling and could be replaced by a sparse rank-revealing factorisation
+    # (SuiteSparse SPQR or a streaming QR) as future work.
     A = Matrix(C')
     if size(A, 1) == 0 || size(A, 2) == 0
         return C

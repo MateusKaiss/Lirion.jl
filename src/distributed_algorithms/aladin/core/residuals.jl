@@ -1,3 +1,17 @@
+# ============================================================
+# ALADIN — Residual computation
+# ============================================================
+#
+# Residuals (`r_primal`, `r_progress`, `lambda_step`) are computed in
+# the Euclidean (L₂) norm. Houska-Frasch-Diehl 2016 specifies the
+# 1-norm in Algorithm 2 step 2, but explicitly remarks (p. 1109,
+# footnote 2): "The termination criterion is not scale invariant. We
+# use one-norms to measure constraint violations throughout, although
+# it would be possible to use other norms." The L₂ choice is paired
+# with the Boyd-style absolute+relative tolerance scheme in
+# `tolerances.jl` and is internally consistent — if a future user
+# wants strict L₁ fidelity, both modules need to be switched together.
+
 function _progress_sq(
     zone::Union{AladinZoneData, AladinZoneDataAC, AladinZoneDataSOCWR},
 )::Float64

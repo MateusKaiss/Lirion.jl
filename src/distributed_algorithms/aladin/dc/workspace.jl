@@ -240,7 +240,7 @@ function _build_shared_bus_pairs(
         length(entries) >= 2 || continue
         # Spanning tree (star): pair every other zone with the lowest-zpos
         # zone as root. N zones → N-1 pairs, LICQ preserved.
-        sort!(entries, by = first)
+        sort!(entries; by = first)
         zr, cr = entries[1]
         for k in 2:length(entries)
             zk, ck = entries[k]

@@ -460,6 +460,7 @@ function _refresh_hess_diag!(
             zone.hess_diag[c] = delta
         end
     end
+    @assert all(isfinite, zone.hess_diag) "SOCWR Hessian diagonal has non-finite entries"
     return nothing
 end
 

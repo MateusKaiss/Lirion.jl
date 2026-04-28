@@ -442,6 +442,10 @@ function refresh_sensitivities_ac!(
         @inbounds for c in 1:n_vars
             H_full[c, c] += δ
         end
+        # Sanity check: NaN/Inf in the Hessian indicates a numerical issue
+        # upstream (Ipopt failure, tap_angle wrap, etc.) — fail loudly here
+        # rather than propagate garbage into the coordinator QP.
+        @assert all(isfinite, H_full.nzval) "AC Hessian has non-finite entries"
     end
 
     zone.hess = H_full
