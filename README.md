@@ -179,11 +179,11 @@ For a detailed explanation of the update rules and their theoretical motivation,
 
 Lirion.jl is the result of a collective research effort under the coordination of the Federal University of Parana. The project was conceptualized by Mateus Kaiss and Daniel Gebbran, evolving towards a comprehensive open-source framework. The key collaborators of this work are:
 
-- **Mateus Kaiss**: Lead Developer. Responsible for the implementation, maintenance, and technical architecture of the project.
+- **Mateus Kaiss**: Researcher and Lead Developer. Responsible for R\&D, and implementation, maintenance, and technical architecture of the project.
 
-- **Daniel Gebbran, PhD**: Project Lead. Secured the funding, established the scientific workflow \& logic, and provides continuous continuous technical input on architecture design, feature implementation, and debugging. 
+- **Daniel Gebbran, PhD**: Research Lead. Established the scientific workflow \& logic, and provides continuous high-level technical direction, including system architecture design, collaborative debugging, and feature implementation oversight. 
 
-- **Prof. Dr. Kristie Kaminski Küster**: Principal Advisor. Provides critical guidance in power systems engineering, reviews the project's logic and implementation, and coordinates the research group's scientific strategy.
+- **Prof. Dr. Kristie Kaminski Küster**: Academic Advisor. Provides critical guidance in power systems engineering, reviews the project's logic and implementation, and coordinates the research group's scientific strategy.
 
 - **Andressa Mathias Pedroso**: Lead Web Developer. Responsible for the design and development of the official Lirion platform and online presence.
 
@@ -199,7 +199,7 @@ This software is part of an ongoing research program. The following works have b
 
 ## Funding
 
-The authors gratefully acknowledge Brazil's Conselho Nacional de Desenvolvimento Científico e Tecnológico (CNPq) for its support through grant 447271/2024-5, established in 2024 and executed in 2025, which has been essential in enabling the continued development, scientific expansion, and open-source release of this work.
+The authors gratefully acknowledge Brazil's Conselho Nacional de Desenvolvimento Científico e Tecnológico (CNPq) for its support through grant 447271/2024-5 — established in 2024 and executed from 2025 through present — led by Daniel Gebbran as the Principal Investigator. This support has been essential in providing the institutional framework, scientific scope, and computational resources essential for the conceptualization and development of Lirion.jl, enabling the continued development, scientific expansion, and open-source release of this work.
 
 
 ## Julia community
