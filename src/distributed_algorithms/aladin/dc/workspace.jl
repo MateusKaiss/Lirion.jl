@@ -1,63 +1,4 @@
 # ============================================================
-# Pair types (consensus structures)
-# ============================================================
-
-# ------------------------------------------------------------
-# Shared bus pair
-# ------------------------------------------------------------
-
-struct SharedBusPair
-    consensus_idx::Int
-    bus_id::Int
-    zone_i::Int
-    col_i::Int
-    zone_j::Int
-    col_j::Int
-end
-
-# ------------------------------------------------------------
-# Shared edge pair
-# ------------------------------------------------------------
-
-struct SharedEdgePair
-    consensus_idx::Int
-    edge_global::Int
-    zone_i::Int
-    edge_local_i::Int
-    zone_j::Int
-    edge_local_j::Int
-end
-
-# ------------------------------------------------------------
-# Split bus pair
-# ------------------------------------------------------------
-
-struct SplitBusPair
-    consensus_idx::Int
-    bus_id::Int
-    zone_i::Int
-    pinj_col_i::Int
-    zone_j::Int
-    pinj_col_j::Int
-end
-
-# ------------------------------------------------------------
-# Dummy branch pair
-# ------------------------------------------------------------
-
-struct DummyBranchPairDC
-    consensus_idx::Int
-    zone_i::Int
-    from_col_i::Int
-    to_col_i::Int
-    b_i::Float64
-    zone_j::Int
-    from_col_j::Int
-    to_col_j::Int
-    b_j::Float64
-end
-
-# ============================================================
 # Workspace structs
 # ============================================================
 
@@ -208,177 +149,6 @@ _get_rhos(ws::DCHybridWorkspaceALADIN) = (
 )
 
 # ============================================================
-# Pair builders
-# ============================================================
-
-# ------------------------------------------------------------
-# Shared bus pairs
-# ------------------------------------------------------------
-
-function _build_shared_bus_pairs(
-    partitions::Partitions{PartitionDC},
-    zones::Vector{AladinZoneData},
-)::Vector{SharedBusPair}
-    acc = Dict{Int, Vector{Tuple{Int, Int}}}()
-    bus_of = Dict{Int, Int}()
-
-    for (zpos, part) in enumerate(partitions.parts)
-        zdata = zones[zpos]
-        @inbounds for i in eachindex(part.zone_shared_bus_ids)
-            cidx = part.shared_bus_consensus_idx[i]
-            cidx == 0 && continue
-            col = zdata.shared_theta_cols[i]
-            v = get!(acc, cidx, Tuple{Int, Int}[])
-            push!(v, (zpos, col))
-            bus_of[cidx] = part.zone_shared_bus_ids[i]
-        end
-    end
-
-    pairs = SharedBusPair[]
-    for cidx in sort!(collect(keys(acc)))
-        entries = acc[cidx]
-        length(entries) >= 2 || continue
-        # Spanning tree (star): pair every other zone with the lowest-zpos
-        # zone as root. N zones → N-1 pairs, LICQ preserved.
-        sort!(entries; by = first)
-        zr, cr = entries[1]
-        for k in 2:length(entries)
-            zk, ck = entries[k]
-            push!(pairs, SharedBusPair(cidx, bus_of[cidx], zr, cr, zk, ck))
-        end
-    end
-    return pairs
-end
-
-# ------------------------------------------------------------
-# Shared edge pairs
-# ------------------------------------------------------------
-
-function _build_shared_edge_pairs(
-    partitions::Partitions{PartitionDC},
-    interzonal::Vector{Int},
-)::Vector{SharedEdgePair}
-    pairs = SharedEdgePair[]
-
-    for (cidx, e) in enumerate(interzonal)
-        entries = Tuple{Int, Int}[]
-        for (zpos, part) in enumerate(partitions.parts)
-            part.branch_idx_full_to_zone[e] == 0 && continue
-            local_k = findfirst(==(e), part.zone_edges)
-            local_k === nothing && continue
-            push!(entries, (zpos, local_k))
-        end
-        length(entries) == 2 || continue
-        zi, li = entries[1]
-        zj, lj = entries[2]
-        push!(pairs, SharedEdgePair(cidx, e, zi, li, zj, lj))
-    end
-    return pairs
-end
-
-# ------------------------------------------------------------
-# Dummy branch pairs
-# ------------------------------------------------------------
-
-function _build_dummy_branch_pairs_dc(
-    partitions::Partitions{PartitionDC},
-    zones::Vector{AladinZoneData},
-    sys_branch_pairs::Vector{NTuple{4, Int}},
-)::Vector{DummyBranchPairDC}
-    pairs = DummyBranchPairDC[]
-    isempty(sys_branch_pairs) && return pairs
-    sizehint!(pairs, length(sys_branch_pairs))
-
-    for (k, (ga, za, gb, zb)) in enumerate(sys_branch_pairs)
-        pa = partitions.parts[za]
-        pb = partitions.parts[zb]
-        la = pa.branch_idx_full_to_zone[ga]
-        lb = pb.branch_idx_full_to_zone[gb]
-        (la == 0 || lb == 0) && continue
-
-        zda = zones[za]
-        zdb = zones[zb]
-
-        fa = pa.branch.from[la]
-        ta = pa.branch.to[la]
-        fb = pb.branch.from[lb]
-        tb = pb.branch.to[lb]
-
-        theta_a = pa.model[:theta]
-        theta_b = pb.model[:theta]
-        from_col_i = zda.var_to_col[theta_a[fa, 1]]
-        to_col_i = zda.var_to_col[theta_a[ta, 1]]
-        from_col_j = zdb.var_to_col[theta_b[fb, 1]]
-        to_col_j = zdb.var_to_col[theta_b[tb, 1]]
-
-        b_i = pa.branch.b[la]
-        b_j = pb.branch.b[lb]
-
-        push!(
-            pairs,
-            DummyBranchPairDC(
-                k, za, from_col_i, to_col_i, b_i,
-                zb, from_col_j, to_col_j, b_j,
-            ),
-        )
-    end
-    return pairs
-end
-
-# ------------------------------------------------------------
-# Split bus pairs
-# ------------------------------------------------------------
-
-function _build_split_bus_pairs(
-    partitions::Partitions{PartitionDC},
-    zones::Vector{AladinZoneData},
-    sys_bus_pairs::Vector{NTuple{3, Int}},
-    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
-)::Vector{SplitBusPair}
-    pairs = SplitBusPair[]
-    isempty(sys_bus_pairs) && return pairs
-    sizehint!(pairs, length(sys_bus_pairs))
-
-    for (k, (bid, za, zb)) in enumerate(sys_bus_pairs)
-        v_a = get(p_inj_vars[za], bid, nothing)
-        v_b = get(p_inj_vars[zb], bid, nothing)
-        (v_a === nothing || v_b === nothing) && continue
-        col_a = zones[za].var_to_col[v_a]
-        col_b = zones[zb].var_to_col[v_b]
-        push!(pairs, SplitBusPair(k, bid, za, col_a, zb, col_b))
-    end
-    return pairs
-end
-
-# ============================================================
-# Zone data & injection helpers
-# ============================================================
-
-function _build_zone_data_vector(
-    partitions::Partitions{PartitionDC};
-    include_edges::Bool,
-)::Vector{AladinZoneData}
-    parts = partitions.parts
-    zones = Vector{AladinZoneData}(undef, length(parts))
-    @inbounds for i in eachindex(parts)
-        zones[i] = build_aladin_zone_data(parts[i]; include_edges = include_edges)
-    end
-    return zones
-end
-
-_prepare_p_inj_vars_dc!(partitions, sys_bus_pairs, ::Union{TieLine, DummyBus}) =
-    [Dict{Int, JuMP.VariableRef}() for _ in 1:length(partitions.parts)]
-
-function _prepare_p_inj_vars_dc!(partitions, sys_bus_pairs, ::SplitBus)
-    n_zones = length(partitions.parts)
-    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
-    @inbounds for i in 1:n_zones
-        _attach_p_inj_variables!(partitions.parts[i], sys_bus_pairs, p_inj_vars[i])
-    end
-    return p_inj_vars
-end
-
-# ============================================================
 # Builders
 # ============================================================
 
@@ -395,10 +165,7 @@ function build_workspace(
     partitions = build_partitions(PartitionDC, sys)
     id = partitions.zones
 
-    build_local_model!(partitions, sys, State, optimizer_factory)
-
-    zones = _build_zone_data_vector(partitions; include_edges = false)
-    bus_pairs = _build_shared_bus_pairs(partitions, zones)
+    zones, bus_pairs = init_state_partition!(partitions, sys, optimizer_factory, cfg)
     n_pairs = length(bus_pairs)
 
     return DCStateWorkspaceALADIN(;
@@ -434,13 +201,9 @@ function build_workspace(
     partitions = build_partitions(PartitionDC, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
-    sys_branch_pairs = sys.branch_pairs
 
-    build_local_model!(partitions, sys, Power, optimizer_factory, inter)
-
-    zones = _build_zone_data_vector(partitions; include_edges = true)
-    edge_pairs = _build_shared_edge_pairs(partitions, inter)
-    dummy_pairs = _build_dummy_branch_pairs_dc(partitions, zones, sys_branch_pairs)
+    zones, edge_pairs, dummy_pairs =
+        init_power_partition!(partitions, sys, optimizer_factory, cfg)
     n_pairs = length(edge_pairs)
     n_dummy = length(dummy_pairs)
 
@@ -484,17 +247,27 @@ function build_workspace(
     partitions = build_partitions(PartitionDC, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
-    sys_bus_pairs = sys.bus_pairs
+    sectioning = cfg.sectioning
 
-    build_local_model!(partitions, sys, Hybrid, optimizer_factory, inter)
+    if sectioning isa TieLine
+        zones, bus_pairs, edge_pairs =
+            init_hybrid_partition!(partitions, sys, optimizer_factory, cfg, sectioning)
+        split_pairs = SplitBusPair[]
+        dummy_pairs = DummyBranchPairDC[]
+        p_inj_vars = Vector{Dict{Int, JuMP.VariableRef}}()
+    elseif sectioning isa DummyBus
+        zones, bus_pairs, edge_pairs, dummy_pairs =
+            init_hybrid_partition!(partitions, sys, optimizer_factory, cfg, sectioning)
+        split_pairs = SplitBusPair[]
+        p_inj_vars = Vector{Dict{Int, JuMP.VariableRef}}()
+    elseif sectioning isa SplitBus
+        zones, bus_pairs, edge_pairs, split_pairs, p_inj_vars =
+            init_hybrid_partition!(partitions, sys, optimizer_factory, cfg, sectioning)
+        dummy_pairs = DummyBranchPairDC[]
+    else
+        error("ALADIN{Hybrid, DC}: unsupported sectioning $(sectioning)")
+    end
 
-    p_inj_vars = _prepare_p_inj_vars_dc!(partitions, sys_bus_pairs, cfg.sectioning)
-
-    zones = _build_zone_data_vector(partitions; include_edges = true)
-    bus_pairs = _build_shared_bus_pairs(partitions, zones)
-    edge_pairs = _build_shared_edge_pairs(partitions, inter)
-    split_pairs = _build_split_bus_pairs(partitions, zones, sys_bus_pairs, p_inj_vars)
-    dummy_pairs = _build_dummy_branch_pairs_dc(partitions, zones, sys.branch_pairs)
     n_bus = length(bus_pairs)
     n_edge = length(edge_pairs)
     n_split = length(split_pairs)

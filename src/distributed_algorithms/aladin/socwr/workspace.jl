@@ -1,49 +1,4 @@
 # ============================================================
-# Pair types (consensus structures)
-# ============================================================
-
-# ------------------------------------------------------------
-# Shared bus pair
-# ------------------------------------------------------------
-
-struct SharedBusPairSOCWR
-    consensus_idx::Int
-    bus_id::Int
-    zone_i::Int
-    v2_col_i::Int
-    zone_j::Int
-    v2_col_j::Int
-end
-
-# ------------------------------------------------------------
-# Shared edge pair
-# ------------------------------------------------------------
-
-struct SharedEdgePairSOCWR
-    consensus_idx::Int
-    edge_global::Int
-    zone_i::Int
-    edge_local_i::Int
-    zone_j::Int
-    edge_local_j::Int
-end
-
-# ------------------------------------------------------------
-# Split bus pair
-# ------------------------------------------------------------
-
-struct SplitBusPairSOCWR
-    consensus_idx::Int
-    bus_id::Int
-    zone_i::Int
-    pinj_col_i::Int
-    qinj_col_i::Int
-    zone_j::Int
-    pinj_col_j::Int
-    qinj_col_j::Int
-end
-
-# ============================================================
 # Workspace structs
 # ============================================================
 
@@ -199,142 +154,6 @@ _get_rhos(ws::SOCWRPowerWorkspaceALADIN) = (rho = ws.rho[],)
 _get_rhos(ws::SOCWRHybridWorkspaceALADIN) = (rho = ws.rho[],)
 
 # ============================================================
-# Pair builders
-# ============================================================
-
-# ------------------------------------------------------------
-# Shared bus pairs
-# ------------------------------------------------------------
-
-function _build_shared_bus_pairs_socwr(
-    partitions::Partitions{PartitionSOCWR},
-    zones::Vector{AladinZoneDataSOCWR},
-)::Vector{SharedBusPairSOCWR}
-    acc = Dict{Int, Vector{Tuple{Int, Int}}}()
-    bus_of = Dict{Int, Int}()
-
-    for (zpos, part) in enumerate(partitions.parts)
-        zdata = zones[zpos]
-        @inbounds for i in eachindex(part.zone_shared_bus_ids)
-            cidx = part.shared_bus_consensus_idx[i]
-            cidx == 0 && continue
-            col = zdata.shared_v2_cols[i]
-            v = get!(acc, cidx, Tuple{Int, Int}[])
-            push!(v, (zpos, col))
-            bus_of[cidx] = part.zone_shared_bus_ids[i]
-        end
-    end
-
-    pairs = SharedBusPairSOCWR[]
-    for cidx in sort!(collect(keys(acc)))
-        entries = acc[cidx]
-        length(entries) >= 2 || continue
-        # Spanning tree (star): pair every other zone with the lowest-zpos
-        # zone as root. N zones → N-1 pairs, LICQ preserved.
-        sort!(entries; by = first)
-        zr, cr = entries[1]
-        for k in 2:length(entries)
-            zk, ck = entries[k]
-            push!(pairs, SharedBusPairSOCWR(cidx, bus_of[cidx], zr, cr, zk, ck))
-        end
-    end
-    return pairs
-end
-
-# ------------------------------------------------------------
-# Shared edge pairs
-# ------------------------------------------------------------
-
-function _build_shared_edge_pairs_socwr(
-    partitions::Partitions{PartitionSOCWR},
-    interzonal::Vector{Int},
-)::Vector{SharedEdgePairSOCWR}
-    pairs = SharedEdgePairSOCWR[]
-    for (cidx, e) in enumerate(interzonal)
-        entries = Tuple{Int, Int}[]
-        for (zpos, part) in enumerate(partitions.parts)
-            part.branch_idx_full_to_zone[e] == 0 && continue
-            local_k = findfirst(==(e), part.zone_edges)
-            local_k === nothing && continue
-            push!(entries, (zpos, local_k))
-        end
-        length(entries) == 2 || continue
-        zi, li = entries[1]
-        zj, lj = entries[2]
-        push!(pairs, SharedEdgePairSOCWR(cidx, e, zi, li, zj, lj))
-    end
-    return pairs
-end
-
-# ------------------------------------------------------------
-# Split bus pairs
-# ------------------------------------------------------------
-
-function _build_split_bus_pairs_socwr(
-    zones::Vector{AladinZoneDataSOCWR},
-    sys_bus_pairs::Vector{NTuple{3, Int}},
-    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
-    q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
-)::Vector{SplitBusPairSOCWR}
-    pairs = SplitBusPairSOCWR[]
-    isempty(sys_bus_pairs) && return pairs
-    sizehint!(pairs, length(sys_bus_pairs))
-
-    for (k, (bid, za, zb)) in enumerate(sys_bus_pairs)
-        vpa = get(p_inj_vars[za], bid, nothing)
-        vqa = get(q_inj_vars[za], bid, nothing)
-        vpb = get(p_inj_vars[zb], bid, nothing)
-        vqb = get(q_inj_vars[zb], bid, nothing)
-        (vpa === nothing || vqa === nothing ||
-         vpb === nothing || vqb === nothing) && continue
-        pcol_a = zones[za].var_to_col[vpa]
-        qcol_a = zones[za].var_to_col[vqa]
-        pcol_b = zones[zb].var_to_col[vpb]
-        qcol_b = zones[zb].var_to_col[vqb]
-        push!(pairs, SplitBusPairSOCWR(
-            k, bid, za, pcol_a, qcol_a, zb, pcol_b, qcol_b,
-        ))
-    end
-    return pairs
-end
-
-# ============================================================
-# Zone data & injection helpers
-# ============================================================
-
-function _build_zone_data_vector_socwr(
-    partitions::Partitions{PartitionSOCWR};
-    include_edges::Bool,
-)::Vector{AladinZoneDataSOCWR}
-    parts = partitions.parts
-    zones = Vector{AladinZoneDataSOCWR}(undef, length(parts))
-    @inbounds for i in eachindex(parts)
-        zones[i] = build_aladin_zone_data_socwr(parts[i]; include_edges = include_edges)
-    end
-    return zones
-end
-
-function _prepare_pq_inj_vars_socwr!(partitions, sys_bus_pairs, ::TieLine)
-    n_zones = length(partitions.parts)
-    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
-    q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
-    return p_inj_vars, q_inj_vars
-end
-
-function _prepare_pq_inj_vars_socwr!(partitions, sys_bus_pairs, ::SplitBus)
-    n_zones = length(partitions.parts)
-    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
-    q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
-    @inbounds for i in 1:n_zones
-        _attach_pq_inj_variables_socwr!(
-            partitions.parts[i], sys_bus_pairs,
-            p_inj_vars[i], q_inj_vars[i],
-        )
-    end
-    return p_inj_vars, q_inj_vars
-end
-
-# ============================================================
 # Builders
 # ============================================================
 
@@ -352,16 +171,12 @@ function build_workspace(
     id = partitions.zones
     inter = sys.interzonal_branches
 
-    build_local_model!(partitions, sys, State, optimizer_factory, inter)
-
-    zones = _build_zone_data_vector_socwr(partitions; include_edges = true)
-    bus_pairs = _build_shared_bus_pairs_socwr(partitions, zones)
-    edge_pairs = _build_shared_edge_pairs_socwr(partitions, inter)
-
+    zones, bus_pairs, edge_pairs =
+        init_state_partition!(partitions, sys, optimizer_factory, cfg)
     n_bus = length(bus_pairs)
     n_edge = length(edge_pairs)
 
-    return SOCWRStateWorkspaceALADIN(;
+    ws = SOCWRStateWorkspaceALADIN(;
         partitions = partitions,
         id = id,
         interzonal = inter,
@@ -381,6 +196,8 @@ function build_workspace(
         alpha3 = cfg.alpha3,
         alpha2_init = cfg.alpha2,
     )
+    _refresh_quad_static_socwr_primal_all!(ws.zones, ws.rho[], ws)
+    return ws
 end
 
 # ------------------------------------------------------------
@@ -397,13 +214,11 @@ function build_workspace(
     id = partitions.zones
     inter = sys.interzonal_branches
 
-    build_local_model!(partitions, sys, Power, optimizer_factory, inter)
-
-    zones = _build_zone_data_vector_socwr(partitions; include_edges = true)
-    edge_pairs = _build_shared_edge_pairs_socwr(partitions, inter)
+    zones, edge_pairs =
+        init_power_partition!(partitions, sys, optimizer_factory, cfg)
     n_edge = length(edge_pairs)
 
-    return SOCWRPowerWorkspaceALADIN(;
+    ws = SOCWRPowerWorkspaceALADIN(;
         partitions = partitions,
         id = id,
         interzonal = inter,
@@ -424,6 +239,12 @@ function build_workspace(
         sigma_qflow = cfg.sigma_qflow,
         proximal_mode = cfg.proximal_mode,
     )
+    if ws.proximal_mode === :pflow
+        _refresh_quad_static_socwr_pflow_all!(ws.zones, ws.edge_pairs, ws.rho[], ws)
+    else
+        _refresh_quad_static_socwr_primal_all!(ws.zones, ws.rho[], ws)
+    end
+    return ws
 end
 
 # ------------------------------------------------------------
@@ -439,26 +260,26 @@ function build_workspace(
     partitions = build_partitions(PartitionSOCWR, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
-    sys_bus_pairs = sys.bus_pairs
+    sectioning = cfg.sectioning
 
-    build_local_model!(partitions, sys, Hybrid, optimizer_factory, inter)
-
-    p_inj_vars, q_inj_vars = _prepare_pq_inj_vars_socwr!(
-        partitions, sys_bus_pairs, cfg.sectioning,
-    )
-
-    zones = _build_zone_data_vector_socwr(partitions; include_edges = true)
-    bus_pairs = _build_shared_bus_pairs_socwr(partitions, zones)
-    edge_pairs = _build_shared_edge_pairs_socwr(partitions, inter)
-    split_pairs = _build_split_bus_pairs_socwr(
-        zones, sys_bus_pairs, p_inj_vars, q_inj_vars,
-    )
+    if sectioning isa TieLine
+        zones, bus_pairs, edge_pairs =
+            init_hybrid_partition!(partitions, sys, optimizer_factory, cfg, sectioning)
+        split_pairs = SplitBusPairSOCWR[]
+        p_inj_vars = Vector{Dict{Int, JuMP.VariableRef}}()
+        q_inj_vars = Vector{Dict{Int, JuMP.VariableRef}}()
+    elseif sectioning isa SplitBus
+        zones, bus_pairs, edge_pairs, split_pairs, p_inj_vars, q_inj_vars =
+            init_hybrid_partition!(partitions, sys, optimizer_factory, cfg, sectioning)
+    else
+        error("ALADIN{Hybrid, SOCWR}: unsupported sectioning $(sectioning)")
+    end
 
     n_bus = length(bus_pairs)
     n_edge = length(edge_pairs)
     n_split = length(split_pairs)
 
-    return SOCWRHybridWorkspaceALADIN(;
+    ws = SOCWRHybridWorkspaceALADIN(;
         partitions = partitions,
         id = id,
         interzonal = inter,
@@ -485,4 +306,6 @@ function build_workspace(
         alpha3 = cfg.alpha3,
         alpha2_init = cfg.alpha2,
     )
+    _refresh_quad_static_socwr_primal_all!(ws.zones, ws.rho[], ws)
+    return ws
 end

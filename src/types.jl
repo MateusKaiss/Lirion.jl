@@ -551,6 +551,12 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
             throw(ArgumentError("rho_upper must be ≥ rho"))
         mu_upper >= mu ||
             throw(ArgumentError("mu_upper must be ≥ mu"))
+        sigma_theta_shared > 0 ||
+            throw(ArgumentError("sigma_theta_shared must be > 0 (Σ_i ≻ 0 hypothesis of HFD Theorem 4)"))
+        sigma_pg > 0 ||
+            throw(ArgumentError("sigma_pg must be > 0 (Σ_i ≻ 0 hypothesis of HFD Theorem 4)"))
+        sigma_other > 0 ||
+            throw(ArgumentError("sigma_other must be > 0 (Σ_i ≻ 0 hypothesis of HFD Theorem 4)"))
         sigma_pflow > 0 || throw(ArgumentError("sigma_pflow must be > 0"))
         sigma_qflow > 0 || throw(ArgumentError("sigma_qflow must be > 0"))
         proximal_mode in (:primal, :pflow) ||

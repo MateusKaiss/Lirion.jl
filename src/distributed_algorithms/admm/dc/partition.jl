@@ -1,36 +1,10 @@
 # ============================================================
-# Helpers
-# ============================================================
-
-function _attach_p_inj_variables!(
-    part::PartitionDC,
-    bus_pairs::Vector{NTuple{3, Int}},
-    p_inj_store::Dict{Int, JuMP.VariableRef},
-)
-    model = part.model::JuMP.Model
-    pos = part.position
-    zone_split_bus_ids = Int[]
-    for (fbus, za, zb) in bus_pairs
-        if za == pos || zb == pos
-            push!(zone_split_bus_ids, fbus)
-        end
-    end
-    isempty(zone_split_bus_ids) && return nothing
-
-    bal_con = model[:active_power_balance]
-
-    for b in zone_split_bus_ids
-        v = @variable(model, base_name = "p_inj_$(b)")
-        JuMP.set_start_value(v, 0.0)
-        p_inj_store[b] = v
-        JuMP.set_normalized_coefficient(bal_con[b, 1], v, 1.0)
-    end
-    return nothing
-end
-
-# ============================================================
 # Per-partition initializers
 # ============================================================
+#
+# `_attach_p_inj_variables!` lives in
+# `distributed_algorithms/shared/sectioning_helpers.jl` (shared with
+# ALADIN — pure JuMP plumbing, algorithm-agnostic).
 
 # ------------------------------------------------------------
 # State

@@ -1,44 +1,10 @@
 # ============================================================
-# Helpers
-# ============================================================
-
-function _attach_pq_inj_variables_socwr!(
-    part::PartitionSOCWR,
-    bus_pairs::Vector{NTuple{3, Int}},
-    p_inj_store::Dict{Int, JuMP.VariableRef},
-    q_inj_store::Dict{Int, JuMP.VariableRef},
-)
-    model = part.model::JuMP.Model
-    pos = part.position
-
-    zone_split_bus_ids = Int[]
-    for (fbus, za, zb) in bus_pairs
-        if za == pos || zb == pos
-            push!(zone_split_bus_ids, fbus)
-        end
-    end
-    isempty(zone_split_bus_ids) && return nothing
-
-    bal_p = model[:active_power_balance]
-    bal_q = model[:reactive_power_balance]
-
-    for b in zone_split_bus_ids
-        vp = @variable(model, base_name = "p_inj_$(b)")
-        JuMP.set_start_value(vp, 0.0)
-        p_inj_store[b] = vp
-        JuMP.set_normalized_coefficient(bal_p[b, 1], vp, 1.0)
-
-        vq = @variable(model, base_name = "q_inj_$(b)")
-        JuMP.set_start_value(vq, 0.0)
-        q_inj_store[b] = vq
-        JuMP.set_normalized_coefficient(bal_q[b, 1], vq, 1.0)
-    end
-    return nothing
-end
-
-# ============================================================
 # Tikhonov regularization
 # ============================================================
+#
+# `_attach_pq_inj_variables_socwr!` lives in
+# `distributed_algorithms/shared/sectioning_helpers.jl` (shared with
+# ALADIN — pure JuMP plumbing, algorithm-agnostic).
 
 function tikhonov_regularization_expr!(
     part::PartitionSOCWR;
