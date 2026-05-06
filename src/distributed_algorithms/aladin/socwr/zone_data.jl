@@ -70,7 +70,7 @@ mutable struct AladinZoneDataSOCWR
 
     # Constant equality Jacobian (cached once; SOCWR equalities are
     # all affine, so they never change across iterations).
-    C_eq::SparseArrays.SparseMatrixCSC{Float64, Int}
+    eq_jac::SparseArrays.SparseMatrixCSC{Float64, Int}
 
     # Phase-2 QP correction Δy_i.
     delta::Vector{Float64}
@@ -316,7 +316,7 @@ end
 # Builder
 # ============================================================
 
-function build_aladin_zone_data_socwr(
+function build_aladin_zone_data(
     part::PartitionSOCWR;
     include_edges::Bool = true,
 )::AladinZoneDataSOCWR
@@ -353,7 +353,7 @@ function build_aladin_zone_data_socwr(
         base_hess_diag[col] = cols.pg_c2_sbase2[k]
     end
 
-    C_eq = _extract_equality_jacobian(model, var_to_col, n_vars)
+    eq_jac = _extract_equality_jacobian(model, var_to_col, n_vars)
 
     return AladinZoneDataSOCWR(
         model,
@@ -384,7 +384,7 @@ function build_aladin_zone_data_socwr(
         zeros(Float64, n_vars),     # g
         copy(base_hess_diag),       # hess_diag (will be refreshed each iter)
         base_hess_diag,
-        C_eq,
+        eq_jac,
         zeros(Float64, n_vars),     # delta
         Int[],                      # active_bound_cols
         zero(JuMP.QuadExpr),        # quad_static

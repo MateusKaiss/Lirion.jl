@@ -12,7 +12,7 @@
 #     in the cone's image space and pull it back to the zone's
 #     variable layout via the affine function's Jacobian.
 #
-# The full active Jacobian `[C_eq ; C_ineq_active ; C_cone_active]`
+# The full active Jacobian `[eq_jac ; C_ineq_active ; C_cone_active]`
 # is rank-reduced via `_delete_dependent_rows` (defined in
 # `aladin/dc/active_set.jl` and reused here).
 
@@ -61,7 +61,7 @@ end
 # For affine functions in cones the row is constant-direction in
 # variable space but its location in the cone depends on y*, so it
 # must be refreshed every iteration (unlike the equality Jacobian
-# C_eq which is structurally constant).
+# eq_jac which is structurally constant).
 
 @inline function _cone_active_normal(
     ::MOI.RotatedSecondOrderCone,
@@ -107,10 +107,10 @@ end
 # ============================================================
 # Active-constraint Jacobian
 # ============================================================
-# C_active = [ C_eq ; C_ineq_active ; C_cone_active ]
+# C_active = [ eq_jac ; C_ineq_active ; C_cone_active ]
 #
 # SOCWR constraint categories:
-#   * affine equalities (power balance, curtailment links) → C_eq
+#   * affine equalities (power balance, curtailment links) → eq_jac
 #     (precomputed at build time, structurally constant)
 #   * affine scalar inequalities (branch angle bounds)     → walked
 #     via scalar dual threshold
@@ -134,7 +134,7 @@ function build_active_jacobian(
     n_vars = zone.n_vars
     y = zone.y
 
-    C_eq = zone.C_eq
+    eq_jac = zone.eq_jac
 
     ineq_rows = Int[]
     ineq_cols = Int[]
@@ -225,11 +225,11 @@ function build_active_jacobian(
     end
 
     C_stacked = if row_offset == 0
-        C_eq
+        eq_jac
     else
         C_ineq =
             SparseArrays.sparse(ineq_rows, ineq_cols, ineq_vals, row_offset, n_vars)
-        vcat(C_eq, C_ineq)
+        vcat(eq_jac, C_ineq)
     end
 
     return _delete_dependent_rows(C_stacked; tol = dep_tol)

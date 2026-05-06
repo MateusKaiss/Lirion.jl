@@ -7,7 +7,7 @@
 #     `zone.y`;
 #   - `compute_cost_gradient!` writes ∇f(y) into `zone.g`;
 #   - `refresh_sensitivities_ac!` rebuilds `zone.hess` and
-#     `zone.jac_cache` using a `MOI.Nonlinear.Evaluator` (AC
+#     `zone.active_jac` using a `MOI.Nonlinear.Evaluator` (AC
 #     equalities/inequalities are non-linear so the Jacobian is not
 #     constant; the Hessian needs a Levenberg-Marquardt floor to
 #     enforce H_i + ρΣ_i ≻ 0 of HFD Theorem 4);
@@ -120,12 +120,12 @@ function refresh_sensitivities_ac!(
     MOI.eval_constraint_jacobian(evaluator, V_J, y_primal)
     n_rows = length(rows)
     if n_rows == 0
-        zone.jac_cache = SparseArrays.spzeros(Float64, 0, n_vars)
+        zone.active_jac = SparseArrays.spzeros(Float64, 0, n_vars)
     else
         I_J = [t[1] for t in J_struct]
         C_J = [t[2] for t in J_struct]
         C_full = SparseArrays.sparse(I_J, C_J, V_J, n_rows, n_vars)
-        zone.jac_cache = _delete_dependent_rows(C_full; tol = dep_tol)
+        zone.active_jac = _delete_dependent_rows(C_full; tol = dep_tol)
     end
 
     # ---- Hessian of Lagrangian ----

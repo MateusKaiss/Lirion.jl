@@ -95,7 +95,7 @@ end
 # Shared bus pairs
 # ------------------------------------------------------------
 
-function _build_shared_bus_pairs_ac(
+function _build_shared_bus_pairs(
     partitions::Partitions{PartitionAC},
     zones::Vector{AladinZoneDataAC},
 )::Vector{SharedBusPairAC}
@@ -135,7 +135,7 @@ end
 # Shared edge pairs
 # ------------------------------------------------------------
 
-function _build_shared_edge_pairs_ac(
+function _build_shared_edge_pairs(
     partitions::Partitions{PartitionAC},
     interzonal::Vector{Int},
 )::Vector{SharedEdgePairAC}
@@ -160,7 +160,7 @@ end
 # Dummy branch pairs
 # ------------------------------------------------------------
 
-function _build_dummy_branch_pairs_ac(
+function _build_dummy_branch_pairs(
     partitions::Partitions{PartitionAC},
     zones::Vector{AladinZoneDataAC},
     sys_branch_pairs::Vector{NTuple{4, Int}},
@@ -221,7 +221,7 @@ end
 # Split bus pairs
 # ------------------------------------------------------------
 
-function _build_split_bus_pairs_ac(
+function _build_split_bus_pairs(
     zones::Vector{AladinZoneDataAC},
     sys_bus_pairs::Vector{NTuple{3, Int}},
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},

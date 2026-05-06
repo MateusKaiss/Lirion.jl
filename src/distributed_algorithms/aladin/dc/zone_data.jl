@@ -51,7 +51,7 @@ mutable struct AladinZoneData
     hess_diag::Vector{Float64}
 
     # Equality-constraint Jacobian (constant for linear DC equalities).
-    C_eq::SparseArrays.SparseMatrixCSC{Float64, Int}
+    eq_jac::SparseArrays.SparseMatrixCSC{Float64, Int}
 
     # Coordinator QP output (Δy correction in full variable space).
     delta::Vector{Float64}
@@ -275,7 +275,7 @@ function build_aladin_zone_data(
         hess_diag[col] += pg_c2_sbase2[k]
     end
     @assert all(isfinite, hess_diag) "DC Hessian diagonal has non-finite entries"
-    C_eq = _extract_equality_jacobian(model, var_to_col, n_vars)
+    eq_jac = _extract_equality_jacobian(model, var_to_col, n_vars)
 
     return AladinZoneData(
         model,
@@ -295,7 +295,7 @@ function build_aladin_zone_data(
         zeros(Float64, n_vars),  # y
         zeros(Float64, n_vars),  # g
         hess_diag,
-        C_eq,
+        eq_jac,
         zeros(Float64, n_vars),  # delta
         Int[],                   # active_bound_cols
         zero(JuMP.QuadExpr),     # quad_static (filled by _build_quad_static_dc!)

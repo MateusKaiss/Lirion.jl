@@ -62,7 +62,7 @@ mutable struct AladinZoneDataAC
     hess::SparseArrays.SparseMatrixCSC{Float64, Int}
 
     # Active-constraint Jacobian refreshed every iteration.
-    jac_cache::SparseArrays.SparseMatrixCSC{Float64, Int}
+    active_jac::SparseArrays.SparseMatrixCSC{Float64, Int}
 
     # QP output.
     delta::Vector{Float64}
@@ -243,7 +243,7 @@ end
 # Builder
 # ============================================================
 
-function build_aladin_zone_data_ac(
+function build_aladin_zone_data(
     part::PartitionAC;
     include_edges::Bool = false,
 )::AladinZoneDataAC

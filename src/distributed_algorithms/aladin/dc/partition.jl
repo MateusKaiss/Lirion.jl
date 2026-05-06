@@ -178,7 +178,7 @@ function init_power_partition!(
         )
     end
     edge_pairs = _build_shared_edge_pairs(partitions, inter)
-    dummy_pairs = _build_dummy_branch_pairs_dc(partitions, zones, sys_branch_pairs)
+    dummy_pairs = _build_dummy_branch_pairs(partitions, zones, sys_branch_pairs)
     return zones, edge_pairs, dummy_pairs
 end
 
@@ -234,7 +234,7 @@ function init_hybrid_partition!(
     end
     bus_pairs = _build_shared_bus_pairs(partitions, zones)
     edge_pairs = _build_shared_edge_pairs(partitions, inter)
-    dummy_pairs = _build_dummy_branch_pairs_dc(partitions, zones, sys_branch_pairs)
+    dummy_pairs = _build_dummy_branch_pairs(partitions, zones, sys_branch_pairs)
     return zones, bus_pairs, edge_pairs, dummy_pairs
 end
 

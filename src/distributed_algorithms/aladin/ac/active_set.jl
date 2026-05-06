@@ -5,7 +5,7 @@
 # AC equalities and active inequalities are non-linear, so the
 # Jacobian is rebuilt every iteration inside `refresh_sensitivities_ac!`
 # (see `sensitivities.jl`) using `MOI.Nonlinear.Evaluator`. The cached
-# matrix lives in `zone.jac_cache`; here we only expose the bound
+# matrix lives in `zone.active_jac`; here we only expose the bound
 # detector and the trivial accessor.
 #
 # `_delete_dependent_rows` is shared with DC (defined in
@@ -39,4 +39,4 @@ end
 @inline build_active_jacobian(
     zone::AladinZoneDataAC;
     kwargs...,
-)::SparseArrays.SparseMatrixCSC{Float64, Int} = zone.jac_cache
+)::SparseArrays.SparseMatrixCSC{Float64, Int} = zone.active_jac

@@ -4,9 +4,9 @@
 #
 # At each iteration the coordinator QP needs the Jacobian of currently
 # *active* constraints (LICQ-rank rows). For the DC formulation:
-#   - equalities are constant (cached in `zone.C_eq` at build time);
+#   - equalities are constant (cached in `zone.eq_jac` at build time);
 #   - inequalities at box bounds are detected via `detect_active_bounds!`;
-#   - active inequality rows are appended to `C_eq` and the stacked
+#   - active inequality rows are appended to `eq_jac` and the stacked
 #     matrix is run through `_delete_dependent_rows` for rank revealing.
 #
 # The QR with column-norm pivoting in `_delete_dependent_rows` is what
@@ -48,8 +48,8 @@ function build_active_jacobian(
     n_vars = zone.n_vars
 
     # Start with the precomputed equality rows.
-    C_eq = zone.C_eq
-    eq_nrows = size(C_eq, 1)
+    eq_jac = zone.eq_jac
+    eq_nrows = size(eq_jac, 1)
 
     # Collect active inequality rows by walking constraint types.
     ineq_rows = Int[]
@@ -61,7 +61,7 @@ function build_active_jacobian(
 
     for (F, S) in JuMP.list_of_constraint_types(model)
         F <: JuMP.VariableRef && continue
-        S === MOI.EqualTo{Float64} && continue  # already in C_eq
+        S === MOI.EqualTo{Float64} && continue  # already in eq_jac
 
         for ci in JuMP.all_constraints(model, F, S)
             if has_duals
@@ -85,11 +85,11 @@ function build_active_jacobian(
     end
 
     C_stacked = if row_offset == 0
-        C_eq
+        eq_jac
     else
         C_ineq =
             SparseArrays.sparse(ineq_rows, ineq_cols, ineq_vals, row_offset, n_vars)
-        vcat(C_eq, C_ineq)
+        vcat(eq_jac, C_ineq)
     end
 
     return _delete_dependent_rows(C_stacked; tol = dep_tol)

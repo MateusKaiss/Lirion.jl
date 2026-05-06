@@ -140,7 +140,7 @@ end
 # Dummy branch pairs
 # ------------------------------------------------------------
 
-function _build_dummy_branch_pairs_dc(
+function _build_dummy_branch_pairs(
     partitions::Partitions{PartitionDC},
     zones::Vector{AladinZoneData},
     sys_branch_pairs::Vector{NTuple{4, Int}},

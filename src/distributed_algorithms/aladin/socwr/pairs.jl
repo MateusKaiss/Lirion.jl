@@ -66,7 +66,7 @@ end
 # Shared bus pairs
 # ------------------------------------------------------------
 
-function _build_shared_bus_pairs_socwr(
+function _build_shared_bus_pairs(
     partitions::Partitions{PartitionSOCWR},
     zones::Vector{AladinZoneDataSOCWR},
 )::Vector{SharedBusPairSOCWR}
@@ -105,7 +105,7 @@ end
 # Shared edge pairs
 # ------------------------------------------------------------
 
-function _build_shared_edge_pairs_socwr(
+function _build_shared_edge_pairs(
     partitions::Partitions{PartitionSOCWR},
     interzonal::Vector{Int},
 )::Vector{SharedEdgePairSOCWR}
@@ -130,7 +130,7 @@ end
 # Split bus pairs
 # ------------------------------------------------------------
 
-function _build_split_bus_pairs_socwr(
+function _build_split_bus_pairs(
     zones::Vector{AladinZoneDataSOCWR},
     sys_bus_pairs::Vector{NTuple{3, Int}},
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},

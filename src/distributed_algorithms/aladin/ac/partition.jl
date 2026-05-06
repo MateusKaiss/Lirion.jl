@@ -34,7 +34,7 @@ function init_state_partition!(
     cfg::ALADINConfig,
 )
     build_local_model!(part, sys_zone, State, optimizer_factory)
-    return build_aladin_zone_data_ac(part; include_edges = false)
+    return build_aladin_zone_data(part; include_edges = false)
 end
 
 # ------------------------------------------------------------
@@ -49,7 +49,7 @@ function init_power_partition!(
     interzonal_branches::Vector{Int},
 )
     build_local_model!(part, sys_zone, Power, optimizer_factory, interzonal_branches)
-    return build_aladin_zone_data_ac(part; include_edges = true)
+    return build_aladin_zone_data(part; include_edges = true)
 end
 
 # ------------------------------------------------------------
@@ -65,7 +65,7 @@ function init_hybrid_partition!(
     interzonal_branches::Vector{Int},
 )
     build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
-    return build_aladin_zone_data_ac(part; include_edges = true)
+    return build_aladin_zone_data(part; include_edges = true)
 end
 
 # ------------------------------------------------------------
@@ -81,7 +81,7 @@ function init_hybrid_partition!(
     interzonal_branches::Vector{Int},
 )
     build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
-    return build_aladin_zone_data_ac(part; include_edges = true)
+    return build_aladin_zone_data(part; include_edges = true)
 end
 
 # ------------------------------------------------------------
@@ -101,7 +101,7 @@ function init_hybrid_partition!(
 )
     build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
     _attach_pq_inj_variables_ac!(part, sys_zone, sys_bus_pairs, p_inj_store, q_inj_store)
-    return build_aladin_zone_data_ac(part; include_edges = true)
+    return build_aladin_zone_data(part; include_edges = true)
 end
 
 # ============================================================
@@ -126,7 +126,7 @@ function init_state_partition!(
             partitions.parts[i], sys.parts[i], optimizer_factory, cfg,
         )
     end
-    bus_pairs = _build_shared_bus_pairs_ac(partitions, zones)
+    bus_pairs = _build_shared_bus_pairs(partitions, zones)
     return zones, bus_pairs
 end
 
@@ -151,8 +151,8 @@ function init_power_partition!(
             partitions.parts[i], sys.parts[i], optimizer_factory, cfg, inter,
         )
     end
-    edge_pairs = _build_shared_edge_pairs_ac(partitions, inter)
-    dummy_pairs = _build_dummy_branch_pairs_ac(partitions, zones, sys_branch_pairs)
+    edge_pairs = _build_shared_edge_pairs(partitions, inter)
+    dummy_pairs = _build_dummy_branch_pairs(partitions, zones, sys_branch_pairs)
     return zones, edge_pairs, dummy_pairs
 end
 
@@ -178,8 +178,8 @@ function init_hybrid_partition!(
             sectioning, inter,
         )
     end
-    bus_pairs = _build_shared_bus_pairs_ac(partitions, zones)
-    edge_pairs = _build_shared_edge_pairs_ac(partitions, inter)
+    bus_pairs = _build_shared_bus_pairs(partitions, zones)
+    edge_pairs = _build_shared_edge_pairs(partitions, inter)
     return zones, bus_pairs, edge_pairs
 end
 
@@ -206,9 +206,9 @@ function init_hybrid_partition!(
             sectioning, inter,
         )
     end
-    bus_pairs = _build_shared_bus_pairs_ac(partitions, zones)
-    edge_pairs = _build_shared_edge_pairs_ac(partitions, inter)
-    dummy_pairs = _build_dummy_branch_pairs_ac(partitions, zones, sys_branch_pairs)
+    bus_pairs = _build_shared_bus_pairs(partitions, zones)
+    edge_pairs = _build_shared_edge_pairs(partitions, inter)
+    dummy_pairs = _build_dummy_branch_pairs(partitions, zones, sys_branch_pairs)
     return zones, bus_pairs, edge_pairs, dummy_pairs
 end
 
@@ -237,8 +237,8 @@ function init_hybrid_partition!(
             sectioning, inter, sys_bus_pairs, p_inj_vars[i], q_inj_vars[i],
         )
     end
-    bus_pairs = _build_shared_bus_pairs_ac(partitions, zones)
-    edge_pairs = _build_shared_edge_pairs_ac(partitions, inter)
-    split_pairs = _build_split_bus_pairs_ac(zones, sys_bus_pairs, p_inj_vars, q_inj_vars)
+    bus_pairs = _build_shared_bus_pairs(partitions, zones)
+    edge_pairs = _build_shared_edge_pairs(partitions, inter)
+    split_pairs = _build_split_bus_pairs(zones, sys_bus_pairs, p_inj_vars, q_inj_vars)
     return zones, bus_pairs, edge_pairs, split_pairs, p_inj_vars, q_inj_vars
 end
