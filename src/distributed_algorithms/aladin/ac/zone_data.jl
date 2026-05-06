@@ -128,6 +128,7 @@ function _collect_ac_cols(
             coefs =
                 (g <= length(obj.generator_costs[1])) ? obj.generator_costs[1][g] :
                 Float64[]
+            @assert length(coefs) <= 3 "ALADIN: generator cost must be at most quadratic (got degree $(length(coefs)-1))"
             c2 = (length(coefs) >= 3) ? coefs[end-2] : 0.0
             c1 = (length(coefs) >= 2) ? coefs[end-1] : 0.0
             push!(pg_c2_sbase2, 2.0 * c2 * sbase^2)
@@ -189,8 +190,21 @@ end
 function _collect_ac_edge_layout(
     model::JuMP.Model,
     var_to_col::Dict{JuMP.VariableRef, Int},
-    part::PartitionAC,
+    part::PartitionAC;
+    include_edges::Bool,
 )
+    include_edges || return (
+        edge_from_theta_col = Int[],
+        edge_to_theta_col = Int[],
+        edge_from_vm_col = Int[],
+        edge_to_vm_col = Int[],
+        edge_g = Float64[],
+        edge_b = Float64[],
+        edge_b_sh = Float64[],
+        edge_inv_tap = Float64[],
+        edge_tap_angle = Float64[],
+    )
+
     zone_edges = part.zone_edges
     n = length(zone_edges)
 
@@ -256,20 +270,7 @@ function build_aladin_zone_data(
     shared_theta_cols, shared_vm_cols =
         _collect_shared_ac_cols(model, var_to_col, part.zone_shared_bus_ids)
 
-    edata =
-        include_edges ?
-        _collect_ac_edge_layout(model, var_to_col, part) :
-        (
-            edge_from_theta_col = Int[],
-            edge_to_theta_col = Int[],
-            edge_from_vm_col = Int[],
-            edge_to_vm_col = Int[],
-            edge_g = Float64[],
-            edge_b = Float64[],
-            edge_b_sh = Float64[],
-            edge_inv_tap = Float64[],
-            edge_tap_angle = Float64[],
-        )
+    edata = _collect_ac_edge_layout(model, var_to_col, part; include_edges)
 
     lb, ub = _collect_bounds(all_vars)
 

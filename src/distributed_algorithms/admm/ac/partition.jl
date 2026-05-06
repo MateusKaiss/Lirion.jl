@@ -1,10 +1,6 @@
 # ============================================================
 # Per-partition initializers
 # ============================================================
-#
-# `_attach_pq_inj_variables_ac!` lives in
-# `distributed_algorithms/shared/sectioning_helpers.jl` (shared with
-# ALADIN — pure JuMP plumbing, algorithm-agnostic).
 
 # ------------------------------------------------------------
 # State

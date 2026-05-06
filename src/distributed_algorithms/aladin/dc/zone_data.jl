@@ -110,6 +110,7 @@ function _collect_pg_layout(
 
         coefs =
             (g <= length(obj.generator_costs[1])) ? obj.generator_costs[1][g] : Float64[]
+        @assert length(coefs) <= 3 "ALADIN: generator cost must be at most quadratic (got degree $(length(coefs)-1))"
         # Matpower convention: cost_coefficients stored as [c_{n}, c_{n-1}, ..., c_0]
         # descending degrees. For quadratic (length=3): [c2, c1, c0].
         c2 = (length(coefs) >= 3) ? coefs[end-2] : 0.0
@@ -139,8 +140,11 @@ end
 function _collect_edge_layout(
     model::JuMP.Model,
     var_to_col::Dict{JuMP.VariableRef, Int},
-    part::PartitionDC,
+    part::PartitionDC;
+    include_edges::Bool,
 )
+    include_edges || return Int[], Int[], Float64[]
+
     zone_edges = part.zone_edges
     n = length(zone_edges)
 
@@ -260,14 +264,8 @@ function build_aladin_zone_data(
     shared_theta_cols =
         _collect_shared_theta_cols(model, var_to_col, part.zone_shared_bus_ids)
 
-    if include_edges
-        edge_from_cols, edge_to_cols, edge_b =
-            _collect_edge_layout(model, var_to_col, part)
-    else
-        edge_from_cols = Int[]
-        edge_to_cols = Int[]
-        edge_b = Float64[]
-    end
+    edge_from_cols, edge_to_cols, edge_b =
+        _collect_edge_layout(model, var_to_col, part; include_edges)
 
     lb, ub = _collect_bounds(all_vars)
     hess_diag = fill(1e-6, n_vars)

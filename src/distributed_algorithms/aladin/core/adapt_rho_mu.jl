@@ -31,13 +31,14 @@ function adapt_rho_mu!(ws::DCStateWorkspaceALADIN, params::ALADINParams)
     rho_changed = _grow_ref!(ws.rho, params.rho_growth, params.rho_upper)
     _grow_ref!(ws.mu, params.mu_growth, params.mu_upper)
     if rho_changed
-        @inbounds for zone in ws.zones
+        @inbounds for (i, zone) in enumerate(ws.zones)
             _build_quad_static_primal_dc!(
                 zone, ws.rho[];
                 sigma_theta_shared = ws.sigma_theta_shared,
                 sigma_pg = ws.sigma_pg,
                 sigma_other = ws.sigma_other,
             )
+            _set_obj_static_dc!(ws.partitions.parts[i], zone)
         end
     end
     return nothing
@@ -50,7 +51,7 @@ function adapt_rho_mu!(ws::DCPowerWorkspaceALADIN, params::ALADINParams)
     rho_changed = _grow_ref!(ws.rho, params.rho_growth, params.rho_upper)
     _grow_ref!(ws.mu, params.mu_growth, params.mu_upper)
     if rho_changed
-        @inbounds for zone in ws.zones
+        @inbounds for (i, zone) in enumerate(ws.zones)
             if ws.proximal_mode === :pflow
                 _build_quad_static_pflow_dc!(
                     zone, ws.rho[];
@@ -66,6 +67,7 @@ function adapt_rho_mu!(ws::DCPowerWorkspaceALADIN, params::ALADINParams)
                     sigma_other = ws.sigma_other,
                 )
             end
+            _set_obj_static_dc!(ws.partitions.parts[i], zone)
         end
     end
     return nothing
@@ -80,13 +82,14 @@ function adapt_rho_mu!(ws::DCHybridWorkspaceALADIN, params::ALADINParams)
     _grow_ref!(ws.rho_inj, params.rho_growth, params.rho_upper)
     _grow_ref!(ws.mu, params.mu_growth, params.mu_upper)
     if rho_bus_changed
-        @inbounds for zone in ws.zones
+        @inbounds for (i, zone) in enumerate(ws.zones)
             _build_quad_static_primal_dc!(
                 zone, ws.rho_bus[];
                 sigma_theta_shared = ws.sigma_theta_shared,
                 sigma_pg = ws.sigma_pg,
                 sigma_other = ws.sigma_other,
             )
+            _set_obj_static_dc!(ws.partitions.parts[i], zone)
         end
     end
     return nothing
@@ -121,7 +124,7 @@ function adapt_rho_mu!(
     rho_changed = _grow_ref!(ws.rho, params.rho_growth, params.rho_upper)
     _grow_ref!(ws.mu, params.mu_growth, params.mu_upper)
     if rho_changed
-        _refresh_quad_static_socwr_primal_all!(ws.zones, ws.rho[], ws)
+        _refresh_quad_static_socwr_primal_all!(ws.partitions.parts, ws.zones, ws.rho[], ws)
     end
     return nothing
 end
@@ -132,9 +135,9 @@ function adapt_rho_mu!(ws::SOCWRPowerWorkspaceALADIN, params::ALADINParams)
     _grow_ref!(ws.mu, params.mu_growth, params.mu_upper)
     if rho_changed
         if ws.proximal_mode === :pflow
-            _refresh_quad_static_socwr_pflow_all!(ws.zones, ws.edge_pairs, ws.rho[], ws)
+            _refresh_quad_static_socwr_pflow_all!(ws.partitions.parts, ws.zones, ws.edge_pairs, ws.rho[], ws)
         else
-            _refresh_quad_static_socwr_primal_all!(ws.zones, ws.rho[], ws)
+            _refresh_quad_static_socwr_primal_all!(ws.partitions.parts, ws.zones, ws.rho[], ws)
         end
     end
     return nothing

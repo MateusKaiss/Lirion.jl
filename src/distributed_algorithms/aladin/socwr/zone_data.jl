@@ -154,6 +154,7 @@ function _collect_socwr_cols(
             coefs =
                 (g <= length(obj.generator_costs[1])) ? obj.generator_costs[1][g] :
                 Float64[]
+            @assert length(coefs) <= 3 "ALADIN: generator cost must be at most quadratic (got degree $(length(coefs)-1))"
             # Matpower convention: descending degrees. For quadratic (len 3)
             # coefs = [c2, c1, c0].
             c2 = (length(coefs) >= 3) ? coefs[end-2] : 0.0
@@ -215,8 +216,11 @@ end
 function _collect_socwr_edge_rt_cols(
     model::JuMP.Model,
     var_to_col::Dict{JuMP.VariableRef, Int},
-    part::PartitionSOCWR,
+    part::PartitionSOCWR;
+    include_edges::Bool,
 )
+    include_edges || return Int[], Int[]
+
     zone_edges = part.zone_edges
     n = length(zone_edges)
 
@@ -239,17 +243,21 @@ end
 # ============================================================
 # Affine expansion of p_flow_branches[l,1] and q_flow_branches[l,1]
 # ============================================================
-# SOCWR branch flows (see src/modeling/branch/socwr.jl) are pure
-# affine combinations of (v²[from], R[l], T[l]). Walking the
-# @expression's .terms yields the exact coefficient vector of the
-# flow w.r.t. the zone's flat variable layout, which is everything
-# we need for the Power/Hybrid coordinator QP consensus rows.
 
 function _collect_socwr_edge_flow_expansion(
     model::JuMP.Model,
     var_to_col::Dict{JuMP.VariableRef, Int},
-    part::PartitionSOCWR,
+    part::PartitionSOCWR;
+    include_edges::Bool,
 )
+    include_edges || return (
+        Vector{Vector{Int}}(),
+        Vector{Vector{Float64}}(),
+        Vector{Vector{Float64}}(),
+        Float64[],
+        Float64[],
+    )
+
     zone_edges = part.zone_edges
     n = length(zone_edges)
 
@@ -329,21 +337,11 @@ function build_aladin_zone_data(
     shared_v2_cols =
         _collect_shared_v2_cols(model, var_to_col, part.zone_shared_bus_ids)
 
-    if include_edges
-        edge_r_cols, edge_t_cols =
-            _collect_socwr_edge_rt_cols(model, var_to_col, part)
-        edge_flow_cols, edge_pflow_coefs, edge_qflow_coefs,
-        edge_pflow_const, edge_qflow_const =
-            _collect_socwr_edge_flow_expansion(model, var_to_col, part)
-    else
-        edge_r_cols = Int[]
-        edge_t_cols = Int[]
-        edge_flow_cols = Vector{Vector{Int}}()
-        edge_pflow_coefs = Vector{Vector{Float64}}()
-        edge_qflow_coefs = Vector{Vector{Float64}}()
-        edge_pflow_const = Float64[]
-        edge_qflow_const = Float64[]
-    end
+    edge_r_cols, edge_t_cols =
+        _collect_socwr_edge_rt_cols(model, var_to_col, part; include_edges)
+    edge_flow_cols, edge_pflow_coefs, edge_qflow_coefs,
+    edge_pflow_const, edge_qflow_const =
+        _collect_socwr_edge_flow_expansion(model, var_to_col, part; include_edges)
 
     lb, ub = _collect_bounds(all_vars)
 

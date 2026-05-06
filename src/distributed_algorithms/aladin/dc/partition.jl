@@ -24,6 +24,7 @@ function init_state_partition!(
         sigma_pg = cfg.sigma_pg,
         sigma_other = cfg.sigma_other,
     )
+    _set_obj_static_dc!(part, zone)
     return zone
 end
 
@@ -55,6 +56,7 @@ function init_power_partition!(
             sigma_other = cfg.sigma_other,
         )
     end
+    _set_obj_static_dc!(part, zone)
     return zone
 end
 
@@ -78,6 +80,7 @@ function init_hybrid_partition!(
         sigma_pg = cfg.sigma_pg,
         sigma_other = cfg.sigma_other,
     )
+    _set_obj_static_dc!(part, zone)
     return zone
 end
 
@@ -101,6 +104,7 @@ function init_hybrid_partition!(
         sigma_pg = cfg.sigma_pg,
         sigma_other = cfg.sigma_other,
     )
+    _set_obj_static_dc!(part, zone)
     return zone
 end
 
@@ -127,6 +131,7 @@ function init_hybrid_partition!(
         sigma_pg = cfg.sigma_pg,
         sigma_other = cfg.sigma_other,
     )
+    _set_obj_static_dc!(part, zone)
     return zone
 end
 

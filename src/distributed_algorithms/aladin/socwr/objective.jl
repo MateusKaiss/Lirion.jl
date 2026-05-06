@@ -160,11 +160,20 @@ function _build_quad_static_pflow_socwr!(
 end
 
 # ------------------------------------------------------------
+# Cache obj_static = obj_base + quad_static
+# ------------------------------------------------------------
+
+@inline function _set_obj_static_socwr!(part::PartitionSOCWR, zone::AladinZoneDataSOCWR)
+    part.obj_static = part.obj_base + zone.quad_static
+    return nothing
+end
+
+# ------------------------------------------------------------
 # Refresh helpers (all zones)
 # ------------------------------------------------------------
 
-@inline function _refresh_quad_static_socwr_primal_all!(zones, rho, ws_or_cfg)
-    @inbounds for zone in zones
+@inline function _refresh_quad_static_socwr_primal_all!(parts, zones, rho, ws_or_cfg)
+    @inbounds for (i, zone) in enumerate(zones)
         _build_quad_static_primal_socwr!(
             zone, rho;
             sigma_theta = ws_or_cfg.sigma_theta,
@@ -175,11 +184,12 @@ end
             sigma_qg = ws_or_cfg.sigma_qg,
             sigma_other = ws_or_cfg.sigma_other,
         )
+        _set_obj_static_socwr!(parts[i], zone)
     end
     return nothing
 end
 
-@inline function _refresh_quad_static_socwr_pflow_all!(zones, edge_pairs, rho, ws_or_cfg)
+@inline function _refresh_quad_static_socwr_pflow_all!(parts, zones, edge_pairs, rho, ws_or_cfg)
     @inbounds for (zone_pos, zone) in enumerate(zones)
         _build_quad_static_pflow_socwr!(
             zone, edge_pairs, zone_pos, rho;
@@ -189,6 +199,7 @@ end
             sigma_qg = ws_or_cfg.sigma_qg,
             sigma_other = ws_or_cfg.sigma_other,
         )
+        _set_obj_static_socwr!(parts[zone_pos], zone)
     end
     return nothing
 end
@@ -475,7 +486,7 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRStateWorkspaceALADIN)
     _lambda_edge_rt_socwr!(lin, ws, zone_pos)
     _socwr_prox_lin_full!(lin, zdata, ws)
 
-    @objective(part.model, Min, part.obj_base + zdata.quad_static + lin)
+    @objective(part.model, Min, part.obj_static + lin)
     return nothing
 end
 
@@ -503,7 +514,7 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRPowerWorkspaceALADIN)
         _socwr_prox_lin_full!(lin, zdata, ws)
     end
 
-    @objective(part.model, Min, part.obj_base + zdata.quad_static + lin)
+    @objective(part.model, Min, part.obj_static + lin)
     return nothing
 end
 
@@ -522,6 +533,6 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRHybridWorkspaceALADIN)
     _lambda_split_bus_socwr!(lin, ws, zone_pos)
     _socwr_prox_lin_full!(lin, zdata, ws)
 
-    @objective(part.model, Min, part.obj_base + zdata.quad_static + lin)
+    @objective(part.model, Min, part.obj_static + lin)
     return nothing
 end

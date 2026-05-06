@@ -93,6 +93,15 @@ function _build_quad_static_pflow_dc!(
     return nothing
 end
 
+# ------------------------------------------------------------
+# Cache obj_static = obj_base + quad_static
+# ------------------------------------------------------------
+
+@inline function _set_obj_static_dc!(part::PartitionDC, zone::AladinZoneData)
+    part.obj_static = part.obj_base + zone.quad_static
+    return nothing
+end
+
 # ============================================================
 # Linear (per-iteration) prox part
 # ============================================================
@@ -272,7 +281,7 @@ function update_objective!(part::PartitionDC, ws::DCStateWorkspaceALADIN)
         sigma_other = ws.sigma_other,
     )
 
-    @objective(part.model, Min, part.obj_base + zdata.quad_static + lin)
+    @objective(part.model, Min, part.obj_static + lin)
     return nothing
 end
 
@@ -306,7 +315,7 @@ function update_objective!(part::PartitionDC, ws::DCPowerWorkspaceALADIN)
         )
     end
 
-    @objective(part.model, Min, part.obj_base + zdata.quad_static + lin)
+    @objective(part.model, Min, part.obj_static + lin)
     return nothing
 end
 
@@ -350,6 +359,6 @@ function update_objective!(part::PartitionDC, ws::DCHybridWorkspaceALADIN)
         sigma_other = ws.sigma_other,
     )
 
-    @objective(part.model, Min, part.obj_base + zdata.quad_static + lin)
+    @objective(part.model, Min, part.obj_static + lin)
     return nothing
 end
