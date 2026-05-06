@@ -8,10 +8,6 @@
 
 </h3>
 
-<p align="center">
-  <b>Created and maintained by <a href="https://github.com/MateusKaiss">Mateus Kaiss</a></b><br/>
-</p>
-
 A Julia package for solving Optimal Power Flow (OPF) problems using both centralized and distributed algorithms.
 
 ## Why Lirion?
@@ -30,9 +26,10 @@ It provides:
   - **SOCBF** — Farivar–Low branch-flow second-order cone relaxation (SOCP)
   - **BFA** — linearized branch-flow approximation / LinDistFlow (LP)
   - **NFA** — network-flow approximation, active-power only (LP)
-- **Distributed OPF** via ADMM (DC / AC / SOCWR) and ALADIN
+- **Distributed OPF** via ADMM (DC / AC / SOCWR) (and upcoming, via ALADIN)
 - Modular **coupling-variable** experimentation: `:state`, `:power`, `:hybrid`
-- Flexible **partitioning/sectioning** strategies: `:tie_line`, `:dummy_bus`, `:metis`
+- Flexible **partitioning** methods: `:tie_line`, `:dummy_bus`
+- Smarter **sectioning** strategy, based on `:metis`
 - **Adaptive penalty (ρ) updates** with per-block residual balancing
 - Structured diagnostics and plots for research
 
@@ -69,7 +66,7 @@ using Lirion
 
 ## Quick Examples
 
-Below are examples showing the **centralized**, **distributed ADMM**, and **distributed ALADIN** workflows in Lirion.
+Below are examples showing the **centralized** and **distributed ADMM** workflows in Lirion.
 
 The example cases below are based on the well-known **PGLib-OPF** benchmark library and are included in the repository for convenience.
 
@@ -79,10 +76,9 @@ If no solver is specified, Lirion automatically selects its default solver per f
 - **NLP formulations (AC, ACR, IVR, LPAC)** → Ipopt
 - **SOCP formulations (SOCWR, SOCBF)** → Clarabel
 
-For detailed installation instructions, solver selection guidance, and a complete list of supported solvers, see the documentation:
+For detailed installation instruction and solver selection guidance, please refer to documentation of each solver and to the basic modelling of each problem herein formulated. 
 
-**Installation Guide**
-https://your-docs-link-here.com/installation
+(Upcoming) **Installation Guide** ...
 
 ---
 
@@ -179,8 +175,6 @@ For a detailed explanation of the update rules and their theoretical motivation,
 
 **ADMM Parameter Tuning Guide** (link to docs section)
 
----
-
 ## Performance & Threading
 
 Lirion has two very different workloads and each one has its own
@@ -250,50 +244,38 @@ The full documentation is available online and includes:
 
 https://your-docs-link-here.com
 
+For a detailed explanation of the update rules and their theoretical motivation, upcoming documentation will address it: **ADMM Parameter Tuning Guide** (Upcoming)
+
 ---
-
-## Mathematical Foundations Website
-
-Lirion is accompanied by a dedicated technical website jointly created by Mateus Kaiss, creator of Lirion.jl, and Andressa Mathias Pedroso, Founder of Creatum.
-
-The website contains deeper mathematical material underlying Lirion’s design, including:
-
-- OPF formulations (DC, AC, ACR, IVR, LPAC, SOCWR, SOCBF, BFA, NFA)
-- ADMM and ALADIN derivations and penalty update rules
-- Coupling-variable design theory
-- Structural and decomposition analysis
-
-The material originates from structured research developed during undergraduate studies and is currently being expanded as part of ongoing graduate research.
-
-https://your-website-link-here.com
-
-
-## LirionLab.jl — Experimental Research Companion
-
-**Lirion.jl is intentionally kept stable, minimal, and tightly scoped.** Its core formulations, API, and architecture are maintained by the principal author and evolve under a conservative roadmap to preserve reproducibility and scientific integrity.
-
-To support ongoing research, student projects, and exploratory methodologies without compromising the stability of the core package, a separate companion repository is planned:
-
-**LirionLab.jl** — an open research playground where collaborators, students, and researchers can prototype new decomposition schemes, coupling strategies, solver integrations, and OPF formulations on top of Lirion.jl.
-
-The intended relationship is:
-
-- **Lirion.jl** — stable core; curated formulations and algorithms; minimal external contributions; strict API stability.
-- **LirionLab.jl** — experimental extensions; depends on Lirion.jl as a library; open to broader contributions; no API stability guarantees.
-
-This separation ensures that Lirion.jl remains a dependable scientific tool, while LirionLab.jl provides a structured space for methodological exploration and academic collaboration.
-
 
 ## Acknowledgments
 
-Lirion.jl originated from the principal developer’s undergraduate thesis in power systems and has since evolved into an ongoing research line in his Master's program (since March 2026). The package was conceived, designed, and developed by **Mateus Kaiss**, as its principal author and maintainer, with support from:
+Lirion.jl is the result of a collective research effort under the coordination of the Federal University of Parana. The project was conceptualized by Mateus Kaiss and Daniel Gebbran, evolving towards a comprehensive open-source framework. The key collaborators of this work are:
 
-- **Dr. Daniel Gebbran Cons Bacilla Ferreira** for his supervision of the research involving distributed methodologies and for his significant role in strengthening the scientific contributions of this work.
+- **Mateus Kaiss**: Researcher and Lead Developer. Responsible for R\&D, and implementation, maintenance, and technical architecture of the project.
 
-- **Prof. Dr. Kristie Kaminski Küster** for her supervision and guidance in power systems research, as well as for reviewing the implemented code.
+- **Daniel Gebbran, PhD**: Research Lead. Established the scientific workflow \& logic, and provides continuous high-level technical direction, including system architecture design, collaborative debugging, and feature implementation oversight. 
 
-- **Andressa Mathias Pedroso** for leading and implementing the design and development of the official Lirion website.
+- **Prof. Dr. Kristie Kaminski Küster**: Academic Advisor. Provides critical guidance in power systems engineering, reviews the project's logic and implementation, and coordinates the research group's scientific strategy.
 
+- **Andressa Mathias Pedroso**: Lead Web Developer. Responsible for the design and development of the official Lirion platform and online presence.
+
+## Scientific Outputs & Deliverables
+
+This software is part of an ongoing research program. The following works have been produced as part of this project's development:
+
+1. **[White Paper]** - *Lirion.jl: A Distributed Framework for Power Systems* (In Preparation).
+2. *On the Impact of Network Sectioning and Coupling Variable Choices in ADMM-Based Distributed Optimal Power Flow* (In Preparation).
+3. **BSc Thesis** - *Desenvolvimento de Ferramenta para Determinação do Fluxo de Potência Ótimo em Redes Elétricas*, Mateus Kaiss, UFPR (2025). [Link to University Repository/PDF]
+4. **Official Documentation** - Available at [lirionlabs.github.io/Lirion.jl](https://github.io)
+
+
+## Funding
+
+The authors gratefully acknowledge Brazil's Conselho Nacional de Desenvolvimento Científico e Tecnológico (CNPq) for its support through grant 447271/2024-5 — established in 2024 and executed from 2025 through present — led by Daniel Gebbran as the Principal Investigator. This support has been essential in providing the institutional framework, scientific scope, and computational resources essential for the conceptualization and development of Lirion.jl, enabling the continued development, scientific expansion, and open-source release of this work.
+
+
+## Julia community
 
 Lirion was developed with deep respect for the Julia open-source optimization ecosystem. In particular, **PowerModels.jl** has been an important source of inspiration throughout all the developer’s academic formation.
 
@@ -303,8 +285,28 @@ Lirion does not aim to replicate PowerModels, but rather to explore complementar
 https://github.com/lanl-ansi/PowerModels.jl
 
 
+## Mathematical Foundations Website
+
+Lirion is accompanied by a dedicated technical \& instructive website, providing learning resources for any person who might be interested in expanding their knowledge in such topics.
+
+The website contains deeper mathematical material underlying Lirion’s design, including:
+
+- OPF formulations (DC, AC, ACR, IVR, LPAC, SOCWR, SOCBF, BFA, NFA)
+- ADMM and ALADIN derivations and penalty update rules
+- Coupling-variable design theory
+- Structural and decomposition analysis
+
+
 ## License
 
 Lirion.jl is released under the MIT License.
 
 See the [LICENSE](LICENSE) file for details.
+
+
+## To-dos:
+
+- [ ] Add infraestructuremodels licensing 
+- [ ] Implement ALADIN method
+- [ ] Further expand examples on README
+- [ ] Test in other 
