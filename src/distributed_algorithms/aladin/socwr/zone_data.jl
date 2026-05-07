@@ -85,8 +85,12 @@ mutable struct AladinZoneDataSOCWR
 end
 
 # ============================================================
-# Column-class detection
+# Variable / cost / topology collectors
 # ============================================================
+
+# ------------------------------------------------------------
+# Column classes (θ / v² / R / T / pg / qg / curt) + cost coefficients
+# ------------------------------------------------------------
 
 function _collect_socwr_cols(
     model::JuMP.Model,
@@ -200,6 +204,10 @@ function _collect_socwr_cols(
     )
 end
 
+# ------------------------------------------------------------
+# Shared v² columns
+# ------------------------------------------------------------
+
 function _collect_shared_v2_cols(
     model::JuMP.Model,
     var_to_col::Dict{JuMP.VariableRef, Int},
@@ -212,6 +220,10 @@ function _collect_shared_v2_cols(
     end
     return out
 end
+
+# ------------------------------------------------------------
+# Interzonal edge layout — R, T columns
+# ------------------------------------------------------------
 
 function _collect_socwr_edge_rt_cols(
     model::JuMP.Model,
@@ -240,9 +252,14 @@ function _collect_socwr_edge_rt_cols(
     return r_cols, t_cols
 end
 
-# ============================================================
-# Affine expansion of p_flow_branches[l,1] and q_flow_branches[l,1]
-# ============================================================
+# ------------------------------------------------------------
+# Interzonal edge layout — affine flow expansion
+# ------------------------------------------------------------
+#
+# `p_flow_branches[l, 1]` and `q_flow_branches[l, 1]` are stored as
+# JuMP affine expressions in (v², R, T). We extract their coefficient
+# vectors here so ALADIN can evaluate flows numerically without
+# re-walking JuMP at every iteration.
 
 function _collect_socwr_edge_flow_expansion(
     model::JuMP.Model,

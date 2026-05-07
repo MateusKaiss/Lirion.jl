@@ -58,12 +58,6 @@ mutable struct AladinZoneData
 
     # Active-set detection buffer: columns at box bounds at current y.
     active_bound_cols::Vector{Int}
-
-    # Cached quadratic part of the Phase-1 proximal term:
-    #   (ρ/2)·Σ σ_k·v_k²
-    # Constant in (ρ, σ); rebuilt only when ρ changes (`adapt_rho_mu!`).
-    # Mirrors `obj_static` in ADMM. The linear x_prev component is
-    # rebuilt every iteration in `update_objective!`.
     quad_static::JuMP.QuadExpr
 end
 
@@ -71,16 +65,9 @@ end
 # Variable / cost / topology collectors
 # ============================================================
 
-function _build_var_layout(model::JuMP.Model)
-    all_vars = JuMP.all_variables(model)
-    n = length(all_vars)
-    var_to_col = Dict{JuMP.VariableRef, Int}()
-    sizehint!(var_to_col, n)
-    @inbounds for i in 1:n
-        var_to_col[all_vars[i]] = i
-    end
-    return all_vars, n, var_to_col
-end
+# ------------------------------------------------------------
+# Generator cost layout
+# ------------------------------------------------------------
 
 function _collect_pg_layout(
     model::JuMP.Model,
@@ -123,6 +110,10 @@ function _collect_pg_layout(
     return pg_cols, pg_c2_sbase2, pg_c1_sbase
 end
 
+# ------------------------------------------------------------
+# Shared θ columns
+# ------------------------------------------------------------
+
 function _collect_shared_theta_cols(
     model::JuMP.Model,
     var_to_col::Dict{JuMP.VariableRef, Int},
@@ -136,6 +127,10 @@ function _collect_shared_theta_cols(
     end
     return out
 end
+
+# ------------------------------------------------------------
+# Interzonal edge layout
+# ------------------------------------------------------------
 
 function _collect_edge_layout(
     model::JuMP.Model,
@@ -168,83 +163,8 @@ function _collect_edge_layout(
     return from_cols, to_cols, b_vals
 end
 
-function _collect_bounds(all_vars::Vector{JuMP.VariableRef})
-    n = length(all_vars)
-    lb = fill(NaN, n)
-    ub = fill(NaN, n)
-    @inbounds for i in 1:n
-        v = all_vars[i]
-        if JuMP.has_lower_bound(v)
-            lb[i] = JuMP.lower_bound(v)
-        end
-        if JuMP.has_upper_bound(v)
-            ub[i] = JuMP.upper_bound(v)
-        end
-    end
-    return lb, ub
-end
-
-# ============================================================
-# Equality Jacobian (constant — DC equalities are affine)
-# ============================================================
-
-function _extract_equality_jacobian(
-    model::JuMP.Model,
-    var_to_col::Dict{JuMP.VariableRef, Int},
-    n_vars::Int,
-)
-    rows = Int[]
-    cols = Int[]
-    vals = Float64[]
-    nrows = 0
-
-    for (F, S) in JuMP.list_of_constraint_types(model)
-        F <: JuMP.VariableRef && continue
-        S === MOI.EqualTo{Float64} || continue
-
-        for ci in JuMP.all_constraints(model, F, S)
-            cobj = JuMP.constraint_object(ci)
-            func = cobj.func
-            nrows += 1
-            _push_affine_row!(rows, cols, vals, nrows, func, var_to_col)
-        end
-    end
-
-    return SparseArrays.sparse(rows, cols, vals, nrows, n_vars)
-end
-
-@inline function _push_affine_row!(
-    rows::Vector{Int},
-    cols::Vector{Int},
-    vals::Vector{Float64},
-    row::Int,
-    func::JuMP.AffExpr,
-    var_to_col::Dict{JuMP.VariableRef, Int},
-)
-    for (v, coef) in func.terms
-        col = get(var_to_col, v, 0)
-        col == 0 && continue
-        push!(rows, row)
-        push!(cols, col)
-        push!(vals, coef)
-    end
-    return nothing
-end
-
-# Non-affine function — shouldn't happen in DC OPF, but guard anyway.
-@inline function _push_affine_row!(
-    ::Vector{Int},
-    ::Vector{Int},
-    ::Vector{Float64},
-    ::Int,
-    func,
-    ::Dict,
-)
-    return error(
-        "ALADIN-DC sensitivity extraction: expected affine equality constraint, " *
-        "got $(typeof(func)). Canonical ALADIN-DC only supports linear local models.",
-    )
-end
+# `_collect_bounds`, `_extract_equality_jacobian`, `_push_affine_row!`
+# live in `aladin/core/zone_helpers.jl` (shared with AC and SOCWR).
 
 # ============================================================
 # Builder

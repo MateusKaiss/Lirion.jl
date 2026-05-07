@@ -135,9 +135,20 @@ function adapt_rho_mu!(ws::SOCWRPowerWorkspaceALADIN, params::ALADINParams)
     _grow_ref!(ws.mu, params.mu_growth, params.mu_upper)
     if rho_changed
         if ws.proximal_mode === :pflow
-            _refresh_quad_static_socwr_pflow_all!(ws.partitions.parts, ws.zones, ws.edge_pairs, ws.rho[], ws)
+            _refresh_quad_static_socwr_pflow_all!(
+                ws.partitions.parts,
+                ws.zones,
+                ws.edge_pairs,
+                ws.rho[],
+                ws,
+            )
         else
-            _refresh_quad_static_socwr_primal_all!(ws.partitions.parts, ws.zones, ws.rho[], ws)
+            _refresh_quad_static_socwr_primal_all!(
+                ws.partitions.parts,
+                ws.zones,
+                ws.rho[],
+                ws,
+            )
         end
     end
     return nothing

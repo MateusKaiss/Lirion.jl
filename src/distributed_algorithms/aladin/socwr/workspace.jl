@@ -240,7 +240,13 @@ function build_workspace(
         proximal_mode = cfg.proximal_mode,
     )
     if ws.proximal_mode === :pflow
-        _refresh_quad_static_socwr_pflow_all!(ws.partitions.parts, ws.zones, ws.edge_pairs, ws.rho[], ws)
+        _refresh_quad_static_socwr_pflow_all!(
+            ws.partitions.parts,
+            ws.zones,
+            ws.edge_pairs,
+            ws.rho[],
+            ws,
+        )
     else
         _refresh_quad_static_socwr_primal_all!(ws.partitions.parts, ws.zones, ws.rho[], ws)
     end

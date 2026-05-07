@@ -189,7 +189,13 @@ end
     return nothing
 end
 
-@inline function _refresh_quad_static_socwr_pflow_all!(parts, zones, edge_pairs, rho, ws_or_cfg)
+@inline function _refresh_quad_static_socwr_pflow_all!(
+    parts,
+    zones,
+    edge_pairs,
+    rho,
+    ws_or_cfg,
+)
     @inbounds for (zone_pos, zone) in enumerate(zones)
         _build_quad_static_pflow_socwr!(
             zone, edge_pairs, zone_pos, rho;
@@ -329,7 +335,11 @@ end
 # Primal — full-arg helper
 # ------------------------------------------------------------
 
-@inline function _socwr_prox_lin_full!(lin::JuMP.AffExpr, zdata::AladinZoneDataSOCWR, ws::_SOCWRLocalWorkspace)
+@inline function _socwr_prox_lin_full!(
+    lin::JuMP.AffExpr,
+    zdata::AladinZoneDataSOCWR,
+    ws::_SOCWRLocalWorkspace,
+)
     _socwr_prox_lin!(
         lin, zdata, ws.rho[];
         sigma_theta = ws.sigma_theta,

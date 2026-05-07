@@ -1,17 +1,6 @@
 # ============================================================
 # ALADIN-AC — Zone-level data layout & builder
 # ============================================================
-#
-# Defines `AladinZoneDataAC` and the static initialisation that runs
-# once at workspace build time:
-#   - column-class detection (θ, V, pg, qg, curtailment) for the
-#     proximal weight matrix Σ_i;
-#   - shared-bus θ/V columns;
-#   - interzonal edge layout (from/to θ, V columns + g, b, b_sh, tap);
-#   - per-variable box bounds.
-#
-# Per-iteration kernels live in `sensitivities.jl` (Hessian/Jacobian
-# refresh via MOI). Active-set logic lives in `active_set.jl`.
 
 # ============================================================
 # Struct
@@ -20,12 +9,10 @@
 mutable struct AladinZoneDataAC
     model::JuMP.Model
 
-    # Flat variable layout.
     all_vars::Vector{JuMP.VariableRef}
     n_vars::Int
     var_to_col::Dict{JuMP.VariableRef, Int}
 
-    # Column classes for Σ_i sigma weights in the proximal term.
     theta_cols::Vector{Int}
     vm_cols::Vector{Int}
     pg_cols::Vector{Int}
@@ -38,7 +25,6 @@ mutable struct AladinZoneDataAC
     shared_theta_cols::Vector{Int}
     shared_vm_cols::Vector{Int}
 
-    # analytically at the current y:
     edge_from_theta_col::Vector{Int}
     edge_to_theta_col::Vector{Int}
     edge_from_vm_col::Vector{Int}
@@ -49,36 +35,30 @@ mutable struct AladinZoneDataAC
     edge_inv_tap::Vector{Float64}
     edge_tap_angle::Vector{Float64}
 
-    # Per-variable box bounds (NaN if absent).
     lb::Vector{Float64}
     ub::Vector{Float64}
 
-    # Previous iterate (proximal centre) and Phase-1 solve result.
     x_prev::Vector{Float64}
     y::Vector{Float64}
 
-    # g_i and H_i refreshed every iteration by `refresh_sensitivities_ac!`.
     g::Vector{Float64}
     hess::SparseArrays.SparseMatrixCSC{Float64, Int}
 
-    # Active-constraint Jacobian refreshed every iteration.
     active_jac::SparseArrays.SparseMatrixCSC{Float64, Int}
 
-    # QP output.
     delta::Vector{Float64}
 
-    # Active box bounds at current y.
     active_bound_cols::Vector{Int}
-
-    # Cached quadratic part of Phase-1 proximal: (ρ/2)·Σ σ_k·v_k²
-    # — see header note in `dc/zone_data.jl`. Mirrors `obj_static`
-    # in ADMM. Refreshed only when ρ changes via `adapt_rho_mu!`.
     quad_static::JuMP.QuadExpr
 end
 
 # ============================================================
-# Column-class detection
+# Variable / cost / topology collectors
 # ============================================================
+
+# ------------------------------------------------------------
+# Column classes (θ / vm / pg / qg / curt) + cost coefficients
+# ------------------------------------------------------------
 
 function _collect_ac_cols(
     model::JuMP.Model,
@@ -170,6 +150,10 @@ function _collect_ac_cols(
     )
 end
 
+# ------------------------------------------------------------
+# Shared θ / vm columns
+# ------------------------------------------------------------
+
 function _collect_shared_ac_cols(
     model::JuMP.Model,
     var_to_col::Dict{JuMP.VariableRef, Int},
@@ -186,6 +170,10 @@ function _collect_shared_ac_cols(
     end
     return theta_cols, vm_cols
 end
+
+# ------------------------------------------------------------
+# Interzonal edge layout
+# ------------------------------------------------------------
 
 function _collect_ac_edge_layout(
     model::JuMP.Model,
@@ -265,13 +253,10 @@ function build_aladin_zone_data(
     model = part.model::JuMP.Model
 
     all_vars, n_vars, var_to_col = _build_var_layout(model)
-
     cols = _collect_ac_cols(model, var_to_col, obj)
     shared_theta_cols, shared_vm_cols =
         _collect_shared_ac_cols(model, var_to_col, part.zone_shared_bus_ids)
-
     edata = _collect_ac_edge_layout(model, var_to_col, part; include_edges)
-
     lb, ub = _collect_bounds(all_vars)
 
     hess_initial = SparseArrays.spzeros(Float64, n_vars, n_vars)

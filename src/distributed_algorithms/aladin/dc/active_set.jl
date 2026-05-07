@@ -95,45 +95,8 @@ function build_active_jacobian(
     return _delete_dependent_rows(C_stacked; tol = dep_tol)
 end
 
-# ============================================================
-# Rank-revealing row reduction (LICQ enforcement)
-# ============================================================
-
-function _delete_dependent_rows(
-    C::SparseArrays.SparseMatrixCSC{Float64, Int};
-    tol::Float64 = 1e-10,
-)::SparseArrays.SparseMatrixCSC{Float64, Int}
-    n_rows = size(C, 1)
-    n_rows <= 1 && return C
-
-    # Dense transpose: columns of A correspond to rows of C.
-    # Sparse QR with column pivoting is not available in Julia stdlib
-    # (`LinearAlgebra.qr(::SparseMatrixCSC, ::ColumnNorm)` is unsupported);
-    # for robust LICQ rank detection we therefore densify here. This is
-    # O(n_rows · n_vars) memory and O(n_rows²) time per call. Acceptable
-    # for case ≤ 200 buses; for larger cases this is a known performance
-    # ceiling and could be replaced by a sparse rank-revealing factorisation
-    # (SuiteSparse SPQR or a streaming QR) as future work.
-    A = Matrix(C')
-    if size(A, 1) == 0 || size(A, 2) == 0
-        return C
-    end
-
-    F = LinearAlgebra.qr(A, LinearAlgebra.ColumnNorm())
-
-    # Count diagonal entries of R above tolerance → rank.
-    r_diag_len = min(size(F.R, 1), size(F.R, 2))
-    rnk = 0
-    @inbounds for i in 1:r_diag_len
-        if abs(F.R[i, i]) > tol
-            rnk += 1
-        end
-    end
-
-    rnk == n_rows && return C
-    keep = sort(F.p[1:rnk])
-    return C[keep, :]
-end
+# `_delete_dependent_rows` lives in `aladin/core/zone_helpers.jl`
+# (shared with AC and SOCWR).
 
 # ============================================================
 # Helper: push affine row of an inequality into COO buffers
