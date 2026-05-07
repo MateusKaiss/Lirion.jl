@@ -28,7 +28,7 @@ struct SharedBusPair
 end
 
 # ------------------------------------------------------------
-# Shared edge pair
+# Interzonal line pair (TieLine sectioning)
 # ------------------------------------------------------------
 
 struct InterzonalLinePair
@@ -41,7 +41,7 @@ struct InterzonalLinePair
 end
 
 # ------------------------------------------------------------
-# Split bus pair
+# Split bus pair (SplitBus sectioning)
 # ------------------------------------------------------------
 
 struct SplitBusPair
@@ -54,7 +54,7 @@ struct SplitBusPair
 end
 
 # ------------------------------------------------------------
-# Dummy branch pair
+# Dummy line pair (DummyBus sectioning)
 # ------------------------------------------------------------
 
 struct DummyLinePairDC
@@ -76,43 +76,56 @@ end
 # ------------------------------------------------------------
 # Shared bus pairs
 # ------------------------------------------------------------
+#
+# Walks every zone, registers (zone_pos, theta_col) for each shared
+# bus it touches, then emits a star spanning tree per consensus_idx
+# (root = lowest zone_pos). N zones touching a bus → N-1 pairs, which
+# preserves LICQ in the coordinator KKT.
 
 function _build_shared_bus_pairs(
     partitions::Partitions{PartitionDC},
     zones::Vector{AladinZoneData},
 )::Vector{SharedBusPair}
-    acc = Dict{Int, Vector{Tuple{Int, Int}}}()
-    bus_of = Dict{Int, Int}()
+    visits = Dict{Int, Vector{Tuple{Int, Int}}}()    # consensus_idx → [(zone_pos, theta_col)]
+    bus_id_by_cidx = Dict{Int, Int}()                # consensus_idx → physical bus id
 
-    for (zpos, part) in enumerate(partitions.parts)
-        zdata = zones[zpos]
+    for (zone_pos, part) in enumerate(partitions.parts)
+        zone_data = zones[zone_pos]
         @inbounds for i in eachindex(part.zone_shared_bus_ids)
-            cidx = part.shared_bus_consensus_idx[i]
-            cidx == 0 && continue
-            col = zdata.shared_theta_cols[i]
-            v = get!(acc, cidx, Tuple{Int, Int}[])
-            push!(v, (zpos, col))
-            bus_of[cidx] = part.zone_shared_bus_ids[i]
+            consensus_idx = part.shared_bus_consensus_idx[i]
+            consensus_idx == 0 && continue
+            theta_col = zone_data.shared_theta_cols[i]
+            cidx_visits = get!(visits, consensus_idx, Tuple{Int, Int}[])
+            push!(cidx_visits, (zone_pos, theta_col))
+            bus_id_by_cidx[consensus_idx] = part.zone_shared_bus_ids[i]
         end
     end
 
     pairs = SharedBusPair[]
-    for cidx in sort!(collect(keys(acc)))
-        entries = acc[cidx]
-        length(entries) >= 2 || continue
-        sort!(entries; by = first)
-        zr, cr = entries[1]
-        for k in 2:length(entries)
-            zk, ck = entries[k]
-            push!(pairs, SharedBusPair(cidx, bus_of[cidx], zr, cr, zk, ck))
+    for consensus_idx in sort!(collect(keys(visits)))
+        cidx_visits = visits[consensus_idx]
+        length(cidx_visits) >= 2 || continue
+        sort!(cidx_visits; by = first)
+        root_zone, root_col = cidx_visits[1]
+        for k in 2:length(cidx_visits)
+            peer_zone, peer_col = cidx_visits[k]
+            push!(pairs, SharedBusPair(
+                consensus_idx,
+                bus_id_by_cidx[consensus_idx],
+                root_zone, root_col,
+                peer_zone, peer_col,
+            ))
         end
     end
     return pairs
 end
 
 # ------------------------------------------------------------
-# Shared edge pairs
+# Interzonal line pairs
 # ------------------------------------------------------------
+#
+# Each interzonal line touches exactly two zones; emit one pair per
+# line carrying its global index and the local index in each zone.
 
 function _build_interzonal_line_pairs(
     partitions::Partitions{PartitionDC},
@@ -120,25 +133,36 @@ function _build_interzonal_line_pairs(
 )::Vector{InterzonalLinePair}
     pairs = InterzonalLinePair[]
 
-    for (cidx, e) in enumerate(interzonal)
-        entries = Tuple{Int, Int}[]
-        for (zpos, part) in enumerate(partitions.parts)
-            part.branch_idx_full_to_zone[e] == 0 && continue
-            local_k = findfirst(==(e), part.zone_edges)
-            local_k === nothing && continue
-            push!(entries, (zpos, local_k))
+    for (consensus_idx, line_global) in enumerate(interzonal)
+        line_visits = Tuple{Int, Int}[]
+        for (zone_pos, part) in enumerate(partitions.parts)
+            part.branch_idx_full_to_zone[line_global] == 0 && continue
+            local_idx = findfirst(==(line_global), part.zone_edges)
+            local_idx === nothing && continue
+            push!(line_visits, (zone_pos, local_idx))
         end
-        length(entries) == 2 || continue
-        zi, li = entries[1]
-        zj, lj = entries[2]
-        push!(pairs, InterzonalLinePair(cidx, e, zi, li, zj, lj))
+        length(line_visits) == 2 || continue
+        zone_i, local_i = line_visits[1]
+        zone_j, local_j = line_visits[2]
+        push!(pairs, InterzonalLinePair(
+            consensus_idx, line_global,
+            zone_i, local_i,
+            zone_j, local_j,
+        ))
     end
     return pairs
 end
 
 # ------------------------------------------------------------
-# Dummy branch pairs
+# Dummy line pairs
 # ------------------------------------------------------------
+#
+# DummyBus sectioning replaces a shared bus by two phantom lines (one
+# per zone, ending at a per-zone dummy bus). For each
+# (line_global_a, zone_a, line_global_b, zone_b) tuple from the
+# system, emit a pair carrying the θ columns of both endpoints AND
+# the susceptances — the consensus row is
+# `b_a·(θ_from_a − θ_to_a) = b_b·(θ_from_b − θ_to_b)`.
 
 function _build_dummy_line_pairs(
     partitions::Partitions{PartitionDC},
@@ -149,38 +173,37 @@ function _build_dummy_line_pairs(
     isempty(sys_branch_pairs) && return pairs
     sizehint!(pairs, length(sys_branch_pairs))
 
-    for (k, (ga, za, gb, zb)) in enumerate(sys_branch_pairs)
-        pa = partitions.parts[za]
-        pb = partitions.parts[zb]
-        la = pa.branch_idx_full_to_zone[ga]
-        lb = pb.branch_idx_full_to_zone[gb]
-        (la == 0 || lb == 0) && continue
+    for (consensus_idx, (line_global_a, zone_a, line_global_b, zone_b)) in
+        enumerate(sys_branch_pairs)
+        part_a = partitions.parts[zone_a]
+        part_b = partitions.parts[zone_b]
+        local_a = part_a.branch_idx_full_to_zone[line_global_a]
+        local_b = part_b.branch_idx_full_to_zone[line_global_b]
+        (local_a == 0 || local_b == 0) && continue
 
-        zda = zones[za]
-        zdb = zones[zb]
+        zone_data_a = zones[zone_a]
+        zone_data_b = zones[zone_b]
 
-        fa = pa.branch.from[la]
-        ta = pa.branch.to[la]
-        fb = pb.branch.from[lb]
-        tb = pb.branch.to[lb]
+        from_a = part_a.branch.from[local_a]
+        to_a = part_a.branch.to[local_a]
+        from_b = part_b.branch.from[local_b]
+        to_b = part_b.branch.to[local_b]
 
-        theta_a = pa.model[:theta]
-        theta_b = pb.model[:theta]
-        from_col_i = zda.var_to_col[theta_a[fa, 1]]
-        to_col_i = zda.var_to_col[theta_a[ta, 1]]
-        from_col_j = zdb.var_to_col[theta_b[fb, 1]]
-        to_col_j = zdb.var_to_col[theta_b[tb, 1]]
+        theta_var_a = part_a.model[:theta]
+        theta_var_b = part_b.model[:theta]
+        from_col_i = zone_data_a.var_to_col[theta_var_a[from_a, 1]]
+        to_col_i   = zone_data_a.var_to_col[theta_var_a[to_a, 1]]
+        from_col_j = zone_data_b.var_to_col[theta_var_b[from_b, 1]]
+        to_col_j   = zone_data_b.var_to_col[theta_var_b[to_b, 1]]
 
-        b_i = pa.branch.b[la]
-        b_j = pb.branch.b[lb]
+        b_i = part_a.branch.b[local_a]
+        b_j = part_b.branch.b[local_b]
 
-        push!(
-            pairs,
-            DummyLinePairDC(
-                k, za, from_col_i, to_col_i, b_i,
-                zb, from_col_j, to_col_j, b_j,
-            ),
-        )
+        push!(pairs, DummyLinePairDC(
+            consensus_idx,
+            zone_a, from_col_i, to_col_i, b_i,
+            zone_b, from_col_j, to_col_j, b_j,
+        ))
     end
     return pairs
 end
@@ -188,6 +211,11 @@ end
 # ------------------------------------------------------------
 # Split bus pairs
 # ------------------------------------------------------------
+#
+# SplitBus sectioning duplicates each shared bus with auxiliary
+# `p_inj` variables (one per zone). Emit a pair carrying the column
+# of each replica so the coordinator can enforce
+# `p_inj_a + p_inj_b = 0`.
 
 function _build_split_bus_pairs(
     partitions::Partitions{PartitionDC},
@@ -199,13 +227,17 @@ function _build_split_bus_pairs(
     isempty(sys_bus_pairs) && return pairs
     sizehint!(pairs, length(sys_bus_pairs))
 
-    for (k, (bid, za, zb)) in enumerate(sys_bus_pairs)
-        v_a = get(p_inj_vars[za], bid, nothing)
-        v_b = get(p_inj_vars[zb], bid, nothing)
-        (v_a === nothing || v_b === nothing) && continue
-        col_a = zones[za].var_to_col[v_a]
-        col_b = zones[zb].var_to_col[v_b]
-        push!(pairs, SplitBusPair(k, bid, za, col_a, zb, col_b))
+    for (consensus_idx, (bus_id, zone_a, zone_b)) in enumerate(sys_bus_pairs)
+        p_inj_var_a = get(p_inj_vars[zone_a], bus_id, nothing)
+        p_inj_var_b = get(p_inj_vars[zone_b], bus_id, nothing)
+        (p_inj_var_a === nothing || p_inj_var_b === nothing) && continue
+        p_inj_col_a = zones[zone_a].var_to_col[p_inj_var_a]
+        p_inj_col_b = zones[zone_b].var_to_col[p_inj_var_b]
+        push!(pairs, SplitBusPair(
+            consensus_idx, bus_id,
+            zone_a, p_inj_col_a,
+            zone_b, p_inj_col_b,
+        ))
     end
     return pairs
 end

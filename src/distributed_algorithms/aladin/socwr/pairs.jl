@@ -31,7 +31,7 @@ struct SharedBusPairSOCWR
 end
 
 # ------------------------------------------------------------
-# Shared edge pair
+# Interzonal line pair (TieLine sectioning)
 # ------------------------------------------------------------
 
 struct InterzonalLinePairSOCWR
@@ -44,7 +44,7 @@ struct InterzonalLinePairSOCWR
 end
 
 # ------------------------------------------------------------
-# Split bus pair
+# Split bus pair (SplitBus sectioning)
 # ------------------------------------------------------------
 
 struct SplitBusPairSOCWR
@@ -65,44 +65,52 @@ end
 # ------------------------------------------------------------
 # Shared bus pairs
 # ------------------------------------------------------------
+#
+# In SOCWR the shared variable on a bus is v² (not θ). Otherwise the
+# logic is the same as DC/AC: walk every zone, collect (zone_pos,
+# v2_col) per shared bus, then emit a star spanning tree per
+# consensus_idx (root = lowest zone_pos). N zones → N-1 pairs.
 
 function _build_shared_bus_pairs(
     partitions::Partitions{PartitionSOCWR},
     zones::Vector{AladinZoneDataSOCWR},
 )::Vector{SharedBusPairSOCWR}
-    acc = Dict{Int, Vector{Tuple{Int, Int}}}()
-    bus_of = Dict{Int, Int}()
+    visits = Dict{Int, Vector{Tuple{Int, Int}}}()    # cidx → [(zone_pos, v2_col)]
+    bus_id_by_cidx = Dict{Int, Int}()                # cidx → physical bus id
 
-    for (zpos, part) in enumerate(partitions.parts)
-        zdata = zones[zpos]
+    for (zone_pos, part) in enumerate(partitions.parts)
+        zone_data = zones[zone_pos]
         @inbounds for i in eachindex(part.zone_shared_bus_ids)
-            cidx = part.shared_bus_consensus_idx[i]
-            cidx == 0 && continue
-            col = zdata.shared_v2_cols[i]
-            v = get!(acc, cidx, Tuple{Int, Int}[])
-            push!(v, (zpos, col))
-            bus_of[cidx] = part.zone_shared_bus_ids[i]
+            consensus_idx = part.shared_bus_consensus_idx[i]
+            consensus_idx == 0 && continue
+            v2_col = zone_data.shared_v2_cols[i]
+            cidx_visits = get!(visits, consensus_idx, Tuple{Int, Int}[])
+            push!(cidx_visits, (zone_pos, v2_col))
+            bus_id_by_cidx[consensus_idx] = part.zone_shared_bus_ids[i]
         end
     end
 
     pairs = SharedBusPairSOCWR[]
-    for cidx in sort!(collect(keys(acc)))
-        entries = acc[cidx]
-        length(entries) >= 2 || continue
-        # Spanning tree (star): pair every other zone with the lowest-zpos
-        # zone as root. N zones → N-1 pairs, LICQ preserved.
-        sort!(entries; by = first)
-        zr, cr = entries[1]
-        for k in 2:length(entries)
-            zk, ck = entries[k]
-            push!(pairs, SharedBusPairSOCWR(cidx, bus_of[cidx], zr, cr, zk, ck))
+    for consensus_idx in sort!(collect(keys(visits)))
+        cidx_visits = visits[consensus_idx]
+        length(cidx_visits) >= 2 || continue
+        sort!(cidx_visits; by = first)
+        root_zone, root_col = cidx_visits[1]
+        for k in 2:length(cidx_visits)
+            peer_zone, peer_col = cidx_visits[k]
+            push!(pairs, SharedBusPairSOCWR(
+                consensus_idx,
+                bus_id_by_cidx[consensus_idx],
+                root_zone, root_col,
+                peer_zone, peer_col,
+            ))
         end
     end
     return pairs
 end
 
 # ------------------------------------------------------------
-# Shared edge pairs
+# Interzonal line pairs
 # ------------------------------------------------------------
 
 function _build_interzonal_line_pairs(
@@ -110,18 +118,22 @@ function _build_interzonal_line_pairs(
     interzonal::Vector{Int},
 )::Vector{InterzonalLinePairSOCWR}
     pairs = InterzonalLinePairSOCWR[]
-    for (cidx, e) in enumerate(interzonal)
-        entries = Tuple{Int, Int}[]
-        for (zpos, part) in enumerate(partitions.parts)
-            part.branch_idx_full_to_zone[e] == 0 && continue
-            local_k = findfirst(==(e), part.zone_edges)
-            local_k === nothing && continue
-            push!(entries, (zpos, local_k))
+    for (consensus_idx, line_global) in enumerate(interzonal)
+        line_visits = Tuple{Int, Int}[]
+        for (zone_pos, part) in enumerate(partitions.parts)
+            part.branch_idx_full_to_zone[line_global] == 0 && continue
+            local_idx = findfirst(==(line_global), part.zone_edges)
+            local_idx === nothing && continue
+            push!(line_visits, (zone_pos, local_idx))
         end
-        length(entries) == 2 || continue
-        zi, li = entries[1]
-        zj, lj = entries[2]
-        push!(pairs, InterzonalLinePairSOCWR(cidx, e, zi, li, zj, lj))
+        length(line_visits) == 2 || continue
+        zone_i, local_i = line_visits[1]
+        zone_j, local_j = line_visits[2]
+        push!(pairs, InterzonalLinePairSOCWR(
+            consensus_idx, line_global,
+            zone_i, local_i,
+            zone_j, local_j,
+        ))
     end
     return pairs
 end
@@ -140,19 +152,21 @@ function _build_split_bus_pairs(
     isempty(sys_bus_pairs) && return pairs
     sizehint!(pairs, length(sys_bus_pairs))
 
-    for (k, (bid, za, zb)) in enumerate(sys_bus_pairs)
-        vpa = get(p_inj_vars[za], bid, nothing)
-        vqa = get(q_inj_vars[za], bid, nothing)
-        vpb = get(p_inj_vars[zb], bid, nothing)
-        vqb = get(q_inj_vars[zb], bid, nothing)
-        (vpa === nothing || vqa === nothing ||
-         vpb === nothing || vqb === nothing) && continue
-        pcol_a = zones[za].var_to_col[vpa]
-        qcol_a = zones[za].var_to_col[vqa]
-        pcol_b = zones[zb].var_to_col[vpb]
-        qcol_b = zones[zb].var_to_col[vqb]
+    for (consensus_idx, (bus_id, zone_a, zone_b)) in enumerate(sys_bus_pairs)
+        p_inj_var_a = get(p_inj_vars[zone_a], bus_id, nothing)
+        q_inj_var_a = get(q_inj_vars[zone_a], bus_id, nothing)
+        p_inj_var_b = get(p_inj_vars[zone_b], bus_id, nothing)
+        q_inj_var_b = get(q_inj_vars[zone_b], bus_id, nothing)
+        (p_inj_var_a === nothing || q_inj_var_a === nothing ||
+         p_inj_var_b === nothing || q_inj_var_b === nothing) && continue
+        p_inj_col_a = zones[zone_a].var_to_col[p_inj_var_a]
+        q_inj_col_a = zones[zone_a].var_to_col[q_inj_var_a]
+        p_inj_col_b = zones[zone_b].var_to_col[p_inj_var_b]
+        q_inj_col_b = zones[zone_b].var_to_col[q_inj_var_b]
         push!(pairs, SplitBusPairSOCWR(
-            k, bid, za, pcol_a, qcol_a, zb, pcol_b, qcol_b,
+            consensus_idx, bus_id,
+            zone_a, p_inj_col_a, q_inj_col_a,
+            zone_b, p_inj_col_b, q_inj_col_b,
         ))
     end
     return pairs
