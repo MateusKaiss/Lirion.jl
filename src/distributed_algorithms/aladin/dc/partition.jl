@@ -182,9 +182,9 @@ function init_power_partition!(
             partitions.parts[i], sys.parts[i], optimizer_factory, cfg, inter,
         )
     end
-    edge_pairs = _build_shared_edge_pairs(partitions, inter)
-    dummy_pairs = _build_dummy_branch_pairs(partitions, zones, sys_branch_pairs)
-    return zones, edge_pairs, dummy_pairs
+    interzonal_line_pairs = _build_interzonal_line_pairs(partitions, inter)
+    dummy_pairs = _build_dummy_line_pairs(partitions, zones, sys_branch_pairs)
+    return zones, interzonal_line_pairs, dummy_pairs
 end
 
 # ------------------------------------------------------------
@@ -210,8 +210,8 @@ function init_hybrid_partition!(
         )
     end
     bus_pairs = _build_shared_bus_pairs(partitions, zones)
-    edge_pairs = _build_shared_edge_pairs(partitions, inter)
-    return zones, bus_pairs, edge_pairs
+    interzonal_line_pairs = _build_interzonal_line_pairs(partitions, inter)
+    return zones, bus_pairs, interzonal_line_pairs
 end
 
 # ------------------------------------------------------------
@@ -238,9 +238,9 @@ function init_hybrid_partition!(
         )
     end
     bus_pairs = _build_shared_bus_pairs(partitions, zones)
-    edge_pairs = _build_shared_edge_pairs(partitions, inter)
-    dummy_pairs = _build_dummy_branch_pairs(partitions, zones, sys_branch_pairs)
-    return zones, bus_pairs, edge_pairs, dummy_pairs
+    interzonal_line_pairs = _build_interzonal_line_pairs(partitions, inter)
+    dummy_pairs = _build_dummy_line_pairs(partitions, zones, sys_branch_pairs)
+    return zones, bus_pairs, interzonal_line_pairs, dummy_pairs
 end
 
 # ------------------------------------------------------------
@@ -268,7 +268,7 @@ function init_hybrid_partition!(
         )
     end
     bus_pairs = _build_shared_bus_pairs(partitions, zones)
-    edge_pairs = _build_shared_edge_pairs(partitions, inter)
+    interzonal_line_pairs = _build_interzonal_line_pairs(partitions, inter)
     split_pairs = _build_split_bus_pairs(partitions, zones, sys_bus_pairs, p_inj_vars)
-    return zones, bus_pairs, edge_pairs, split_pairs, p_inj_vars
+    return zones, bus_pairs, interzonal_line_pairs, split_pairs, p_inj_vars
 end

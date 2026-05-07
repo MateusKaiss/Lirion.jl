@@ -138,7 +138,7 @@ function adapt_rho_mu!(ws::SOCWRPowerWorkspaceALADIN, params::ALADINParams)
             _refresh_quad_static_socwr_pflow_all!(
                 ws.partitions.parts,
                 ws.zones,
-                ws.edge_pairs,
+                ws.interzonal_line_pairs,
                 ws.rho[],
                 ws,
             )

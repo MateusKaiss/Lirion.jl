@@ -82,13 +82,13 @@ function _socwr_merit(ws::SOCWRStateWorkspaceALADIN, α::Float64)
         r_sq += d * d
         λr += ws.vars.v2.lambda[k] * d
     end
-    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+    @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        ri_col = zi.edge_r_cols[pair.edge_local_i]
-        rj_col = zj.edge_r_cols[pair.edge_local_j]
-        ti_col = zi.edge_t_cols[pair.edge_local_i]
-        tj_col = zj.edge_t_cols[pair.edge_local_j]
+        ri_col = zi.edge_r_cols[pair.line_local_i]
+        rj_col = zj.edge_r_cols[pair.line_local_j]
+        ti_col = zi.edge_t_cols[pair.line_local_i]
+        tj_col = zj.edge_t_cols[pair.line_local_j]
         dr = (zi.y[ri_col] + α * zi.delta[ri_col]) -
              (zj.y[rj_col] + α * zj.delta[rj_col])
         dt = (zi.y[ti_col] + α * zi.delta[ti_col]) -
@@ -109,13 +109,13 @@ function _socwr_merit(ws::SOCWRPowerWorkspaceALADIN, α::Float64)
 
     r_sq = 0.0
     λr = 0.0
-    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+    @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pi_val = _socwr_flow_at_trial(zi, pair.edge_local_i, α, :p)
-        pj_val = _socwr_flow_at_trial(zj, pair.edge_local_j, α, :p)
-        qi_val = _socwr_flow_at_trial(zi, pair.edge_local_i, α, :q)
-        qj_val = _socwr_flow_at_trial(zj, pair.edge_local_j, α, :q)
+        pi_val = _socwr_flow_at_trial(zi, pair.line_local_i, α, :p)
+        pj_val = _socwr_flow_at_trial(zj, pair.line_local_j, α, :p)
+        qi_val = _socwr_flow_at_trial(zi, pair.line_local_i, α, :q)
+        qj_val = _socwr_flow_at_trial(zj, pair.line_local_j, α, :q)
         dp = pi_val - pj_val
         dq = qi_val - qj_val
         r_sq += dp * dp + dq * dq
@@ -143,22 +143,22 @@ function _socwr_merit(ws::SOCWRHybridWorkspaceALADIN, α::Float64)
         r_sq += d * d
         λr += ws.vars.v2.lambda[k] * d
     end
-    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+    @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        ri_col = zi.edge_r_cols[pair.edge_local_i]
-        rj_col = zj.edge_r_cols[pair.edge_local_j]
-        ti_col = zi.edge_t_cols[pair.edge_local_i]
-        tj_col = zj.edge_t_cols[pair.edge_local_j]
+        ri_col = zi.edge_r_cols[pair.line_local_i]
+        rj_col = zj.edge_r_cols[pair.line_local_j]
+        ti_col = zi.edge_t_cols[pair.line_local_i]
+        tj_col = zj.edge_t_cols[pair.line_local_j]
         dr = (zi.y[ri_col] + α * zi.delta[ri_col]) -
              (zj.y[rj_col] + α * zj.delta[rj_col])
         dt = (zi.y[ti_col] + α * zi.delta[ti_col]) -
              (zj.y[tj_col] + α * zj.delta[tj_col])
 
-        pi_val = _socwr_flow_at_trial(zi, pair.edge_local_i, α, :p)
-        pj_val = _socwr_flow_at_trial(zj, pair.edge_local_j, α, :p)
-        qi_val = _socwr_flow_at_trial(zi, pair.edge_local_i, α, :q)
-        qj_val = _socwr_flow_at_trial(zj, pair.edge_local_j, α, :q)
+        pi_val = _socwr_flow_at_trial(zi, pair.line_local_i, α, :p)
+        pj_val = _socwr_flow_at_trial(zj, pair.line_local_j, α, :p)
+        qi_val = _socwr_flow_at_trial(zi, pair.line_local_i, α, :q)
+        qj_val = _socwr_flow_at_trial(zj, pair.line_local_j, α, :q)
         dp = pi_val - pj_val
         dq = qi_val - qj_val
 
@@ -194,13 +194,13 @@ function _socwr_dΦ0(ws::SOCWRStateWorkspaceALADIN)
         Δr = zi.delta[pair.v2_col_i] - zj.delta[pair.v2_col_j]
         dΦ += (ws.vars.v2.lambda[k] + mu * r0) * Δr
     end
-    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+    @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        ri_col = zi.edge_r_cols[pair.edge_local_i]
-        rj_col = zj.edge_r_cols[pair.edge_local_j]
-        ti_col = zi.edge_t_cols[pair.edge_local_i]
-        tj_col = zj.edge_t_cols[pair.edge_local_j]
+        ri_col = zi.edge_r_cols[pair.line_local_i]
+        rj_col = zj.edge_r_cols[pair.line_local_j]
+        ti_col = zi.edge_t_cols[pair.line_local_i]
+        tj_col = zj.edge_t_cols[pair.line_local_j]
 
         r0_r = zi.y[ri_col] - zj.y[rj_col]
         Δr_r = zi.delta[ri_col] - zj.delta[rj_col]
@@ -220,18 +220,18 @@ function _socwr_dΦ0(ws::SOCWRPowerWorkspaceALADIN)
     end
     mu = ws.mu[]
 
-    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+    @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
 
-        pi_val = _socwr_flow_at_trial(zi, pair.edge_local_i, 0.0, :p)
-        pj_val = _socwr_flow_at_trial(zj, pair.edge_local_j, 0.0, :p)
-        qi_val = _socwr_flow_at_trial(zi, pair.edge_local_i, 0.0, :q)
-        qj_val = _socwr_flow_at_trial(zj, pair.edge_local_j, 0.0, :q)
-        dpi = _socwr_flow_dir_deriv(zi, pair.edge_local_i, :p)
-        dpj = _socwr_flow_dir_deriv(zj, pair.edge_local_j, :p)
-        dqi = _socwr_flow_dir_deriv(zi, pair.edge_local_i, :q)
-        dqj = _socwr_flow_dir_deriv(zj, pair.edge_local_j, :q)
+        pi_val = _socwr_flow_at_trial(zi, pair.line_local_i, 0.0, :p)
+        pj_val = _socwr_flow_at_trial(zj, pair.line_local_j, 0.0, :p)
+        qi_val = _socwr_flow_at_trial(zi, pair.line_local_i, 0.0, :q)
+        qj_val = _socwr_flow_at_trial(zj, pair.line_local_j, 0.0, :q)
+        dpi = _socwr_flow_dir_deriv(zi, pair.line_local_i, :p)
+        dpj = _socwr_flow_dir_deriv(zj, pair.line_local_j, :p)
+        dqi = _socwr_flow_dir_deriv(zi, pair.line_local_i, :q)
+        dqj = _socwr_flow_dir_deriv(zj, pair.line_local_j, :q)
 
         r0_p = pi_val - pj_val
         Δr_p = dpi - dpj
@@ -259,27 +259,27 @@ function _socwr_dΦ0(ws::SOCWRHybridWorkspaceALADIN)
         dΦ += (ws.vars.v2.lambda[k] + mu * r0) * Δr
     end
 
-    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+    @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        ri_col = zi.edge_r_cols[pair.edge_local_i]
-        rj_col = zj.edge_r_cols[pair.edge_local_j]
-        ti_col = zi.edge_t_cols[pair.edge_local_i]
-        tj_col = zj.edge_t_cols[pair.edge_local_j]
+        ri_col = zi.edge_r_cols[pair.line_local_i]
+        rj_col = zj.edge_r_cols[pair.line_local_j]
+        ti_col = zi.edge_t_cols[pair.line_local_i]
+        tj_col = zj.edge_t_cols[pair.line_local_j]
 
         r0_r = zi.y[ri_col] - zj.y[rj_col]
         Δr_r = zi.delta[ri_col] - zj.delta[rj_col]
         r0_t = zi.y[ti_col] - zj.y[tj_col]
         Δr_t = zi.delta[ti_col] - zj.delta[tj_col]
 
-        pi_val = _socwr_flow_at_trial(zi, pair.edge_local_i, 0.0, :p)
-        pj_val = _socwr_flow_at_trial(zj, pair.edge_local_j, 0.0, :p)
-        qi_val = _socwr_flow_at_trial(zi, pair.edge_local_i, 0.0, :q)
-        qj_val = _socwr_flow_at_trial(zj, pair.edge_local_j, 0.0, :q)
-        dpi = _socwr_flow_dir_deriv(zi, pair.edge_local_i, :p)
-        dpj = _socwr_flow_dir_deriv(zj, pair.edge_local_j, :p)
-        dqi = _socwr_flow_dir_deriv(zi, pair.edge_local_i, :q)
-        dqj = _socwr_flow_dir_deriv(zj, pair.edge_local_j, :q)
+        pi_val = _socwr_flow_at_trial(zi, pair.line_local_i, 0.0, :p)
+        pj_val = _socwr_flow_at_trial(zj, pair.line_local_j, 0.0, :p)
+        qi_val = _socwr_flow_at_trial(zi, pair.line_local_i, 0.0, :q)
+        qj_val = _socwr_flow_at_trial(zj, pair.line_local_j, 0.0, :q)
+        dpi = _socwr_flow_dir_deriv(zi, pair.line_local_i, :p)
+        dpj = _socwr_flow_dir_deriv(zj, pair.line_local_j, :p)
+        dqi = _socwr_flow_dir_deriv(zi, pair.line_local_i, :q)
+        dqj = _socwr_flow_dir_deriv(zj, pair.line_local_j, :q)
 
         r0_p = pi_val - pj_val
         Δr_p = dpi - dpj

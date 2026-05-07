@@ -40,12 +40,12 @@ end
     expr::JuMP.AffExpr,
     zones::Vector{AladinZoneDataSOCWR},
     dy_all::Vector{Vector{JuMP.VariableRef}},
-    pair::SharedEdgePairSOCWR,
+    pair::InterzonalLinePairSOCWR,
 )
     zi = zones[pair.zone_i]
     zj = zones[pair.zone_j]
-    ri_col = zi.edge_r_cols[pair.edge_local_i]
-    rj_col = zj.edge_r_cols[pair.edge_local_j]
+    ri_col = zi.edge_r_cols[pair.line_local_i]
+    rj_col = zj.edge_r_cols[pair.line_local_j]
     yi = zi.y[ri_col]
     yj = zj.y[rj_col]
     JuMP.add_to_expression!(expr, yi - yj)
@@ -58,12 +58,12 @@ end
     expr::JuMP.AffExpr,
     zones::Vector{AladinZoneDataSOCWR},
     dy_all::Vector{Vector{JuMP.VariableRef}},
-    pair::SharedEdgePairSOCWR,
+    pair::InterzonalLinePairSOCWR,
 )
     zi = zones[pair.zone_i]
     zj = zones[pair.zone_j]
-    ti_col = zi.edge_t_cols[pair.edge_local_i]
-    tj_col = zj.edge_t_cols[pair.edge_local_j]
+    ti_col = zi.edge_t_cols[pair.line_local_i]
+    tj_col = zj.edge_t_cols[pair.line_local_j]
     yi = zi.y[ti_col]
     yj = zj.y[tj_col]
     JuMP.add_to_expression!(expr, yi - yj)
@@ -124,18 +124,18 @@ end
     expr::JuMP.AffExpr,
     zones::Vector{AladinZoneDataSOCWR},
     dy_all::Vector{Vector{JuMP.VariableRef}},
-    pair::SharedEdgePairSOCWR,
+    pair::InterzonalLinePairSOCWR,
     which::Symbol,   # :p or :q
 )
     zi = zones[pair.zone_i]
     zj = zones[pair.zone_j]
 
-    fi = _socwr_flow_value_at_y(zi, pair.edge_local_i, which)
-    fj = _socwr_flow_value_at_y(zj, pair.edge_local_j, which)
+    fi = _socwr_flow_value_at_y(zi, pair.line_local_i, which)
+    fj = _socwr_flow_value_at_y(zj, pair.line_local_j, which)
     JuMP.add_to_expression!(expr, fi - fj)
 
-    _add_socwr_flow_grad!(expr, dy_all[pair.zone_i], zi, pair.edge_local_i, +1.0, which)
-    _add_socwr_flow_grad!(expr, dy_all[pair.zone_j], zj, pair.edge_local_j, -1.0, which)
+    _add_socwr_flow_grad!(expr, dy_all[pair.zone_i], zi, pair.line_local_i, +1.0, which)
+    _add_socwr_flow_grad!(expr, dy_all[pair.zone_j], zj, pair.line_local_j, -1.0, which)
     return expr
 end
 
@@ -191,7 +191,7 @@ function solve_coordinator_qp!(ws::SOCWRStateWorkspaceALADIN)
     model, dy_all, qp_obj = _build_socwr_qp_skeleton(ws)
 
     n_bus = length(ws.bus_pairs)
-    n_edge = length(ws.edge_pairs)
+    n_edge = length(ws.interzonal_line_pairs)
 
     s_v2 = JuMP.@variable(model, [1:n_bus], base_name = "sv2")
     s_r = JuMP.@variable(model, [1:n_edge], base_name = "sr")
@@ -221,11 +221,11 @@ function solve_coordinator_qp!(ws::SOCWRStateWorkspaceALADIN)
     end
     @inbounds for k in 1:n_edge
         er = zero(JuMP.AffExpr)
-        _edge_r_expr_socwr!(er, ws.zones, dy_all, ws.edge_pairs[k])
+        _edge_r_expr_socwr!(er, ws.zones, dy_all, ws.interzonal_line_pairs[k])
         cons_r[k] = JuMP.@constraint(model, er == s_r[k])
 
         et = zero(JuMP.AffExpr)
-        _edge_t_expr_socwr!(et, ws.zones, dy_all, ws.edge_pairs[k])
+        _edge_t_expr_socwr!(et, ws.zones, dy_all, ws.interzonal_line_pairs[k])
         cons_t[k] = JuMP.@constraint(model, et == s_t[k])
     end
 
@@ -254,7 +254,7 @@ end
 function solve_coordinator_qp!(ws::SOCWRPowerWorkspaceALADIN)
     model, dy_all, qp_obj = _build_socwr_qp_skeleton(ws)
 
-    n_edge = length(ws.edge_pairs)
+    n_edge = length(ws.interzonal_line_pairs)
 
     s_p = JuMP.@variable(model, [1:n_edge], base_name = "sp")
     s_q = JuMP.@variable(model, [1:n_edge], base_name = "sq")
@@ -272,11 +272,11 @@ function solve_coordinator_qp!(ws::SOCWRPowerWorkspaceALADIN)
     cons_q = Vector{JuMP.ConstraintRef}(undef, n_edge)
     @inbounds for k in 1:n_edge
         ep = zero(JuMP.AffExpr)
-        _pq_coupling_expr_socwr!(ep, ws.zones, dy_all, ws.edge_pairs[k], :p)
+        _pq_coupling_expr_socwr!(ep, ws.zones, dy_all, ws.interzonal_line_pairs[k], :p)
         cons_p[k] = JuMP.@constraint(model, ep == s_p[k])
 
         eq = zero(JuMP.AffExpr)
-        _pq_coupling_expr_socwr!(eq, ws.zones, dy_all, ws.edge_pairs[k], :q)
+        _pq_coupling_expr_socwr!(eq, ws.zones, dy_all, ws.interzonal_line_pairs[k], :q)
         cons_q[k] = JuMP.@constraint(model, eq == s_q[k])
     end
 
@@ -302,7 +302,7 @@ function solve_coordinator_qp!(ws::SOCWRHybridWorkspaceALADIN)
     model, dy_all, qp_obj = _build_socwr_qp_skeleton(ws)
 
     n_bus = length(ws.bus_pairs)
-    n_edge = length(ws.edge_pairs)
+    n_edge = length(ws.interzonal_line_pairs)
     n_split = length(ws.split_bus_pairs)
 
     s_v2 = JuMP.@variable(model, [1:n_bus], base_name = "sv2")
@@ -351,19 +351,19 @@ function solve_coordinator_qp!(ws::SOCWRHybridWorkspaceALADIN)
     end
     @inbounds for k in 1:n_edge
         er = zero(JuMP.AffExpr)
-        _edge_r_expr_socwr!(er, ws.zones, dy_all, ws.edge_pairs[k])
+        _edge_r_expr_socwr!(er, ws.zones, dy_all, ws.interzonal_line_pairs[k])
         cons_r[k] = JuMP.@constraint(model, er == s_r[k])
 
         et = zero(JuMP.AffExpr)
-        _edge_t_expr_socwr!(et, ws.zones, dy_all, ws.edge_pairs[k])
+        _edge_t_expr_socwr!(et, ws.zones, dy_all, ws.interzonal_line_pairs[k])
         cons_t[k] = JuMP.@constraint(model, et == s_t[k])
 
         ep = zero(JuMP.AffExpr)
-        _pq_coupling_expr_socwr!(ep, ws.zones, dy_all, ws.edge_pairs[k], :p)
+        _pq_coupling_expr_socwr!(ep, ws.zones, dy_all, ws.interzonal_line_pairs[k], :p)
         cons_p[k] = JuMP.@constraint(model, ep == s_p[k])
 
         eq = zero(JuMP.AffExpr)
-        _pq_coupling_expr_socwr!(eq, ws.zones, dy_all, ws.edge_pairs[k], :q)
+        _pq_coupling_expr_socwr!(eq, ws.zones, dy_all, ws.interzonal_line_pairs[k], :q)
         cons_q[k] = JuMP.@constraint(model, eq == s_q[k])
     end
     @inbounds for k in 1:n_split

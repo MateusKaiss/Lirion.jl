@@ -52,8 +52,8 @@ Base.@kwdef mutable struct ACPowerWorkspaceALADIN <: AbstractALADINWorkspace
     interzonal::Vector{Int}
 
     zones::Vector{AladinZoneDataAC}
-    edge_pairs::Vector{SharedEdgePairAC}
-    dummy_branch_pairs::Vector{DummyBranchPairAC} = DummyBranchPairAC[]
+    interzonal_line_pairs::Vector{InterzonalLinePairAC}
+    dummy_line_pairs::Vector{DummyLinePairAC} = DummyLinePairAC[]
 
     vars::NamedTuple{
         (:p_flow, :q_flow, :p_dummy, :q_dummy),
@@ -101,13 +101,13 @@ Base.@kwdef mutable struct ACHybridWorkspaceALADIN <: AbstractALADINWorkspace
 
     zones::Vector{AladinZoneDataAC}
     bus_pairs::Vector{SharedBusPairAC}
-    edge_pairs::Vector{SharedEdgePairAC}
+    interzonal_line_pairs::Vector{InterzonalLinePairAC}
     split_bus_pairs::Vector{SplitBusPairAC} = SplitBusPairAC[]
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
         Vector{Dict{Int, JuMP.VariableRef}}()
     q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
         Vector{Dict{Int, JuMP.VariableRef}}()
-    dummy_branch_pairs::Vector{DummyBranchPairAC} = DummyBranchPairAC[]
+    dummy_line_pairs::Vector{DummyLinePairAC} = DummyLinePairAC[]
 
     vars::NamedTuple{
         (:theta, :v_mag, :p_flow, :q_flow, :p_inj, :q_inj, :p_dummy, :q_dummy),
@@ -208,9 +208,9 @@ function build_workspace(
     id = partitions.zones
     inter = sys.interzonal_branches
 
-    zones, edge_pairs, dummy_pairs =
+    zones, interzonal_line_pairs, dummy_pairs =
         init_power_partition!(partitions, sys, optimizer_factory, cfg)
-    n_edge = length(edge_pairs)
+    n_edge = length(interzonal_line_pairs)
     n_dummy = length(dummy_pairs)
 
     ws = ACPowerWorkspaceALADIN(;
@@ -218,8 +218,8 @@ function build_workspace(
         id = id,
         interzonal = inter,
         zones = zones,
-        edge_pairs = edge_pairs,
-        dummy_branch_pairs = dummy_pairs,
+        interzonal_line_pairs = interzonal_line_pairs,
+        dummy_line_pairs = dummy_pairs,
         vars = (
             p_flow = LambdaState(n_edge),
             q_flow = LambdaState(n_edge),
@@ -257,28 +257,28 @@ function build_workspace(
     sectioning = cfg.sectioning
 
     if sectioning isa TieLine
-        zones, bus_pairs, edge_pairs =
+        zones, bus_pairs, interzonal_line_pairs =
             init_hybrid_partition!(partitions, sys, optimizer_factory, cfg, sectioning)
         split_pairs = SplitBusPairAC[]
-        dummy_pairs = DummyBranchPairAC[]
+        dummy_pairs = DummyLinePairAC[]
         p_inj_vars = Vector{Dict{Int, JuMP.VariableRef}}()
         q_inj_vars = Vector{Dict{Int, JuMP.VariableRef}}()
     elseif sectioning isa DummyBus
-        zones, bus_pairs, edge_pairs, dummy_pairs =
+        zones, bus_pairs, interzonal_line_pairs, dummy_pairs =
             init_hybrid_partition!(partitions, sys, optimizer_factory, cfg, sectioning)
         split_pairs = SplitBusPairAC[]
         p_inj_vars = Vector{Dict{Int, JuMP.VariableRef}}()
         q_inj_vars = Vector{Dict{Int, JuMP.VariableRef}}()
     elseif sectioning isa SplitBus
-        zones, bus_pairs, edge_pairs, split_pairs, p_inj_vars, q_inj_vars =
+        zones, bus_pairs, interzonal_line_pairs, split_pairs, p_inj_vars, q_inj_vars =
             init_hybrid_partition!(partitions, sys, optimizer_factory, cfg, sectioning)
-        dummy_pairs = DummyBranchPairAC[]
+        dummy_pairs = DummyLinePairAC[]
     else
         error("ALADIN{Hybrid, AC}: unsupported sectioning $(sectioning)")
     end
 
     n_bus = length(bus_pairs)
-    n_edge = length(edge_pairs)
+    n_edge = length(interzonal_line_pairs)
     n_split = length(split_pairs)
     n_dummy = length(dummy_pairs)
 
@@ -288,11 +288,11 @@ function build_workspace(
         interzonal = inter,
         zones = zones,
         bus_pairs = bus_pairs,
-        edge_pairs = edge_pairs,
+        interzonal_line_pairs = interzonal_line_pairs,
         split_bus_pairs = split_pairs,
         p_inj_vars = p_inj_vars,
         q_inj_vars = q_inj_vars,
-        dummy_branch_pairs = dummy_pairs,
+        dummy_line_pairs = dummy_pairs,
         vars = (
             theta = LambdaState(n_bus),
             v_mag = LambdaState(n_bus),

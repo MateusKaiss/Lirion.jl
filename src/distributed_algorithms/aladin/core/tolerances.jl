@@ -54,7 +54,7 @@ end
 @inline function _dummy_pf_norms(ws)
     ni = 0.0
     nj = 0.0
-    @inbounds for pair in ws.dummy_branch_pairs
+    @inbounds for pair in ws.dummy_line_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
         pfi = pair.b_i * (zi.y[pair.from_col_i] - zi.y[pair.to_col_i])
@@ -70,14 +70,14 @@ function compute_tolerances!(
     eps_abs::Float64,
     eps_rel::Float64,
 )
-    n = length(ws.edge_pairs) + length(ws.dummy_branch_pairs)
+    n = length(ws.interzonal_line_pairs) + length(ws.dummy_line_pairs)
     norm_i = 0.0
     norm_j = 0.0
-    @inbounds for pair in ws.edge_pairs
+    @inbounds for pair in ws.interzonal_line_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        li = pair.edge_local_i
-        lj = pair.edge_local_j
+        li = pair.line_local_i
+        lj = pair.line_local_j
         pfi = zi.edge_b[li] * (zi.y[zi.edge_from_cols[li]] - zi.y[zi.edge_to_cols[li]])
         pfj = zj.edge_b[lj] * (zj.y[zj.edge_from_cols[lj]] - zj.y[zj.edge_to_cols[lj]])
         norm_i += pfi * pfi
@@ -115,14 +115,14 @@ function compute_tolerances!(
         eps_rel * max(sqrt(norm_i_bus), sqrt(norm_j_bus))
 
     # Edge block
-    n_edge = length(ws.edge_pairs)
+    n_edge = length(ws.interzonal_line_pairs)
     norm_i_edge = 0.0
     norm_j_edge = 0.0
-    @inbounds for pair in ws.edge_pairs
+    @inbounds for pair in ws.interzonal_line_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        li = pair.edge_local_i
-        lj = pair.edge_local_j
+        li = pair.line_local_i
+        lj = pair.line_local_j
         pfi = zi.edge_b[li] * (zi.y[zi.edge_from_cols[li]] - zi.y[zi.edge_to_cols[li]])
         pfj = zj.edge_b[lj] * (zj.y[zj.edge_from_cols[lj]] - zj.y[zj.edge_to_cols[lj]])
         norm_i_edge += pfi * pfi
@@ -147,7 +147,7 @@ function compute_tolerances!(
         eps_rel * max(sqrt(norm_i_split), sqrt(norm_j_split))
 
     # DummyBus block: p_flow norms on half-branches
-    n_dummy = length(ws.dummy_branch_pairs)
+    n_dummy = length(ws.dummy_line_pairs)
     nd_i, nd_j = _dummy_pf_norms(ws)
     eps_pri_dummy =
         sqrt(max(n_dummy, 1)) * eps_abs +
@@ -192,7 +192,7 @@ end
 @inline function _norms_dummy_pq_ac(ws)
     ni = 0.0
     nj = 0.0
-    @inbounds for pair in ws.dummy_branch_pairs
+    @inbounds for pair in ws.dummy_line_pairs
         yi = ws.zones[pair.zone_i].y
         yj = ws.zones[pair.zone_j].y
         pfi = _dummy_ac_pf_at(pair, yi, :i)
@@ -210,16 +210,16 @@ function compute_tolerances!(
     eps_abs::Float64,
     eps_rel::Float64,
 )
-    n = 2 * length(ws.edge_pairs) + 2 * length(ws.dummy_branch_pairs)
+    n = 2 * length(ws.interzonal_line_pairs) + 2 * length(ws.dummy_line_pairs)
     norm_i = 0.0
     norm_j = 0.0
-    @inbounds for pair in ws.edge_pairs
+    @inbounds for pair in ws.interzonal_line_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pfi = _ac_pf_at(zi, pair.edge_local_i)
-        pfj = _ac_pf_at(zj, pair.edge_local_j)
-        qfi = _ac_qf_at(zi, pair.edge_local_i)
-        qfj = _ac_qf_at(zj, pair.edge_local_j)
+        pfi = _ac_pf_at(zi, pair.line_local_i)
+        pfj = _ac_pf_at(zj, pair.line_local_j)
+        qfi = _ac_qf_at(zi, pair.line_local_i)
+        qfj = _ac_qf_at(zj, pair.line_local_j)
         norm_i += pfi * pfi + qfi * qfi
         norm_j += pfj * pfj + qfj * qfj
     end
@@ -239,8 +239,8 @@ function compute_tolerances!(
     eps_rel::Float64,
 )
     n =
-        2 * length(ws.bus_pairs) + 2 * length(ws.edge_pairs) +
-        2 * length(ws.split_bus_pairs) + 2 * length(ws.dummy_branch_pairs)
+        2 * length(ws.bus_pairs) + 2 * length(ws.interzonal_line_pairs) +
+        2 * length(ws.split_bus_pairs) + 2 * length(ws.dummy_line_pairs)
     norm_i = 0.0
     norm_j = 0.0
     @inbounds for pair in ws.bus_pairs
@@ -253,13 +253,13 @@ function compute_tolerances!(
         norm_i += θi * θi + vi * vi
         norm_j += θj * θj + vj * vj
     end
-    @inbounds for pair in ws.edge_pairs
+    @inbounds for pair in ws.interzonal_line_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pfi = _ac_pf_at(zi, pair.edge_local_i)
-        pfj = _ac_pf_at(zj, pair.edge_local_j)
-        qfi = _ac_qf_at(zi, pair.edge_local_i)
-        qfj = _ac_qf_at(zj, pair.edge_local_j)
+        pfi = _ac_pf_at(zi, pair.line_local_i)
+        pfj = _ac_pf_at(zj, pair.line_local_j)
+        qfi = _ac_qf_at(zi, pair.line_local_i)
+        qfj = _ac_qf_at(zj, pair.line_local_j)
         norm_i += pfi * pfi + qfi * qfi
         norm_j += pfj * pfj + qfj * qfj
     end
@@ -304,13 +304,13 @@ end
 @inline function _norms_edge_rt_socwr(ws)
     ni = 0.0
     nj = 0.0
-    @inbounds for pair in ws.edge_pairs
+    @inbounds for pair in ws.interzonal_line_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        ri = zi.y[zi.edge_r_cols[pair.edge_local_i]]
-        rj = zj.y[zj.edge_r_cols[pair.edge_local_j]]
-        ti = zi.y[zi.edge_t_cols[pair.edge_local_i]]
-        tj = zj.y[zj.edge_t_cols[pair.edge_local_j]]
+        ri = zi.y[zi.edge_r_cols[pair.line_local_i]]
+        rj = zj.y[zj.edge_r_cols[pair.line_local_j]]
+        ti = zi.y[zi.edge_t_cols[pair.line_local_i]]
+        tj = zj.y[zj.edge_t_cols[pair.line_local_j]]
         ni += ri * ri + ti * ti
         nj += rj * rj + tj * tj
     end
@@ -336,13 +336,13 @@ end
 @inline function _norms_edge_pq_socwr(ws)
     ni = 0.0
     nj = 0.0
-    @inbounds for pair in ws.edge_pairs
+    @inbounds for pair in ws.interzonal_line_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pi_val = _socwr_flow_value_at_y(zi, pair.edge_local_i, :p)
-        pj_val = _socwr_flow_value_at_y(zj, pair.edge_local_j, :p)
-        qi_val = _socwr_flow_value_at_y(zi, pair.edge_local_i, :q)
-        qj_val = _socwr_flow_value_at_y(zj, pair.edge_local_j, :q)
+        pi_val = _socwr_flow_value_at_y(zi, pair.line_local_i, :p)
+        pj_val = _socwr_flow_value_at_y(zj, pair.line_local_j, :p)
+        qi_val = _socwr_flow_value_at_y(zi, pair.line_local_i, :q)
+        qj_val = _socwr_flow_value_at_y(zj, pair.line_local_j, :q)
         ni += pi_val * pi_val + qi_val * qi_val
         nj += pj_val * pj_val + qj_val * qj_val
     end
@@ -354,7 +354,7 @@ function compute_tolerances!(
     eps_abs::Float64,
     eps_rel::Float64,
 )
-    n = length(ws.bus_pairs) + 2 * length(ws.edge_pairs)
+    n = length(ws.bus_pairs) + 2 * length(ws.interzonal_line_pairs)
     ni_b, nj_b = _norms_bus_v2_socwr(ws)
     ni_rt, nj_rt = _norms_edge_rt_socwr(ws)
     ni = ni_b + ni_rt
@@ -371,7 +371,7 @@ function compute_tolerances!(
     eps_abs::Float64,
     eps_rel::Float64,
 )
-    n = 2 * length(ws.edge_pairs)
+    n = 2 * length(ws.interzonal_line_pairs)
     ni, nj = _norms_edge_pq_socwr(ws)
     ws.eps_primal =
         sqrt(max(n, 1)) * eps_abs +
@@ -385,7 +385,7 @@ function compute_tolerances!(
     eps_abs::Float64,
     eps_rel::Float64,
 )
-    n = length(ws.bus_pairs) + 4 * length(ws.edge_pairs) +
+    n = length(ws.bus_pairs) + 4 * length(ws.interzonal_line_pairs) +
         2 * length(ws.split_bus_pairs)
     ni_b, nj_b = _norms_bus_v2_socwr(ws)
     ni_rt, nj_rt = _norms_edge_rt_socwr(ws)

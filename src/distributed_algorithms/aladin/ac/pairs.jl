@@ -33,13 +33,13 @@ end
 # Shared edge pair
 # ------------------------------------------------------------
 
-struct SharedEdgePairAC
+struct InterzonalLinePairAC
     consensus_idx::Int
-    edge_global::Int
+    line_global::Int
     zone_i::Int
-    edge_local_i::Int
+    line_local_i::Int
     zone_j::Int
-    edge_local_j::Int
+    line_local_j::Int
 end
 
 # ------------------------------------------------------------
@@ -61,7 +61,7 @@ end
 # Dummy branch pair
 # ------------------------------------------------------------
 
-struct DummyBranchPairAC
+struct DummyLinePairAC
     consensus_idx::Int
     zone_i::Int
     local_i::Int
@@ -135,11 +135,11 @@ end
 # Shared edge pairs
 # ------------------------------------------------------------
 
-function _build_shared_edge_pairs(
+function _build_interzonal_line_pairs(
     partitions::Partitions{PartitionAC},
     interzonal::Vector{Int},
-)::Vector{SharedEdgePairAC}
-    pairs = SharedEdgePairAC[]
+)::Vector{InterzonalLinePairAC}
+    pairs = InterzonalLinePairAC[]
     for (cidx, e) in enumerate(interzonal)
         entries = Tuple{Int, Int}[]
         for (zpos, part) in enumerate(partitions.parts)
@@ -151,7 +151,7 @@ function _build_shared_edge_pairs(
         length(entries) == 2 || continue
         zi, li = entries[1]
         zj, lj = entries[2]
-        push!(pairs, SharedEdgePairAC(cidx, e, zi, li, zj, lj))
+        push!(pairs, InterzonalLinePairAC(cidx, e, zi, li, zj, lj))
     end
     return pairs
 end
@@ -160,12 +160,12 @@ end
 # Dummy branch pairs
 # ------------------------------------------------------------
 
-function _build_dummy_branch_pairs(
+function _build_dummy_line_pairs(
     partitions::Partitions{PartitionAC},
     zones::Vector{AladinZoneDataAC},
     sys_branch_pairs::Vector{NTuple{4, Int}},
-)::Vector{DummyBranchPairAC}
-    pairs = DummyBranchPairAC[]
+)::Vector{DummyLinePairAC}
+    pairs = DummyLinePairAC[]
     isempty(sys_branch_pairs) && return pairs
     sizehint!(pairs, length(sys_branch_pairs))
 
@@ -201,7 +201,7 @@ function _build_dummy_branch_pairs(
 
         push!(
             pairs,
-            DummyBranchPairAC(
+            DummyLinePairAC(
                 k,
                 za, la,
                 from_theta_col_i, to_theta_col_i, from_vm_col_i, to_vm_col_i,

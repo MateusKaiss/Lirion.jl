@@ -129,28 +129,28 @@ end
     expr::JuMP.AffExpr,
     zones::Vector{AladinZoneDataAC},
     dy_all::Vector{Vector{JuMP.VariableRef}},
-    pair::SharedEdgePairAC,
+    pair::InterzonalLinePairAC,
     flow::Symbol,   # :p or :q
 )
     zi = zones[pair.zone_i]
     zj = zones[pair.zone_j]
 
-    lin_i = _ac_flow_linearisation(zi, pair.edge_local_i)
-    lin_j = _ac_flow_linearisation(zj, pair.edge_local_j)
+    lin_i = _ac_flow_linearisation(zi, pair.line_local_i)
+    lin_j = _ac_flow_linearisation(zj, pair.line_local_j)
 
     if flow === :p
         JuMP.add_to_expression!(expr, lin_i.pf - lin_j.pf)
         # Zone i side: +∇pf_i ⋅ Δy_i
-        _add_flow_grad!(expr, dy_all[pair.zone_i], zi, pair.edge_local_i,
+        _add_flow_grad!(expr, dy_all[pair.zone_i], zi, pair.line_local_i,
             +1.0, lin_i.dpf_dvf, lin_i.dpf_dvt, lin_i.dpf_dθf, lin_i.dpf_dθt)
         # Zone j side: -∇pf_j ⋅ Δy_j
-        _add_flow_grad!(expr, dy_all[pair.zone_j], zj, pair.edge_local_j,
+        _add_flow_grad!(expr, dy_all[pair.zone_j], zj, pair.line_local_j,
             -1.0, lin_j.dpf_dvf, lin_j.dpf_dvt, lin_j.dpf_dθf, lin_j.dpf_dθt)
     else
         JuMP.add_to_expression!(expr, lin_i.qf - lin_j.qf)
-        _add_flow_grad!(expr, dy_all[pair.zone_i], zi, pair.edge_local_i,
+        _add_flow_grad!(expr, dy_all[pair.zone_i], zi, pair.line_local_i,
             +1.0, lin_i.dqf_dvf, lin_i.dqf_dvt, lin_i.dqf_dθf, lin_i.dqf_dθt)
-        _add_flow_grad!(expr, dy_all[pair.zone_j], zj, pair.edge_local_j,
+        _add_flow_grad!(expr, dy_all[pair.zone_j], zj, pair.line_local_j,
             -1.0, lin_j.dqf_dvf, lin_j.dqf_dvt, lin_j.dqf_dθf, lin_j.dqf_dθt)
     end
     return expr
@@ -201,7 +201,7 @@ end
     expr::JuMP.AffExpr,
     zones::Vector{AladinZoneDataAC},
     dy_all::Vector{Vector{JuMP.VariableRef}},
-    pair::DummyBranchPairAC,
+    pair::DummyLinePairAC,
     flow::Symbol,  # :p or :q
 )
     zi = zones[pair.zone_i]
@@ -389,8 +389,8 @@ end
 function solve_coordinator_qp!(ws::ACPowerWorkspaceALADIN)
     model, dy_all, qp_obj = _build_ac_qp_skeleton(ws)
 
-    n_edge = length(ws.edge_pairs)
-    n_dummy = length(ws.dummy_branch_pairs)
+    n_edge = length(ws.interzonal_line_pairs)
+    n_dummy = length(ws.dummy_line_pairs)
     s_p = JuMP.@variable(model, [1:n_edge], base_name = "sp")
     s_q = JuMP.@variable(model, [1:n_edge], base_name = "sq")
     s_pd = JuMP.@variable(model, [1:n_dummy], base_name = "spd")
@@ -417,20 +417,20 @@ function solve_coordinator_qp!(ws::ACPowerWorkspaceALADIN)
     cons_qd = Vector{JuMP.ConstraintRef}(undef, n_dummy)
     @inbounds for k in 1:n_edge
         ep = zero(JuMP.AffExpr)
-        _pq_coupling_expr_ac!(ep, ws.zones, dy_all, ws.edge_pairs[k], :p)
+        _pq_coupling_expr_ac!(ep, ws.zones, dy_all, ws.interzonal_line_pairs[k], :p)
         cons_p[k] = JuMP.@constraint(model, ep == s_p[k])
 
         eq = zero(JuMP.AffExpr)
-        _pq_coupling_expr_ac!(eq, ws.zones, dy_all, ws.edge_pairs[k], :q)
+        _pq_coupling_expr_ac!(eq, ws.zones, dy_all, ws.interzonal_line_pairs[k], :q)
         cons_q[k] = JuMP.@constraint(model, eq == s_q[k])
     end
     @inbounds for k in 1:n_dummy
         epd = zero(JuMP.AffExpr)
-        _dummy_pq_coupling_expr_ac!(epd, ws.zones, dy_all, ws.dummy_branch_pairs[k], :p)
+        _dummy_pq_coupling_expr_ac!(epd, ws.zones, dy_all, ws.dummy_line_pairs[k], :p)
         cons_pd[k] = JuMP.@constraint(model, epd == s_pd[k])
 
         eqd = zero(JuMP.AffExpr)
-        _dummy_pq_coupling_expr_ac!(eqd, ws.zones, dy_all, ws.dummy_branch_pairs[k], :q)
+        _dummy_pq_coupling_expr_ac!(eqd, ws.zones, dy_all, ws.dummy_line_pairs[k], :q)
         cons_qd[k] = JuMP.@constraint(model, eqd == s_qd[k])
     end
 
@@ -462,9 +462,9 @@ function solve_coordinator_qp!(ws::ACHybridWorkspaceALADIN)
     model, dy_all, qp_obj = _build_ac_qp_skeleton(ws)
 
     n_bus = length(ws.bus_pairs)
-    n_edge = length(ws.edge_pairs)
+    n_edge = length(ws.interzonal_line_pairs)
     n_split = length(ws.split_bus_pairs)
-    n_dummy = length(ws.dummy_branch_pairs)
+    n_dummy = length(ws.dummy_line_pairs)
 
     s_theta = JuMP.@variable(model, [1:n_bus], base_name = "sθ")
     s_vm = JuMP.@variable(model, [1:n_bus], base_name = "svm")
@@ -518,11 +518,11 @@ function solve_coordinator_qp!(ws::ACHybridWorkspaceALADIN)
     cons_q = Vector{JuMP.ConstraintRef}(undef, n_edge)
     @inbounds for k in 1:n_edge
         ep = zero(JuMP.AffExpr)
-        _pq_coupling_expr_ac!(ep, ws.zones, dy_all, ws.edge_pairs[k], :p)
+        _pq_coupling_expr_ac!(ep, ws.zones, dy_all, ws.interzonal_line_pairs[k], :p)
         cons_p[k] = JuMP.@constraint(model, ep == s_p[k])
 
         eq = zero(JuMP.AffExpr)
-        _pq_coupling_expr_ac!(eq, ws.zones, dy_all, ws.edge_pairs[k], :q)
+        _pq_coupling_expr_ac!(eq, ws.zones, dy_all, ws.interzonal_line_pairs[k], :q)
         cons_q[k] = JuMP.@constraint(model, eq == s_q[k])
     end
 
@@ -542,11 +542,11 @@ function solve_coordinator_qp!(ws::ACHybridWorkspaceALADIN)
     cons_qd = Vector{JuMP.ConstraintRef}(undef, n_dummy)
     @inbounds for k in 1:n_dummy
         epd = zero(JuMP.AffExpr)
-        _dummy_pq_coupling_expr_ac!(epd, ws.zones, dy_all, ws.dummy_branch_pairs[k], :p)
+        _dummy_pq_coupling_expr_ac!(epd, ws.zones, dy_all, ws.dummy_line_pairs[k], :p)
         cons_pd[k] = JuMP.@constraint(model, epd == s_pd[k])
 
         eqd = zero(JuMP.AffExpr)
-        _dummy_pq_coupling_expr_ac!(eqd, ws.zones, dy_all, ws.dummy_branch_pairs[k], :q)
+        _dummy_pq_coupling_expr_ac!(eqd, ws.zones, dy_all, ws.dummy_line_pairs[k], :q)
         cons_qd[k] = JuMP.@constraint(model, eqd == s_qd[k])
     end
 

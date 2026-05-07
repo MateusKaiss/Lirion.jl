@@ -290,7 +290,7 @@ end
 function _build_consensus_df(ws::Any, partitions, sys)::DataFrame
     rows = NamedTuple[]
 
-    # ALADIN workspaces carry explicit `SharedBusPair` / `SharedEdgePair`
+    # ALADIN workspaces carry explicit `SharedBusPair` / `InterzonalLinePair`
     # structs AND a `zones` field with cached `y` buffers. ADMM uses
     # `NTuple`-based `bus_pairs` / `branch_pairs` for DummyBus/SplitBus
     # bookkeeping and exposes per-zone state via `partitions.parts[k].model`.
@@ -306,17 +306,17 @@ function _build_consensus_df(ws::Any, partitions, sys)::DataFrame
     end
 
     has_edge_pairs =
-        hasproperty(ws, :edge_pairs) && !isempty(ws.edge_pairs) &&
-        !(eltype(ws.edge_pairs) <: NTuple)
+        hasproperty(ws, :interzonal_line_pairs) && !isempty(ws.interzonal_line_pairs) &&
+        !(eltype(ws.interzonal_line_pairs) <: NTuple)
     if has_edge_pairs
         _push_edge_consensus_rows!(rows, ws, partitions)
     elseif hasproperty(ws, :interzonal) && !isempty(ws.interzonal)
         _push_admm_interzonal_rows!(rows, ws, partitions)
     end
 
-    # DummyBus half-branch consensus. ALADIN uses `dummy_branch_pairs`
+    # DummyBus half-branch consensus. ALADIN uses `dummy_line_pairs`
     # (Vector of struct); ADMM uses `branch_pairs::Vector{NTuple{4,Int}}`.
-    if hasproperty(ws, :dummy_branch_pairs) && !isempty(ws.dummy_branch_pairs)
+    if hasproperty(ws, :dummy_line_pairs) && !isempty(ws.dummy_line_pairs)
         _push_dummy_consensus_rows!(rows, ws, partitions)
     elseif hasproperty(ws, :branch_pairs) && !isempty(ws.branch_pairs) &&
            eltype(ws.branch_pairs) <: NTuple
@@ -411,18 +411,18 @@ function _push_bus_consensus_rows!(rows, ws, partitions)
 end
 
 function _push_edge_consensus_rows!(rows, ws, partitions)
-    for pair in ws.edge_pairs
+    for pair in ws.interzonal_line_pairs
         zi = pair.zone_i
         zj = pair.zone_j
         mi = partitions.parts[zi].model
         mj = partitions.parts[zj].model
-        le_i = pair.edge_local_i
-        le_j = pair.edge_local_j
+        le_i = pair.line_local_i
+        le_j = pair.line_local_j
         gi = partitions.parts[zi].zone_edges[le_i]
         li = partitions.parts[zi].branch_idx_full_to_zone[gi]
         gj = partitions.parts[zj].zone_edges[le_j]
         lj = partitions.parts[zj].branch_idx_full_to_zone[gj]
-        bid = pair.edge_global
+        bid = pair.line_global
         if haskey(mi, :p_flow_branches) && haskey(mj, :p_flow_branches)
             _push_branch_reading!(rows, :p_flow, bid, zi,
                 _safe_value(mi[:p_flow_branches][li, 1]))
@@ -440,7 +440,7 @@ function _push_edge_consensus_rows!(rows, ws, partitions)
 end
 
 function _push_dummy_consensus_rows!(rows, ws, partitions)
-    for pair in ws.dummy_branch_pairs
+    for pair in ws.dummy_line_pairs
         zi = pair.zone_i
         zj = pair.zone_j
         mi = partitions.parts[zi].model

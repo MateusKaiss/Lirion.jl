@@ -169,18 +169,18 @@ function _lambda_edge_pq_ac!(
     branch_map =
         ws.partitions.parts[zone_pos].branch_idx_full_to_zone
 
-    for (k, pair) in enumerate(ws.edge_pairs)
+    for (k, pair) in enumerate(ws.interzonal_line_pairs)
         if pair.zone_i == zone_pos
-            le = pair.edge_local_i
+            le = pair.line_local_i
             sign = 1.0
         elseif pair.zone_j == zone_pos
-            le = pair.edge_local_j
+            le = pair.line_local_j
             sign = -1.0
         else
             continue
         end
-        edge_global = pair.edge_global
-        l = branch_map[edge_global]
+        line_global = pair.line_global
+        l = branch_map[line_global]
         l == 0 && continue
         lp = sign * ws.vars.p_flow.lambda[k]
         lq = sign * ws.vars.q_flow.lambda[k]
@@ -201,7 +201,7 @@ function _lambda_dummy_pq_ac!(
 )
     part_pf = model[:p_flow_branches]
     part_qf = model[:q_flow_branches]
-    for (k, pair) in enumerate(ws.dummy_branch_pairs)
+    for (k, pair) in enumerate(ws.dummy_line_pairs)
         if pair.zone_i == zone_pos
             l = pair.local_i
             sign = 1.0

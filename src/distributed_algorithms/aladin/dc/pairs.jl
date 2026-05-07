@@ -31,13 +31,13 @@ end
 # Shared edge pair
 # ------------------------------------------------------------
 
-struct SharedEdgePair
+struct InterzonalLinePair
     consensus_idx::Int
-    edge_global::Int
+    line_global::Int
     zone_i::Int
-    edge_local_i::Int
+    line_local_i::Int
     zone_j::Int
-    edge_local_j::Int
+    line_local_j::Int
 end
 
 # ------------------------------------------------------------
@@ -57,7 +57,7 @@ end
 # Dummy branch pair
 # ------------------------------------------------------------
 
-struct DummyBranchPairDC
+struct DummyLinePairDC
     consensus_idx::Int
     zone_i::Int
     from_col_i::Int
@@ -114,11 +114,11 @@ end
 # Shared edge pairs
 # ------------------------------------------------------------
 
-function _build_shared_edge_pairs(
+function _build_interzonal_line_pairs(
     partitions::Partitions{PartitionDC},
     interzonal::Vector{Int},
-)::Vector{SharedEdgePair}
-    pairs = SharedEdgePair[]
+)::Vector{InterzonalLinePair}
+    pairs = InterzonalLinePair[]
 
     for (cidx, e) in enumerate(interzonal)
         entries = Tuple{Int, Int}[]
@@ -131,7 +131,7 @@ function _build_shared_edge_pairs(
         length(entries) == 2 || continue
         zi, li = entries[1]
         zj, lj = entries[2]
-        push!(pairs, SharedEdgePair(cidx, e, zi, li, zj, lj))
+        push!(pairs, InterzonalLinePair(cidx, e, zi, li, zj, lj))
     end
     return pairs
 end
@@ -140,12 +140,12 @@ end
 # Dummy branch pairs
 # ------------------------------------------------------------
 
-function _build_dummy_branch_pairs(
+function _build_dummy_line_pairs(
     partitions::Partitions{PartitionDC},
     zones::Vector{AladinZoneData},
     sys_branch_pairs::Vector{NTuple{4, Int}},
-)::Vector{DummyBranchPairDC}
-    pairs = DummyBranchPairDC[]
+)::Vector{DummyLinePairDC}
+    pairs = DummyLinePairDC[]
     isempty(sys_branch_pairs) && return pairs
     sizehint!(pairs, length(sys_branch_pairs))
 
@@ -176,7 +176,7 @@ function _build_dummy_branch_pairs(
 
         push!(
             pairs,
-            DummyBranchPairDC(
+            DummyLinePairDC(
                 k, za, from_col_i, to_col_i, b_i,
                 zb, from_col_j, to_col_j, b_j,
             ),

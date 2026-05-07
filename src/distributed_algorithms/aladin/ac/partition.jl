@@ -1,23 +1,7 @@
 # ============================================================
 # ALADIN-AC — Per-partition setup
 # ============================================================
-#
-# Mirrors `admm/ac/partition.jl`:
-#   - Per-partition initialisers (one zone at a time): build local NLP
-#     + build the per-zone data buffer.
-#   - Batch entry points (Partitions{...}): iterate the per-partition
-#     calls and then run cross-zone pair builders.
-#   - Hybrid is dispatched on `Sectioning` (TieLine / DummyBus /
-#     SplitBus) so each variant only takes the arguments it actually
-#     uses.
-#
-# `quad_static` is filled by the workspace builder (after these run)
-# via `_refresh_quad_static_ac_all!` from `objective.jl`, since it
-# needs the workspace's sigma fields, not the config's.
-#
-# Pair types and pair builders live in `pairs.jl`. Workspace structs
-# and `build_workspace` dispatch live in `workspace.jl`. Objective
-# builders (static + per-iteration) live in `objective.jl`.
+
 
 # ============================================================
 # Per-partition initialisers
@@ -151,9 +135,9 @@ function init_power_partition!(
             partitions.parts[i], sys.parts[i], optimizer_factory, cfg, inter,
         )
     end
-    edge_pairs = _build_shared_edge_pairs(partitions, inter)
-    dummy_pairs = _build_dummy_branch_pairs(partitions, zones, sys_branch_pairs)
-    return zones, edge_pairs, dummy_pairs
+    interzonal_line_pairs = _build_interzonal_line_pairs(partitions, inter)
+    dummy_pairs = _build_dummy_line_pairs(partitions, zones, sys_branch_pairs)
+    return zones, interzonal_line_pairs, dummy_pairs
 end
 
 # ------------------------------------------------------------
@@ -179,8 +163,8 @@ function init_hybrid_partition!(
         )
     end
     bus_pairs = _build_shared_bus_pairs(partitions, zones)
-    edge_pairs = _build_shared_edge_pairs(partitions, inter)
-    return zones, bus_pairs, edge_pairs
+    interzonal_line_pairs = _build_interzonal_line_pairs(partitions, inter)
+    return zones, bus_pairs, interzonal_line_pairs
 end
 
 # ------------------------------------------------------------
@@ -207,9 +191,9 @@ function init_hybrid_partition!(
         )
     end
     bus_pairs = _build_shared_bus_pairs(partitions, zones)
-    edge_pairs = _build_shared_edge_pairs(partitions, inter)
-    dummy_pairs = _build_dummy_branch_pairs(partitions, zones, sys_branch_pairs)
-    return zones, bus_pairs, edge_pairs, dummy_pairs
+    interzonal_line_pairs = _build_interzonal_line_pairs(partitions, inter)
+    dummy_pairs = _build_dummy_line_pairs(partitions, zones, sys_branch_pairs)
+    return zones, bus_pairs, interzonal_line_pairs, dummy_pairs
 end
 
 # ------------------------------------------------------------
@@ -238,7 +222,7 @@ function init_hybrid_partition!(
         )
     end
     bus_pairs = _build_shared_bus_pairs(partitions, zones)
-    edge_pairs = _build_shared_edge_pairs(partitions, inter)
+    interzonal_line_pairs = _build_interzonal_line_pairs(partitions, inter)
     split_pairs = _build_split_bus_pairs(zones, sys_bus_pairs, p_inj_vars, q_inj_vars)
-    return zones, bus_pairs, edge_pairs, split_pairs, p_inj_vars, q_inj_vars
+    return zones, bus_pairs, interzonal_line_pairs, split_pairs, p_inj_vars, q_inj_vars
 end

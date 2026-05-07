@@ -86,7 +86,7 @@ end
 
 function _build_quad_static_pflow_socwr!(
     zone::AladinZoneDataSOCWR,
-    edge_pairs::Vector{SharedEdgePairSOCWR},
+    interzonal_line_pairs::Vector{InterzonalLinePairSOCWR},
     zone_pos::Int,
     rho::Float64;
     sigma_pflow::Float64,
@@ -112,11 +112,11 @@ function _build_quad_static_pflow_socwr!(
         JuMP.add_to_expression!(quad, 0.5 * rho * sig, v, v)
     end
 
-    @inbounds for pair in edge_pairs
+    @inbounds for pair in interzonal_line_pairs
         if pair.zone_i == zone_pos
-            le = pair.edge_local_i
+            le = pair.line_local_i
         elseif pair.zone_j == zone_pos
-            le = pair.edge_local_j
+            le = pair.line_local_j
         else
             continue
         end
@@ -192,13 +192,13 @@ end
 @inline function _refresh_quad_static_socwr_pflow_all!(
     parts,
     zones,
-    edge_pairs,
+    interzonal_line_pairs,
     rho,
     ws_or_cfg,
 )
     @inbounds for (zone_pos, zone) in enumerate(zones)
         _build_quad_static_pflow_socwr!(
-            zone, edge_pairs, zone_pos, rho;
+            zone, interzonal_line_pairs, zone_pos, rho;
             sigma_pflow = ws_or_cfg.sigma_pflow,
             sigma_qflow = ws_or_cfg.sigma_qflow,
             sigma_pg = ws_or_cfg.sigma_pg,
@@ -273,7 +273,7 @@ end
 @inline function _prox_pflow_lin_socwr!(
     lin::JuMP.AffExpr,
     zone::AladinZoneDataSOCWR,
-    edge_pairs::Vector{SharedEdgePairSOCWR},
+    interzonal_line_pairs::Vector{InterzonalLinePairSOCWR},
     zone_pos::Int,
     rho::Float64;
     sigma_pflow::Float64,
@@ -297,11 +297,11 @@ end
         JuMP.add_to_expression!(lin, -rho * sig * zone.x_prev[k], zone.all_vars[k])
     end
 
-    @inbounds for pair in edge_pairs
+    @inbounds for pair in interzonal_line_pairs
         if pair.zone_i == zone_pos
-            le = pair.edge_local_i
+            le = pair.line_local_i
         elseif pair.zone_j == zone_pos
-            le = pair.edge_local_j
+            le = pair.line_local_j
         else
             continue
         end
@@ -392,12 +392,12 @@ end
     zone_pos::Int,
 )
     zdata = ws.zones[zone_pos]
-    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+    @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         if pair.zone_i == zone_pos
-            le = pair.edge_local_i
+            le = pair.line_local_i
             sign = 1.0
         elseif pair.zone_j == zone_pos
-            le = pair.edge_local_j
+            le = pair.line_local_j
             sign = -1.0
         else
             continue
@@ -423,12 +423,12 @@ end
     zone_pos::Int,
 )
     zdata = ws.zones[zone_pos]
-    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+    @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         if pair.zone_i == zone_pos
-            le = pair.edge_local_i
+            le = pair.line_local_i
             sign = 1.0
         elseif pair.zone_j == zone_pos
-            le = pair.edge_local_j
+            le = pair.line_local_j
             sign = -1.0
         else
             continue
@@ -513,7 +513,7 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRPowerWorkspaceALADIN)
 
     if ws.proximal_mode == :pflow
         _prox_pflow_lin_socwr!(
-            lin, zdata, ws.edge_pairs, zone_pos, ws.rho[];
+            lin, zdata, ws.interzonal_line_pairs, zone_pos, ws.rho[];
             sigma_pflow = ws.sigma_pflow,
             sigma_qflow = ws.sigma_qflow,
             sigma_pg = ws.sigma_pg,

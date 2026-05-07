@@ -113,16 +113,16 @@ function _dc_merit(ws::DCPowerWorkspaceALADIN, α::Float64)
     end
     r_sq = 0.0
     λr = 0.0
-    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+    @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pi_val = _dc_pflow_at(zi, pair.edge_local_i, α)
-        pj_val = _dc_pflow_at(zj, pair.edge_local_j, α)
+        pi_val = _dc_pflow_at(zi, pair.line_local_i, α)
+        pj_val = _dc_pflow_at(zj, pair.line_local_j, α)
         d = pi_val - pj_val
         r_sq += d * d
         λr += ws.vars.p_flow.lambda[k] * d
     end
-    @inbounds for (k, pair) in enumerate(ws.dummy_branch_pairs)
+    @inbounds for (k, pair) in enumerate(ws.dummy_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
         pi_val = _dc_dummy_pflow_at(
@@ -154,16 +154,16 @@ function _dc_merit(ws::DCHybridWorkspaceALADIN, α::Float64)
         r_sq += d * d
         λr += ws.vars.theta.lambda[k] * d
     end
-    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+    @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pi_val = _dc_pflow_at(zi, pair.edge_local_i, α)
-        pj_val = _dc_pflow_at(zj, pair.edge_local_j, α)
+        pi_val = _dc_pflow_at(zi, pair.line_local_i, α)
+        pj_val = _dc_pflow_at(zj, pair.line_local_j, α)
         d = pi_val - pj_val
         r_sq += d * d
         λr += ws.vars.p_flow.lambda[k] * d
     end
-    @inbounds for (k, pair) in enumerate(ws.dummy_branch_pairs)
+    @inbounds for (k, pair) in enumerate(ws.dummy_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
         pi_val = _dc_dummy_pflow_at(
@@ -215,18 +215,18 @@ function _dc_dΦ0(ws::DCPowerWorkspaceALADIN)
         dΦ += _dc_cost_dir_deriv_0(zone)
     end
     mu = ws.mu[]
-    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+    @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
         r0 =
-            _dc_pflow_at(zi, pair.edge_local_i, 0.0) -
-            _dc_pflow_at(zj, pair.edge_local_j, 0.0)
+            _dc_pflow_at(zi, pair.line_local_i, 0.0) -
+            _dc_pflow_at(zj, pair.line_local_j, 0.0)
         Δr =
-            _dc_pflow_dir_deriv(zi, pair.edge_local_i) -
-            _dc_pflow_dir_deriv(zj, pair.edge_local_j)
+            _dc_pflow_dir_deriv(zi, pair.line_local_i) -
+            _dc_pflow_dir_deriv(zj, pair.line_local_j)
         dΦ += (ws.vars.p_flow.lambda[k] + mu * r0) * Δr
     end
-    @inbounds for (k, pair) in enumerate(ws.dummy_branch_pairs)
+    @inbounds for (k, pair) in enumerate(ws.dummy_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
         r0 =
@@ -253,18 +253,18 @@ function _dc_dΦ0(ws::DCHybridWorkspaceALADIN)
         Δr = zi.delta[pair.col_i] - zj.delta[pair.col_j]
         dΦ += (ws.vars.theta.lambda[k] + mu * r0) * Δr
     end
-    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+    @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
         r0 =
-            _dc_pflow_at(zi, pair.edge_local_i, 0.0) -
-            _dc_pflow_at(zj, pair.edge_local_j, 0.0)
+            _dc_pflow_at(zi, pair.line_local_i, 0.0) -
+            _dc_pflow_at(zj, pair.line_local_j, 0.0)
         Δr =
-            _dc_pflow_dir_deriv(zi, pair.edge_local_i) -
-            _dc_pflow_dir_deriv(zj, pair.edge_local_j)
+            _dc_pflow_dir_deriv(zi, pair.line_local_i) -
+            _dc_pflow_dir_deriv(zj, pair.line_local_j)
         dΦ += (ws.vars.p_flow.lambda[k] + mu * r0) * Δr
     end
-    @inbounds for (k, pair) in enumerate(ws.dummy_branch_pairs)
+    @inbounds for (k, pair) in enumerate(ws.dummy_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
         r0 =

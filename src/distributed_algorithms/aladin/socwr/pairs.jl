@@ -10,7 +10,7 @@
 # Per-partition runtime setup (NLP build, quad_static, p_inj/q_inj
 # variables) lives in `partition.jl`.
 #
-# Note: SOCWR has no DummyBranchPair — DummyBus sectioning is
+# Note: SOCWR has no DummyLinePair — DummyBus sectioning is
 # explicitly rejected at ALADINConfig time (see `src/types.jl`).
 
 # ============================================================
@@ -34,13 +34,13 @@ end
 # Shared edge pair
 # ------------------------------------------------------------
 
-struct SharedEdgePairSOCWR
+struct InterzonalLinePairSOCWR
     consensus_idx::Int
-    edge_global::Int
+    line_global::Int
     zone_i::Int
-    edge_local_i::Int
+    line_local_i::Int
     zone_j::Int
-    edge_local_j::Int
+    line_local_j::Int
 end
 
 # ------------------------------------------------------------
@@ -105,11 +105,11 @@ end
 # Shared edge pairs
 # ------------------------------------------------------------
 
-function _build_shared_edge_pairs(
+function _build_interzonal_line_pairs(
     partitions::Partitions{PartitionSOCWR},
     interzonal::Vector{Int},
-)::Vector{SharedEdgePairSOCWR}
-    pairs = SharedEdgePairSOCWR[]
+)::Vector{InterzonalLinePairSOCWR}
+    pairs = InterzonalLinePairSOCWR[]
     for (cidx, e) in enumerate(interzonal)
         entries = Tuple{Int, Int}[]
         for (zpos, part) in enumerate(partitions.parts)
@@ -121,7 +121,7 @@ function _build_shared_edge_pairs(
         length(entries) == 2 || continue
         zi, li = entries[1]
         zj, lj = entries[2]
-        push!(pairs, SharedEdgePairSOCWR(cidx, e, zi, li, zj, lj))
+        push!(pairs, InterzonalLinePairSOCWR(cidx, e, zi, li, zj, lj))
     end
     return pairs
 end

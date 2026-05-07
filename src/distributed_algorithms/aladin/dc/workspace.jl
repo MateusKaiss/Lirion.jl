@@ -50,8 +50,8 @@ Base.@kwdef mutable struct DCPowerWorkspaceALADIN <: AbstractALADINWorkspace
     interzonal::Vector{Int}
 
     zones::Vector{AladinZoneData}
-    edge_pairs::Vector{SharedEdgePair}
-    dummy_branch_pairs::Vector{DummyBranchPairDC} = DummyBranchPairDC[]
+    interzonal_line_pairs::Vector{InterzonalLinePair}
+    dummy_line_pairs::Vector{DummyLinePairDC} = DummyLinePairDC[]
 
     vars::NamedTuple{(:p_flow, :p_dummy), Tuple{LambdaState, LambdaState}}
 
@@ -93,11 +93,11 @@ Base.@kwdef mutable struct DCHybridWorkspaceALADIN <: AbstractALADINWorkspace
 
     zones::Vector{AladinZoneData}
     bus_pairs::Vector{SharedBusPair}
-    edge_pairs::Vector{SharedEdgePair}
+    interzonal_line_pairs::Vector{InterzonalLinePair}
     split_bus_pairs::Vector{SplitBusPair} = SplitBusPair[]
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
         Vector{Dict{Int, JuMP.VariableRef}}()
-    dummy_branch_pairs::Vector{DummyBranchPairDC} = DummyBranchPairDC[]
+    dummy_line_pairs::Vector{DummyLinePairDC} = DummyLinePairDC[]
 
     vars::NamedTuple{
         (:theta, :p_flow, :p_inj, :p_dummy),
@@ -202,9 +202,9 @@ function build_workspace(
     id = partitions.zones
     inter = sys.interzonal_branches
 
-    zones, edge_pairs, dummy_pairs =
+    zones, interzonal_line_pairs, dummy_pairs =
         init_power_partition!(partitions, sys, optimizer_factory, cfg)
-    n_pairs = length(edge_pairs)
+    n_pairs = length(interzonal_line_pairs)
     n_dummy = length(dummy_pairs)
 
     return DCPowerWorkspaceALADIN(;
@@ -212,8 +212,8 @@ function build_workspace(
         id = id,
         interzonal = inter,
         zones = zones,
-        edge_pairs = edge_pairs,
-        dummy_branch_pairs = dummy_pairs,
+        interzonal_line_pairs = interzonal_line_pairs,
+        dummy_line_pairs = dummy_pairs,
         vars = (
             p_flow = LambdaState(n_pairs),
             p_dummy = LambdaState(n_dummy),
@@ -250,26 +250,26 @@ function build_workspace(
     sectioning = cfg.sectioning
 
     if sectioning isa TieLine
-        zones, bus_pairs, edge_pairs =
+        zones, bus_pairs, interzonal_line_pairs =
             init_hybrid_partition!(partitions, sys, optimizer_factory, cfg, sectioning)
         split_pairs = SplitBusPair[]
-        dummy_pairs = DummyBranchPairDC[]
+        dummy_pairs = DummyLinePairDC[]
         p_inj_vars = Vector{Dict{Int, JuMP.VariableRef}}()
     elseif sectioning isa DummyBus
-        zones, bus_pairs, edge_pairs, dummy_pairs =
+        zones, bus_pairs, interzonal_line_pairs, dummy_pairs =
             init_hybrid_partition!(partitions, sys, optimizer_factory, cfg, sectioning)
         split_pairs = SplitBusPair[]
         p_inj_vars = Vector{Dict{Int, JuMP.VariableRef}}()
     elseif sectioning isa SplitBus
-        zones, bus_pairs, edge_pairs, split_pairs, p_inj_vars =
+        zones, bus_pairs, interzonal_line_pairs, split_pairs, p_inj_vars =
             init_hybrid_partition!(partitions, sys, optimizer_factory, cfg, sectioning)
-        dummy_pairs = DummyBranchPairDC[]
+        dummy_pairs = DummyLinePairDC[]
     else
         error("ALADIN{Hybrid, DC}: unsupported sectioning $(sectioning)")
     end
 
     n_bus = length(bus_pairs)
-    n_edge = length(edge_pairs)
+    n_edge = length(interzonal_line_pairs)
     n_split = length(split_pairs)
     n_dummy = length(dummy_pairs)
 
@@ -279,10 +279,10 @@ function build_workspace(
         interzonal = inter,
         zones = zones,
         bus_pairs = bus_pairs,
-        edge_pairs = edge_pairs,
+        interzonal_line_pairs = interzonal_line_pairs,
         split_bus_pairs = split_pairs,
         p_inj_vars = p_inj_vars,
-        dummy_branch_pairs = dummy_pairs,
+        dummy_line_pairs = dummy_pairs,
         vars = (
             theta = LambdaState(n_bus),
             p_flow = LambdaState(n_edge),

@@ -206,17 +206,17 @@ end
 @inline function _lambda_edge_affexpr!(
     lin::JuMP.AffExpr,
     ws_zones::Vector{AladinZoneData},
-    edge_pairs::Vector{SharedEdgePair},
+    interzonal_line_pairs::Vector{InterzonalLinePair},
     lambda_edge::Vector{Float64},
     zone_pos::Int,
 )
     zdata = ws_zones[zone_pos]
-    for (k, pair) in enumerate(edge_pairs)
+    for (k, pair) in enumerate(interzonal_line_pairs)
         if pair.zone_i == zone_pos
-            le = pair.edge_local_i
+            le = pair.line_local_i
             sign = 1.0
         elseif pair.zone_j == zone_pos
-            le = pair.edge_local_j
+            le = pair.line_local_j
             sign = -1.0
         else
             continue
@@ -238,7 +238,7 @@ end
 @inline function _lambda_dummy_affexpr!(
     lin::JuMP.AffExpr,
     ws_zones::Vector{AladinZoneData},
-    dummy_pairs::Vector{DummyBranchPairDC},
+    dummy_pairs::Vector{DummyLinePairDC},
     lambda_dummy::Vector{Float64},
     zone_pos::Int,
 )
@@ -294,9 +294,9 @@ function update_objective!(part::PartitionDC, ws::DCPowerWorkspaceALADIN)
     zdata = ws.zones[zone_pos]
 
     lin = zero(JuMP.AffExpr)
-    _lambda_edge_affexpr!(lin, ws.zones, ws.edge_pairs, ws.vars.p_flow.lambda, zone_pos)
+    _lambda_edge_affexpr!(lin, ws.zones, ws.interzonal_line_pairs, ws.vars.p_flow.lambda, zone_pos)
     _lambda_dummy_affexpr!(
-        lin, ws.zones, ws.dummy_branch_pairs, ws.vars.p_dummy.lambda, zone_pos,
+        lin, ws.zones, ws.dummy_line_pairs, ws.vars.p_dummy.lambda, zone_pos,
     )
 
     if ws.proximal_mode == :pflow
@@ -337,9 +337,9 @@ function update_objective!(part::PartitionDC, ws::DCHybridWorkspaceALADIN)
             JuMP.add_to_expression!(lin, -ws.vars.theta.lambda[k], zdata.all_vars[col])
         end
     end
-    _lambda_edge_affexpr!(lin, ws.zones, ws.edge_pairs, ws.vars.p_flow.lambda, zone_pos)
+    _lambda_edge_affexpr!(lin, ws.zones, ws.interzonal_line_pairs, ws.vars.p_flow.lambda, zone_pos)
     _lambda_dummy_affexpr!(
-        lin, ws.zones, ws.dummy_branch_pairs, ws.vars.p_dummy.lambda, zone_pos,
+        lin, ws.zones, ws.dummy_line_pairs, ws.vars.p_dummy.lambda, zone_pos,
     )
 
     for (k, pair) in enumerate(ws.split_bus_pairs)

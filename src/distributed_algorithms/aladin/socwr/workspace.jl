@@ -13,7 +13,7 @@ Base.@kwdef mutable struct SOCWRStateWorkspaceALADIN <: AbstractALADINWorkspace
 
     zones::Vector{AladinZoneDataSOCWR}
     bus_pairs::Vector{SharedBusPairSOCWR}
-    edge_pairs::Vector{SharedEdgePairSOCWR}
+    interzonal_line_pairs::Vector{InterzonalLinePairSOCWR}
 
     vars::NamedTuple{(:v2, :r, :t), Tuple{LambdaState, LambdaState, LambdaState}}
 
@@ -55,7 +55,7 @@ Base.@kwdef mutable struct SOCWRPowerWorkspaceALADIN <: AbstractALADINWorkspace
     interzonal::Vector{Int}
 
     zones::Vector{AladinZoneDataSOCWR}
-    edge_pairs::Vector{SharedEdgePairSOCWR}
+    interzonal_line_pairs::Vector{InterzonalLinePairSOCWR}
 
     vars::NamedTuple{(:p_flow, :q_flow), Tuple{LambdaState, LambdaState}}
 
@@ -102,7 +102,7 @@ Base.@kwdef mutable struct SOCWRHybridWorkspaceALADIN <: AbstractALADINWorkspace
 
     zones::Vector{AladinZoneDataSOCWR}
     bus_pairs::Vector{SharedBusPairSOCWR}
-    edge_pairs::Vector{SharedEdgePairSOCWR}
+    interzonal_line_pairs::Vector{InterzonalLinePairSOCWR}
     split_bus_pairs::Vector{SplitBusPairSOCWR} = SplitBusPairSOCWR[]
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
         Vector{Dict{Int, JuMP.VariableRef}}()
@@ -171,10 +171,10 @@ function build_workspace(
     id = partitions.zones
     inter = sys.interzonal_branches
 
-    zones, bus_pairs, edge_pairs =
+    zones, bus_pairs, interzonal_line_pairs =
         init_state_partition!(partitions, sys, optimizer_factory, cfg)
     n_bus = length(bus_pairs)
-    n_edge = length(edge_pairs)
+    n_edge = length(interzonal_line_pairs)
 
     ws = SOCWRStateWorkspaceALADIN(;
         partitions = partitions,
@@ -182,7 +182,7 @@ function build_workspace(
         interzonal = inter,
         zones = zones,
         bus_pairs = bus_pairs,
-        edge_pairs = edge_pairs,
+        interzonal_line_pairs = interzonal_line_pairs,
         vars = (
             v2 = LambdaState(n_bus),
             r = LambdaState(n_edge),
@@ -214,16 +214,16 @@ function build_workspace(
     id = partitions.zones
     inter = sys.interzonal_branches
 
-    zones, edge_pairs =
+    zones, interzonal_line_pairs =
         init_power_partition!(partitions, sys, optimizer_factory, cfg)
-    n_edge = length(edge_pairs)
+    n_edge = length(interzonal_line_pairs)
 
     ws = SOCWRPowerWorkspaceALADIN(;
         partitions = partitions,
         id = id,
         interzonal = inter,
         zones = zones,
-        edge_pairs = edge_pairs,
+        interzonal_line_pairs = interzonal_line_pairs,
         vars = (
             p_flow = LambdaState(n_edge),
             q_flow = LambdaState(n_edge),
@@ -243,7 +243,7 @@ function build_workspace(
         _refresh_quad_static_socwr_pflow_all!(
             ws.partitions.parts,
             ws.zones,
-            ws.edge_pairs,
+            ws.interzonal_line_pairs,
             ws.rho[],
             ws,
         )
@@ -269,20 +269,20 @@ function build_workspace(
     sectioning = cfg.sectioning
 
     if sectioning isa TieLine
-        zones, bus_pairs, edge_pairs =
+        zones, bus_pairs, interzonal_line_pairs =
             init_hybrid_partition!(partitions, sys, optimizer_factory, cfg, sectioning)
         split_pairs = SplitBusPairSOCWR[]
         p_inj_vars = Vector{Dict{Int, JuMP.VariableRef}}()
         q_inj_vars = Vector{Dict{Int, JuMP.VariableRef}}()
     elseif sectioning isa SplitBus
-        zones, bus_pairs, edge_pairs, split_pairs, p_inj_vars, q_inj_vars =
+        zones, bus_pairs, interzonal_line_pairs, split_pairs, p_inj_vars, q_inj_vars =
             init_hybrid_partition!(partitions, sys, optimizer_factory, cfg, sectioning)
     else
         error("ALADIN{Hybrid, SOCWR}: unsupported sectioning $(sectioning)")
     end
 
     n_bus = length(bus_pairs)
-    n_edge = length(edge_pairs)
+    n_edge = length(interzonal_line_pairs)
     n_split = length(split_pairs)
 
     ws = SOCWRHybridWorkspaceALADIN(;
@@ -291,7 +291,7 @@ function build_workspace(
         interzonal = inter,
         zones = zones,
         bus_pairs = bus_pairs,
-        edge_pairs = edge_pairs,
+        interzonal_line_pairs = interzonal_line_pairs,
         split_bus_pairs = split_pairs,
         p_inj_vars = p_inj_vars,
         q_inj_vars = q_inj_vars,

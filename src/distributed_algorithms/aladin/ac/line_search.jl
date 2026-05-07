@@ -157,7 +157,7 @@ end
 end
 
 @inline function _ac_dummy_pf_at_trial(
-    pair::DummyBranchPairAC, zone::AladinZoneDataAC, side::Symbol, α::Float64,
+    pair::DummyLinePairAC, zone::AladinZoneDataAC, side::Symbol, α::Float64,
 )
     if side === :i
         fc_θ, tc_θ = pair.from_theta_col_i, pair.to_theta_col_i
@@ -177,7 +177,7 @@ end
 end
 
 @inline function _ac_dummy_qf_at_trial(
-    pair::DummyBranchPairAC, zone::AladinZoneDataAC, side::Symbol, α::Float64,
+    pair::DummyLinePairAC, zone::AladinZoneDataAC, side::Symbol, α::Float64,
 )
     if side === :i
         fc_θ, tc_θ = pair.from_theta_col_i, pair.to_theta_col_i
@@ -200,7 +200,7 @@ end
 end
 
 @inline function _ac_dummy_pf_dir_deriv(
-    pair::DummyBranchPairAC, zone::AladinZoneDataAC, side::Symbol,
+    pair::DummyLinePairAC, zone::AladinZoneDataAC, side::Symbol,
 )
     if side === :i
         fc_θ, tc_θ = pair.from_theta_col_i, pair.to_theta_col_i
@@ -229,7 +229,7 @@ end
 end
 
 @inline function _ac_dummy_qf_dir_deriv(
-    pair::DummyBranchPairAC, zone::AladinZoneDataAC, side::Symbol,
+    pair::DummyLinePairAC, zone::AladinZoneDataAC, side::Symbol,
 )
     if side === :i
         fc_θ, tc_θ = pair.from_theta_col_i, pair.to_theta_col_i
@@ -292,19 +292,19 @@ function _ac_merit(ws::ACPowerWorkspaceALADIN, α::Float64)
     end
     r_sq = 0.0
     λr = 0.0
-    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+    @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pi_val = _ac_pf_at_trial(zi, pair.edge_local_i, α)
-        pj_val = _ac_pf_at_trial(zj, pair.edge_local_j, α)
-        qi_val = _ac_qf_at_trial(zi, pair.edge_local_i, α)
-        qj_val = _ac_qf_at_trial(zj, pair.edge_local_j, α)
+        pi_val = _ac_pf_at_trial(zi, pair.line_local_i, α)
+        pj_val = _ac_pf_at_trial(zj, pair.line_local_j, α)
+        qi_val = _ac_qf_at_trial(zi, pair.line_local_i, α)
+        qj_val = _ac_qf_at_trial(zj, pair.line_local_j, α)
         dp = pi_val - pj_val
         dq = qi_val - qj_val
         r_sq += dp * dp + dq * dq
         λr += ws.vars.p_flow.lambda[k] * dp + ws.vars.q_flow.lambda[k] * dq
     end
-    @inbounds for (k, pair) in enumerate(ws.dummy_branch_pairs)
+    @inbounds for (k, pair) in enumerate(ws.dummy_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
         pi_val = _ac_dummy_pf_at_trial(pair, zi, :i, α)
@@ -338,19 +338,19 @@ function _ac_merit(ws::ACHybridWorkspaceALADIN, α::Float64)
         r_sq += dθ * dθ + dv * dv
         λr += ws.vars.theta.lambda[k] * dθ + ws.vars.v_mag.lambda[k] * dv
     end
-    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+    @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pi_val = _ac_pf_at_trial(zi, pair.edge_local_i, α)
-        pj_val = _ac_pf_at_trial(zj, pair.edge_local_j, α)
-        qi_val = _ac_qf_at_trial(zi, pair.edge_local_i, α)
-        qj_val = _ac_qf_at_trial(zj, pair.edge_local_j, α)
+        pi_val = _ac_pf_at_trial(zi, pair.line_local_i, α)
+        pj_val = _ac_pf_at_trial(zj, pair.line_local_j, α)
+        qi_val = _ac_qf_at_trial(zi, pair.line_local_i, α)
+        qj_val = _ac_qf_at_trial(zj, pair.line_local_j, α)
         dp = pi_val - pj_val
         dq = qi_val - qj_val
         r_sq += dp * dp + dq * dq
         λr += ws.vars.p_flow.lambda[k] * dp + ws.vars.q_flow.lambda[k] * dq
     end
-    @inbounds for (k, pair) in enumerate(ws.dummy_branch_pairs)
+    @inbounds for (k, pair) in enumerate(ws.dummy_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
         pi_val = _ac_dummy_pf_at_trial(pair, zi, :i, α)
@@ -414,25 +414,25 @@ function _ac_dΦ0(ws::ACPowerWorkspaceALADIN)
         dΦ += _ac_cost_dir_deriv_0(zone)
     end
     mu = ws.mu[]
-    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+    @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
         r0_p =
-            _ac_pf_at_trial(zi, pair.edge_local_i, 0.0) -
-            _ac_pf_at_trial(zj, pair.edge_local_j, 0.0)
+            _ac_pf_at_trial(zi, pair.line_local_i, 0.0) -
+            _ac_pf_at_trial(zj, pair.line_local_j, 0.0)
         Δr_p =
-            _ac_pf_dir_deriv(zi, pair.edge_local_i) -
-            _ac_pf_dir_deriv(zj, pair.edge_local_j)
+            _ac_pf_dir_deriv(zi, pair.line_local_i) -
+            _ac_pf_dir_deriv(zj, pair.line_local_j)
         r0_q =
-            _ac_qf_at_trial(zi, pair.edge_local_i, 0.0) -
-            _ac_qf_at_trial(zj, pair.edge_local_j, 0.0)
+            _ac_qf_at_trial(zi, pair.line_local_i, 0.0) -
+            _ac_qf_at_trial(zj, pair.line_local_j, 0.0)
         Δr_q =
-            _ac_qf_dir_deriv(zi, pair.edge_local_i) -
-            _ac_qf_dir_deriv(zj, pair.edge_local_j)
+            _ac_qf_dir_deriv(zi, pair.line_local_i) -
+            _ac_qf_dir_deriv(zj, pair.line_local_j)
         dΦ += (ws.vars.p_flow.lambda[k] + mu * r0_p) * Δr_p
         dΦ += (ws.vars.q_flow.lambda[k] + mu * r0_q) * Δr_q
     end
-    @inbounds for (k, pair) in enumerate(ws.dummy_branch_pairs)
+    @inbounds for (k, pair) in enumerate(ws.dummy_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
         r0_p =
@@ -467,25 +467,25 @@ function _ac_dΦ0(ws::ACHybridWorkspaceALADIN)
         dΦ += (ws.vars.theta.lambda[k] + mu * r0_θ) * Δr_θ
         dΦ += (ws.vars.v_mag.lambda[k] + mu * r0_v) * Δr_v
     end
-    @inbounds for (k, pair) in enumerate(ws.edge_pairs)
+    @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
         r0_p =
-            _ac_pf_at_trial(zi, pair.edge_local_i, 0.0) -
-            _ac_pf_at_trial(zj, pair.edge_local_j, 0.0)
+            _ac_pf_at_trial(zi, pair.line_local_i, 0.0) -
+            _ac_pf_at_trial(zj, pair.line_local_j, 0.0)
         Δr_p =
-            _ac_pf_dir_deriv(zi, pair.edge_local_i) -
-            _ac_pf_dir_deriv(zj, pair.edge_local_j)
+            _ac_pf_dir_deriv(zi, pair.line_local_i) -
+            _ac_pf_dir_deriv(zj, pair.line_local_j)
         r0_q =
-            _ac_qf_at_trial(zi, pair.edge_local_i, 0.0) -
-            _ac_qf_at_trial(zj, pair.edge_local_j, 0.0)
+            _ac_qf_at_trial(zi, pair.line_local_i, 0.0) -
+            _ac_qf_at_trial(zj, pair.line_local_j, 0.0)
         Δr_q =
-            _ac_qf_dir_deriv(zi, pair.edge_local_i) -
-            _ac_qf_dir_deriv(zj, pair.edge_local_j)
+            _ac_qf_dir_deriv(zi, pair.line_local_i) -
+            _ac_qf_dir_deriv(zj, pair.line_local_j)
         dΦ += (ws.vars.p_flow.lambda[k] + mu * r0_p) * Δr_p
         dΦ += (ws.vars.q_flow.lambda[k] + mu * r0_q) * Δr_q
     end
-    @inbounds for (k, pair) in enumerate(ws.dummy_branch_pairs)
+    @inbounds for (k, pair) in enumerate(ws.dummy_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
         r0_p =
