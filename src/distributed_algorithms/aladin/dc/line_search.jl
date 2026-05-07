@@ -180,8 +180,8 @@ function _dc_merit(ws::DCHybridWorkspaceALADIN, α::Float64)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
         # split_bus consensus is x_i + x_j = 0 (sign-flipped sum convention).
-        xi = zi.y[pair.pinj_col_i] + α * zi.delta[pair.pinj_col_i]
-        xj = zj.y[pair.pinj_col_j] + α * zj.delta[pair.pinj_col_j]
+        xi = zi.y[pair.p_inj_col_i] + α * zi.delta[pair.p_inj_col_i]
+        xj = zj.y[pair.p_inj_col_j] + α * zj.delta[pair.p_inj_col_j]
         d = xi + xj
         r_sq += d * d
         λr += ws.vars.p_inj.lambda[k] * d
@@ -278,8 +278,8 @@ function _dc_dΦ0(ws::DCHybridWorkspaceALADIN)
     @inbounds for (k, pair) in enumerate(ws.split_bus_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        r0 = zi.y[pair.pinj_col_i] + zj.y[pair.pinj_col_j]
-        Δr = zi.delta[pair.pinj_col_i] + zj.delta[pair.pinj_col_j]
+        r0 = zi.y[pair.p_inj_col_i] + zj.y[pair.p_inj_col_j]
+        Δr = zi.delta[pair.p_inj_col_i] + zj.delta[pair.p_inj_col_j]
         dΦ += (ws.vars.p_inj.lambda[k] + mu * r0) * Δr
     end
     return dΦ

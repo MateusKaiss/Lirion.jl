@@ -230,11 +230,11 @@ end
     zdata = ws.zones[zone_pos]
     @inbounds for (k, pair) in enumerate(ws.split_bus_pairs)
         if pair.zone_i == zone_pos
-            pcol = pair.pinj_col_i
-            qcol = pair.qinj_col_i
+            pcol = pair.p_inj_col_i
+            qcol = pair.q_inj_col_i
         elseif pair.zone_j == zone_pos
-            pcol = pair.pinj_col_j
-            qcol = pair.qinj_col_j
+            pcol = pair.p_inj_col_j
+            qcol = pair.q_inj_col_j
         else
             continue
         end

@@ -126,8 +126,8 @@ function compute_residuals!(ws::DCHybridWorkspaceALADIN)
     # SplitBus p_inj consensus block: residual is p_inj_i + p_inj_j (target 0).
     r_pri_split_sq = 0.0
     @inbounds for pair in ws.split_bus_pairs
-        yi = ws.zones[pair.zone_i].y[pair.pinj_col_i]
-        yj = ws.zones[pair.zone_j].y[pair.pinj_col_j]
+        yi = ws.zones[pair.zone_i].y[pair.p_inj_col_i]
+        yj = ws.zones[pair.zone_j].y[pair.p_inj_col_j]
         r_pri_split_sq += (yi + yj)^2
     end
 
@@ -324,10 +324,10 @@ function compute_residuals!(ws::ACHybridWorkspaceALADIN)
     @inbounds for pair in ws.split_bus_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pi_val = zi.y[pair.pinj_col_i]
-        pj_val = zj.y[pair.pinj_col_j]
-        qi_val = zi.y[pair.qinj_col_i]
-        qj_val = zj.y[pair.qinj_col_j]
+        pi_val = zi.y[pair.p_inj_col_i]
+        pj_val = zj.y[pair.p_inj_col_j]
+        qi_val = zi.y[pair.q_inj_col_i]
+        qj_val = zj.y[pair.q_inj_col_j]
         r_pri_sq += (pi_val + pj_val)^2 + (qi_val + qj_val)^2
     end
     r_pri_sq += _r_pri_dummy_pq_sq_ac(ws)
@@ -408,10 +408,10 @@ end
     @inbounds for pair in ws.split_bus_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pi_val = zi.y[pair.pinj_col_i]
-        pj_val = zj.y[pair.pinj_col_j]
-        qi_val = zi.y[pair.qinj_col_i]
-        qj_val = zj.y[pair.qinj_col_j]
+        pi_val = zi.y[pair.p_inj_col_i]
+        pj_val = zj.y[pair.p_inj_col_j]
+        qi_val = zi.y[pair.q_inj_col_i]
+        qj_val = zj.y[pair.q_inj_col_j]
         s += (pi_val + pj_val)^2 + (qi_val + qj_val)^2
     end
     return s

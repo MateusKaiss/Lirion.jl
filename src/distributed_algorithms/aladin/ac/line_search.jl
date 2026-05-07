@@ -365,10 +365,10 @@ function _ac_merit(ws::ACHybridWorkspaceALADIN, α::Float64)
     @inbounds for (k, pair) in enumerate(ws.split_bus_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pi = zi.y[pair.pinj_col_i] + α * zi.delta[pair.pinj_col_i]
-        pj = zj.y[pair.pinj_col_j] + α * zj.delta[pair.pinj_col_j]
-        qi = zi.y[pair.qinj_col_i] + α * zi.delta[pair.qinj_col_i]
-        qj = zj.y[pair.qinj_col_j] + α * zj.delta[pair.qinj_col_j]
+        pi = zi.y[pair.p_inj_col_i] + α * zi.delta[pair.p_inj_col_i]
+        pj = zj.y[pair.p_inj_col_j] + α * zj.delta[pair.p_inj_col_j]
+        qi = zi.y[pair.q_inj_col_i] + α * zi.delta[pair.q_inj_col_i]
+        qj = zj.y[pair.q_inj_col_j] + α * zj.delta[pair.q_inj_col_j]
         # split-bus consensus is x_i + x_j = 0 (sign-flipped sum convention).
         dp = pi + pj
         dq = qi + qj
@@ -505,10 +505,10 @@ function _ac_dΦ0(ws::ACHybridWorkspaceALADIN)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
         # split-bus consensus is x_i + x_j = 0 (sign-flipped sum convention).
-        r0_p = zi.y[pair.pinj_col_i] + zj.y[pair.pinj_col_j]
-        Δr_p = zi.delta[pair.pinj_col_i] + zj.delta[pair.pinj_col_j]
-        r0_q = zi.y[pair.qinj_col_i] + zj.y[pair.qinj_col_j]
-        Δr_q = zi.delta[pair.qinj_col_i] + zj.delta[pair.qinj_col_j]
+        r0_p = zi.y[pair.p_inj_col_i] + zj.y[pair.p_inj_col_j]
+        Δr_p = zi.delta[pair.p_inj_col_i] + zj.delta[pair.p_inj_col_j]
+        r0_q = zi.y[pair.q_inj_col_i] + zj.y[pair.q_inj_col_j]
+        Δr_q = zi.delta[pair.q_inj_col_i] + zj.delta[pair.q_inj_col_j]
         dΦ += (ws.vars.p_inj.lambda[k] + mu * r0_p) * Δr_p
         dΦ += (ws.vars.q_inj.lambda[k] + mu * r0_q) * Δr_q
     end

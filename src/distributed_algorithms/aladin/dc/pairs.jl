@@ -48,9 +48,9 @@ struct SplitBusPair
     consensus_idx::Int
     bus_id::Int
     zone_i::Int
-    pinj_col_i::Int
+    p_inj_col_i::Int
     zone_j::Int
-    pinj_col_j::Int
+    p_inj_col_j::Int
 end
 
 # ------------------------------------------------------------

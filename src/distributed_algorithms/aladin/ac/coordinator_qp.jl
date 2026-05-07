@@ -258,11 +258,11 @@ end
 )
     zi = zones[pair.zone_i]
     zj = zones[pair.zone_j]
-    yi = zi.y[pair.pinj_col_i]
-    yj = zj.y[pair.pinj_col_j]
+    yi = zi.y[pair.p_inj_col_i]
+    yj = zj.y[pair.p_inj_col_j]
     JuMP.add_to_expression!(expr, yi + yj)
-    JuMP.add_to_expression!(expr, 1.0, dy_all[pair.zone_i][pair.pinj_col_i])
-    JuMP.add_to_expression!(expr, 1.0, dy_all[pair.zone_j][pair.pinj_col_j])
+    JuMP.add_to_expression!(expr, 1.0, dy_all[pair.zone_i][pair.p_inj_col_i])
+    JuMP.add_to_expression!(expr, 1.0, dy_all[pair.zone_j][pair.p_inj_col_j])
     return expr
 end
 
@@ -274,11 +274,11 @@ end
 )
     zi = zones[pair.zone_i]
     zj = zones[pair.zone_j]
-    yi = zi.y[pair.qinj_col_i]
-    yj = zj.y[pair.qinj_col_j]
+    yi = zi.y[pair.q_inj_col_i]
+    yj = zj.y[pair.q_inj_col_j]
     JuMP.add_to_expression!(expr, yi + yj)
-    JuMP.add_to_expression!(expr, 1.0, dy_all[pair.zone_i][pair.qinj_col_i])
-    JuMP.add_to_expression!(expr, 1.0, dy_all[pair.zone_j][pair.qinj_col_j])
+    JuMP.add_to_expression!(expr, 1.0, dy_all[pair.zone_i][pair.q_inj_col_i])
+    JuMP.add_to_expression!(expr, 1.0, dy_all[pair.zone_j][pair.q_inj_col_j])
     return expr
 end
 

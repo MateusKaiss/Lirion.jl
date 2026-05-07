@@ -546,12 +546,12 @@ function _push_split_bus_consensus_rows!(rows, ws, partitions)
         zi = pair.zone_i
         zj = pair.zone_j
         bid = pair.bus_id
-        if hasproperty(pair, :pinj_col_i) && hasproperty(ws, :zones)
-            _push_bus_reading!(rows, :p_inj, bid, zi, ws.zones[zi].y[pair.pinj_col_i])
-            _push_bus_reading!(rows, :p_inj, bid, zj, ws.zones[zj].y[pair.pinj_col_j])
-            if hasproperty(pair, :qinj_col_i)
-                _push_bus_reading!(rows, :q_inj, bid, zi, ws.zones[zi].y[pair.qinj_col_i])
-                _push_bus_reading!(rows, :q_inj, bid, zj, ws.zones[zj].y[pair.qinj_col_j])
+        if hasproperty(pair, :p_inj_col_i) && hasproperty(ws, :zones)
+            _push_bus_reading!(rows, :p_inj, bid, zi, ws.zones[zi].y[pair.p_inj_col_i])
+            _push_bus_reading!(rows, :p_inj, bid, zj, ws.zones[zj].y[pair.p_inj_col_j])
+            if hasproperty(pair, :q_inj_col_i)
+                _push_bus_reading!(rows, :q_inj, bid, zi, ws.zones[zi].y[pair.q_inj_col_i])
+                _push_bus_reading!(rows, :q_inj, bid, zj, ws.zones[zj].y[pair.q_inj_col_j])
             end
         end
     end

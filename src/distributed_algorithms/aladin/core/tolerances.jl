@@ -137,8 +137,8 @@ function compute_tolerances!(
     norm_i_split = 0.0
     norm_j_split = 0.0
     @inbounds for pair in ws.split_bus_pairs
-        yi = ws.zones[pair.zone_i].y[pair.pinj_col_i]
-        yj = ws.zones[pair.zone_j].y[pair.pinj_col_j]
+        yi = ws.zones[pair.zone_i].y[pair.p_inj_col_i]
+        yj = ws.zones[pair.zone_j].y[pair.p_inj_col_j]
         norm_i_split += yi * yi
         norm_j_split += yj * yj
     end
@@ -266,10 +266,10 @@ function compute_tolerances!(
     @inbounds for pair in ws.split_bus_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pi_val = zi.y[pair.pinj_col_i]
-        pj_val = zj.y[pair.pinj_col_j]
-        qi_val = zi.y[pair.qinj_col_i]
-        qj_val = zj.y[pair.qinj_col_j]
+        pi_val = zi.y[pair.p_inj_col_i]
+        pj_val = zj.y[pair.p_inj_col_j]
+        qi_val = zi.y[pair.q_inj_col_i]
+        qj_val = zj.y[pair.q_inj_col_j]
         norm_i += pi_val * pi_val + qi_val * qi_val
         norm_j += pj_val * pj_val + qj_val * qj_val
     end
@@ -323,10 +323,10 @@ end
     @inbounds for pair in ws.split_bus_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pi_val = zi.y[pair.pinj_col_i]
-        pj_val = zj.y[pair.pinj_col_j]
-        qi_val = zi.y[pair.qinj_col_i]
-        qj_val = zj.y[pair.qinj_col_j]
+        pi_val = zi.y[pair.p_inj_col_i]
+        pj_val = zj.y[pair.p_inj_col_j]
+        qi_val = zi.y[pair.q_inj_col_i]
+        qj_val = zj.y[pair.q_inj_col_j]
         ni += pi_val * pi_val + qi_val * qi_val
         nj += pj_val * pj_val + qj_val * qj_val
     end

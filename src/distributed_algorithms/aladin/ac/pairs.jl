@@ -1,14 +1,6 @@
 # ============================================================
 # ALADIN-AC — Consensus pair types and builders
 # ============================================================
-#
-# ALADIN imposes the coupling `Σ A_i x_i = b` row-by-row through
-# explicit pair structures (one per λ component). This file defines
-# the four pair types used across coupling variants and the builders
-# that populate the pair lists once at workspace construction time.
-#
-# Per-partition runtime setup (NLP build, quad_static, p_inj/q_inj
-# variables) lives in `partition.jl`.
 
 # ============================================================
 # Pair types (consensus structures)
@@ -50,11 +42,11 @@ struct SplitBusPairAC
     consensus_idx::Int
     bus_id::Int
     zone_i::Int
-    pinj_col_i::Int
-    qinj_col_i::Int
+    p_inj_col_i::Int
+    q_inj_col_i::Int
     zone_j::Int
-    pinj_col_j::Int
-    qinj_col_j::Int
+    p_inj_col_j::Int
+    q_inj_col_j::Int
 end
 
 # ------------------------------------------------------------
@@ -119,8 +111,6 @@ function _build_shared_bus_pairs(
     for cidx in sort!(collect(keys(acc)))
         entries = acc[cidx]
         length(entries) >= 2 || continue
-        # Spanning tree (star): pair every other zone with the lowest-zpos
-        # zone as root. N zones → N-1 pairs, LICQ preserved.
         sort!(entries; by = first)
         zr, tr, vr = entries[1]
         for k in 2:length(entries)
