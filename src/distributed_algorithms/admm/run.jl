@@ -2,6 +2,9 @@
 # Core loop
 # ============================================================
 
+@inline stop_if_converged(ws::AbstractADMMWorkspace) =
+    (ws.r_primal < ws.eps_primal) && (ws.r_dual < ws.eps_dual)
+
 function run_algorithm!(ws, params::ADMMParams)
     tag = _print_tag(ws)
 

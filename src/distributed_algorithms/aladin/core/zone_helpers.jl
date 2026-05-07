@@ -17,6 +17,18 @@ function _build_var_layout(model::JuMP.Model)
     return all_vars, n, var_to_col
 end
 
+# Initial `x_prev` from JuMP `start_value` (warm-start). Falls back
+# to 0.0 when no start value is set. Used by every zone-data builder.
+function _init_from_start_values(all_vars::Vector{JuMP.VariableRef})
+    n = length(all_vars)
+    v = Vector{Float64}(undef, n)
+    @inbounds for k in 1:n
+        sv = JuMP.start_value(all_vars[k])
+        v[k] = sv === nothing ? 0.0 : Float64(sv)
+    end
+    return v
+end
+
 # ============================================================
 # Box bounds
 # ============================================================

@@ -165,9 +165,13 @@ include("distributed_algorithms/local_models.jl")
 include("distributed_algorithms/shared/algorithms.jl")
 include("distributed_algorithms/shared/traits.jl")
 include("distributed_algorithms/shared/totals.jl")
-include("distributed_algorithms/shared/support.jl")
-include("distributed_algorithms/shared/history.jl")
 include("distributed_algorithms/shared/sectioning_helpers.jl")
+
+# `aladin/params.jl` defines AbstractALADINWorkspace + LambdaState used
+# by shared/history.jl, shared/local_solve.jl, shared/logging.jl below.
+include("distributed_algorithms/aladin/params.jl")
+
+include("distributed_algorithms/shared/history.jl")
 
 include("distributed_algorithms/admm/core/var_state.jl")
 include("distributed_algorithms/admm/core/snapshots.jl")
@@ -193,7 +197,6 @@ include("distributed_algorithms/admm/core/residuals.jl")
 include("distributed_algorithms/admm/core/tolerances.jl")
 include("distributed_algorithms/admm/core/rho_update.jl")
 
-include("distributed_algorithms/aladin/params.jl")
 include("distributed_algorithms/aladin/core/zone_helpers.jl")
 
 include("distributed_algorithms/aladin/dc/zone_data.jl")
