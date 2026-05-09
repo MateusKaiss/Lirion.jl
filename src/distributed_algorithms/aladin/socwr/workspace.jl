@@ -196,7 +196,7 @@ function build_workspace(
         alpha3 = cfg.alpha3,
         alpha2_init = cfg.alpha2,
     )
-    _refresh_quad_static_socwr_primal_all!(ws.partitions.parts, ws.zones, ws.rho[], ws)
+    refresh_rho!(ws)
     return ws
 end
 
@@ -239,17 +239,7 @@ function build_workspace(
         sigma_qflow = cfg.sigma_qflow,
         proximal_mode = cfg.proximal_mode,
     )
-    if ws.proximal_mode === :pflow
-        _refresh_quad_static_socwr_pflow_all!(
-            ws.partitions.parts,
-            ws.zones,
-            ws.interzonal_line_pairs,
-            ws.rho[],
-            ws,
-        )
-    else
-        _refresh_quad_static_socwr_primal_all!(ws.partitions.parts, ws.zones, ws.rho[], ws)
-    end
+    refresh_rho!(ws)
     return ws
 end
 
@@ -312,6 +302,6 @@ function build_workspace(
         alpha3 = cfg.alpha3,
         alpha2_init = cfg.alpha2,
     )
-    _refresh_quad_static_socwr_primal_all!(ws.partitions.parts, ws.zones, ws.rho[], ws)
+    refresh_rho!(ws)
     return ws
 end

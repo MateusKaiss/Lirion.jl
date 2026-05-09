@@ -190,7 +190,7 @@ function build_workspace(
         alpha3 = cfg.alpha3,
         alpha2_init = cfg.alpha2,
     )
-    _refresh_quad_static_ac_all!(ws.zones, ws.rho[], ws)
+    refresh_rho!(ws)
     return ws
 end
 
@@ -237,7 +237,7 @@ function build_workspace(
         sigma_qflow = cfg.sigma_qflow,
         proximal_mode = cfg.proximal_mode,
     )
-    _refresh_quad_static_ac_all!(ws.zones, ws.rho[], ws)
+    refresh_rho!(ws)
     return ws
 end
 
@@ -311,6 +311,6 @@ function build_workspace(
         alpha3 = cfg.alpha3,
         alpha2_init = cfg.alpha2,
     )
-    _refresh_quad_static_ac_all!(ws.zones, ws.rho[], ws)
+    refresh_rho!(ws)
     return ws
 end

@@ -12,7 +12,7 @@
 #     see `src/types.jl`).
 #
 # `quad_static` is filled by the workspace builder (after these run)
-# via `_refresh_quad_static_socwr_*_all!` from `objective.jl`, since
+# via `_refresh_quad_socwr_*!` from `objective.jl`, since
 # it needs the workspace's sigma fields, not the config's.
 #
 # Pair types and pair builders live in `pairs.jl`. Workspace structs

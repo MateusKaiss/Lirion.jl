@@ -172,7 +172,7 @@ end
 # Refresh helpers (all zones)
 # ------------------------------------------------------------
 
-@inline function _refresh_quad_static_socwr_primal_all!(parts, zones, rho, ws_or_cfg)
+@inline function _refresh_quad_socwr_primal!(parts, zones, rho, ws_or_cfg)
     @inbounds for (i, zone) in enumerate(zones)
         _build_quad_static_primal_socwr!(
             zone, rho;
@@ -189,7 +189,7 @@ end
     return nothing
 end
 
-@inline function _refresh_quad_static_socwr_pflow_all!(
+@inline function _refresh_quad_socwr_pflow!(
     parts,
     zones,
     interzonal_line_pairs,
@@ -209,6 +209,23 @@ end
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Public entry point: refresh_rho! (analogue of admm/refresh_rho!)
+# ------------------------------------------------------------
+
+refresh_rho!(ws::SOCWRStateWorkspaceALADIN) =
+    _refresh_quad_socwr_primal!(ws.partitions.parts, ws.zones, ws.rho[], ws)
+
+refresh_rho!(ws::SOCWRPowerWorkspaceALADIN) =
+    ws.proximal_mode === :pflow ?
+        _refresh_quad_socwr_pflow!(
+            ws.partitions.parts, ws.zones, ws.interzonal_line_pairs, ws.rho[], ws,
+        ) :
+        _refresh_quad_socwr_primal!(ws.partitions.parts, ws.zones, ws.rho[], ws)
+
+refresh_rho!(ws::SOCWRHybridWorkspaceALADIN) =
+    _refresh_quad_socwr_primal!(ws.partitions.parts, ws.zones, ws.rho[], ws)
 
 # ============================================================
 # Linear (per-iteration) prox part

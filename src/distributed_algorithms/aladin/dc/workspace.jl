@@ -186,7 +186,7 @@ function build_workspace(
         sigma_other = cfg.sigma_other,
         proximal_mode = cfg.proximal_mode,
     )
-    _refresh_quad_static_dc_primal_all!(ws.partitions.parts, ws.zones, ws.rho[], ws)
+    refresh_rho!(ws)
     return ws
 end
 
@@ -233,11 +233,7 @@ function build_workspace(
         sigma_qflow = cfg.sigma_qflow,
         proximal_mode = cfg.proximal_mode,
     )
-    if ws.proximal_mode === :pflow
-        _refresh_quad_static_dc_pflow_all!(ws.partitions.parts, ws.zones, ws.rho[], ws)
-    else
-        _refresh_quad_static_dc_primal_all!(ws.partitions.parts, ws.zones, ws.rho[], ws)
-    end
+    refresh_rho!(ws)
     return ws
 end
 
@@ -310,6 +306,6 @@ function build_workspace(
         sigma_other = cfg.sigma_other,
         proximal_mode = cfg.proximal_mode,
     )
-    _refresh_quad_static_dc_primal_all!(ws.partitions.parts, ws.zones, ws.rho_bus[], ws)
+    refresh_rho!(ws)
     return ws
 end

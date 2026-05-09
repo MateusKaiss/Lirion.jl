@@ -106,7 +106,7 @@ end
 # Refresh helpers (all zones)
 # ------------------------------------------------------------
 
-@inline function _refresh_quad_static_dc_primal_all!(parts, zones, rho, ws_or_cfg)
+@inline function _refresh_quad_dc_primal!(parts, zones, rho, ws_or_cfg)
     @inbounds for (i, zone) in enumerate(zones)
         _build_quad_static_primal_dc!(
             zone, rho;
@@ -119,7 +119,7 @@ end
     return nothing
 end
 
-@inline function _refresh_quad_static_dc_pflow_all!(parts, zones, rho, ws_or_cfg)
+@inline function _refresh_quad_dc_pflow!(parts, zones, rho, ws_or_cfg)
     @inbounds for (i, zone) in enumerate(zones)
         _build_quad_static_pflow_dc!(
             zone, rho;
@@ -131,6 +131,21 @@ end
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Public entry point: refresh_rho! (analogue of admm/refresh_rho!)
+# ------------------------------------------------------------
+
+refresh_rho!(ws::DCStateWorkspaceALADIN) =
+    _refresh_quad_dc_primal!(ws.partitions.parts, ws.zones, ws.rho[], ws)
+
+refresh_rho!(ws::DCPowerWorkspaceALADIN) =
+    ws.proximal_mode === :pflow ?
+        _refresh_quad_dc_pflow!(ws.partitions.parts, ws.zones, ws.rho[], ws) :
+        _refresh_quad_dc_primal!(ws.partitions.parts, ws.zones, ws.rho[], ws)
+
+refresh_rho!(ws::DCHybridWorkspaceALADIN) =
+    _refresh_quad_dc_primal!(ws.partitions.parts, ws.zones, ws.rho_bus[], ws)
 
 # ============================================================
 # Linear (per-iteration) prox part

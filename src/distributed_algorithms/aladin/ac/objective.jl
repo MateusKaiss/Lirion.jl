@@ -66,7 +66,7 @@ end
 # Refresh helper (all zones)
 # ------------------------------------------------------------
 
-@inline function _refresh_quad_static_ac_all!(zones, rho, ws_or_cfg)
+@inline function _refresh_quad_ac!(zones, rho, ws_or_cfg)
     @inbounds for zone in zones
         _build_quad_static_ac!(
             zone, rho;
@@ -79,6 +79,14 @@ end
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Public entry point: refresh_rho! (analogue of admm/refresh_rho!)
+# ------------------------------------------------------------
+
+refresh_rho!(ws::ACStateWorkspaceALADIN)  = _refresh_quad_ac!(ws.zones, ws.rho[], ws)
+refresh_rho!(ws::ACPowerWorkspaceALADIN)  = _refresh_quad_ac!(ws.zones, ws.rho[], ws)
+refresh_rho!(ws::ACHybridWorkspaceALADIN) = _refresh_quad_ac!(ws.zones, ws.rho[], ws)
 
 # ============================================================
 # Linear (per-iteration) prox part
