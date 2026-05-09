@@ -168,7 +168,7 @@ function build_workspace(
     zones, bus_pairs = init_state_partition!(partitions, sys, optimizer_factory, cfg)
     n_pairs = length(bus_pairs)
 
-    return DCStateWorkspaceALADIN(;
+    ws = DCStateWorkspaceALADIN(;
         partitions = partitions,
         id = id,
         zones = zones,
@@ -186,6 +186,8 @@ function build_workspace(
         sigma_other = cfg.sigma_other,
         proximal_mode = cfg.proximal_mode,
     )
+    _refresh_quad_static_dc_primal_all!(ws.partitions.parts, ws.zones, ws.rho[], ws)
+    return ws
 end
 
 # ------------------------------------------------------------
@@ -202,12 +204,11 @@ function build_workspace(
     id = partitions.zones
     inter = sys.interzonal_branches
 
-    zones, interzonal_line_pairs, dummy_pairs =
-        init_power_partition!(partitions, sys, optimizer_factory, cfg)
+    zones, interzonal_line_pairs, dummy_pairs = init_power_partition!(partitions, sys, optimizer_factory, cfg)
     n_pairs = length(interzonal_line_pairs)
     n_dummy = length(dummy_pairs)
 
-    return DCPowerWorkspaceALADIN(;
+    ws = DCPowerWorkspaceALADIN(;
         partitions = partitions,
         id = id,
         interzonal = inter,
@@ -232,6 +233,12 @@ function build_workspace(
         sigma_qflow = cfg.sigma_qflow,
         proximal_mode = cfg.proximal_mode,
     )
+    if ws.proximal_mode === :pflow
+        _refresh_quad_static_dc_pflow_all!(ws.partitions.parts, ws.zones, ws.rho[], ws)
+    else
+        _refresh_quad_static_dc_primal_all!(ws.partitions.parts, ws.zones, ws.rho[], ws)
+    end
+    return ws
 end
 
 # ------------------------------------------------------------
@@ -273,7 +280,7 @@ function build_workspace(
     n_split = length(split_pairs)
     n_dummy = length(dummy_pairs)
 
-    return DCHybridWorkspaceALADIN(;
+    ws = DCHybridWorkspaceALADIN(;
         partitions = partitions,
         id = id,
         interzonal = inter,
@@ -303,4 +310,6 @@ function build_workspace(
         sigma_other = cfg.sigma_other,
         proximal_mode = cfg.proximal_mode,
     )
+    _refresh_quad_static_dc_primal_all!(ws.partitions.parts, ws.zones, ws.rho_bus[], ws)
+    return ws
 end

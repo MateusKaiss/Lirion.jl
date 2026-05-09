@@ -1,6 +1,10 @@
 # ============================================================
 # ALADIN-DC — Per-partition setup
 # ============================================================
+#
+# `quad_static` is filled by the workspace builder (after these run)
+# via `_refresh_quad_static_dc_*_all!` from `objective.jl`, since it
+# needs the workspace's sigma fields. Mirrors AC and SOCWR.
 
 # ============================================================
 # Per-partition initialisers
@@ -17,15 +21,7 @@ function init_state_partition!(
     cfg::ALADINConfig,
 )
     build_local_model!(part, sys_zone, State, optimizer_factory)
-    zone = build_aladin_zone_data(part; include_edges = false)
-    _build_quad_static_primal_dc!(
-        zone, cfg.rho;
-        sigma_theta_shared = cfg.sigma_theta_shared,
-        sigma_pg = cfg.sigma_pg,
-        sigma_other = cfg.sigma_other,
-    )
-    _set_obj_static_dc!(part, zone)
-    return zone
+    return build_aladin_zone_data(part; include_edges = false)
 end
 
 # ------------------------------------------------------------
@@ -40,24 +36,7 @@ function init_power_partition!(
     interzonal_branches::Vector{Int},
 )
     build_local_model!(part, sys_zone, Power, optimizer_factory, interzonal_branches)
-    zone = build_aladin_zone_data(part; include_edges = true)
-    if cfg.proximal_mode === :pflow
-        _build_quad_static_pflow_dc!(
-            zone, cfg.rho;
-            sigma_pflow = cfg.sigma_pflow,
-            sigma_pg = cfg.sigma_pg,
-            sigma_other = cfg.sigma_other,
-        )
-    else
-        _build_quad_static_primal_dc!(
-            zone, cfg.rho;
-            sigma_theta_shared = cfg.sigma_theta_shared,
-            sigma_pg = cfg.sigma_pg,
-            sigma_other = cfg.sigma_other,
-        )
-    end
-    _set_obj_static_dc!(part, zone)
-    return zone
+    return build_aladin_zone_data(part; include_edges = true)
 end
 
 # ------------------------------------------------------------
@@ -73,15 +52,7 @@ function init_hybrid_partition!(
     interzonal_branches::Vector{Int},
 )
     build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
-    zone = build_aladin_zone_data(part; include_edges = true)
-    _build_quad_static_primal_dc!(
-        zone, cfg.rho;
-        sigma_theta_shared = cfg.sigma_theta_shared,
-        sigma_pg = cfg.sigma_pg,
-        sigma_other = cfg.sigma_other,
-    )
-    _set_obj_static_dc!(part, zone)
-    return zone
+    return build_aladin_zone_data(part; include_edges = true)
 end
 
 # ------------------------------------------------------------
@@ -97,15 +68,7 @@ function init_hybrid_partition!(
     interzonal_branches::Vector{Int},
 )
     build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
-    zone = build_aladin_zone_data(part; include_edges = true)
-    _build_quad_static_primal_dc!(
-        zone, cfg.rho;
-        sigma_theta_shared = cfg.sigma_theta_shared,
-        sigma_pg = cfg.sigma_pg,
-        sigma_other = cfg.sigma_other,
-    )
-    _set_obj_static_dc!(part, zone)
-    return zone
+    return build_aladin_zone_data(part; include_edges = true)
 end
 
 # ------------------------------------------------------------
@@ -124,15 +87,7 @@ function init_hybrid_partition!(
 )
     build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
     _attach_p_inj_variables!(part, sys_bus_pairs, p_inj_store)
-    zone = build_aladin_zone_data(part; include_edges = true)
-    _build_quad_static_primal_dc!(
-        zone, cfg.rho;
-        sigma_theta_shared = cfg.sigma_theta_shared,
-        sigma_pg = cfg.sigma_pg,
-        sigma_other = cfg.sigma_other,
-    )
-    _set_obj_static_dc!(part, zone)
-    return zone
+    return build_aladin_zone_data(part; include_edges = true)
 end
 
 # ============================================================

@@ -86,18 +86,13 @@ end
 # ------------------------------------------------------------
 # Shared bus pairs
 # ------------------------------------------------------------
-#
-# Walks every zone, registers (zone_pos, theta_col, vm_col) for each
-# shared bus it touches, then emits a star spanning tree per
-# consensus_idx (root = lowest zone_pos). N zones touching a bus →
-# N-1 pairs, which preserves LICQ in the coordinator KKT.
 
 function _build_shared_bus_pairs(
     partitions::Partitions{PartitionAC},
     zones::Vector{AladinZoneDataAC},
 )::Vector{SharedBusPairAC}
-    visits = Dict{Int, Vector{Tuple{Int, Int, Int}}}()  # cidx → [(zone_pos, theta_col, vm_col)]
-    bus_id_by_cidx = Dict{Int, Int}()                    # cidx → physical bus id
+    visits = Dict{Int, Vector{Tuple{Int, Int, Int}}}()
+    bus_id_by_cidx = Dict{Int, Int}()
 
     for (zone_pos, part) in enumerate(partitions.parts)
         zone_data = zones[zone_pos]
@@ -120,12 +115,15 @@ function _build_shared_bus_pairs(
         root_zone, root_theta_col, root_vm_col = cidx_visits[1]
         for k in 2:length(cidx_visits)
             peer_zone, peer_theta_col, peer_vm_col = cidx_visits[k]
-            push!(pairs, SharedBusPairAC(
-                consensus_idx,
-                bus_id_by_cidx[consensus_idx],
-                root_zone, root_theta_col, root_vm_col,
-                peer_zone, peer_theta_col, peer_vm_col,
-            ))
+            push!(
+                pairs,
+                SharedBusPairAC(
+                    consensus_idx,
+                    bus_id_by_cidx[consensus_idx],
+                    root_zone, root_theta_col, root_vm_col,
+                    peer_zone, peer_theta_col, peer_vm_col,
+                ),
+            )
         end
     end
     return pairs
@@ -151,11 +149,14 @@ function _build_interzonal_line_pairs(
         length(line_visits) == 2 || continue
         zone_i, local_i = line_visits[1]
         zone_j, local_j = line_visits[2]
-        push!(pairs, InterzonalLinePairAC(
-            consensus_idx, line_global,
-            zone_i, local_i,
-            zone_j, local_j,
-        ))
+        push!(
+            pairs,
+            InterzonalLinePairAC(
+                consensus_idx, line_global,
+                zone_i, local_i,
+                zone_j, local_j,
+            ),
+        )
     end
     return pairs
 end
@@ -163,11 +164,6 @@ end
 # ------------------------------------------------------------
 # Dummy line pairs
 # ------------------------------------------------------------
-#
-# DummyBus sectioning in AC carries far more parameters per phantom
-# line than DC (g, b, b_sh, tap, tap_angle) because the AC flow is a
-# nonlinear function of all of them. The pair captures both endpoints
-# in θ AND vm of each replica.
 
 function _build_dummy_line_pairs(
     partitions::Partitions{PartitionAC},
@@ -200,26 +196,31 @@ function _build_dummy_line_pairs(
         to_b = part_b.branch.to[local_b]
 
         from_theta_col_i = zone_data_a.var_to_col[theta_var_a[from_a, 1]]
-        to_theta_col_i   = zone_data_a.var_to_col[theta_var_a[to_a, 1]]
-        from_vm_col_i    = zone_data_a.var_to_col[vm_var_a[from_a, 1]]
-        to_vm_col_i      = zone_data_a.var_to_col[vm_var_a[to_a, 1]]
+        to_theta_col_i = zone_data_a.var_to_col[theta_var_a[to_a, 1]]
+        from_vm_col_i = zone_data_a.var_to_col[vm_var_a[from_a, 1]]
+        to_vm_col_i = zone_data_a.var_to_col[vm_var_a[to_a, 1]]
 
         from_theta_col_j = zone_data_b.var_to_col[theta_var_b[from_b, 1]]
-        to_theta_col_j   = zone_data_b.var_to_col[theta_var_b[to_b, 1]]
-        from_vm_col_j    = zone_data_b.var_to_col[vm_var_b[from_b, 1]]
-        to_vm_col_j      = zone_data_b.var_to_col[vm_var_b[to_b, 1]]
+        to_theta_col_j = zone_data_b.var_to_col[theta_var_b[to_b, 1]]
+        from_vm_col_j = zone_data_b.var_to_col[vm_var_b[from_b, 1]]
+        to_vm_col_j = zone_data_b.var_to_col[vm_var_b[to_b, 1]]
 
-        push!(pairs, DummyLinePairAC(
-            consensus_idx,
-            zone_a, local_a,
-            from_theta_col_i, to_theta_col_i, from_vm_col_i, to_vm_col_i,
-            part_a.branch.g[local_a], part_a.branch.b[local_a], part_a.branch.b_sh[local_a],
-            part_a.branch.inv_tap[local_a], part_a.branch.tap_angle[local_a],
-            zone_b, local_b,
-            from_theta_col_j, to_theta_col_j, from_vm_col_j, to_vm_col_j,
-            part_b.branch.g[local_b], part_b.branch.b[local_b], part_b.branch.b_sh[local_b],
-            part_b.branch.inv_tap[local_b], part_b.branch.tap_angle[local_b],
-        ))
+        push!(
+            pairs,
+            DummyLinePairAC(
+                consensus_idx,
+                zone_a, local_a,
+                from_theta_col_i, to_theta_col_i, from_vm_col_i, to_vm_col_i,
+                part_a.branch.g[local_a], part_a.branch.b[local_a],
+                part_a.branch.b_sh[local_a],
+                part_a.branch.inv_tap[local_a], part_a.branch.tap_angle[local_a],
+                zone_b, local_b,
+                from_theta_col_j, to_theta_col_j, from_vm_col_j, to_vm_col_j,
+                part_b.branch.g[local_b], part_b.branch.b[local_b],
+                part_b.branch.b_sh[local_b],
+                part_b.branch.inv_tap[local_b], part_b.branch.tap_angle[local_b],
+            ),
+        )
     end
     return pairs
 end
@@ -243,17 +244,22 @@ function _build_split_bus_pairs(
         q_inj_var_a = get(q_inj_vars[zone_a], bus_id, nothing)
         p_inj_var_b = get(p_inj_vars[zone_b], bus_id, nothing)
         q_inj_var_b = get(q_inj_vars[zone_b], bus_id, nothing)
-        (p_inj_var_a === nothing || q_inj_var_a === nothing ||
-         p_inj_var_b === nothing || q_inj_var_b === nothing) && continue
+        (
+            p_inj_var_a === nothing || q_inj_var_a === nothing ||
+            p_inj_var_b === nothing || q_inj_var_b === nothing
+        ) && continue
         p_inj_col_a = zones[zone_a].var_to_col[p_inj_var_a]
         q_inj_col_a = zones[zone_a].var_to_col[q_inj_var_a]
         p_inj_col_b = zones[zone_b].var_to_col[p_inj_var_b]
         q_inj_col_b = zones[zone_b].var_to_col[q_inj_var_b]
-        push!(pairs, SplitBusPairAC(
-            consensus_idx, bus_id,
-            zone_a, p_inj_col_a, q_inj_col_a,
-            zone_b, p_inj_col_b, q_inj_col_b,
-        ))
+        push!(
+            pairs,
+            SplitBusPairAC(
+                consensus_idx, bus_id,
+                zone_a, p_inj_col_a, q_inj_col_a,
+                zone_b, p_inj_col_b, q_inj_col_b,
+            ),
+        )
     end
     return pairs
 end

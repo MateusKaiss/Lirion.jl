@@ -109,12 +109,15 @@ function _build_shared_bus_pairs(
         root_zone, root_col = cidx_visits[1]
         for k in 2:length(cidx_visits)
             peer_zone, peer_col = cidx_visits[k]
-            push!(pairs, SharedBusPair(
-                consensus_idx,
-                bus_id_by_cidx[consensus_idx],
-                root_zone, root_col,
-                peer_zone, peer_col,
-            ))
+            push!(
+                pairs,
+                SharedBusPair(
+                    consensus_idx,
+                    bus_id_by_cidx[consensus_idx],
+                    root_zone, root_col,
+                    peer_zone, peer_col,
+                ),
+            )
         end
     end
     return pairs
@@ -144,11 +147,14 @@ function _build_interzonal_line_pairs(
         length(line_visits) == 2 || continue
         zone_i, local_i = line_visits[1]
         zone_j, local_j = line_visits[2]
-        push!(pairs, InterzonalLinePair(
-            consensus_idx, line_global,
-            zone_i, local_i,
-            zone_j, local_j,
-        ))
+        push!(
+            pairs,
+            InterzonalLinePair(
+                consensus_idx, line_global,
+                zone_i, local_i,
+                zone_j, local_j,
+            ),
+        )
     end
     return pairs
 end
@@ -192,18 +198,21 @@ function _build_dummy_line_pairs(
         theta_var_a = part_a.model[:theta]
         theta_var_b = part_b.model[:theta]
         from_col_i = zone_data_a.var_to_col[theta_var_a[from_a, 1]]
-        to_col_i   = zone_data_a.var_to_col[theta_var_a[to_a, 1]]
+        to_col_i = zone_data_a.var_to_col[theta_var_a[to_a, 1]]
         from_col_j = zone_data_b.var_to_col[theta_var_b[from_b, 1]]
-        to_col_j   = zone_data_b.var_to_col[theta_var_b[to_b, 1]]
+        to_col_j = zone_data_b.var_to_col[theta_var_b[to_b, 1]]
 
         b_i = part_a.branch.b[local_a]
         b_j = part_b.branch.b[local_b]
 
-        push!(pairs, DummyLinePairDC(
-            consensus_idx,
-            zone_a, from_col_i, to_col_i, b_i,
-            zone_b, from_col_j, to_col_j, b_j,
-        ))
+        push!(
+            pairs,
+            DummyLinePairDC(
+                consensus_idx,
+                zone_a, from_col_i, to_col_i, b_i,
+                zone_b, from_col_j, to_col_j, b_j,
+            ),
+        )
     end
     return pairs
 end
@@ -233,11 +242,14 @@ function _build_split_bus_pairs(
         (p_inj_var_a === nothing || p_inj_var_b === nothing) && continue
         p_inj_col_a = zones[zone_a].var_to_col[p_inj_var_a]
         p_inj_col_b = zones[zone_b].var_to_col[p_inj_var_b]
-        push!(pairs, SplitBusPair(
-            consensus_idx, bus_id,
-            zone_a, p_inj_col_a,
-            zone_b, p_inj_col_b,
-        ))
+        push!(
+            pairs,
+            SplitBusPair(
+                consensus_idx, bus_id,
+                zone_a, p_inj_col_a,
+                zone_b, p_inj_col_b,
+            ),
+        )
     end
     return pairs
 end

@@ -102,6 +102,36 @@ end
     return nothing
 end
 
+# ------------------------------------------------------------
+# Refresh helpers (all zones)
+# ------------------------------------------------------------
+
+@inline function _refresh_quad_static_dc_primal_all!(parts, zones, rho, ws_or_cfg)
+    @inbounds for (i, zone) in enumerate(zones)
+        _build_quad_static_primal_dc!(
+            zone, rho;
+            sigma_theta_shared = ws_or_cfg.sigma_theta_shared,
+            sigma_pg = ws_or_cfg.sigma_pg,
+            sigma_other = ws_or_cfg.sigma_other,
+        )
+        _set_obj_static_dc!(parts[i], zone)
+    end
+    return nothing
+end
+
+@inline function _refresh_quad_static_dc_pflow_all!(parts, zones, rho, ws_or_cfg)
+    @inbounds for (i, zone) in enumerate(zones)
+        _build_quad_static_pflow_dc!(
+            zone, rho;
+            sigma_pflow = ws_or_cfg.sigma_pflow,
+            sigma_pg = ws_or_cfg.sigma_pg,
+            sigma_other = ws_or_cfg.sigma_other,
+        )
+        _set_obj_static_dc!(parts[i], zone)
+    end
+    return nothing
+end
+
 # ============================================================
 # Linear (per-iteration) prox part
 # ============================================================
@@ -294,7 +324,13 @@ function update_objective!(part::PartitionDC, ws::DCPowerWorkspaceALADIN)
     zdata = ws.zones[zone_pos]
 
     lin = zero(JuMP.AffExpr)
-    _lambda_edge_affexpr!(lin, ws.zones, ws.interzonal_line_pairs, ws.vars.p_flow.lambda, zone_pos)
+    _lambda_edge_affexpr!(
+        lin,
+        ws.zones,
+        ws.interzonal_line_pairs,
+        ws.vars.p_flow.lambda,
+        zone_pos,
+    )
     _lambda_dummy_affexpr!(
         lin, ws.zones, ws.dummy_line_pairs, ws.vars.p_dummy.lambda, zone_pos,
     )
@@ -337,7 +373,13 @@ function update_objective!(part::PartitionDC, ws::DCHybridWorkspaceALADIN)
             JuMP.add_to_expression!(lin, -ws.vars.theta.lambda[k], zdata.all_vars[col])
         end
     end
-    _lambda_edge_affexpr!(lin, ws.zones, ws.interzonal_line_pairs, ws.vars.p_flow.lambda, zone_pos)
+    _lambda_edge_affexpr!(
+        lin,
+        ws.zones,
+        ws.interzonal_line_pairs,
+        ws.vars.p_flow.lambda,
+        zone_pos,
+    )
     _lambda_dummy_affexpr!(
         lin, ws.zones, ws.dummy_line_pairs, ws.vars.p_dummy.lambda, zone_pos,
     )

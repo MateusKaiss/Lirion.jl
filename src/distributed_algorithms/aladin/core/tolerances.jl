@@ -385,7 +385,8 @@ function compute_tolerances!(
     eps_abs::Float64,
     eps_rel::Float64,
 )
-    n = length(ws.bus_pairs) + 4 * length(ws.interzonal_line_pairs) +
+    n =
+        length(ws.bus_pairs) + 4 * length(ws.interzonal_line_pairs) +
         2 * length(ws.split_bus_pairs)
     ni_b, nj_b = _norms_bus_v2_socwr(ws)
     ni_rt, nj_rt = _norms_edge_rt_socwr(ws)

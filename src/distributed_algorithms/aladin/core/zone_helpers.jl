@@ -53,7 +53,6 @@ end
 # Equality Jacobian (sparse, from JuMP affine constraints)
 # ============================================================
 
-
 function _extract_equality_jacobian(
     model::JuMP.Model,
     var_to_col::Dict{JuMP.VariableRef, Int},
