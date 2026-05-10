@@ -2,17 +2,29 @@
 # ALADIN — Adaptive ρ/μ schedule
 # ============================================================
 #
-# EXTENSION OUTSIDE THE CANONICAL PAPER. Houska-Frasch-Diehl 2016
-# specifies a single fixed ρ "sufficiently large" (Lemma 3 / Theorem 4
-# hypotheses); no schedule is prescribed. The monotonic growth here is a
-# practical heuristic borrowed from augmented Lagrangian / penalty
-# methods. It remains compatible with the paper's local convergence
-# guarantee provided ρ_upper < ∞ (so ρ stabilises in finite iterations).
+# Called once per outer iteration (after residuals + line search).
+# Grows ρ and μ monotonically (`adaptive = true`) and, when ρ moved,
+# rebuilds each zone's cached `quad_static` via `refresh_rho!`.
 #
-# Default in `ALADINConfig` is `adaptive = false`. Enable explicitly
-# (`adaptive = true`) with caution; the choice of `rho_growth`,
-# `mu_growth` and the upper bounds is empirical and may need tuning per
-# case. The adaptive schedule is NOT covered by the convergence proofs.
+# Monotonic growth is a practical heuristic borrowed from augmented
+# Lagrangian / penalty methods. Houska-Frasch-Diehl 2016 fixes ρ
+# "sufficiently large" and proves local convergence; the growth here
+# is compatible with that proof as long as `rho_upper < ∞` (ρ
+# stabilises in finite iterations). The schedule itself is NOT
+# covered by the proof — defaults to `adaptive = false` in
+# `ALADINConfig`; enable explicitly with caution.
+#
+# Note μ never triggers `refresh_rho!`: it enters only the coordinator
+# QP (Levenberg-Marquardt regularisation) and never appears inside
+# `quad_static`, so bumping `ws.mu[]` is free.
+
+# ------------------------------------------------------------
+# Helper
+# ------------------------------------------------------------
+#
+# Multiplies `ref[]` by `factor`, clamps at `upper`, and reports
+# whether the value actually moved. Callers use the return value to
+# skip cache rebuilds when ρ has saturated at the upper bound.
 
 @inline function _grow_ref!(
     ref::Base.RefValue{Float64},
@@ -24,7 +36,13 @@
     return ref[] != prev
 end
 
-# ---- DC State (single ρ) ----
+# ============================================================
+# Dispatch
+# ============================================================
+
+# ------------------------------------------------------------
+# DC State (single ρ)
+# ------------------------------------------------------------
 
 function adapt_rho_mu!(ws::DCStateWorkspaceALADIN, params::ALADINParams)
     params.adaptive || return nothing
@@ -34,7 +52,9 @@ function adapt_rho_mu!(ws::DCStateWorkspaceALADIN, params::ALADINParams)
     return nothing
 end
 
-# ---- DC Power (single ρ, primal or pflow) ----
+# ------------------------------------------------------------
+# DC Power (single ρ; primal or pflow proximal mode)
+# ------------------------------------------------------------
 
 function adapt_rho_mu!(ws::DCPowerWorkspaceALADIN, params::ALADINParams)
     params.adaptive || return nothing
@@ -44,7 +64,14 @@ function adapt_rho_mu!(ws::DCPowerWorkspaceALADIN, params::ALADINParams)
     return nothing
 end
 
-# ---- DC Hybrid (ρ_bus + ρ_edge + ρ_inj; quad_static keyed on ρ_bus) ----
+# ------------------------------------------------------------
+# DC Hybrid (ρ_bus + ρ_edge + ρ_inj)
+# ------------------------------------------------------------
+#
+# Three separate ρ refs — one per consensus class. `quad_static`
+# only caches the ρ_bus part (the other two enter the coordinator QP
+# as linear couplings, never inside the per-zone quadratic), so only
+# a `ρ_bus` change forces `refresh_rho!`.
 
 function adapt_rho_mu!(ws::DCHybridWorkspaceALADIN, params::ALADINParams)
     params.adaptive || return nothing
@@ -56,7 +83,12 @@ function adapt_rho_mu!(ws::DCHybridWorkspaceALADIN, params::ALADINParams)
     return nothing
 end
 
-# ---- AC (State / Power / Hybrid) ----
+# ------------------------------------------------------------
+# AC (State / Power / Hybrid)
+# ------------------------------------------------------------
+#
+# All three AC workspaces share a single ρ — variants differ only in
+# which consensus pairs exist, not in how ρ is scheduled.
 
 function adapt_rho_mu!(
     ws::Union{
@@ -73,7 +105,11 @@ function adapt_rho_mu!(
     return nothing
 end
 
-# ---- SOCWR (State / Power / Hybrid) ----
+# ------------------------------------------------------------
+# SOCWR (State / Power / Hybrid)
+# ------------------------------------------------------------
+#
+# Same pattern as AC: one ρ across all three variants.
 
 function adapt_rho_mu!(
     ws::Union{
