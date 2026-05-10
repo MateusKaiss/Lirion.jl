@@ -175,15 +175,15 @@ refresh_rho!(ws::DCStateWorkspaceALADIN) =
 
 refresh_rho!(ws::DCPowerWorkspaceALADIN) =
     ws.proximal_mode === :pflow ?
-        _refresh_quad_dc_pflow!(ws.partitions.parts, ws.zones, ws.rho[], ws) :
-        _refresh_quad_dc_primal!(ws.partitions.parts, ws.zones, ws.rho[], ws)
+    _refresh_quad_dc_pflow!(ws.partitions.parts, ws.zones, ws.rho[], ws) :
+    _refresh_quad_dc_primal!(ws.partitions.parts, ws.zones, ws.rho[], ws)
 
 refresh_rho!(ws::DCHybridWorkspaceALADIN) =
     ws.proximal_mode === :pflow ?
-        _refresh_quad_dc_hybrid_pflow!(
-            ws.partitions.parts, ws.zones, ws.rho_bus[], ws,
-        ) :
-        _refresh_quad_dc_primal!(ws.partitions.parts, ws.zones, ws.rho_bus[], ws)
+    _refresh_quad_dc_hybrid_pflow!(
+        ws.partitions.parts, ws.zones, ws.rho_bus[], ws,
+    ) :
+    _refresh_quad_dc_primal!(ws.partitions.parts, ws.zones, ws.rho_bus[], ws)
 
 # ============================================================
 # Linear (per-iteration) prox part

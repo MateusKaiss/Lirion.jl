@@ -208,7 +208,8 @@ function build_workspace(
     id = partitions.zones
     inter = sys.interzonal_branches
 
-    zones, interzonal_line_pairs, dummy_pairs = init_power_partition!(partitions, sys, optimizer_factory, cfg)
+    zones, interzonal_line_pairs, dummy_pairs =
+        init_power_partition!(partitions, sys, optimizer_factory, cfg)
     n_pairs = length(interzonal_line_pairs)
     n_dummy = length(dummy_pairs)
 

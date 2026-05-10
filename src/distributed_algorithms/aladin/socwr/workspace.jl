@@ -135,6 +135,9 @@ Base.@kwdef mutable struct SOCWRHybridWorkspaceALADIN <: AbstractALADINWorkspace
     sigma_pg::Float64 = 1.0
     sigma_qg::Float64 = 1.0
     sigma_other::Float64 = 1.0
+    sigma_pflow::Float64 = 1.0
+    sigma_qflow::Float64 = 1.0
+    proximal_mode::Symbol = :primal
 
     r_primal::Float64 = 0.0
     r_progress::Float64 = 0.0
@@ -301,6 +304,9 @@ function build_workspace(
         alpha2 = cfg.alpha2,
         alpha3 = cfg.alpha3,
         alpha2_init = cfg.alpha2,
+        sigma_pflow = cfg.sigma_pflow,
+        sigma_qflow = cfg.sigma_qflow,
+        proximal_mode = cfg.proximal_mode,
     )
     refresh_rho!(ws)
     return ws

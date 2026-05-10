@@ -203,6 +203,11 @@ include(joinpath(@__DIR__, "distributed", "test_aladin_socwr.jl"))
         central_optimizer = DEFAULT_SOCWR_SOLVER,
         distributed_optimizer = DEFAULT_SOCWR_SOLVER,
     )
+    run_aladin_socwr_hybrid_pflow_tests(;
+        rtol = 0.01,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
+    )
     run_aladin_socwr_splitbus_hybrid_tests(;
         rtol = 0.05,
         central_optimizer = DEFAULT_SOCWR_SOLVER,
