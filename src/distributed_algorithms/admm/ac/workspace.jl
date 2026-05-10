@@ -43,7 +43,13 @@ Base.@kwdef mutable struct ACPowerWorkspace{S <: Sectioning} <: AbstractADMMWork
     branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[]
     pair_counts::Vector{Int} = Int[]
 
-    vars::NamedTuple{(:p_flow, :q_flow), Tuple{VarState, VarState}}
+    # `p_flow`/`q_flow` carry tie-line consensus; `p_dummy`/`q_dummy`
+    # carry dummy-line consensus (Method 2). Exactly one pair is non-empty
+    # depending on `S`.
+    vars::NamedTuple{
+        (:p_flow, :q_flow, :p_dummy, :q_dummy),
+        Tuple{VarState, VarState, VarState, VarState},
+    }
 
     p_branch_counts::Vector{Int}
     q_branch_counts::Vector{Int}
@@ -82,8 +88,11 @@ Base.@kwdef mutable struct ACHybridWorkspace{S <: Sectioning} <: AbstractADMMWor
         Vector{Dict{Int, JuMP.VariableRef}}()
 
     vars::NamedTuple{
-        (:theta, :v_mag, :p_flow, :q_flow, :p_inj, :q_inj),
-        Tuple{VarState, VarState, VarState, VarState, VarState, VarState},
+        (:theta, :v_mag, :p_flow, :q_flow, :p_dummy, :q_dummy, :p_inj, :q_inj),
+        Tuple{
+            VarState, VarState, VarState, VarState,
+            VarState, VarState, VarState, VarState,
+        },
     }
 
     sin_sum::Vector{Float64}
@@ -189,8 +198,10 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, AC})
     sectioning = config.sectioning
     if sectioning isa TieLine
         n_flow = n_inter
+        n_dummy = 0
     elseif sectioning isa DummyBus
-        n_flow = n_pairs
+        n_flow = 0
+        n_dummy = n_pairs
     else
         error("ADMM{Power, AC}: unsupported sectioning $(sectioning)")
     end
@@ -205,9 +216,14 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, AC})
         brpairs,
     )
 
+    p_flow = VarState(n_flow, n_zones, config.rho_p)
+    q_flow = VarState(n_flow, n_zones, config.rho_q)
     vars = (
-        p_flow = VarState(n_flow, n_zones, config.rho_p),
-        q_flow = VarState(n_flow, n_zones, config.rho_q),
+        p_flow = p_flow,
+        q_flow = q_flow,
+        # dummy twins share rho refs with their tie-line counterparts.
+        p_dummy = VarState(n_dummy, n_zones, p_flow.rho, p_flow.prev_rho),
+        q_dummy = VarState(n_dummy, n_zones, q_flow.rho, q_flow.prev_rho),
     )
 
     return ACPowerWorkspace(;
@@ -245,13 +261,15 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC})
     sectioning = config.sectioning
     if sectioning isa TieLine
         n_flow = n_inter
+        n_dummy = 0
         init_hybrid_partition!(
             partitions, sys, optimizer_factory,
             config.rho_theta, config.rho_v, config.rho_p, config.rho_q,
             sectioning, inter,
         )
     elseif sectioning isa DummyBus
-        n_flow = n_pairs
+        n_flow = 0
+        n_dummy = n_pairs
         init_hybrid_partition!(
             partitions, sys, optimizer_factory,
             config.rho_theta, config.rho_v, config.rho_p, config.rho_q,
@@ -259,6 +277,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC})
         )
     elseif sectioning isa SplitBus
         n_flow = 0
+        n_dummy = 0
         init_hybrid_partition!(
             partitions, sys, optimizer_factory,
             config.rho_theta, config.rho_v, config.rho_p, config.rho_q,
@@ -268,11 +287,15 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC})
         error("ADMM{Hybrid, AC}: unsupported sectioning $(sectioning)")
     end
 
+    p_flow = VarState(n_flow, n_zones, config.rho_p)
+    q_flow = VarState(n_flow, n_zones, config.rho_q)
     vars = (
         theta = VarState(n_shared, n_zones, config.rho_theta),
         v_mag = VarState(n_shared, n_zones, config.rho_v; init_value = 1.0),
-        p_flow = VarState(n_flow, n_zones, config.rho_p),
-        q_flow = VarState(n_flow, n_zones, config.rho_q),
+        p_flow = p_flow,
+        q_flow = q_flow,
+        p_dummy = VarState(n_dummy, n_zones, p_flow.rho, p_flow.prev_rho),
+        q_dummy = VarState(n_dummy, n_zones, q_flow.rho, q_flow.prev_rho),
         p_inj = VarState(n_bus_pairs, n_zones, config.rho_p),
         q_inj = VarState(n_bus_pairs, n_zones, config.rho_q),
     )

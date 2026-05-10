@@ -46,7 +46,13 @@ Base.@kwdef mutable struct SOCWRPowerWorkspace{S <: Sectioning} <: AbstractADMMW
     branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[]
     pair_counts::Vector{Int} = Int[]
 
-    vars::NamedTuple{(:p_flow, :q_flow), Tuple{VarState, VarState}}
+    # `p_flow`/`q_flow` carry tie-line consensus; `p_dummy`/`q_dummy`
+    # carry dummy-line consensus (Method 2). Exactly one pair is non-empty
+    # depending on `S`.
+    vars::NamedTuple{
+        (:p_flow, :q_flow, :p_dummy, :q_dummy),
+        Tuple{VarState, VarState, VarState, VarState},
+    }
 
     branch_counts::Vector{Int}
 
@@ -84,9 +90,10 @@ Base.@kwdef mutable struct SOCWRHybridWorkspace{S <: Sectioning} <: AbstractADMM
         Vector{Dict{Int, JuMP.VariableRef}}()
 
     vars::NamedTuple{
-        (:v2, :p_flow, :q_flow, :r, :t, :p_inj, :q_inj),
+        (:v2, :p_flow, :q_flow, :p_dummy, :q_dummy, :r, :t, :p_inj, :q_inj),
         Tuple{
-            VarState, VarState, VarState, VarState, VarState, VarState, VarState,
+            VarState, VarState, VarState, VarState, VarState,
+            VarState, VarState, VarState, VarState,
         },
     }
 
@@ -199,8 +206,10 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWR})
     sectioning = config.sectioning
     if sectioning isa TieLine
         n_flow = n_inter
+        n_dummy = 0
     elseif sectioning isa DummyBus
-        n_flow = n_pairs
+        n_flow = 0
+        n_dummy = n_pairs
     else
         error("ADMM{Power, SOCWR}: unsupported sectioning $(sectioning)")
     end
@@ -215,9 +224,13 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWR})
         brpairs,
     )
 
+    p_flow = VarState(n_flow, n_zones, config.rho_p)
+    q_flow = VarState(n_flow, n_zones, config.rho_q)
     vars = (
-        p_flow = VarState(n_flow, n_zones, config.rho_p),
-        q_flow = VarState(n_flow, n_zones, config.rho_q),
+        p_flow = p_flow,
+        q_flow = q_flow,
+        p_dummy = VarState(n_dummy, n_zones, p_flow.rho, p_flow.prev_rho),
+        q_dummy = VarState(n_dummy, n_zones, q_flow.rho, q_flow.prev_rho),
     )
 
     return SOCWRPowerWorkspace(;
@@ -254,6 +267,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
     sectioning = config.sectioning
     if sectioning isa TieLine
         n_flow = n_inter
+        n_dummy = 0
         n_rt = n_inter
         init_hybrid_partition!(
             partitions, sys, optimizer_factory,
@@ -261,7 +275,8 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
             sectioning, inter,
         )
     elseif sectioning isa DummyBus
-        n_flow = n_pairs
+        n_flow = 0
+        n_dummy = n_pairs
         n_rt = 0
         init_hybrid_partition!(
             partitions, sys, optimizer_factory,
@@ -270,6 +285,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
         )
     elseif sectioning isa SplitBus
         n_flow = 0
+        n_dummy = 0
         n_rt = 0
         init_hybrid_partition!(
             partitions, sys, optimizer_factory,
@@ -280,10 +296,14 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
         error("ADMM{Hybrid, SOCWR}: unsupported sectioning $(sectioning)")
     end
 
+    p_flow = VarState(n_flow, n_zones, config.rho_p)
+    q_flow = VarState(n_flow, n_zones, config.rho_q)
     vars = (
         v2 = VarState(n_shared, n_zones, config.rho_v2; init_value = 1.0),
-        p_flow = VarState(n_flow, n_zones, config.rho_p),
-        q_flow = VarState(n_flow, n_zones, config.rho_q),
+        p_flow = p_flow,
+        q_flow = q_flow,
+        p_dummy = VarState(n_dummy, n_zones, p_flow.rho, p_flow.prev_rho),
+        q_dummy = VarState(n_dummy, n_zones, q_flow.rho, q_flow.prev_rho),
         r = VarState(n_rt, n_zones, config.rho_r),
         t = VarState(n_rt, n_zones, config.rho_t),
         p_inj = VarState(n_bus_pairs, n_zones, config.rho_p),

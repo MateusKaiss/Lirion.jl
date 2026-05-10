@@ -351,16 +351,16 @@ end
 # ------------------------------------------------------------
 
 function compute_residuals!(ws::DCPowerWorkspace{DummyBus})
-    rho = ws.vars.p_flow.rho[]
+    rho = ws.vars.p_dummy.rho[]
     ws.r_primal = _primal_residual_branch_pairs(
         ws.partitions,
-        ws.vars.p_flow.consensus,
+        ws.vars.p_dummy.consensus,
         ws.branch_pairs,
         _dc_flow_value,
     )
     ws.r_dual = _dual_residual_branch_pairs(
-        ws.vars.p_flow.consensus,
-        ws.vars.p_flow.consensus_prev,
+        ws.vars.p_dummy.consensus,
+        ws.vars.p_dummy.consensus_prev,
         ws.branch_pairs,
         rho,
     )
@@ -421,16 +421,16 @@ function compute_residuals!(ws::DCHybridWorkspace{DummyBus})
         ws.vars.theta.rho[],
     )
 
-    rho = ws.vars.p_flow.rho[]
+    rho = ws.vars.p_dummy.rho[]
     ws.r_primal_branch = _primal_residual_branch_pairs(
         ws.partitions,
-        ws.vars.p_flow.consensus,
+        ws.vars.p_dummy.consensus,
         ws.branch_pairs,
         _dc_flow_value,
     )
     ws.r_dual_branch = _dual_residual_branch_pairs(
-        ws.vars.p_flow.consensus,
-        ws.vars.p_flow.consensus_prev,
+        ws.vars.p_dummy.consensus,
+        ws.vars.p_dummy.consensus_prev,
         ws.branch_pairs,
         rho,
     )
@@ -535,23 +535,23 @@ end
 # ------------------------------------------------------------
 
 function compute_residuals!(ws::ACPowerWorkspace{DummyBus})
-    rho_p = ws.vars.p_flow.rho[]
-    rho_q = ws.vars.q_flow.rho[]
+    rho_p = ws.vars.p_dummy.rho[]
+    rho_q = ws.vars.q_dummy.rho[]
 
     ws.r_primal_p, ws.r_primal_q = _primal_residual_branch_pairs_ac(
         ws.partitions,
-        ws.vars.p_flow.consensus,
-        ws.vars.q_flow.consensus,
+        ws.vars.p_dummy.consensus,
+        ws.vars.q_dummy.consensus,
         ws.branch_pairs,
     )
     ws.r_dual_p = _dual_residual_branch_pairs(
-        ws.vars.p_flow.consensus,
-        ws.vars.p_flow.consensus_prev,
+        ws.vars.p_dummy.consensus,
+        ws.vars.p_dummy.consensus_prev,
         ws.branch_pairs, rho_p,
     )
     ws.r_dual_q = _dual_residual_branch_pairs(
-        ws.vars.q_flow.consensus,
-        ws.vars.q_flow.consensus_prev,
+        ws.vars.q_dummy.consensus,
+        ws.vars.q_dummy.consensus_prev,
         ws.branch_pairs, rho_q,
     )
 
@@ -611,8 +611,8 @@ end
 # ------------------------------------------------------------
 
 function compute_residuals!(ws::ACHybridWorkspace{DummyBus})
-    rho_p = ws.vars.p_flow.rho[]
-    rho_q = ws.vars.q_flow.rho[]
+    rho_p = ws.vars.p_dummy.rho[]
+    rho_q = ws.vars.q_dummy.rho[]
 
     ws.r_primal_theta, ws.r_primal_v_mag = _primal_residual_bus_ac_components(
         ws.partitions,
@@ -628,18 +628,18 @@ function compute_residuals!(ws::ACHybridWorkspace{DummyBus})
 
     ws.r_primal_p, ws.r_primal_q = _primal_residual_branch_pairs_ac(
         ws.partitions,
-        ws.vars.p_flow.consensus,
-        ws.vars.q_flow.consensus,
+        ws.vars.p_dummy.consensus,
+        ws.vars.q_dummy.consensus,
         ws.branch_pairs,
     )
     ws.r_dual_p = _dual_residual_branch_pairs(
-        ws.vars.p_flow.consensus,
-        ws.vars.p_flow.consensus_prev,
+        ws.vars.p_dummy.consensus,
+        ws.vars.p_dummy.consensus_prev,
         ws.branch_pairs, rho_p,
     )
     ws.r_dual_q = _dual_residual_branch_pairs(
-        ws.vars.q_flow.consensus,
-        ws.vars.q_flow.consensus_prev,
+        ws.vars.q_dummy.consensus,
+        ws.vars.q_dummy.consensus_prev,
         ws.branch_pairs, rho_q,
     )
 
@@ -770,29 +770,29 @@ end
 # ------------------------------------------------------------
 
 function compute_residuals!(ws::SOCWRPowerWorkspace{DummyBus})
-    rho_p = ws.vars.p_flow.rho[]
-    rho_q = ws.vars.q_flow.rho[]
+    rho_p = ws.vars.p_dummy.rho[]
+    rho_q = ws.vars.q_dummy.rho[]
 
     ws.r_primal_p = _primal_residual_branch_pairs(
         ws.partitions,
-        ws.vars.p_flow.consensus,
+        ws.vars.p_dummy.consensus,
         ws.branch_pairs,
         _socwr_p_value,
     )
     ws.r_primal_q = _primal_residual_branch_pairs(
         ws.partitions,
-        ws.vars.q_flow.consensus,
+        ws.vars.q_dummy.consensus,
         ws.branch_pairs,
         _socwr_q_value,
     )
     ws.r_dual_p = _dual_residual_branch_pairs(
-        ws.vars.p_flow.consensus,
-        ws.vars.p_flow.consensus_prev,
+        ws.vars.p_dummy.consensus,
+        ws.vars.p_dummy.consensus_prev,
         ws.branch_pairs, rho_p,
     )
     ws.r_dual_q = _dual_residual_branch_pairs(
-        ws.vars.q_flow.consensus,
-        ws.vars.q_flow.consensus_prev,
+        ws.vars.q_dummy.consensus,
+        ws.vars.q_dummy.consensus_prev,
         ws.branch_pairs, rho_q,
     )
 
@@ -869,8 +869,8 @@ end
 # ------------------------------------------------------------
 
 function compute_residuals!(ws::SOCWRHybridWorkspace{DummyBus})
-    rho_p = ws.vars.p_flow.rho[]
-    rho_q = ws.vars.q_flow.rho[]
+    rho_p = ws.vars.p_dummy.rho[]
+    rho_q = ws.vars.q_dummy.rho[]
 
     ws.r_primal_bus = _primal_residual_bus_single(
         ws.partitions,
@@ -886,24 +886,24 @@ function compute_residuals!(ws::SOCWRHybridWorkspace{DummyBus})
 
     ws.r_primal_p = _primal_residual_branch_pairs(
         ws.partitions,
-        ws.vars.p_flow.consensus,
+        ws.vars.p_dummy.consensus,
         ws.branch_pairs,
         _socwr_p_value,
     )
     ws.r_primal_q = _primal_residual_branch_pairs(
         ws.partitions,
-        ws.vars.q_flow.consensus,
+        ws.vars.q_dummy.consensus,
         ws.branch_pairs,
         _socwr_q_value,
     )
     ws.r_dual_p = _dual_residual_branch_pairs(
-        ws.vars.p_flow.consensus,
-        ws.vars.p_flow.consensus_prev,
+        ws.vars.p_dummy.consensus,
+        ws.vars.p_dummy.consensus_prev,
         ws.branch_pairs, rho_p,
     )
     ws.r_dual_q = _dual_residual_branch_pairs(
-        ws.vars.q_flow.consensus,
-        ws.vars.q_flow.consensus_prev,
+        ws.vars.q_dummy.consensus,
+        ws.vars.q_dummy.consensus_prev,
         ws.branch_pairs, rho_q,
     )
 

@@ -305,7 +305,7 @@ end
 
 function consensus!(ws::DCPowerWorkspace{DummyBus})
     _consensus_branch_pairs!(
-        ws.vars.p_flow.consensus,
+        ws.vars.p_dummy.consensus,
         ws.pair_counts,
         ws.partitions,
         ws.branch_pairs,
@@ -347,7 +347,7 @@ function consensus!(ws::DCHybridWorkspace{DummyBus})
         snapshot_theta_shared!,
     )
     _consensus_branch_pairs!(
-        ws.vars.p_flow.consensus,
+        ws.vars.p_dummy.consensus,
         ws.pair_counts,
         ws.partitions,
         ws.branch_pairs,
@@ -412,8 +412,8 @@ end
 
 function consensus!(ws::ACPowerWorkspace{DummyBus})
     _consensus_branch_pairs_ac!(
-        ws.vars.p_flow.consensus,
-        ws.vars.q_flow.consensus,
+        ws.vars.p_dummy.consensus,
+        ws.vars.q_dummy.consensus,
         ws.pair_counts,
         ws.partitions,
         ws.branch_pairs,
@@ -459,8 +459,8 @@ function consensus!(ws::ACHybridWorkspace{DummyBus})
         ws.partitions,
     )
     _consensus_branch_pairs_ac!(
-        ws.vars.p_flow.consensus,
-        ws.vars.q_flow.consensus,
+        ws.vars.p_dummy.consensus,
+        ws.vars.q_dummy.consensus,
         ws.pair_counts,
         ws.partitions,
         ws.branch_pairs,
@@ -536,14 +536,14 @@ end
 
 function consensus!(ws::SOCWRPowerWorkspace{DummyBus})
     _consensus_branch_pairs!(
-        ws.vars.p_flow.consensus,
+        ws.vars.p_dummy.consensus,
         ws.pair_counts,
         ws.partitions,
         ws.branch_pairs,
         _socwr_p_value,
     )
     _consensus_branch_pairs!(
-        ws.vars.q_flow.consensus,
+        ws.vars.q_dummy.consensus,
         ws.pair_counts,
         ws.partitions,
         ws.branch_pairs,
@@ -594,14 +594,14 @@ function consensus!(ws::SOCWRHybridWorkspace{DummyBus})
         snapshot_v2_shared!,
     )
     _consensus_branch_pairs!(
-        ws.vars.p_flow.consensus,
+        ws.vars.p_dummy.consensus,
         ws.pair_counts,
         ws.partitions,
         ws.branch_pairs,
         _socwr_p_value,
     )
     _consensus_branch_pairs!(
-        ws.vars.q_flow.consensus,
+        ws.vars.q_dummy.consensus,
         ws.pair_counts,
         ws.partitions,
         ws.branch_pairs,

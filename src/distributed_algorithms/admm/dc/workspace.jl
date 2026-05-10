@@ -36,7 +36,9 @@ Base.@kwdef mutable struct DCPowerWorkspace{S <: Sectioning} <: AbstractADMMWork
     branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[]
     pair_counts::Vector{Int} = Int[]
 
-    vars::NamedTuple{(:p_flow,), Tuple{VarState}}
+    # `p_flow` carries tie-line consensus; `p_dummy` carries dummy-line
+    # consensus (Method 2). Exactly one is non-empty depending on `S`.
+    vars::NamedTuple{(:p_flow, :p_dummy), Tuple{VarState, VarState}}
 
     branch_counts::Vector{Int}
 
@@ -66,8 +68,8 @@ Base.@kwdef mutable struct DCHybridWorkspace{S <: Sectioning} <: AbstractADMMWor
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
         Vector{Dict{Int, JuMP.VariableRef}}()
 
-    vars::NamedTuple{(:theta, :p_flow, :p_inj),
-        Tuple{VarState, VarState, VarState}}
+    vars::NamedTuple{(:theta, :p_flow, :p_dummy, :p_inj),
+        Tuple{VarState, VarState, VarState, VarState}}
 
     bus_counts::Vector{Int}
     branch_counts::Vector{Int}
@@ -142,17 +144,23 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, DC})
 
     sectioning = config.sectioning
     if sectioning isa TieLine
-        n_flow = n_inter
+        n_p_flow = n_inter
+        n_p_dummy = 0
     elseif sectioning isa DummyBus
-        n_flow = n_pairs
+        n_p_flow = 0
+        n_p_dummy = n_pairs
     else
         error("ADMM{Power, DC}: unsupported sectioning $(sectioning)")
     end
 
     init_power_partition!(partitions, sys, optimizer_factory, config.rho_p, inter, pairs)
 
+    p_flow = VarState(n_p_flow, n_zones, config.rho_p)
     vars = (
-        p_flow = VarState(n_flow, n_zones, config.rho_p),
+        p_flow = p_flow,
+        # p_dummy shares p_flow's rho refs so adaptive rho/refresh kernels
+        # update both consistently with a single schedule.
+        p_dummy = VarState(n_p_dummy, n_zones, p_flow.rho, p_flow.prev_rho),
     )
 
     return DCPowerWorkspace(;
@@ -188,18 +196,21 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
     sectioning = config.sectioning
     if sectioning isa TieLine
         n_p_flow = n_inter
+        n_p_dummy = 0
         init_hybrid_partition!(
             partitions, sys, optimizer_factory,
             config.rho_theta, config.rho_p, sectioning, inter,
         )
     elseif sectioning isa DummyBus
-        n_p_flow = n_pairs
+        n_p_flow = 0
+        n_p_dummy = n_pairs
         init_hybrid_partition!(
             partitions, sys, optimizer_factory,
             config.rho_theta, config.rho_p, sectioning, inter, pairs,
         )
     elseif sectioning isa SplitBus
         n_p_flow = 0
+        n_p_dummy = 0
         init_hybrid_partition!(
             partitions, sys, optimizer_factory,
             config.rho_theta, config.rho_p, sectioning, inter,
@@ -209,9 +220,11 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
         error("ADMM{Hybrid, DC}: unsupported sectioning $(sectioning)")
     end
 
+    p_flow = VarState(n_p_flow, n_zones, config.rho_p)
     vars = (
         theta = VarState(n_shared, n_zones, config.rho_theta),
-        p_flow = VarState(n_p_flow, n_zones, config.rho_p),
+        p_flow = p_flow,
+        p_dummy = VarState(n_p_dummy, n_zones, p_flow.rho, p_flow.prev_rho),
         p_inj = VarState(n_bus_pairs, n_zones, config.rho_p),
     )
 

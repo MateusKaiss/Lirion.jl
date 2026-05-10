@@ -114,16 +114,13 @@ end
 
 function build_linear_branch_term(
     part::PartitionDC,
-    zone_edges::Vector{Int},
     p_flow_consensus::Vector{Float64},
     duals_p_flow::AbstractVector{Float64},
     interzonal::Vector{Int},
     rho_p::Float64,
-    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )::JuMP.AffExpr
     m = part.model::JuMP.Model
     lin = zero(JuMP.AffExpr)
-    n_inter = length(interzonal)
     @inbounds for (k, e) in enumerate(interzonal)
         l = part.branch_idx_full_to_zone[e]
         l == 0 && continue
@@ -132,12 +129,24 @@ function build_linear_branch_term(
         p_dual = duals_p_flow[k]
         lin += (p_dual - rho_p * p_cons) * p
     end
+    return lin
+end
+
+function build_linear_dummy_term(
+    part::PartitionDC,
+    p_dummy_consensus::Vector{Float64},
+    duals_p_dummy::AbstractVector{Float64},
+    branch_pairs::Vector{NTuple{4, Int}},
+    rho_p::Float64,
+)::JuMP.AffExpr
+    m = part.model::JuMP.Model
+    lin = zero(JuMP.AffExpr)
+    isempty(branch_pairs) && return lin
 
     pos = part.position
     @inbounds for (k, (ga, za, gb, zb)) in enumerate(branch_pairs)
-        idx = n_inter + k
-        p_cons = p_flow_consensus[idx]
-        p_dual = duals_p_flow[idx]
+        p_cons = p_dummy_consensus[k]
+        p_dual = duals_p_dummy[k]
         if za == pos
             l = part.branch_idx_full_to_zone[ga]
             if l != 0
@@ -215,17 +224,22 @@ end
 # ------------------------------------------------------------
 
 function update_objective!(part::PartitionDC, ws::DCPowerWorkspace)
-    lin = build_linear_branch_term(
+    lin_branch = build_linear_branch_term(
         part,
-        part.zone_edges,
         ws.vars.p_flow.consensus,
         view(ws.vars.p_flow.duals, :, part.position),
         ws.interzonal,
         ws.vars.p_flow.rho[],
+    )
+    lin_dummy = build_linear_dummy_term(
+        part,
+        ws.vars.p_dummy.consensus,
+        view(ws.vars.p_dummy.duals, :, part.position),
         ws.branch_pairs,
+        ws.vars.p_dummy.rho[],
     )
 
-    @objective(part.model, Min, part.obj_static + lin)
+    @objective(part.model, Min, part.obj_static + lin_branch + lin_dummy)
 end
 
 # ------------------------------------------------------------
@@ -245,15 +259,24 @@ function update_objective!(
 
     lin_branch = build_linear_branch_term(
         part,
-        part.zone_edges,
         ws.vars.p_flow.consensus,
         view(ws.vars.p_flow.duals, :, part.position),
         ws.interzonal,
         ws.vars.p_flow.rho[],
+    )
+    lin_dummy = build_linear_dummy_term(
+        part,
+        ws.vars.p_dummy.consensus,
+        view(ws.vars.p_dummy.duals, :, part.position),
         ws.branch_pairs,
+        ws.vars.p_dummy.rho[],
     )
 
-    @objective(part.model, Min, part.obj_static + lin_bus + lin_branch)
+    @objective(
+        part.model,
+        Min,
+        part.obj_static + lin_bus + lin_branch + lin_dummy,
+    )
     return nothing
 end
 

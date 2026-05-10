@@ -29,3 +29,21 @@ function VarState(
         Ref(rho_init),
     )
 end
+
+# Twin VarState that shares its rho refs with another (used so p_dummy
+# follows the same rho schedule as the tie-line p_flow it complements).
+function VarState(
+    n::Int,
+    n_zones::Int,
+    rho::Base.RefValue{Float64},
+    prev_rho::Base.RefValue{Float64};
+    init_value::Float64 = 0.0,
+)
+    return VarState(
+        fill(init_value, n),
+        fill(init_value, n),
+        zeros(n, n_zones),
+        rho,
+        prev_rho,
+    )
+end

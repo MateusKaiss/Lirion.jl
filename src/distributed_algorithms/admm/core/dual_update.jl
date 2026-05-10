@@ -254,10 +254,10 @@ end
 
 function dual_update!(ws::DCPowerWorkspace{DummyBus})
     _update_branch_pairs_duals_single!(
-        ws.vars.p_flow.duals,
+        ws.vars.p_dummy.duals,
         ws.partitions,
-        ws.vars.p_flow.consensus,
-        ws.vars.p_flow.rho[],
+        ws.vars.p_dummy.consensus,
+        ws.vars.p_dummy.rho[],
         ws.branch_pairs,
         _dc_flow_value,
     )
@@ -300,10 +300,10 @@ function dual_update!(ws::DCHybridWorkspace{DummyBus})
         snapshot_theta_shared!,
     )
     _update_branch_pairs_duals_single!(
-        ws.vars.p_flow.duals,
+        ws.vars.p_dummy.duals,
         ws.partitions,
-        ws.vars.p_flow.consensus,
-        ws.vars.p_flow.rho[],
+        ws.vars.p_dummy.consensus,
+        ws.vars.p_dummy.rho[],
         ws.branch_pairs,
         _dc_flow_value,
     )
@@ -379,15 +379,15 @@ end
 # ------------------------------------------------------------
 
 function dual_update!(ws::ACPowerWorkspace{DummyBus})
-    rho_p = ws.vars.p_flow.rho[]
-    rho_q = ws.vars.q_flow.rho[]
+    rho_p = ws.vars.p_dummy.rho[]
+    rho_q = ws.vars.q_dummy.rho[]
 
     _update_branch_pairs_duals_ac!(
-        ws.vars.p_flow.duals,
-        ws.vars.q_flow.duals,
+        ws.vars.p_dummy.duals,
+        ws.vars.q_dummy.duals,
         ws.partitions,
-        ws.vars.p_flow.consensus,
-        ws.vars.q_flow.consensus,
+        ws.vars.p_dummy.consensus,
+        ws.vars.q_dummy.consensus,
         rho_p, rho_q,
         ws.branch_pairs,
     )
@@ -428,8 +428,8 @@ end
 # ------------------------------------------------------------
 
 function dual_update!(ws::ACHybridWorkspace{DummyBus})
-    rho_p = ws.vars.p_flow.rho[]
-    rho_q = ws.vars.q_flow.rho[]
+    rho_p = ws.vars.p_dummy.rho[]
+    rho_q = ws.vars.q_dummy.rho[]
 
     _update_bus_duals_ac!(
         ws.vars.theta.duals,
@@ -441,11 +441,11 @@ function dual_update!(ws::ACHybridWorkspace{DummyBus})
         ws.vars.v_mag.rho[],
     )
     _update_branch_pairs_duals_ac!(
-        ws.vars.p_flow.duals,
-        ws.vars.q_flow.duals,
+        ws.vars.p_dummy.duals,
+        ws.vars.q_dummy.duals,
         ws.partitions,
-        ws.vars.p_flow.consensus,
-        ws.vars.q_flow.consensus,
+        ws.vars.p_dummy.consensus,
+        ws.vars.q_dummy.consensus,
         rho_p, rho_q,
         ws.branch_pairs,
     )
@@ -535,21 +535,21 @@ end
 # ------------------------------------------------------------
 
 function dual_update!(ws::SOCWRPowerWorkspace{DummyBus})
-    rho_p = ws.vars.p_flow.rho[]
-    rho_q = ws.vars.q_flow.rho[]
+    rho_p = ws.vars.p_dummy.rho[]
+    rho_q = ws.vars.q_dummy.rho[]
 
     _update_branch_pairs_duals_single!(
-        ws.vars.p_flow.duals,
+        ws.vars.p_dummy.duals,
         ws.partitions,
-        ws.vars.p_flow.consensus,
+        ws.vars.p_dummy.consensus,
         rho_p,
         ws.branch_pairs,
         _socwr_p_value,
     )
     _update_branch_pairs_duals_single!(
-        ws.vars.q_flow.duals,
+        ws.vars.q_dummy.duals,
         ws.partitions,
-        ws.vars.q_flow.consensus,
+        ws.vars.q_dummy.consensus,
         rho_q,
         ws.branch_pairs,
         _socwr_q_value,

@@ -283,14 +283,14 @@ function compute_tolerances!(
 )
     ws.eps_primal = _eps_primal_branch_pairs(
         ws.partitions,
-        ws.vars.p_flow.consensus,
+        ws.vars.p_dummy.consensus,
         ws.branch_pairs,
         :p_flow_branches,
         eps_abs,
         eps_rel,
     )
     ws.eps_dual = _eps_dual_branch_pairs(
-        ws.vars.p_flow.duals,
+        ws.vars.p_dummy.duals,
         ws.branch_pairs,
         eps_abs,
         eps_rel,
@@ -367,14 +367,14 @@ function compute_tolerances!(
 
     eps_r_pair = _eps_primal_branch_pairs(
         ws.partitions,
-        ws.vars.p_flow.consensus,
+        ws.vars.p_dummy.consensus,
         ws.branch_pairs,
         :p_flow_branches,
         eps_abs,
         eps_rel,
     )
     eps_s_pair = _eps_dual_branch_pairs(
-        ws.vars.p_flow.duals,
+        ws.vars.p_dummy.duals,
         ws.branch_pairs,
         eps_abs,
         eps_rel,
@@ -493,7 +493,7 @@ function compute_tolerances!(
 )
     eps_r_p = _eps_primal_branch_pairs(
         ws.partitions,
-        ws.vars.p_flow.consensus,
+        ws.vars.p_dummy.consensus,
         ws.branch_pairs,
         :p_flow_branches,
         eps_abs,
@@ -501,20 +501,20 @@ function compute_tolerances!(
     )
     eps_r_q = _eps_primal_branch_pairs(
         ws.partitions,
-        ws.vars.q_flow.consensus,
+        ws.vars.q_dummy.consensus,
         ws.branch_pairs,
         :q_flow_branches,
         eps_abs,
         eps_rel,
     )
     eps_s_p = _eps_dual_branch_pairs(
-        ws.vars.p_flow.duals,
+        ws.vars.p_dummy.duals,
         ws.branch_pairs,
         eps_abs,
         eps_rel,
     )
     eps_s_q = _eps_dual_branch_pairs(
-        ws.vars.q_flow.duals,
+        ws.vars.q_dummy.duals,
         ws.branch_pairs,
         eps_abs,
         eps_rel,
@@ -594,7 +594,7 @@ function compute_tolerances!(
 
     eps_r_p_pair = _eps_primal_branch_pairs(
         ws.partitions,
-        ws.vars.p_flow.consensus,
+        ws.vars.p_dummy.consensus,
         ws.branch_pairs,
         :p_flow_branches,
         eps_abs,
@@ -602,20 +602,20 @@ function compute_tolerances!(
     )
     eps_r_q_pair = _eps_primal_branch_pairs(
         ws.partitions,
-        ws.vars.q_flow.consensus,
+        ws.vars.q_dummy.consensus,
         ws.branch_pairs,
         :q_flow_branches,
         eps_abs,
         eps_rel,
     )
     eps_s_p_pair = _eps_dual_branch_pairs(
-        ws.vars.p_flow.duals,
+        ws.vars.p_dummy.duals,
         ws.branch_pairs,
         eps_abs,
         eps_rel,
     )
     eps_s_q_pair = _eps_dual_branch_pairs(
-        ws.vars.q_flow.duals,
+        ws.vars.q_dummy.duals,
         ws.branch_pairs,
         eps_abs,
         eps_rel,
@@ -756,7 +756,7 @@ function compute_tolerances!(
 )
     eps_r_p = _eps_primal_branch_pairs(
         ws.partitions,
-        ws.vars.p_flow.consensus,
+        ws.vars.p_dummy.consensus,
         ws.branch_pairs,
         :p_flow_branches,
         eps_abs,
@@ -764,20 +764,20 @@ function compute_tolerances!(
     )
     eps_r_q = _eps_primal_branch_pairs(
         ws.partitions,
-        ws.vars.q_flow.consensus,
+        ws.vars.q_dummy.consensus,
         ws.branch_pairs,
         :q_flow_branches,
         eps_abs,
         eps_rel,
     )
     eps_s_p = _eps_dual_branch_pairs(
-        ws.vars.p_flow.duals,
+        ws.vars.p_dummy.duals,
         ws.branch_pairs,
         eps_abs,
         eps_rel,
     )
     eps_s_q = _eps_dual_branch_pairs(
-        ws.vars.q_flow.duals,
+        ws.vars.q_dummy.duals,
         ws.branch_pairs,
         eps_abs,
         eps_rel,
@@ -873,7 +873,7 @@ function compute_tolerances!(
 
     eps_r_p_pair = _eps_primal_branch_pairs(
         ws.partitions,
-        ws.vars.p_flow.consensus,
+        ws.vars.p_dummy.consensus,
         ws.branch_pairs,
         :p_flow_branches,
         eps_abs,
@@ -881,20 +881,20 @@ function compute_tolerances!(
     )
     eps_r_q_pair = _eps_primal_branch_pairs(
         ws.partitions,
-        ws.vars.q_flow.consensus,
+        ws.vars.q_dummy.consensus,
         ws.branch_pairs,
         :q_flow_branches,
         eps_abs,
         eps_rel,
     )
     eps_s_p_pair = _eps_dual_branch_pairs(
-        ws.vars.p_flow.duals,
+        ws.vars.p_dummy.duals,
         ws.branch_pairs,
         eps_abs,
         eps_rel,
     )
     eps_s_q_pair = _eps_dual_branch_pairs(
-        ws.vars.q_flow.duals,
+        ws.vars.q_dummy.duals,
         ws.branch_pairs,
         eps_abs,
         eps_rel,

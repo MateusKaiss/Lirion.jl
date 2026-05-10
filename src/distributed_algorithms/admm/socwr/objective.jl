@@ -176,7 +176,6 @@ end
 
 function build_linear_branch_pq_term(
     part::PartitionSOCWR,
-    zone_edges::Vector{Int},
     p_consensus::Vector{Float64},
     q_consensus::Vector{Float64},
     duals_p::AbstractVector{Float64},
@@ -184,11 +183,9 @@ function build_linear_branch_pq_term(
     interzonal::Vector{Int},
     rho_p::Float64,
     rho_q::Float64,
-    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )::JuMP.AffExpr
     m = part.model::JuMP.Model
     lin = zero(JuMP.AffExpr)
-    n_inter = length(interzonal)
 
     @inbounds for (k, e) in enumerate(interzonal)
         l = part.branch_idx_full_to_zone[e]
@@ -203,13 +200,29 @@ function build_linear_branch_pq_term(
         lin += (p_dual - rho_p * p_cons) * p + (q_dual - rho_q * q_cons) * q
     end
 
+    return lin
+end
+
+function build_linear_dummy_pq_term(
+    part::PartitionSOCWR,
+    p_consensus::Vector{Float64},
+    q_consensus::Vector{Float64},
+    duals_p::AbstractVector{Float64},
+    duals_q::AbstractVector{Float64},
+    branch_pairs::Vector{NTuple{4, Int}},
+    rho_p::Float64,
+    rho_q::Float64,
+)::JuMP.AffExpr
+    m = part.model::JuMP.Model
+    lin = zero(JuMP.AffExpr)
+    isempty(branch_pairs) && return lin
+
     pos = part.position
     @inbounds for (k, (ga, za, gb, zb)) in enumerate(branch_pairs)
-        idx = n_inter + k
-        p_cons = p_consensus[idx]
-        q_cons = q_consensus[idx]
-        p_dual = duals_p[idx]
-        q_dual = duals_q[idx]
+        p_cons = p_consensus[k]
+        q_cons = q_consensus[k]
+        p_dual = duals_p[k]
+        q_dual = duals_q[k]
         if za == pos
             l = part.branch_idx_full_to_zone[ga]
             if l != 0
@@ -304,9 +317,8 @@ end
 function update_objective!(part::PartitionSOCWR, ws::SOCWRPowerWorkspace)
     p = part.position
 
-    lin = build_linear_branch_pq_term(
+    lin_pq = build_linear_branch_pq_term(
         part,
-        part.zone_edges,
         ws.vars.p_flow.consensus,
         ws.vars.q_flow.consensus,
         view(ws.vars.p_flow.duals, :, p),
@@ -314,10 +326,19 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRPowerWorkspace)
         ws.interzonal,
         ws.vars.p_flow.rho[],
         ws.vars.q_flow.rho[],
+    )
+    lin_dummy = build_linear_dummy_pq_term(
+        part,
+        ws.vars.p_dummy.consensus,
+        ws.vars.q_dummy.consensus,
+        view(ws.vars.p_dummy.duals, :, p),
+        view(ws.vars.q_dummy.duals, :, p),
         ws.branch_pairs,
+        ws.vars.p_dummy.rho[],
+        ws.vars.q_dummy.rho[],
     )
 
-    @objective(part.model, Min, part.obj_static + lin)
+    @objective(part.model, Min, part.obj_static + lin_pq + lin_dummy)
 end
 
 # ------------------------------------------------------------
@@ -339,7 +360,6 @@ function update_objective!(
 
     lin_pq = build_linear_branch_pq_term(
         part,
-        part.zone_edges,
         ws.vars.p_flow.consensus,
         ws.vars.q_flow.consensus,
         view(ws.vars.p_flow.duals, :, p),
@@ -347,7 +367,16 @@ function update_objective!(
         ws.interzonal,
         ws.vars.p_flow.rho[],
         ws.vars.q_flow.rho[],
+    )
+    lin_dummy = build_linear_dummy_pq_term(
+        part,
+        ws.vars.p_dummy.consensus,
+        ws.vars.q_dummy.consensus,
+        view(ws.vars.p_dummy.duals, :, p),
+        view(ws.vars.q_dummy.duals, :, p),
         ws.branch_pairs,
+        ws.vars.p_dummy.rho[],
+        ws.vars.q_dummy.rho[],
     )
 
     lin_rt = build_linear_branch_rt_term(
@@ -362,7 +391,11 @@ function update_objective!(
         ws.vars.t.rho[],
     )
 
-    @objective(part.model, Min, part.obj_static + lin_bus + lin_pq + lin_rt)
+    @objective(
+        part.model,
+        Min,
+        part.obj_static + lin_bus + lin_pq + lin_dummy + lin_rt,
+    )
     return nothing
 end
 
