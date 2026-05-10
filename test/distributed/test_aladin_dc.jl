@@ -189,6 +189,62 @@ function run_aladin_dc_hybrid_tests(;
 end
 
 # ============================================================
+# ALADIN DC - HYBRID + proximal_mode=:pflow
+# ------------------------------------------------------------
+# Same consensus as the default Hybrid (shared θ + tie-line p_flow);
+# the prox additionally regularises the flow expressions on the
+# tie-lines. σ_pflow stays small because in Hybrid the pflow term is
+# additive to σ_θ_shared on edge-endpoint θ — see workspace docstring.
+# ============================================================
+function run_aladin_dc_hybrid_pflow_tests(;
+    rtol = 0.01,
+    atol = 1e-6,
+    central_optimizer = nothing,
+    distributed_optimizer = nothing,
+)
+    test_dir = @__DIR__
+
+    make_alg(p) = Lirion.aladin(;
+        coupling = :hybrid,
+        sectioning = :tie_line,
+        proximal_mode = :pflow,
+        max_iter = p.max_iter,
+        rho = p.rho,
+        mu = p.mu,
+        sigma_pflow = p.sigma_pflow,
+        eps_abs = p.eps_abs,
+        eps_rel = p.eps_rel,
+    )
+
+    defaults(_) = (
+        max_iter = 5000,
+        rho = 10000.0,
+        mu = 1000.0,
+        sigma_pflow = 1.0,
+        eps_abs = 2e-4,
+        eps_rel = 2e-4,
+    )
+
+    overrides(_case_name) = NamedTuple()
+
+    return run_case_suite(;
+        label = "ALADIN-DC HYBRID PFLOW",
+        test_dir = test_dir,
+        case_list = ALADIN_DC_HYBRID_CASES,
+        model = Lirion.dc(),
+        central_optimizer = central_optimizer,
+        distributed_optimizer = distributed_optimizer,
+        objective_central = aladin_central_obj_dc,
+        objective_dist = aladin_dist_obj_dc,
+        make_algorithm = make_alg,
+        defaults = defaults,
+        overrides = overrides,
+        rtol = rtol,
+        atol = atol,
+    )
+end
+
+# ============================================================
 # ALADIN DC - SPLIT-BUS HYBRID (Method 3 — Harris et al. 2022, Fig. 1c)
 # ============================================================
 function run_aladin_dc_splitbus_hybrid_tests(;
