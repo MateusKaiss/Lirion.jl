@@ -1,25 +1,6 @@
 # ============================================================
 # ALADIN-DC — Local (Phase 1) objective builder
 # ============================================================
-#
-# The Phase-1 prox objective has three pieces:
-#   1. Static quadratic    `(ρ/2)·Σ σ_k·v_k²`        (cached, refresh on ρ change)
-#   2. Linear prox          `−ρ·Σ σ_k·x_prev_k·v_k`  (rebuilt every iter)
-#   3. Coupling λᵀ·A_i·x   (rebuilt every iter)
-#
-# This file holds all three plus the per-variant `update_objective!`
-# dispatch — the ALADIN analogue of `admm/dc/objective.jl`.
-
-# ============================================================
-# Quadratic (static, cached) part
-# ============================================================
-#
-# `(ρ/2)·Σ σ_k·v_k²` is constant in (ρ, σ); cached on `zone.quad_static`
-# at workspace build time and refreshed only when ρ changes
-# (`adapt_rho_mu!`). Two variants:
-#   - `:primal` (canonical): sigmas by class — θ_shared / pg / other
-#   - `:pflow` (experimental): sigmas (pg, other) on every var + extra
-#     σ_pflow on each interzonal edge's `(b·θ_f − b·θ_t)²` term
 
 # ------------------------------------------------------------
 # Primal
@@ -94,6 +75,45 @@ function _build_quad_static_pflow_dc!(
 end
 
 # ------------------------------------------------------------
+# Hybrid + pflow
+# ------------------------------------------------------------
+#
+# Hybrid TieLine has consensus on BOTH shared θ AND p_flow on tie-lines.
+# The `:pflow` proximal here keeps the primal prox on shared θ / pg /
+# other AND adds the σ_pflow·b²·(θ_f − θ_t)² term so each consensus
+# direction has its own prox-aligned regulariser.
+
+function _build_quad_static_hybrid_pflow_dc!(
+    zone::AladinZoneData,
+    rho::Float64;
+    sigma_theta_shared::Float64,
+    sigma_pg::Float64,
+    sigma_other::Float64,
+    sigma_pflow::Float64,
+)
+    _build_quad_static_primal_dc!(
+        zone, rho;
+        sigma_theta_shared = sigma_theta_shared,
+        sigma_pg = sigma_pg,
+        sigma_other = sigma_other,
+    )
+    quad = zone.quad_static
+    @inbounds for k in eachindex(zone.edge_from_cols)
+        fcol = zone.edge_from_cols[k]
+        tcol = zone.edge_to_cols[k]
+        bval = zone.edge_b[k]
+        coef_sq = 0.5 * rho * sigma_pflow * bval * bval
+        v_f = zone.all_vars[fcol]
+        v_t = zone.all_vars[tcol]
+        JuMP.add_to_expression!(quad, coef_sq, v_f, v_f)
+        JuMP.add_to_expression!(quad, -2 * coef_sq, v_f, v_t)
+        JuMP.add_to_expression!(quad, coef_sq, v_t, v_t)
+    end
+    zone.quad_static = quad
+    return nothing
+end
+
+# ------------------------------------------------------------
 # Cache obj_static = obj_base + quad_static
 # ------------------------------------------------------------
 
@@ -132,6 +152,20 @@ end
     return nothing
 end
 
+@inline function _refresh_quad_dc_hybrid_pflow!(parts, zones, rho, ws_or_cfg)
+    @inbounds for (i, zone) in enumerate(zones)
+        _build_quad_static_hybrid_pflow_dc!(
+            zone, rho;
+            sigma_theta_shared = ws_or_cfg.sigma_theta_shared,
+            sigma_pg = ws_or_cfg.sigma_pg,
+            sigma_other = ws_or_cfg.sigma_other,
+            sigma_pflow = ws_or_cfg.sigma_pflow,
+        )
+        _set_obj_static_dc!(parts[i], zone)
+    end
+    return nothing
+end
+
 # ------------------------------------------------------------
 # Public entry point: refresh_rho! (analogue of admm/refresh_rho!)
 # ------------------------------------------------------------
@@ -145,7 +179,11 @@ refresh_rho!(ws::DCPowerWorkspaceALADIN) =
         _refresh_quad_dc_primal!(ws.partitions.parts, ws.zones, ws.rho[], ws)
 
 refresh_rho!(ws::DCHybridWorkspaceALADIN) =
-    _refresh_quad_dc_primal!(ws.partitions.parts, ws.zones, ws.rho_bus[], ws)
+    ws.proximal_mode === :pflow ?
+        _refresh_quad_dc_hybrid_pflow!(
+            ws.partitions.parts, ws.zones, ws.rho_bus[], ws,
+        ) :
+        _refresh_quad_dc_primal!(ws.partitions.parts, ws.zones, ws.rho_bus[], ws)
 
 # ============================================================
 # Linear (per-iteration) prox part
@@ -206,6 +244,42 @@ end
         JuMP.add_to_expression!(lin, -rho * sig * zone.x_prev[k], zone.all_vars[k])
     end
 
+    @inbounds for k in eachindex(zone.edge_from_cols)
+        fcol = zone.edge_from_cols[k]
+        tcol = zone.edge_to_cols[k]
+        bval = zone.edge_b[k]
+        p_prev = bval * (zone.x_prev[fcol] - zone.x_prev[tcol])
+        coef_lin = -rho * sigma_pflow * bval * p_prev
+        JuMP.add_to_expression!(lin, coef_lin, zone.all_vars[fcol])
+        JuMP.add_to_expression!(lin, -coef_lin, zone.all_vars[tcol])
+    end
+    return lin
+end
+
+# ------------------------------------------------------------
+# Hybrid + pflow
+# ------------------------------------------------------------
+#
+# Linear counterpart to `_build_quad_static_hybrid_pflow_dc!`: keeps
+# the primal linear prox (shared θ / pg / other) and adds the edge
+# pflow term so the per-iteration linearisation matches the cached
+# quadratic.
+
+@inline function _prox_lin_hybrid_pflow_dc!(
+    lin::JuMP.AffExpr,
+    zone::AladinZoneData,
+    rho::Float64;
+    sigma_theta_shared::Float64,
+    sigma_pg::Float64,
+    sigma_other::Float64,
+    sigma_pflow::Float64,
+)
+    _prox_lin_primal_dc!(
+        lin, zone, rho;
+        sigma_theta_shared = sigma_theta_shared,
+        sigma_pg = sigma_pg,
+        sigma_other = sigma_other,
+    )
     @inbounds for k in eachindex(zone.edge_from_cols)
         fcol = zone.edge_from_cols[k]
         tcol = zone.edge_to_cols[k]
@@ -409,12 +483,22 @@ function update_objective!(part::PartitionDC, ws::DCHybridWorkspaceALADIN)
         end
     end
 
-    _prox_lin_primal_dc!(
-        lin, zdata, ws.rho_bus[];
-        sigma_theta_shared = ws.sigma_theta_shared,
-        sigma_pg = ws.sigma_pg,
-        sigma_other = ws.sigma_other,
-    )
+    if ws.proximal_mode === :pflow
+        _prox_lin_hybrid_pflow_dc!(
+            lin, zdata, ws.rho_bus[];
+            sigma_theta_shared = ws.sigma_theta_shared,
+            sigma_pg = ws.sigma_pg,
+            sigma_other = ws.sigma_other,
+            sigma_pflow = ws.sigma_pflow,
+        )
+    else
+        _prox_lin_primal_dc!(
+            lin, zdata, ws.rho_bus[];
+            sigma_theta_shared = ws.sigma_theta_shared,
+            sigma_pg = ws.sigma_pg,
+            sigma_other = ws.sigma_other,
+        )
+    end
 
     @objective(part.model, Min, part.obj_static + lin)
     return nothing

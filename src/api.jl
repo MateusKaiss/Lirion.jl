@@ -64,11 +64,11 @@ end
             throw(ArgumentError(
                 "Invalid proximal_mode=$pm. Allowed: :primal, :pflow",
             ))
-        pm === :pflow && coupling !== :power &&
+        pm === :pflow && !(coupling in (:power, :hybrid)) &&
             throw(
                 ArgumentError(
-                    "proximal_mode=:pflow is only supported with coupling=:power " *
-                    "(got coupling=$(coupling)). Use coupling=:power or " *
+                    "proximal_mode=:pflow is supported with coupling=:power or " *
+                    ":hybrid (got coupling=$(coupling)). Use one of those, or " *
                     "proximal_mode=:primal.",
                 ),
             )
