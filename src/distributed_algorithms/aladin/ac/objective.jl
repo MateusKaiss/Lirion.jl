@@ -1,23 +1,6 @@
 # ============================================================
 # ALADIN-AC — Local (Phase 1) objective builder
 # ============================================================
-#
-# The Phase-1 prox objective has three pieces:
-#   1. Static quadratic    `(ρ/2)·Σ σ_k·v_k²`        (cached, refresh on ρ change)
-#   2. Linear prox          `−ρ·Σ σ_k·x_prev_k·v_k`  (rebuilt every iter)
-#   3. Coupling λᵀ·A_i·x   (rebuilt every iter)
-#
-# This file holds all three plus the per-variant `update_objective!`
-# dispatch — the ALADIN analogue of `admm/ac/objective.jl`.
-
-# ============================================================
-# Quadratic (static, cached) part
-# ============================================================
-#
-# `(ρ/2)·Σ σ_k·v_k²` is constant in (ρ, σ); cached on `zone.quad_static`
-# at workspace build time and refreshed only when ρ changes
-# (`adapt_rho_mu!`). AC has a single sigma-by-class variant:
-# θ / vm / pg / qg / other.
 
 # ------------------------------------------------------------
 # Sigma-by-class
@@ -246,7 +229,6 @@ end
         else
             continue
         end
-        # Sign-flipped consensus: both zones contribute +λ.
         JuMP.add_to_expression!(lin, ws.vars.p_inj.lambda[k], zdata.all_vars[pcol])
         JuMP.add_to_expression!(lin, ws.vars.q_inj.lambda[k], zdata.all_vars[qcol])
     end
@@ -289,9 +271,6 @@ function update_objective!(part::PartitionAC, ws::ACPowerWorkspaceALADIN)
     zdata = ws.zones[zone_pos]
     model = part.model
 
-    # AC only supports proximal_mode = :primal. The :pflow mode is rejected
-    # at ALADINConfig construction time because p_flow_branches is non-linear
-    # in (V, θ), so (p_flow − p_prev)² is not quadratic in primal variables.
     lin = zero(JuMP.AffExpr)
     _ac_prox_lin!(
         lin, zdata, ws.rho[];

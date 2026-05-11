@@ -115,18 +115,20 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{State, DC})
     n_zones = length(partitions)
     n_shared = length(sys.full_shared_bus_ids)
 
-    init_state_partition!(partitions, sys, optimizer_factory, config.rho_theta)
+    init_state_partition!(partitions, sys, optimizer_factory)
 
     vars = (
         theta = VarState(n_shared, n_zones, config.rho_theta),
     )
 
-    return DCStateWorkspace(;
+    ws = DCStateWorkspace(;
         partitions = partitions,
         id = id,
         vars = vars,
         bus_counts = zeros(Int, n_shared),
     )
+    refresh_rho!(ws)
+    return ws
 end
 
 # ------------------------------------------------------------
@@ -153,7 +155,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, DC})
         error("ADMM{Power, DC}: unsupported sectioning $(sectioning)")
     end
 
-    init_power_partition!(partitions, sys, optimizer_factory, config.rho_p, inter, pairs)
+    init_power_partition!(partitions, sys, optimizer_factory, inter)
 
     p_flow = VarState(n_p_flow, n_zones, config.rho_p)
     vars = (
@@ -163,7 +165,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, DC})
         p_dummy = VarState(n_p_dummy, n_zones, p_flow.rho, p_flow.prev_rho),
     )
 
-    return DCPowerWorkspace(;
+    ws = DCPowerWorkspace(;
         partitions = partitions,
         id = id,
         sectioning = sectioning,
@@ -173,6 +175,8 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, DC})
         vars = vars,
         branch_counts = zeros(Int, n_inter),
     )
+    refresh_rho!(ws)
+    return ws
 end
 
 # ------------------------------------------------------------
@@ -198,22 +202,19 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
         n_p_flow = n_inter
         n_p_dummy = 0
         init_hybrid_partition!(
-            partitions, sys, optimizer_factory,
-            config.rho_theta, config.rho_p, sectioning, inter,
+            partitions, sys, optimizer_factory, sectioning, inter,
         )
     elseif sectioning isa DummyBus
         n_p_flow = 0
         n_p_dummy = n_pairs
         init_hybrid_partition!(
-            partitions, sys, optimizer_factory,
-            config.rho_theta, config.rho_p, sectioning, inter, pairs,
+            partitions, sys, optimizer_factory, sectioning, inter,
         )
     elseif sectioning isa SplitBus
         n_p_flow = 0
         n_p_dummy = 0
         init_hybrid_partition!(
-            partitions, sys, optimizer_factory,
-            config.rho_theta, config.rho_p, sectioning, inter,
+            partitions, sys, optimizer_factory, sectioning, inter,
             bpairs, p_inj_vars,
         )
     else
@@ -228,7 +229,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
         p_inj = VarState(n_bus_pairs, n_zones, config.rho_p),
     )
 
-    return DCHybridWorkspace(;
+    ws = DCHybridWorkspace(;
         partitions = partitions,
         id = id,
         sectioning = sectioning,
@@ -241,4 +242,6 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
         bus_counts = zeros(Int, n_shared),
         branch_counts = zeros(Int, n_inter),
     )
+    refresh_rho!(ws)
+    return ws
 end

@@ -77,11 +77,6 @@ end
 # ------------------------------------------------------------
 # Hybrid + pflow
 # ------------------------------------------------------------
-#
-# Hybrid TieLine has consensus on BOTH shared θ AND p_flow on tie-lines.
-# The `:pflow` proximal here keeps the primal prox on shared θ / pg /
-# other AND adds the σ_pflow·b²·(θ_f − θ_t)² term so each consensus
-# direction has its own prox-aligned regulariser.
 
 function _build_quad_static_hybrid_pflow_dc!(
     zone::AladinZoneData,
@@ -167,7 +162,7 @@ end
 end
 
 # ------------------------------------------------------------
-# Public entry point: refresh_rho! (analogue of admm/refresh_rho!)
+# Public entry point: refresh_rho!
 # ------------------------------------------------------------
 
 refresh_rho!(ws::DCStateWorkspaceALADIN) =
@@ -259,11 +254,6 @@ end
 # ------------------------------------------------------------
 # Hybrid + pflow
 # ------------------------------------------------------------
-#
-# Linear counterpart to `_build_quad_static_hybrid_pflow_dc!`: keeps
-# the primal linear prox (shared θ / pg / other) and adds the edge
-# pflow term so the per-iteration linearisation matches the cached
-# quadratic.
 
 @inline function _prox_lin_hybrid_pflow_dc!(
     lin::JuMP.AffExpr,

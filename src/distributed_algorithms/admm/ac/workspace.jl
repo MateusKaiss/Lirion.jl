@@ -159,20 +159,14 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{State, AC})
     n_zones = length(partitions)
     n_shared = length(sys.full_shared_bus_ids)
 
-    init_state_partition!(
-        partitions,
-        sys,
-        optimizer_factory,
-        config.rho_theta,
-        config.rho_v,
-    )
+    init_state_partition!(partitions, sys, optimizer_factory)
 
     vars = (
         theta = VarState(n_shared, n_zones, config.rho_theta),
         v_mag = VarState(n_shared, n_zones, config.rho_v; init_value = 1.0),
     )
 
-    return ACStateWorkspace(;
+    ws = ACStateWorkspace(;
         partitions = partitions,
         id = id,
         vars = vars,
@@ -180,6 +174,8 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{State, AC})
         cos_sum = zeros(n_shared),
         bus_counts = zeros(Int, n_shared),
     )
+    refresh_rho!(ws)
+    return ws
 end
 
 # ------------------------------------------------------------
@@ -206,15 +202,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, AC})
         error("ADMM{Power, AC}: unsupported sectioning $(sectioning)")
     end
 
-    init_power_partition!(
-        partitions,
-        sys,
-        optimizer_factory,
-        config.rho_p,
-        config.rho_q,
-        inter,
-        brpairs,
-    )
+    init_power_partition!(partitions, sys, optimizer_factory, inter)
 
     p_flow = VarState(n_flow, n_zones, config.rho_p)
     q_flow = VarState(n_flow, n_zones, config.rho_q)
@@ -226,7 +214,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, AC})
         q_dummy = VarState(n_dummy, n_zones, q_flow.rho, q_flow.prev_rho),
     )
 
-    return ACPowerWorkspace(;
+    ws = ACPowerWorkspace(;
         partitions = partitions,
         id = id,
         sectioning = sectioning,
@@ -237,6 +225,8 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, AC})
         p_branch_counts = zeros(Int, n_inter),
         q_branch_counts = zeros(Int, n_inter),
     )
+    refresh_rho!(ws)
+    return ws
 end
 
 # ------------------------------------------------------------
@@ -263,25 +253,20 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC})
         n_flow = n_inter
         n_dummy = 0
         init_hybrid_partition!(
-            partitions, sys, optimizer_factory,
-            config.rho_theta, config.rho_v, config.rho_p, config.rho_q,
-            sectioning, inter,
+            partitions, sys, optimizer_factory, sectioning, inter,
         )
     elseif sectioning isa DummyBus
         n_flow = 0
         n_dummy = n_pairs
         init_hybrid_partition!(
-            partitions, sys, optimizer_factory,
-            config.rho_theta, config.rho_v, config.rho_p, config.rho_q,
-            sectioning, inter, brpairs,
+            partitions, sys, optimizer_factory, sectioning, inter,
         )
     elseif sectioning isa SplitBus
         n_flow = 0
         n_dummy = 0
         init_hybrid_partition!(
-            partitions, sys, optimizer_factory,
-            config.rho_theta, config.rho_v, config.rho_p, config.rho_q,
-            sectioning, inter, bpairs, p_inj_vars, q_inj_vars,
+            partitions, sys, optimizer_factory, sectioning, inter,
+            bpairs, p_inj_vars, q_inj_vars,
         )
     else
         error("ADMM{Hybrid, AC}: unsupported sectioning $(sectioning)")
@@ -300,7 +285,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC})
         q_inj = VarState(n_bus_pairs, n_zones, config.rho_q),
     )
 
-    return ACHybridWorkspace(;
+    ws = ACHybridWorkspace(;
         partitions = partitions,
         id = id,
         sectioning = sectioning,
@@ -317,4 +302,6 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC})
         p_branch_counts = zeros(Int, n_inter),
         q_branch_counts = zeros(Int, n_inter),
     )
+    refresh_rho!(ws)
+    return ws
 end

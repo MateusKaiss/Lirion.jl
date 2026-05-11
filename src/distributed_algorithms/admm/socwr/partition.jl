@@ -53,16 +53,9 @@ function init_state_partition!(
     part::PartitionSOCWR,
     sys_zone::SystemData,
     optimizer_factory,
-    rho_v2::Float64,
-    rho_r::Float64,
-    rho_t::Float64,
     interzonal_branches,
 )
     build_local_model!(part, sys_zone, State, optimizer_factory, interzonal_branches)
-    build_quad_bus_expr!(part, rho_v2)
-    build_quad_branch_rt_expr!(part, rho_r, rho_t, part.zone_edges)
-    part.obj_static = part.obj_base + part.quad_bus_expr + part.quad_rt_expr
-    @objective(part.model, Min, part.obj_static)
     return nothing
 end
 
@@ -74,10 +67,7 @@ function init_power_partition!(
     part::PartitionSOCWR,
     sys_zone::SystemData,
     optimizer_factory,
-    rho_p::Float64,
-    rho_q::Float64,
     interzonal_branches,
-    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )
     build_local_model!(part, sys_zone, Power, optimizer_factory, interzonal_branches)
     if is_gurobi(part.model)
@@ -91,9 +81,6 @@ function init_power_partition!(
     else
         part.tikhonov_reg_expr = zero(JuMP.QuadExpr)
     end
-    build_quad_branch_pq_expr!(part, rho_p, rho_q, part.zone_edges, branch_pairs)
-    part.obj_static = part.obj_base + part.quad_pq_expr + part.tikhonov_reg_expr
-    @objective(part.model, Min, part.obj_static)
     return nothing
 end
 
@@ -105,22 +92,10 @@ function init_hybrid_partition!(
     part::PartitionSOCWR,
     sys_zone::SystemData,
     optimizer_factory,
-    rho_v2::Float64,
-    rho_p::Float64,
-    rho_q::Float64,
-    rho_r::Float64,
-    rho_t::Float64,
     ::TieLine,
     interzonal_branches,
 )
     build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
-    build_quad_bus_expr!(part, rho_v2)
-    build_quad_branch_pq_expr!(part, rho_p, rho_q, part.zone_edges, NTuple{4, Int}[])
-    build_quad_branch_rt_expr!(part, rho_r, rho_t, part.zone_edges)
-    part.obj_static =
-        part.obj_base + part.quad_bus_expr + part.quad_pq_expr +
-        part.quad_rt_expr
-    @objective(part.model, Min, part.obj_static)
     return nothing
 end
 
@@ -132,23 +107,10 @@ function init_hybrid_partition!(
     part::PartitionSOCWR,
     sys_zone::SystemData,
     optimizer_factory,
-    rho_v2::Float64,
-    rho_p::Float64,
-    rho_q::Float64,
-    rho_r::Float64,
-    rho_t::Float64,
     ::DummyBus,
     interzonal_branches,
-    branch_pairs::Vector{NTuple{4, Int}},
 )
     build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
-    build_quad_bus_expr!(part, rho_v2)
-    build_quad_branch_pq_expr!(part, rho_p, rho_q, part.zone_edges, branch_pairs)
-    build_quad_branch_rt_expr!(part, rho_r, rho_t, part.zone_edges)
-    part.obj_static =
-        part.obj_base + part.quad_bus_expr + part.quad_pq_expr +
-        part.quad_rt_expr
-    @objective(part.model, Min, part.obj_static)
     return nothing
 end
 
@@ -160,11 +122,6 @@ function init_hybrid_partition!(
     part::PartitionSOCWR,
     sys_zone::SystemData,
     optimizer_factory,
-    rho_v2::Float64,
-    rho_p::Float64,
-    rho_q::Float64,
-    rho_r::Float64,
-    rho_t::Float64,
     ::SplitBus,
     interzonal_branches,
     bus_pairs::Vector{NTuple{3, Int}},
@@ -175,13 +132,6 @@ function init_hybrid_partition!(
     _attach_pq_inj_variables_socwr!(
         part, bus_pairs, p_inj_store, q_inj_store,
     )
-    build_quad_bus_expr!(part, rho_v2)
-    build_quad_p_inj_expr_socwr!(part, rho_p, p_inj_store)
-    build_quad_q_inj_expr_socwr!(part, rho_q, q_inj_store)
-    part.obj_static =
-        part.obj_base + part.quad_bus_expr +
-        part.quad_p_inj_expr + part.quad_q_inj_expr
-    @objective(part.model, Min, part.obj_static)
     return nothing
 end
 
@@ -197,9 +147,6 @@ function init_state_partition!(
     partitions::Partitions{PartitionSOCWR},
     sys::DistributedSystem,
     optimizer_factory,
-    rho_v2::Float64,
-    rho_r::Float64,
-    rho_t::Float64,
     interzonal_branches,
 )
     n = length(partitions.parts)
@@ -207,7 +154,7 @@ function init_state_partition!(
     @inbounds for i in 1:n
         init_state_partition!(
             partitions.parts[i], sys.parts[i], optimizer_factory,
-            rho_v2, rho_r, rho_t, interzonal_branches,
+            interzonal_branches,
         )
     end
     return nothing
@@ -221,17 +168,14 @@ function init_power_partition!(
     partitions::Partitions{PartitionSOCWR},
     sys::DistributedSystem,
     optimizer_factory,
-    rho_p::Float64,
-    rho_q::Float64,
     interzonal_branches,
-    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )
     n = length(partitions.parts)
     @assert length(sys.parts) == n
     @inbounds for i in 1:n
         init_power_partition!(
             partitions.parts[i], sys.parts[i], optimizer_factory,
-            rho_p, rho_q, interzonal_branches, branch_pairs,
+            interzonal_branches,
         )
     end
     return nothing
@@ -245,11 +189,6 @@ function init_hybrid_partition!(
     partitions::Partitions{PartitionSOCWR},
     sys::DistributedSystem,
     optimizer_factory,
-    rho_v2::Float64,
-    rho_p::Float64,
-    rho_q::Float64,
-    rho_r::Float64,
-    rho_t::Float64,
     sectioning::TieLine,
     interzonal_branches,
 )
@@ -258,7 +197,7 @@ function init_hybrid_partition!(
     @inbounds for i in 1:n
         init_hybrid_partition!(
             partitions.parts[i], sys.parts[i], optimizer_factory,
-            rho_v2, rho_p, rho_q, rho_r, rho_t, sectioning, interzonal_branches,
+            sectioning, interzonal_branches,
         )
     end
     return nothing
@@ -272,22 +211,15 @@ function init_hybrid_partition!(
     partitions::Partitions{PartitionSOCWR},
     sys::DistributedSystem,
     optimizer_factory,
-    rho_v2::Float64,
-    rho_p::Float64,
-    rho_q::Float64,
-    rho_r::Float64,
-    rho_t::Float64,
     sectioning::DummyBus,
     interzonal_branches,
-    branch_pairs::Vector{NTuple{4, Int}},
 )
     n = length(partitions.parts)
     @assert length(sys.parts) == n
     @inbounds for i in 1:n
         init_hybrid_partition!(
             partitions.parts[i], sys.parts[i], optimizer_factory,
-            rho_v2, rho_p, rho_q, rho_r, rho_t, sectioning,
-            interzonal_branches, branch_pairs,
+            sectioning, interzonal_branches,
         )
     end
     return nothing
@@ -301,11 +233,6 @@ function init_hybrid_partition!(
     partitions::Partitions{PartitionSOCWR},
     sys::DistributedSystem,
     optimizer_factory,
-    rho_v2::Float64,
-    rho_p::Float64,
-    rho_q::Float64,
-    rho_r::Float64,
-    rho_t::Float64,
     sectioning::SplitBus,
     interzonal_branches,
     bus_pairs::Vector{NTuple{3, Int}},
@@ -319,8 +246,8 @@ function init_hybrid_partition!(
     @inbounds for i in 1:n
         init_hybrid_partition!(
             partitions.parts[i], sys.parts[i], optimizer_factory,
-            rho_v2, rho_p, rho_q, rho_r, rho_t, sectioning,
-            interzonal_branches, bus_pairs, p_inj_vars[i], q_inj_vars[i],
+            sectioning, interzonal_branches,
+            bus_pairs, p_inj_vars[i], q_inj_vars[i],
         )
     end
     return nothing

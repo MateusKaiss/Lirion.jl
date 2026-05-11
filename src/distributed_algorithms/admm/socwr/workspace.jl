@@ -164,15 +164,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCWR})
     n_shared = length(sys.full_shared_bus_ids)
     n_inter = length(inter)
 
-    init_state_partition!(
-        partitions,
-        sys,
-        optimizer_factory,
-        config.rho_v2,
-        config.rho_r,
-        config.rho_t,
-        inter,
-    )
+    init_state_partition!(partitions, sys, optimizer_factory, inter)
 
     vars = (
         v2 = VarState(n_shared, n_zones, config.rho_v2; init_value = 1.0),
@@ -180,7 +172,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCWR})
         t = VarState(n_inter, n_zones, config.rho_t),
     )
 
-    return SOCWRStateWorkspace(;
+    ws = SOCWRStateWorkspace(;
         partitions = partitions,
         id = id,
         interzonal = inter,
@@ -188,6 +180,8 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCWR})
         bus_counts = zeros(Int, n_shared),
         branch_counts = zeros(Int, n_inter),
     )
+    refresh_rho!(ws)
+    return ws
 end
 
 # ------------------------------------------------------------
@@ -214,15 +208,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWR})
         error("ADMM{Power, SOCWR}: unsupported sectioning $(sectioning)")
     end
 
-    init_power_partition!(
-        partitions,
-        sys,
-        optimizer_factory,
-        config.rho_p,
-        config.rho_q,
-        inter,
-        brpairs,
-    )
+    init_power_partition!(partitions, sys, optimizer_factory, inter)
 
     p_flow = VarState(n_flow, n_zones, config.rho_p)
     q_flow = VarState(n_flow, n_zones, config.rho_q)
@@ -233,7 +219,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWR})
         q_dummy = VarState(n_dummy, n_zones, q_flow.rho, q_flow.prev_rho),
     )
 
-    return SOCWRPowerWorkspace(;
+    ws = SOCWRPowerWorkspace(;
         partitions = partitions,
         id = id,
         sectioning = sectioning,
@@ -243,6 +229,8 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWR})
         vars = vars,
         branch_counts = zeros(Int, n_inter),
     )
+    refresh_rho!(ws)
+    return ws
 end
 
 # ------------------------------------------------------------
@@ -270,27 +258,22 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
         n_dummy = 0
         n_rt = n_inter
         init_hybrid_partition!(
-            partitions, sys, optimizer_factory,
-            config.rho_v2, config.rho_p, config.rho_q, config.rho_r, config.rho_t,
-            sectioning, inter,
+            partitions, sys, optimizer_factory, sectioning, inter,
         )
     elseif sectioning isa DummyBus
         n_flow = 0
         n_dummy = n_pairs
         n_rt = 0
         init_hybrid_partition!(
-            partitions, sys, optimizer_factory,
-            config.rho_v2, config.rho_p, config.rho_q, config.rho_r, config.rho_t,
-            sectioning, inter, brpairs,
+            partitions, sys, optimizer_factory, sectioning, inter,
         )
     elseif sectioning isa SplitBus
         n_flow = 0
         n_dummy = 0
         n_rt = 0
         init_hybrid_partition!(
-            partitions, sys, optimizer_factory,
-            config.rho_v2, config.rho_p, config.rho_q, config.rho_r, config.rho_t,
-            sectioning, inter, bpairs, p_inj_vars, q_inj_vars,
+            partitions, sys, optimizer_factory, sectioning, inter,
+            bpairs, p_inj_vars, q_inj_vars,
         )
     else
         error("ADMM{Hybrid, SOCWR}: unsupported sectioning $(sectioning)")
@@ -310,7 +293,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
         q_inj = VarState(n_bus_pairs, n_zones, config.rho_q),
     )
 
-    return SOCWRHybridWorkspace(;
+    ws = SOCWRHybridWorkspace(;
         partitions = partitions,
         id = id,
         sectioning = sectioning,
@@ -324,4 +307,6 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
         bus_counts = zeros(Int, n_shared),
         branch_counts = zeros(Int, n_inter),
     )
+    refresh_rho!(ws)
+    return ws
 end

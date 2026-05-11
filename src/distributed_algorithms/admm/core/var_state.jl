@@ -21,12 +21,16 @@ function VarState(
     init_value::Float64 = 0.0,
 )
     consensus = fill(init_value, n)
+    # `prev_rho` starts as NaN so refresh_rho! always rebuilds the
+    # cached quadratics on the first call (NaN != anything, including
+    # itself). Subsequent calls compare equal and short-circuit when ρ
+    # is unchanged.
     return VarState(
         consensus,
         fill(init_value, n),
         zeros(n, n_zones),
         Ref(rho_init),
-        Ref(rho_init),
+        Ref(NaN),
     )
 end
 
