@@ -1,67 +1,10 @@
 # ============================================================
-# ALADIN-SOCWR — Active-set detection & conic Jacobian assembly
-# ============================================================
-#
-# Implements the canonical HFD 2016 Algorithm 1 active-set treatment
-# for conic problems:
-#
-#   - bound detection on box constraints (`detect_active_bounds!`);
-#   - scalar affine inequalities walked via dual threshold;
-#   - vector cone constraints (RSOC, SOC) walked via dual norm
-#     threshold; at each active cone we compute the outward normal
-#     in the cone's image space and pull it back to the zone's
-#     variable layout via the affine function's Jacobian.
-#
-# The full active Jacobian `[eq_jac ; C_ineq_active ; C_cone_active]`
-# is rank-reduced via `_delete_dependent_rows` (defined in
-# `aladin/dc/active_set.jl` and reused here).
-
-# ============================================================
-# Active bounds at current iterate
+# ALADIN-SOCWR — Conic Jacobian assembly
 # ============================================================
 
-function detect_active_bounds!(zone::AladinZoneDataSOCWR; tol::Float64 = 1e-6)
-    active = zone.active_bound_cols
-    empty!(active)
-    y = zone.y
-    @inbounds for i in 1:zone.n_vars
-        lo = zone.lb[i]
-        hi = zone.ub[i]
-        v = y[i]
-        if !isnan(lo) && v - lo < tol
-            push!(active, i)
-        elseif !isnan(hi) && hi - v < tol
-            push!(active, i)
-        end
-    end
-    return nothing
-end
-
 # ============================================================
-# Cone active-face normals (canonical HFD Alg. 1 for conic problems)
+# Cone active-face normals
 # ============================================================
-# At an active (primal on the cone boundary) conic constraint
-# `func(y) ∈ K`, HFD 2016 Algorithm 1 requires preserving the
-# active-face hyperplane in the Phase-2 coordinator QP via a row
-# `nᵀ · ∇func · Δy = 0`, where n is the outward normal of K at
-# `func(y*)` and ∇func is the Jacobian of the affine constraint
-# function w.r.t. the zone variables.
-#
-# We derive n from the squared-slack representation of each cone
-# (so both n and its scaling are unambiguous):
-#
-#   Rotated SOC  K_rot = {(u, v, t₁, t₂, ...) : 2uv ≥ Σ tₖ², u,v ≥ 0}
-#     slack g = Σ tₖ² - 2uv  ≤ 0
-#     ∇g = (-2v, -2u, 2t₁, 2t₂, ...)
-#
-#   Standard SOC K_soc = {(t, x₁, x₂, ...) : t² ≥ Σ xₖ², t ≥ 0}
-#     slack g = Σ xₖ² - t²   ≤ 0
-#     ∇g = (-2t, 2x₁, 2x₂, ...)
-#
-# For affine functions in cones the row is constant-direction in
-# variable space but its location in the cone depends on y*, so it
-# must be refreshed every iteration (unlike the equality Jacobian
-# eq_jac which is structurally constant).
 
 @inline function _cone_active_normal(
     ::MOI.RotatedSecondOrderCone,
@@ -107,21 +50,6 @@ end
 # ============================================================
 # Active-constraint Jacobian
 # ============================================================
-# C_active = [ eq_jac ; C_ineq_active ; C_cone_active ]
-#
-# SOCWR constraint categories:
-#   * affine equalities (power balance, curtailment links) → eq_jac
-#     (precomputed at build time, structurally constant)
-#   * affine scalar inequalities (branch angle bounds)     → walked
-#     via scalar dual threshold
-#   * vector-valued cone constraints (Jabr RSOC, thermal SOC) → walked
-#     via cone dual norm threshold; at each active cone we compute the
-#     outward normal in the cone's image space and pull it back to the
-#     zone's variable layout via the affine function's Jacobian.
-#
-# Inactive cones contribute zero to the Lagrangian Hessian (the affine
-# functions have zero Hessian) and zero rows here; active cones
-# contribute one row per constraint (the tangent hyperplane).
 
 function build_active_jacobian(
     zone::AladinZoneDataSOCWR;

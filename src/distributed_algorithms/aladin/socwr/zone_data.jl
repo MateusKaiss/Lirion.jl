@@ -1,24 +1,12 @@
 # ============================================================
 # ALADIN-SOCWR — Zone-level data layout & builder
 # ============================================================
-#
-# Defines `AladinZoneDataSOCWR` and the static initialisation that runs
-# once at workspace build time:
-#   - column-class detection (θ, v², R, T, pg, qg, curtailment) for the
-#     proximal weight matrix Σ_i;
-#   - shared-bus v² columns;
-#   - interzonal edge layout (R, T columns) and the affine flow
-#     expansion (cached `pflow = c_p · x + const_p`, idem qflow).
-#
-# Per-iteration kernels (cost gradient, Hessian diagonal refresh) live
-# in `sensitivities.jl`; active-set logic (bound detection, conic
-# normals, Jacobian assembly) lives in `active_set.jl`.
 
 # ============================================================
 # Struct
 # ============================================================
 
-mutable struct AladinZoneDataSOCWR
+mutable struct AladinZoneDataSOCWR <: AbstractAladinZoneData
     # JuMP model reference — used every iteration to walk constraints
     # and extract active-inequality duals.
     model::JuMP.Model
@@ -255,11 +243,6 @@ end
 # ------------------------------------------------------------
 # Interzonal edge layout — affine flow expansion
 # ------------------------------------------------------------
-#
-# `p_flow_branches[l, 1]` and `q_flow_branches[l, 1]` are stored as
-# JuMP affine expressions in (v², R, T). We extract their coefficient
-# vectors here so ALADIN can evaluate flows numerically without
-# re-walking JuMP at every iteration.
 
 function _collect_socwr_edge_flow_expansion(
     model::JuMP.Model,

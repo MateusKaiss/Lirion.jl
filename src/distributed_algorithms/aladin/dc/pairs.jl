@@ -1,14 +1,6 @@
 # ============================================================
 # ALADIN-DC — Consensus pair types and builders
 # ============================================================
-#
-# ALADIN imposes the coupling `Σ A_i x_i = b` row-by-row through
-# explicit pair structures (one per λ component). This file defines
-# the four pair types used across coupling variants and the builders
-# that populate the pair lists once at workspace construction time.
-#
-# Per-partition runtime setup (NLP build, quad_static, p_inj
-# variables) lives in `partition.jl`, mirroring `admm/dc/partition.jl`.
 
 # ============================================================
 # Pair types (consensus structures)
@@ -76,11 +68,6 @@ end
 # ------------------------------------------------------------
 # Shared bus pairs
 # ------------------------------------------------------------
-#
-# Walks every zone, registers (zone_pos, theta_col) for each shared
-# bus it touches, then emits a star spanning tree per consensus_idx
-# (root = lowest zone_pos). N zones touching a bus → N-1 pairs, which
-# preserves LICQ in the coordinator KKT.
 
 function _build_shared_bus_pairs(
     partitions::Partitions{PartitionDC},
@@ -126,9 +113,6 @@ end
 # ------------------------------------------------------------
 # Interzonal line pairs
 # ------------------------------------------------------------
-#
-# Each interzonal line touches exactly two zones; emit one pair per
-# line carrying its global index and the local index in each zone.
 
 function _build_interzonal_line_pairs(
     partitions::Partitions{PartitionDC},
@@ -162,13 +146,6 @@ end
 # ------------------------------------------------------------
 # Dummy line pairs
 # ------------------------------------------------------------
-#
-# DummyBus sectioning replaces a shared bus by two phantom lines (one
-# per zone, ending at a per-zone dummy bus). For each
-# (line_global_a, zone_a, line_global_b, zone_b) tuple from the
-# system, emit a pair carrying the θ columns of both endpoints AND
-# the susceptances — the consensus row is
-# `b_a·(θ_from_a − θ_to_a) = b_b·(θ_from_b − θ_to_b)`.
 
 function _build_dummy_line_pairs(
     partitions::Partitions{PartitionDC},
@@ -220,11 +197,6 @@ end
 # ------------------------------------------------------------
 # Split bus pairs
 # ------------------------------------------------------------
-#
-# SplitBus sectioning duplicates each shared bus with auxiliary
-# `p_inj` variables (one per zone). Emit a pair carrying the column
-# of each replica so the coordinator can enforce
-# `p_inj_a + p_inj_b = 0`.
 
 function _build_split_bus_pairs(
     partitions::Partitions{PartitionDC},

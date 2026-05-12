@@ -3,6 +3,7 @@
 # ============================================================
 
 abstract type AbstractALADINWorkspace <: AbstractDistributedWorkspace end
+abstract type AbstractAladinZoneData end
 
 mutable struct LambdaState
     lambda::Vector{Float64}
@@ -47,11 +48,6 @@ end
 # ============================================================
 # Coordinator QP optimizer factory
 # ============================================================
-#
-# Defaults to OSQP (primal QP, indirect method) when the user does
-# not pass an explicit factory. Tolerances tuned for ALADIN's
-# coordinator step — tighter than typical OSQP defaults to match the
-# precision needed by Phase-2 Newton updates.
 
 function _resolve_qp_optimizer(user_opt)
     user_opt === nothing || return user_opt

@@ -64,7 +64,7 @@ end
 end
 
 # ------------------------------------------------------------
-# Public entry point: refresh_rho! (analogue of admm/refresh_rho!)
+# Public entry point: refresh_rho!
 # ------------------------------------------------------------
 
 refresh_rho!(ws::ACStateWorkspaceALADIN) = _refresh_quad_ac!(ws.zones, ws.rho[], ws)

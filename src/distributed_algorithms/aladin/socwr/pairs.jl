@@ -1,17 +1,6 @@
 # ============================================================
 # ALADIN-SOCWR — Consensus pair types and builders
 # ============================================================
-#
-# ALADIN imposes the coupling `Σ A_i x_i = b` row-by-row through
-# explicit pair structures (one per λ component). This file defines
-# the three pair types used across coupling variants and the builders
-# that populate the pair lists once at workspace construction time.
-#
-# Per-partition runtime setup (NLP build, quad_static, p_inj/q_inj
-# variables) lives in `partition.jl`.
-#
-# Note: SOCWR has no DummyLinePair — DummyBus sectioning is
-# explicitly rejected at ALADINConfig time (see `src/types.jl`).
 
 # ============================================================
 # Pair types (consensus structures)
@@ -65,11 +54,6 @@ end
 # ------------------------------------------------------------
 # Shared bus pairs
 # ------------------------------------------------------------
-#
-# In SOCWR the shared variable on a bus is v² (not θ). Otherwise the
-# logic is the same as DC/AC: walk every zone, collect (zone_pos,
-# v2_col) per shared bus, then emit a star spanning tree per
-# consensus_idx (root = lowest zone_pos). N zones → N-1 pairs.
 
 function _build_shared_bus_pairs(
     partitions::Partitions{PartitionSOCWR},

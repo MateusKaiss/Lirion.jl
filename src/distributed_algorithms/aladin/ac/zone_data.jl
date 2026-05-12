@@ -6,7 +6,7 @@
 # Struct
 # ============================================================
 
-mutable struct AladinZoneDataAC
+mutable struct AladinZoneDataAC <: AbstractAladinZoneData
     model::JuMP.Model
 
     all_vars::Vector{JuMP.VariableRef}

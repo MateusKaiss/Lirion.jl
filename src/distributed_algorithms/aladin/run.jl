@@ -5,7 +5,6 @@
 @inline stop_if_converged(ws::AbstractALADINWorkspace) =
     (ws.r_primal < ws.eps_primal) && (ws.r_progress < ws.eps_progress)
 
-# Default no-op; each model overrides in its `line_search.jl`.
 @inline _line_search_step!(::AbstractALADINWorkspace) = nothing
 
 function run_algorithm!(ws::AbstractALADINWorkspace, params::ALADINParams)

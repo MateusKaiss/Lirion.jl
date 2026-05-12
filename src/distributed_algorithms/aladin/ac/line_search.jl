@@ -1,19 +1,6 @@
 # ============================================================
 # ALADIN-AC — Armijo line search on the HFD 2016 merit function
 # ============================================================
-#
-# AC OPF is non-convex, so Theorem 4 of Houska-Frasch-Diehl 2016
-# requires Algorithm 3 globalisation for local convergence guarantees.
-# This file implements Armijo backtracking on the merit function:
-#
-#   Φ(α) = Σ cost_i(y + αδ) + λᵀ·r(α) + (μ/2)·‖r(α)‖²
-#
-# The flow residuals r(α) are non-linear in α (p_flow involves
-# cos/sin of θ_f − θ_t), so Φ is evaluated point-wise from the analytic
-# flow expressions. The directional derivative dΦ/dα|_{α=0} is computed
-# **analytically** via the chain rule, matching the convention used in
-# the SOCWR (`socwr/line_search.jl`) and DC (`dc/line_search.jl`)
-# implementations — full canonical parity across the three models.
 
 const _ACPhase2Workspace = Union{
     ACStateWorkspaceALADIN,
@@ -89,21 +76,6 @@ end
 # ------------------------------------------------------------
 # Analytic directional derivatives dpf/dα and dqf/dα at α = 0
 # ------------------------------------------------------------
-#
-# pf = g·τ²·vf² − τ·vf·vt·(g·cos(Δθ) + b·sin(Δθ))
-# qf = −(b + b_sh/2)·τ²·vf² − τ·vf·vt·(−b·cos(Δθ) + g·sin(Δθ))
-#
-# Partials at the current iterate (α=0):
-#   ∂pf/∂vf = 2g·τ²·vf − τ·vt·(g·cos(Δθ) + b·sin(Δθ))
-#   ∂pf/∂vt = − τ·vf·(g·cos(Δθ) + b·sin(Δθ))
-#   ∂pf/∂θf = τ·vf·vt·(g·sin(Δθ) − b·cos(Δθ))
-#   ∂pf/∂θt = − ∂pf/∂θf
-#   ∂qf/∂vf = −2(b + b_sh/2)·τ²·vf − τ·vt·(−b·cos(Δθ) + g·sin(Δθ))
-#   ∂qf/∂vt = − τ·vf·(−b·cos(Δθ) + g·sin(Δθ))
-#   ∂qf/∂θf = − τ·vf·vt·(b·sin(Δθ) + g·cos(Δθ))
-#   ∂qf/∂θt = − ∂qf/∂θf
-#
-# Chain rule: dpf/dα|_{α=0} = Σ ∂pf/∂x · δx evaluated at y.
 
 @inline function _ac_pf_dir_deriv(zone::AladinZoneDataAC, le::Int)
     fcol_θ = zone.edge_from_theta_col[le]
@@ -379,15 +351,8 @@ function _ac_merit(ws::ACHybridWorkspaceALADIN, α::Float64)
 end
 
 # ------------------------------------------------------------
-# Analytical directional derivative dΦ/dα at α = 0
+# Analytical directional derivative at trial origin
 # ------------------------------------------------------------
-#
-# Φ(α) = Σ cost_i(y + αδ) + λᵀ·r(α) + (μ/2)·‖r(α)‖²
-# dΦ/dα|_{α=0} = Σ ∇cost_i(y)·δ + (λ + μ·r₀)ᵀ·Δr
-#
-# where r₀ = r(0) is the current consensus residual and Δr = dr/dα|_0.
-# For state pairs r is affine in α; for AC flows Δr comes from the
-# analytic chain-rule helpers `_ac_pf_dir_deriv` / `_ac_qf_dir_deriv`.
 
 function _ac_dΦ0(ws::ACStateWorkspaceALADIN)
     dΦ = 0.0

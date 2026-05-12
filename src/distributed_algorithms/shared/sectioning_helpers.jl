@@ -1,12 +1,6 @@
 # ============================================================
 # Sectioning JuMP-side helpers (shared between ADMM and ALADIN)
 # ============================================================
-#
-# Used by SplitBus sectioning to attach auxiliary `p_inj_<bus>` (and
-# `q_inj_<bus>` in AC/SOCWR) variables to each zone's local model and
-# rewire the active/reactive power balance constraints. Pure JuMP
-# plumbing — independent of the distributed algorithm — so it lives
-# here rather than in `admm/` or `aladin/`.
 
 # ============================================================
 # DC

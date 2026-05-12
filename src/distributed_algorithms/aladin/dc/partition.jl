@@ -1,10 +1,6 @@
 # ============================================================
 # ALADIN-DC — Per-partition setup
 # ============================================================
-#
-# `quad_static` is filled by the workspace builder (after these run)
-# via `_refresh_quad_dc_*!` from `objective.jl`, since it
-# needs the workspace's sigma fields. Mirrors AC and SOCWR.
 
 # ============================================================
 # Per-partition initialisers

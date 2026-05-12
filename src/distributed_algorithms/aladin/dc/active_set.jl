@@ -1,41 +1,5 @@
 # ============================================================
-# ALADIN-DC — Active-set detection & Jacobian assembly
-# ============================================================
-#
-# At each iteration the coordinator QP needs the Jacobian of currently
-# *active* constraints (LICQ-rank rows). For the DC formulation:
-#   - equalities are constant (cached in `zone.eq_jac` at build time);
-#   - inequalities at box bounds are detected via `detect_active_bounds!`;
-#   - active inequality rows are appended to `eq_jac` and the stacked
-#     matrix is run through `_delete_dependent_rows` for rank revealing.
-#
-# The QR with column-norm pivoting in `_delete_dependent_rows` is what
-# enforces LICQ at the algorithm level — see header note in that
-# function for the densification trade-off.
-
-# ============================================================
-# Active bounds at current iterate
-# ============================================================
-
-function detect_active_bounds!(zone::AladinZoneData; tol::Float64 = 1e-6)
-    active = zone.active_bound_cols
-    empty!(active)
-    y = zone.y
-    @inbounds for i in 1:zone.n_vars
-        lo = zone.lb[i]
-        hi = zone.ub[i]
-        v = y[i]
-        if !isnan(lo) && v - lo < tol
-            push!(active, i)
-        elseif !isnan(hi) && hi - v < tol
-            push!(active, i)
-        end
-    end
-    return nothing
-end
-
-# ============================================================
-# Active-constraint Jacobian (equalities + active inequalities)
+# ALADIN-DC — Active-constraint Jacobian
 # ============================================================
 
 function build_active_jacobian(
@@ -47,11 +11,9 @@ function build_active_jacobian(
     var_to_col = zone.var_to_col
     n_vars = zone.n_vars
 
-    # Start with the precomputed equality rows.
     eq_jac = zone.eq_jac
     eq_nrows = size(eq_jac, 1)
 
-    # Collect active inequality rows by walking constraint types.
     ineq_rows = Int[]
     ineq_cols = Int[]
     ineq_vals = Vector{Float64}()
@@ -61,7 +23,7 @@ function build_active_jacobian(
 
     for (F, S) in JuMP.list_of_constraint_types(model)
         F <: JuMP.VariableRef && continue
-        S === MOI.EqualTo{Float64} && continue  # already in eq_jac
+        S === MOI.EqualTo{Float64} && continue
 
         for ci in JuMP.all_constraints(model, F, S)
             if has_duals
@@ -94,15 +56,6 @@ function build_active_jacobian(
 
     return _delete_dependent_rows(C_stacked; tol = dep_tol)
 end
-
-# `_delete_dependent_rows` lives in `aladin/core/zone_helpers.jl`
-# (shared with AC and SOCWR).
-
-# ============================================================
-# Helper: push affine row of an inequality into COO buffers
-# (separate from the equality version in `zone_data.jl` because
-# inequalities use a runtime row offset rather than nrows counter)
-# ============================================================
 
 @inline function _push_affine_row_offset!(
     rows::Vector{Int},

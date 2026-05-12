@@ -10,7 +10,6 @@
 @inline consensus_vars(::Type{SOCWR}, ::Type{Power}) = (:p_flow, :q_flow)
 @inline consensus_vars(::Type{SOCWR}, ::Type{Hybrid}) = (:v2, :p_flow, :q_flow, :r, :t)
 
-# Sugar: lift from a tag value.
 @inline consensus_vars(tag::DistributedAlgorithm) =
     consensus_vars(formulation(tag), coupling(tag))
 

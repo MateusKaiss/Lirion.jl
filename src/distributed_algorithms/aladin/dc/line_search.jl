@@ -1,17 +1,6 @@
 # ============================================================
 # ALADIN-DC — Armijo line search on the HFD 2016 merit function
 # ============================================================
-#
-# Implements Algorithm 3 of Houska-Frasch-Diehl 2016 (p. 1112-1113).
-# DC OPF is convex, so the local Lemma 3 / Theorem 4 hypotheses are
-# satisfied without globalisation; line search is included for
-# robustness against non-quadratic descent and to bring DC parity with
-# SOCWR. Set `line_search = false` in the workspace to disable.
-#
-# Φ(α) = Σ cost_i(y + αδ) + λᵀ·r(α) + (μ/2)·‖r(α)‖²
-#
-# r(α) is the consensus residual (affine in α since DC fluxos = b·Δθ),
-# so dΦ/dα|_{α=0} = Σ ∇cost_i(y)·δ + (λ + μ·r₀)ᵀ·Δr is exact.
 
 const _DCPhase2Workspace = Union{
     DCStateWorkspaceALADIN,

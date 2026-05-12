@@ -229,6 +229,7 @@ include("distributed_algorithms/aladin/socwr/objective.jl")
 include("distributed_algorithms/aladin/socwr/coordinator_qp.jl")
 include("distributed_algorithms/aladin/socwr/line_search.jl")
 
+include("distributed_algorithms/aladin/core/sensitivities.jl")
 include("distributed_algorithms/aladin/core/flow_accessors.jl")
 
 include("distributed_algorithms/aladin/core/primal_update.jl")

@@ -1,23 +1,6 @@
 # ============================================================
 # ALADIN-SOCWR — Per-partition setup
 # ============================================================
-#
-# Mirrors `admm/socwr/partition.jl`:
-#   - Per-partition initialisers (one zone at a time): build local NLP
-#     + build the per-zone data buffer.
-#   - Batch entry points (Partitions{...}): iterate the per-partition
-#     calls and then run cross-zone pair builders.
-#   - Hybrid is dispatched on `Sectioning` (TieLine / SplitBus); SOCWR
-#     does not support DummyBus (rejected at ALADINConfig time —
-#     see `src/types.jl`).
-#
-# `quad_static` is filled by the workspace builder (after these run)
-# via `_refresh_quad_socwr_*!` from `objective.jl`, since
-# it needs the workspace's sigma fields, not the config's.
-#
-# Pair types and pair builders live in `pairs.jl`. Workspace structs
-# and `build_workspace` dispatch live in `workspace.jl`. Objective
-# builders (static + per-iteration) live in `objective.jl`.
 
 # ============================================================
 # Per-partition initialisers

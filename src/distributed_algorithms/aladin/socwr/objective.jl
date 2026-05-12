@@ -1,14 +1,6 @@
 # ============================================================
 # ALADIN-SOCWR — Local (Phase 1) objective builder
 # ============================================================
-#
-# The Phase-1 prox objective has three pieces:
-#   1. Static quadratic    `(ρ/2)·Σ σ_k·v_k²`        (cached, refresh on ρ change)
-#   2. Linear prox          `−ρ·Σ σ_k·x_prev_k·v_k`  (rebuilt every iter)
-#   3. Coupling λᵀ·A_i·x   (rebuilt every iter)
-#
-# This file holds all three plus the per-variant `update_objective!`
-# dispatch — the ALADIN analogue of `admm/socwr/objective.jl`.
 
 const _SOCWRLocalWorkspace = Union{
     SOCWRStateWorkspaceALADIN,
@@ -19,13 +11,6 @@ const _SOCWRLocalWorkspace = Union{
 # ============================================================
 # Quadratic (static, cached) part
 # ============================================================
-#
-# `(ρ/2)·Σ σ_k·v_k²` is constant in (ρ, σ); cached on `zone.quad_static`
-# at workspace build time and refreshed only when ρ changes
-# (`adapt_rho_mu!`). Two variants:
-#   - `:primal` (canonical): sigmas by class — θ / v² / r / t / pg / qg
-#   - `:pflow` (experimental): sigmas (pg, qg, other) on every var +
-#     extra σ_pflow / σ_qflow on each interzonal edge's flow expression
 
 # ------------------------------------------------------------
 # Primal

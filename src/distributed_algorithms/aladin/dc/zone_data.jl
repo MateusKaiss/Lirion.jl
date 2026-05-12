@@ -1,25 +1,12 @@
 # ============================================================
 # ALADIN-DC — Zone-level data layout & builder
 # ============================================================
-#
-# Defines `AladinZoneData` (the per-zone state container used by all
-# Phase-1 / Phase-2 kernels) and the static initialisation that runs
-# once at workspace build time:
-#   - flat variable layout (`_build_var_layout`),
-#   - generator cost coefficients (`_collect_pg_layout`),
-#   - shared-bus θ columns (`_collect_shared_theta_cols`),
-#   - interzonal edge layout (`_collect_edge_layout`),
-#   - per-variable box bounds (`_collect_bounds`),
-#   - linear equality Jacobian (`_extract_equality_jacobian`).
-#
-# Per-iteration kernels live in `sensitivities.jl`; active-set logic
-# lives in `active_set.jl`.
 
 # ============================================================
 # Struct
 # ============================================================
 
-mutable struct AladinZoneData
+mutable struct AladinZoneData <: AbstractAladinZoneData
     model::JuMP.Model
 
     # Flat variable layout (all JuMP variables of this zone's local model).
