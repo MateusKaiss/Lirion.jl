@@ -486,6 +486,7 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
     rho_upper::Float64
     mu_upper::Float64
     proximal_mode::Symbol
+    qp_optimizer::Any
 
     function ALADINConfig(
         base_model::Type{<:OPFModel},
@@ -511,6 +512,7 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
         rho_upper::Real = 1e6,
         mu_upper::Real = 1e6,
         proximal_mode::Symbol = :primal,
+        qp_optimizer = nothing,
     )
         base_model in (DC, AC, SOCWR) ||
             throw(
@@ -617,6 +619,7 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
             Float64(rho_upper),
             Float64(mu_upper),
             proximal_mode,
+            qp_optimizer,
         )
     end
 end

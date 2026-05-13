@@ -49,16 +49,18 @@ end
 # Coordinator QP optimizer factory
 # ============================================================
 
+const _DEFAULT_QP_FACTORY = JuMP.optimizer_with_attributes(
+    OSQP.Optimizer,
+    "eps_abs" => 1e-8,
+    "eps_rel" => 1e-8,
+    "max_iter" => 200_000,
+    "verbose" => false,
+    "polish" => true,
+    "polish_refine_iter" => 5,
+    "linsys_solver" => "qdldl",
+)
+
 function _resolve_qp_optimizer(user_opt)
-    user_opt === nothing || return user_opt
-    return JuMP.optimizer_with_attributes(
-        OSQP.Optimizer,
-        "eps_abs" => 1e-8,
-        "eps_rel" => 1e-8,
-        "max_iter" => 200_000,
-        "verbose" => false,
-        "polish" => true,
-        "polish_refine_iter" => 5,
-        "linsys_solver" => "qdldl",
-    )
+    user_opt === nothing && return _DEFAULT_QP_FACTORY
+    return _silent_factory(user_opt)
 end
