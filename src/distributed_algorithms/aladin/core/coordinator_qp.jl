@@ -121,7 +121,11 @@ end
 
 function _check_qp_status!(model::JuMP.Model, tag::AbstractString)
     ts = JuMP.termination_status(model)
-    acceptable = ts == MOI.OPTIMAL || ts == MOI.LOCALLY_SOLVED
+    acceptable =
+        ts == MOI.OPTIMAL ||
+        ts == MOI.LOCALLY_SOLVED ||
+        ts == MOI.ALMOST_OPTIMAL ||
+        ts == MOI.ALMOST_LOCALLY_SOLVED
     if !acceptable
         raw = try
             JuMP.raw_status(model)
