@@ -1,19 +1,20 @@
 @inline function _ac_pf_at(zone::AladinZoneDataAC, le::Int)
-    θf = zone.y[zone.edge_from_theta_col[le]]
-    θt = zone.y[zone.edge_to_theta_col[le]]
+    theta_f = zone.y[zone.edge_from_theta_col[le]]
+    theta_t = zone.y[zone.edge_to_theta_col[le]]
     vf = zone.y[zone.edge_from_vm_col[le]]
     vt = zone.y[zone.edge_to_vm_col[le]]
     g = zone.edge_g[le]
     b = zone.edge_b[le]
     tau = zone.edge_inv_tap[le]
     tap_angle = zone.edge_tap_angle[le]
-    Δθ = θf - θt - tap_angle
-    return g * (tau * vf)^2 - tau * vf * vt * (g * cos(Δθ) + b * sin(Δθ))
+    delta_theta = theta_f - theta_t - tap_angle
+    return g * (tau * vf)^2 -
+           tau * vf * vt * (g * cos(delta_theta) + b * sin(delta_theta))
 end
 
 @inline function _ac_qf_at(zone::AladinZoneDataAC, le::Int)
-    θf = zone.y[zone.edge_from_theta_col[le]]
-    θt = zone.y[zone.edge_to_theta_col[le]]
+    theta_f = zone.y[zone.edge_from_theta_col[le]]
+    theta_t = zone.y[zone.edge_to_theta_col[le]]
     vf = zone.y[zone.edge_from_vm_col[le]]
     vt = zone.y[zone.edge_to_vm_col[le]]
     g = zone.edge_g[le]
@@ -21,9 +22,9 @@ end
     b_sh = zone.edge_b_sh[le]
     tau = zone.edge_inv_tap[le]
     tap_angle = zone.edge_tap_angle[le]
-    Δθ = θf - θt - tap_angle
+    delta_theta = theta_f - theta_t - tap_angle
     return -(b + b_sh / 2) * (tau * vf)^2 -
-           tau * vf * vt * (-b * cos(Δθ) + g * sin(Δθ))
+           tau * vf * vt * (-b * cos(delta_theta) + g * sin(delta_theta))
 end
 
 @inline function _socwr_flow_value_at_y(

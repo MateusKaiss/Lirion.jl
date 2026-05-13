@@ -84,14 +84,15 @@ end
     vals::Vector{Float64},
     row::Int,
     func::JuMP.AffExpr,
-    var_to_col::Dict{JuMP.VariableRef, Int},
+    var_to_col::Dict{JuMP.VariableRef, Int};
+    scale::Float64 = 1.0,
 )
     for (v, coef) in func.terms
         col = get(var_to_col, v, 0)
         col == 0 && continue
         push!(rows, row)
         push!(cols, col)
-        push!(vals, coef)
+        push!(vals, scale * coef)
     end
     return nothing
 end
@@ -110,6 +111,43 @@ end
         "got $(typeof(func)). Canonical ALADIN DC/SOCWR only supports linear " *
         "local equalities.",
     )
+end
+
+# ============================================================
+# Affine inequality rows (active-set Jacobian assembly)
+# ============================================================
+
+function _collect_affine_inequality_rows!(
+    rows::Vector{Int},
+    cols::Vector{Int},
+    vals::Vector{Float64},
+    row_offset::Int,
+    model::JuMP.Model,
+    var_to_col::Dict{JuMP.VariableRef, Int},
+    has_duals::Bool;
+    dual_tol::Float64,
+)::Int
+    for (F, S) in JuMP.list_of_constraint_types(model)
+        F <: JuMP.VariableRef && continue
+        S === MOI.EqualTo{Float64} && continue
+        F <: JuMP.AffExpr || continue
+
+        for ci in JuMP.all_constraints(model, F, S)
+            has_duals || continue
+            dval = try
+                JuMP.dual(ci)
+            catch
+                0.0
+            end
+            (dval isa Real) || continue
+            abs(dval) > dual_tol || continue
+
+            cobj = JuMP.constraint_object(ci)
+            row_offset += 1
+            _push_affine_row!(rows, cols, vals, row_offset, cobj.func, var_to_col)
+        end
+    end
+    return row_offset
 end
 
 # ============================================================

@@ -1,6 +1,10 @@
 # ============================================================
-# ALADIN-AC — Phase 2 Coordinator QP (canonical HFD 2016)
-# ------------------------------------------------------------
+# ALADIN-AC — Phase 2 coordinator QP
+# ============================================================
+
+# ============================================================
+# Zone cost — AC override (full sparse Hessian)
+# ============================================================
 
 @inline function _add_zone_cost!(
     qp_obj::JuMP.QuadExpr,
@@ -33,26 +37,33 @@
     return nothing
 end
 
+# ============================================================
+# AC flow linearisation (Taylor expansion at current y)
+# ============================================================
+
 struct _ACFlowLin
     pf::Float64
     qf::Float64
     dpf_dvf::Float64
     dpf_dvt::Float64
-    dpf_dθf::Float64
-    dpf_dθt::Float64
+    dpf_dtheta_f::Float64
+    dpf_dtheta_t::Float64
     dqf_dvf::Float64
     dqf_dvt::Float64
-    dqf_dθf::Float64
-    dqf_dθt::Float64
+    dqf_dtheta_f::Float64
+    dqf_dtheta_t::Float64
 end
+
+# ------------------------------------------------------------
+# Interzonal line
+# ------------------------------------------------------------
 
 @inline function _ac_flow_linearisation(
     zone::AladinZoneDataAC,
     le::Int,
 )::_ACFlowLin
-    # Pull current variable values at y
-    θf = zone.y[zone.edge_from_theta_col[le]]
-    θt = zone.y[zone.edge_to_theta_col[le]]
+    theta_f = zone.y[zone.edge_from_theta_col[le]]
+    theta_t = zone.y[zone.edge_to_theta_col[le]]
     vf = zone.y[zone.edge_from_vm_col[le]]
     vt = zone.y[zone.edge_to_vm_col[le]]
 
@@ -62,35 +73,81 @@ end
     tau = zone.edge_inv_tap[le]
     tap_angle = zone.edge_tap_angle[le]
 
-    Δθ = θf - θt - tap_angle
-    c = cos(Δθ)
-    s = sin(Δθ)
+    delta_theta = theta_f - theta_t - tap_angle
+    c = cos(delta_theta)
+    s = sin(delta_theta)
 
-    # Flow values at y
     pf = g * (tau * vf)^2 - tau * vf * vt * (g * c + b * s)
     qf = -(b + b_sh / 2) * (tau * vf)^2 - tau * vf * vt * (-b * c + g * s)
 
-    # Gradients:  d(pf)/d(vf, vt, θf, θt)
     dpf_dvf = 2.0 * g * tau^2 * vf - tau * vt * (g * c + b * s)
     dpf_dvt = -tau * vf * (g * c + b * s)
-    dpf_dθf = -tau * vf * vt * (-g * s + b * c)
-    dpf_dθt = -dpf_dθf   # symmetric: d/dθt = -d/dθf
+    dpf_dtheta_f = -tau * vf * vt * (-g * s + b * c)
+    dpf_dtheta_t = -dpf_dtheta_f
 
-    # Gradients:  d(qf)/d(vf, vt, θf, θt)
     dqf_dvf = -2.0 * (b + b_sh / 2) * tau^2 * vf - tau * vt * (-b * c + g * s)
     dqf_dvt = -tau * vf * (-b * c + g * s)
-    dqf_dθf = -tau * vf * vt * (b * s + g * c)
-    dqf_dθt = -dqf_dθf
+    dqf_dtheta_f = -tau * vf * vt * (b * s + g * c)
+    dqf_dtheta_t = -dqf_dtheta_f
 
     return _ACFlowLin(
         pf, qf,
-        dpf_dvf, dpf_dvt, dpf_dθf, dpf_dθt,
-        dqf_dvf, dqf_dvt, dqf_dθf, dqf_dθt,
+        dpf_dvf, dpf_dvt, dpf_dtheta_f, dpf_dtheta_t,
+        dqf_dvf, dqf_dvt, dqf_dtheta_f, dqf_dtheta_t,
     )
 end
 
 # ------------------------------------------------------------
-# Coupling expression helpers
+# Dummy line
+# ------------------------------------------------------------
+
+@inline function _dummy_ac_flow_linearisation(
+    y::Vector{Float64},
+    from_theta_col::Int,
+    to_theta_col::Int,
+    from_vm_col::Int,
+    to_vm_col::Int,
+    g::Float64,
+    b::Float64,
+    b_sh::Float64,
+    tau::Float64,
+    tap_angle::Float64,
+)::_ACFlowLin
+    theta_f = y[from_theta_col]
+    theta_t = y[to_theta_col]
+    vf = y[from_vm_col]
+    vt = y[to_vm_col]
+
+    delta_theta = theta_f - theta_t - tap_angle
+    c = cos(delta_theta)
+    s = sin(delta_theta)
+
+    pf = g * (tau * vf)^2 - tau * vf * vt * (g * c + b * s)
+    qf = -(b + b_sh / 2) * (tau * vf)^2 - tau * vf * vt * (-b * c + g * s)
+
+    dpf_dvf = 2.0 * g * tau^2 * vf - tau * vt * (g * c + b * s)
+    dpf_dvt = -tau * vf * (g * c + b * s)
+    dpf_dtheta_f = -tau * vf * vt * (-g * s + b * c)
+    dpf_dtheta_t = -dpf_dtheta_f
+
+    dqf_dvf = -2.0 * (b + b_sh / 2) * tau^2 * vf - tau * vt * (-b * c + g * s)
+    dqf_dvt = -tau * vf * (-b * c + g * s)
+    dqf_dtheta_f = -tau * vf * vt * (b * s + g * c)
+    dqf_dtheta_t = -dqf_dtheta_f
+
+    return _ACFlowLin(
+        pf, qf,
+        dpf_dvf, dpf_dvt, dpf_dtheta_f, dpf_dtheta_t,
+        dqf_dvf, dqf_dvt, dqf_dtheta_f, dqf_dtheta_t,
+    )
+end
+
+# ============================================================
+# Pair coupling expressions
+# ============================================================
+
+# ------------------------------------------------------------
+# Bus θ consensus
 # ------------------------------------------------------------
 
 @inline function _bus_theta_expr_ac!(
@@ -109,6 +166,10 @@ end
     return expr
 end
 
+# ------------------------------------------------------------
+# Bus |V| consensus
+# ------------------------------------------------------------
+
 @inline function _bus_vm_expr_ac!(
     expr::JuMP.AffExpr,
     zones::Vector{AladinZoneDataAC},
@@ -125,12 +186,16 @@ end
     return expr
 end
 
+# ------------------------------------------------------------
+# Interzonal p/q flow consensus
+# ------------------------------------------------------------
+
 @inline function _pq_coupling_expr_ac!(
     expr::JuMP.AffExpr,
     zones::Vector{AladinZoneDataAC},
     dy_all::Vector{Vector{JuMP.VariableRef}},
     pair::InterzonalLinePairAC,
-    flow::Symbol,   # :p or :q
+    flow::Symbol,
 )
     zi = zones[pair.zone_i]
     zj = zones[pair.zone_j]
@@ -140,69 +205,30 @@ end
 
     if flow === :p
         JuMP.add_to_expression!(expr, lin_i.pf - lin_j.pf)
-        # Zone i side: +∇pf_i ⋅ Δy_i
         _add_flow_grad!(expr, dy_all[pair.zone_i], zi, pair.line_local_i,
-            +1.0, lin_i.dpf_dvf, lin_i.dpf_dvt, lin_i.dpf_dθf, lin_i.dpf_dθt)
-        # Zone j side: -∇pf_j ⋅ Δy_j
+            +1.0, lin_i.dpf_dvf, lin_i.dpf_dvt, lin_i.dpf_dtheta_f, lin_i.dpf_dtheta_t)
         _add_flow_grad!(expr, dy_all[pair.zone_j], zj, pair.line_local_j,
-            -1.0, lin_j.dpf_dvf, lin_j.dpf_dvt, lin_j.dpf_dθf, lin_j.dpf_dθt)
+            -1.0, lin_j.dpf_dvf, lin_j.dpf_dvt, lin_j.dpf_dtheta_f, lin_j.dpf_dtheta_t)
     else
         JuMP.add_to_expression!(expr, lin_i.qf - lin_j.qf)
         _add_flow_grad!(expr, dy_all[pair.zone_i], zi, pair.line_local_i,
-            +1.0, lin_i.dqf_dvf, lin_i.dqf_dvt, lin_i.dqf_dθf, lin_i.dqf_dθt)
+            +1.0, lin_i.dqf_dvf, lin_i.dqf_dvt, lin_i.dqf_dtheta_f, lin_i.dqf_dtheta_t)
         _add_flow_grad!(expr, dy_all[pair.zone_j], zj, pair.line_local_j,
-            -1.0, lin_j.dqf_dvf, lin_j.dqf_dvt, lin_j.dqf_dθf, lin_j.dqf_dθt)
+            -1.0, lin_j.dqf_dvf, lin_j.dqf_dvt, lin_j.dqf_dtheta_f, lin_j.dqf_dtheta_t)
     end
     return expr
 end
 
-@inline function _dummy_ac_flow_linearisation(
-    y::Vector{Float64},
-    from_theta_col::Int,
-    to_theta_col::Int,
-    from_vm_col::Int,
-    to_vm_col::Int,
-    g::Float64,
-    b::Float64,
-    b_sh::Float64,
-    tau::Float64,
-    tap_angle::Float64,
-)::_ACFlowLin
-    θf = y[from_theta_col]
-    θt = y[to_theta_col]
-    vf = y[from_vm_col]
-    vt = y[to_vm_col]
-
-    Δθ = θf - θt - tap_angle
-    c = cos(Δθ)
-    s = sin(Δθ)
-
-    pf = g * (tau * vf)^2 - tau * vf * vt * (g * c + b * s)
-    qf = -(b + b_sh / 2) * (tau * vf)^2 - tau * vf * vt * (-b * c + g * s)
-
-    dpf_dvf = 2.0 * g * tau^2 * vf - tau * vt * (g * c + b * s)
-    dpf_dvt = -tau * vf * (g * c + b * s)
-    dpf_dθf = -tau * vf * vt * (-g * s + b * c)
-    dpf_dθt = -dpf_dθf
-
-    dqf_dvf = -2.0 * (b + b_sh / 2) * tau^2 * vf - tau * vt * (-b * c + g * s)
-    dqf_dvt = -tau * vf * (-b * c + g * s)
-    dqf_dθf = -tau * vf * vt * (b * s + g * c)
-    dqf_dθt = -dqf_dθf
-
-    return _ACFlowLin(
-        pf, qf,
-        dpf_dvf, dpf_dvt, dpf_dθf, dpf_dθt,
-        dqf_dvf, dqf_dvt, dqf_dθf, dqf_dθt,
-    )
-end
+# ------------------------------------------------------------
+# Dummy-line p/q flow consensus
+# ------------------------------------------------------------
 
 @inline function _dummy_pq_coupling_expr_ac!(
     expr::JuMP.AffExpr,
     zones::Vector{AladinZoneDataAC},
     dy_all::Vector{Vector{JuMP.VariableRef}},
     pair::DummyLinePairAC,
-    flow::Symbol,  # :p or :q
+    flow::Symbol,
 )
     zi = zones[pair.zone_i]
     zj = zones[pair.zone_j]
@@ -228,27 +254,31 @@ end
         dy_j = dy_all[pair.zone_j]
         JuMP.add_to_expression!(expr, lin_i.dpf_dvf, dy_i[pair.from_vm_col_i])
         JuMP.add_to_expression!(expr, lin_i.dpf_dvt, dy_i[pair.to_vm_col_i])
-        JuMP.add_to_expression!(expr, lin_i.dpf_dθf, dy_i[pair.from_theta_col_i])
-        JuMP.add_to_expression!(expr, lin_i.dpf_dθt, dy_i[pair.to_theta_col_i])
+        JuMP.add_to_expression!(expr, lin_i.dpf_dtheta_f, dy_i[pair.from_theta_col_i])
+        JuMP.add_to_expression!(expr, lin_i.dpf_dtheta_t, dy_i[pair.to_theta_col_i])
         JuMP.add_to_expression!(expr, -lin_j.dpf_dvf, dy_j[pair.from_vm_col_j])
         JuMP.add_to_expression!(expr, -lin_j.dpf_dvt, dy_j[pair.to_vm_col_j])
-        JuMP.add_to_expression!(expr, -lin_j.dpf_dθf, dy_j[pair.from_theta_col_j])
-        JuMP.add_to_expression!(expr, -lin_j.dpf_dθt, dy_j[pair.to_theta_col_j])
+        JuMP.add_to_expression!(expr, -lin_j.dpf_dtheta_f, dy_j[pair.from_theta_col_j])
+        JuMP.add_to_expression!(expr, -lin_j.dpf_dtheta_t, dy_j[pair.to_theta_col_j])
     else
         JuMP.add_to_expression!(expr, lin_i.qf - lin_j.qf)
         dy_i = dy_all[pair.zone_i]
         dy_j = dy_all[pair.zone_j]
         JuMP.add_to_expression!(expr, lin_i.dqf_dvf, dy_i[pair.from_vm_col_i])
         JuMP.add_to_expression!(expr, lin_i.dqf_dvt, dy_i[pair.to_vm_col_i])
-        JuMP.add_to_expression!(expr, lin_i.dqf_dθf, dy_i[pair.from_theta_col_i])
-        JuMP.add_to_expression!(expr, lin_i.dqf_dθt, dy_i[pair.to_theta_col_i])
+        JuMP.add_to_expression!(expr, lin_i.dqf_dtheta_f, dy_i[pair.from_theta_col_i])
+        JuMP.add_to_expression!(expr, lin_i.dqf_dtheta_t, dy_i[pair.to_theta_col_i])
         JuMP.add_to_expression!(expr, -lin_j.dqf_dvf, dy_j[pair.from_vm_col_j])
         JuMP.add_to_expression!(expr, -lin_j.dqf_dvt, dy_j[pair.to_vm_col_j])
-        JuMP.add_to_expression!(expr, -lin_j.dqf_dθf, dy_j[pair.from_theta_col_j])
-        JuMP.add_to_expression!(expr, -lin_j.dqf_dθt, dy_j[pair.to_theta_col_j])
+        JuMP.add_to_expression!(expr, -lin_j.dqf_dtheta_f, dy_j[pair.from_theta_col_j])
+        JuMP.add_to_expression!(expr, -lin_j.dqf_dtheta_t, dy_j[pair.to_theta_col_j])
     end
     return expr
 end
+
+# ------------------------------------------------------------
+# Split-bus p_inj / q_inj consensus
+# ------------------------------------------------------------
 
 @inline function _pinj_coupling_expr_ac!(
     expr::JuMP.AffExpr,
@@ -282,69 +312,39 @@ end
     return expr
 end
 
+# ------------------------------------------------------------
+# Flow-gradient row helper
+# ------------------------------------------------------------
+
 @inline function _add_flow_grad!(
     expr::JuMP.AffExpr,
     dy::Vector{JuMP.VariableRef},
     zone::AladinZoneDataAC,
     le::Int,
     sign::Float64,
-    dvf::Float64, dvt::Float64, dθf::Float64, dθt::Float64,
+    dvf::Float64, dvt::Float64, dtheta_f::Float64, dtheta_t::Float64,
 )
     JuMP.add_to_expression!(expr, sign * dvf, dy[zone.edge_from_vm_col[le]])
     JuMP.add_to_expression!(expr, sign * dvt, dy[zone.edge_to_vm_col[le]])
-    JuMP.add_to_expression!(expr, sign * dθf, dy[zone.edge_from_theta_col[le]])
-    JuMP.add_to_expression!(expr, sign * dθt, dy[zone.edge_to_theta_col[le]])
+    JuMP.add_to_expression!(expr, sign * dtheta_f, dy[zone.edge_from_theta_col[le]])
+    JuMP.add_to_expression!(expr, sign * dtheta_t, dy[zone.edge_to_theta_col[le]])
     return nothing
 end
 
-# ------------------------------------------------------------
-# Shared QP scaffolding for AC
-# ------------------------------------------------------------
-
-function _build_ac_qp_skeleton(ws::AbstractALADINWorkspace)
-    model = JuMP.Model(ws.qp_optimizer)
-    n_zones = length(ws.zones)
-
-    dy_all = Vector{Vector{JuMP.VariableRef}}(undef, n_zones)
-    @inbounds for i in 1:n_zones
-        dy_all[i] =
-            JuMP.@variable(model, [1:ws.zones[i].n_vars], base_name = "dy$(i)")
-    end
-
-    qp_obj = zero(JuMP.QuadExpr)
-    @inbounds for i in 1:n_zones
-        _add_zone_cost!(qp_obj, ws.zones[i], dy_all[i])
-    end
-
-    @inbounds for i in 1:n_zones
-        _add_active_constraints!(model, ws.zones[i], dy_all[i])
-        _add_active_bound_constraints!(model, ws.zones[i], dy_all[i])
-    end
-
-    return model, dy_all, qp_obj
-end
-
-function _extract_delta!(ws::AbstractALADINWorkspace, dy_all)
-    @inbounds for i in eachindex(ws.zones)
-        delta = ws.zones[i].delta
-        v = dy_all[i]
-        for k in 1:ws.zones[i].n_vars
-            delta[k] = JuMP.value(v[k])
-        end
-    end
-    return nothing
-end
+# ============================================================
+# Dispatch
+# ============================================================
 
 # ------------------------------------------------------------
 # STATE
 # ------------------------------------------------------------
 
 function solve_coordinator_qp!(ws::ACStateWorkspaceALADIN)
-    model, dy_all, qp_obj = _build_ac_qp_skeleton(ws)
+    model, dy_all, qp_obj = _build_qp_skeleton(ws)
 
     n_bus = length(ws.bus_pairs)
 
-    s_theta = JuMP.@variable(model, [1:n_bus], base_name = "sθ")
+    s_theta = JuMP.@variable(model, [1:n_bus], base_name = "s_theta")
     s_vm = JuMP.@variable(model, [1:n_bus], base_name = "svm")
 
     mu = ws.mu[]
@@ -387,7 +387,7 @@ end
 # ------------------------------------------------------------
 
 function solve_coordinator_qp!(ws::ACPowerWorkspaceALADIN)
-    model, dy_all, qp_obj = _build_ac_qp_skeleton(ws)
+    model, dy_all, qp_obj = _build_qp_skeleton(ws)
 
     n_edge = length(ws.interzonal_line_pairs)
     n_dummy = length(ws.dummy_line_pairs)
@@ -459,14 +459,14 @@ end
 # ------------------------------------------------------------
 
 function solve_coordinator_qp!(ws::ACHybridWorkspaceALADIN)
-    model, dy_all, qp_obj = _build_ac_qp_skeleton(ws)
+    model, dy_all, qp_obj = _build_qp_skeleton(ws)
 
     n_bus = length(ws.bus_pairs)
     n_edge = length(ws.interzonal_line_pairs)
     n_split = length(ws.split_bus_pairs)
     n_dummy = length(ws.dummy_line_pairs)
 
-    s_theta = JuMP.@variable(model, [1:n_bus], base_name = "sθ")
+    s_theta = JuMP.@variable(model, [1:n_bus], base_name = "s_theta")
     s_vm = JuMP.@variable(model, [1:n_bus], base_name = "svm")
     s_p = JuMP.@variable(model, [1:n_edge], base_name = "sp")
     s_q = JuMP.@variable(model, [1:n_edge], base_name = "sq")

@@ -1,24 +1,14 @@
 # ============================================================
-# ALADIN-SOCWR — Phase 2 Coordinator QP
+# ALADIN-SOCWR — Phase 2 coordinator QP
 # ============================================================
 
-@inline function _add_zone_cost!(
-    qp_obj::JuMP.QuadExpr,
-    zone::AladinZoneDataSOCWR,
-    dy::Vector{JuMP.VariableRef},
-)
-    @inbounds for k in 1:zone.n_vars
-        gk = zone.g[k]
-        if gk != 0.0
-            JuMP.add_to_expression!(qp_obj, gk, dy[k])
-        end
-        hk = zone.hess_diag[k]
-        if hk != 0.0
-            JuMP.add_to_expression!(qp_obj, 0.5 * hk, dy[k], dy[k])
-        end
-    end
-    return nothing
-end
+# ============================================================
+# Pair coupling expressions
+# ============================================================
+
+# ------------------------------------------------------------
+# Bus consensus
+# ------------------------------------------------------------
 
 @inline function _bus_v2_expr_socwr!(
     expr::JuMP.AffExpr,
@@ -35,6 +25,10 @@ end
     JuMP.add_to_expression!(expr, -1.0, dy_all[pair.zone_j][pair.v2_col_j])
     return expr
 end
+
+# ------------------------------------------------------------
+# Edge R consensus
+# ------------------------------------------------------------
 
 @inline function _edge_r_expr_socwr!(
     expr::JuMP.AffExpr,
@@ -54,6 +48,10 @@ end
     return expr
 end
 
+# ------------------------------------------------------------
+# Edge T consensus
+# ------------------------------------------------------------
+
 @inline function _edge_t_expr_socwr!(
     expr::JuMP.AffExpr,
     zones::Vector{AladinZoneDataSOCWR},
@@ -71,6 +69,10 @@ end
     JuMP.add_to_expression!(expr, -1.0, dy_all[pair.zone_j][tj_col])
     return expr
 end
+
+# ------------------------------------------------------------
+# Split-bus p_inj / q_inj consensus
+# ------------------------------------------------------------
 
 @inline function _pinj_coupling_expr_socwr!(
     expr::JuMP.AffExpr,
@@ -103,6 +105,10 @@ end
     JuMP.add_to_expression!(expr, 1.0, dy_all[pair.zone_j][pair.q_inj_col_j])
     return expr
 end
+
+# ------------------------------------------------------------
+# Interzonal p/q flow consensus
+# ------------------------------------------------------------
 
 @inline function _add_socwr_flow_grad!(
     expr::JuMP.AffExpr,
@@ -139,56 +145,16 @@ end
     return expr
 end
 
-# ------------------------------------------------------------
-# QP skeleton: Δy variables, zone costs, active-set preservation
-# ------------------------------------------------------------
-
-const _SOCWRCoordWorkspace = Union{
-    SOCWRStateWorkspaceALADIN,
-    SOCWRPowerWorkspaceALADIN,
-    SOCWRHybridWorkspaceALADIN,
-}
-
-function _build_socwr_qp_skeleton(ws::_SOCWRCoordWorkspace)
-    model = JuMP.Model(ws.qp_optimizer)
-    n_zones = length(ws.zones)
-
-    dy_all = Vector{Vector{JuMP.VariableRef}}(undef, n_zones)
-    @inbounds for i in 1:n_zones
-        dy_all[i] =
-            JuMP.@variable(model, [1:ws.zones[i].n_vars], base_name = "dy$(i)")
-    end
-
-    qp_obj = zero(JuMP.QuadExpr)
-    @inbounds for i in 1:n_zones
-        _add_zone_cost!(qp_obj, ws.zones[i], dy_all[i])
-    end
-
-    @inbounds for i in 1:n_zones
-        _add_active_constraints!(model, ws.zones[i], dy_all[i])
-        _add_active_bound_constraints!(model, ws.zones[i], dy_all[i])
-    end
-
-    return model, dy_all, qp_obj
-end
-
-function _extract_delta_socwr!(ws::_SOCWRCoordWorkspace, dy_all)
-    @inbounds for i in eachindex(ws.zones)
-        delta = ws.zones[i].delta
-        v = dy_all[i]
-        for k in 1:ws.zones[i].n_vars
-            delta[k] = JuMP.value(v[k])
-        end
-    end
-    return nothing
-end
+# ============================================================
+# Dispatch
+# ============================================================
 
 # ------------------------------------------------------------
-# STATE — v² consensus + R/T consensus
+# STATE
 # ------------------------------------------------------------
 
 function solve_coordinator_qp!(ws::SOCWRStateWorkspaceALADIN)
-    model, dy_all, qp_obj = _build_socwr_qp_skeleton(ws)
+    model, dy_all, qp_obj = _build_qp_skeleton(ws)
 
     n_bus = length(ws.bus_pairs)
     n_edge = length(ws.interzonal_line_pairs)
@@ -232,7 +198,7 @@ function solve_coordinator_qp!(ws::SOCWRStateWorkspaceALADIN)
     JuMP.optimize!(model)
     _check_qp_status!(model, "ALADIN-state/SOCWR coordinator QP")
 
-    _extract_delta_socwr!(ws, dy_all)
+    _extract_delta!(ws, dy_all)
 
     nu_v2 = ws.vars.v2.nu
     nu_r = ws.vars.r.nu
@@ -248,11 +214,11 @@ function solve_coordinator_qp!(ws::SOCWRStateWorkspaceALADIN)
 end
 
 # ------------------------------------------------------------
-# POWER — p_flow / q_flow consensus
+# POWER
 # ------------------------------------------------------------
 
 function solve_coordinator_qp!(ws::SOCWRPowerWorkspaceALADIN)
-    model, dy_all, qp_obj = _build_socwr_qp_skeleton(ws)
+    model, dy_all, qp_obj = _build_qp_skeleton(ws)
 
     n_edge = length(ws.interzonal_line_pairs)
 
@@ -283,7 +249,7 @@ function solve_coordinator_qp!(ws::SOCWRPowerWorkspaceALADIN)
     JuMP.optimize!(model)
     _check_qp_status!(model, "ALADIN-power/SOCWR coordinator QP")
 
-    _extract_delta_socwr!(ws, dy_all)
+    _extract_delta!(ws, dy_all)
 
     nu_p = ws.vars.p_flow.nu
     nu_q = ws.vars.q_flow.nu
@@ -295,11 +261,11 @@ function solve_coordinator_qp!(ws::SOCWRPowerWorkspaceALADIN)
 end
 
 # ------------------------------------------------------------
-# HYBRID — v²/R/T + p_flow/q_flow
+# HYBRID
 # ------------------------------------------------------------
 
 function solve_coordinator_qp!(ws::SOCWRHybridWorkspaceALADIN)
-    model, dy_all, qp_obj = _build_socwr_qp_skeleton(ws)
+    model, dy_all, qp_obj = _build_qp_skeleton(ws)
 
     n_bus = length(ws.bus_pairs)
     n_edge = length(ws.interzonal_line_pairs)
@@ -379,7 +345,7 @@ function solve_coordinator_qp!(ws::SOCWRHybridWorkspaceALADIN)
     JuMP.optimize!(model)
     _check_qp_status!(model, "ALADIN-hybrid/SOCWR coordinator QP")
 
-    _extract_delta_socwr!(ws, dy_all)
+    _extract_delta!(ws, dy_all)
 
     nu_v2 = ws.vars.v2.nu
     nu_r = ws.vars.r.nu

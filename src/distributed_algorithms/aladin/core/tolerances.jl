@@ -26,6 +26,25 @@ function _progress_tol(
     return sqrt(max(n, 1)) * eps_abs + eps_rel * max(sqrt(ny_sq), sqrt(nx_sq))
 end
 
+# ------------------------------------------------------------
+# Boyd-style ε_pri finalisation (shared across DC/AC/SOCWR)
+# ------------------------------------------------------------
+
+@inline function _finalize_eps_primal!(
+    ws::AbstractALADINWorkspace,
+    n_pairs::Int,
+    norm_i_sq::Float64,
+    norm_j_sq::Float64,
+    eps_abs::Float64,
+    eps_rel::Float64,
+)
+    ws.eps_primal =
+        sqrt(max(n_pairs, 1)) * eps_abs +
+        eps_rel * max(sqrt(norm_i_sq), sqrt(norm_j_sq))
+    ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
+    return nothing
+end
+
 # ---- State ----
 
 function compute_tolerances!(
@@ -42,10 +61,7 @@ function compute_tolerances!(
         norm_i += yi * yi
         norm_j += yj * yj
     end
-    ws.eps_primal =
-        sqrt(max(n, 1)) * eps_abs +
-        eps_rel * max(sqrt(norm_i), sqrt(norm_j))
-    ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
+    _finalize_eps_primal!(ws, n, norm_i, norm_j, eps_abs, eps_rel)
     return nothing
 end
 
@@ -86,10 +102,7 @@ function compute_tolerances!(
     nd_i, nd_j = _dummy_pf_norms(ws)
     norm_i += nd_i
     norm_j += nd_j
-    ws.eps_primal =
-        sqrt(max(n, 1)) * eps_abs +
-        eps_rel * max(sqrt(norm_i), sqrt(norm_j))
-    ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
+    _finalize_eps_primal!(ws, n, norm_i, norm_j, eps_abs, eps_rel)
     return nothing
 end
 
@@ -175,17 +188,14 @@ function compute_tolerances!(
     @inbounds for pair in ws.bus_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        θi = zi.y[pair.theta_col_i]
-        θj = zj.y[pair.theta_col_j]
+        theta_i = zi.y[pair.theta_col_i]
+        theta_j = zj.y[pair.theta_col_j]
         vi = zi.y[pair.vm_col_i]
         vj = zj.y[pair.vm_col_j]
-        norm_i += θi * θi + vi * vi
-        norm_j += θj * θj + vj * vj
+        norm_i += theta_i * theta_i + vi * vi
+        norm_j += theta_j * theta_j + vj * vj
     end
-    ws.eps_primal =
-        sqrt(max(n, 1)) * eps_abs +
-        eps_rel * max(sqrt(norm_i), sqrt(norm_j))
-    ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
+    _finalize_eps_primal!(ws, n, norm_i, norm_j, eps_abs, eps_rel)
     return nothing
 end
 
@@ -226,10 +236,7 @@ function compute_tolerances!(
     nd_i, nd_j = _norms_dummy_pq_ac(ws)
     norm_i += nd_i
     norm_j += nd_j
-    ws.eps_primal =
-        sqrt(max(n, 1)) * eps_abs +
-        eps_rel * max(sqrt(norm_i), sqrt(norm_j))
-    ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
+    _finalize_eps_primal!(ws, n, norm_i, norm_j, eps_abs, eps_rel)
     return nothing
 end
 
@@ -246,12 +253,12 @@ function compute_tolerances!(
     @inbounds for pair in ws.bus_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        θi = zi.y[pair.theta_col_i]
-        θj = zj.y[pair.theta_col_j]
+        theta_i = zi.y[pair.theta_col_i]
+        theta_j = zj.y[pair.theta_col_j]
         vi = zi.y[pair.vm_col_i]
         vj = zj.y[pair.vm_col_j]
-        norm_i += θi * θi + vi * vi
-        norm_j += θj * θj + vj * vj
+        norm_i += theta_i * theta_i + vi * vi
+        norm_j += theta_j * theta_j + vj * vj
     end
     @inbounds for pair in ws.interzonal_line_pairs
         zi = ws.zones[pair.zone_i]
@@ -276,10 +283,7 @@ function compute_tolerances!(
     nd_i, nd_j = _norms_dummy_pq_ac(ws)
     norm_i += nd_i
     norm_j += nd_j
-    ws.eps_primal =
-        sqrt(max(n, 1)) * eps_abs +
-        eps_rel * max(sqrt(norm_i), sqrt(norm_j))
-    ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
+    _finalize_eps_primal!(ws, n, norm_i, norm_j, eps_abs, eps_rel)
     return nothing
 end
 
@@ -359,10 +363,7 @@ function compute_tolerances!(
     ni_rt, nj_rt = _norms_edge_rt_socwr(ws)
     ni = ni_b + ni_rt
     nj = nj_b + nj_rt
-    ws.eps_primal =
-        sqrt(max(n, 1)) * eps_abs +
-        eps_rel * max(sqrt(ni), sqrt(nj))
-    ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
+    _finalize_eps_primal!(ws, n, ni, nj, eps_abs, eps_rel)
     return nothing
 end
 
@@ -373,10 +374,7 @@ function compute_tolerances!(
 )
     n = 2 * length(ws.interzonal_line_pairs)
     ni, nj = _norms_edge_pq_socwr(ws)
-    ws.eps_primal =
-        sqrt(max(n, 1)) * eps_abs +
-        eps_rel * max(sqrt(ni), sqrt(nj))
-    ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
+    _finalize_eps_primal!(ws, n, ni, nj, eps_abs, eps_rel)
     return nothing
 end
 
@@ -394,9 +392,6 @@ function compute_tolerances!(
     ni_sp, nj_sp = _norms_split_pq_socwr(ws)
     ni = ni_b + ni_rt + ni_pq + ni_sp
     nj = nj_b + nj_rt + nj_pq + nj_sp
-    ws.eps_primal =
-        sqrt(max(n, 1)) * eps_abs +
-        eps_rel * max(sqrt(ni), sqrt(nj))
-    ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
+    _finalize_eps_primal!(ws, n, ni, nj, eps_abs, eps_rel)
     return nothing
 end

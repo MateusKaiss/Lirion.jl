@@ -198,6 +198,7 @@ include("distributed_algorithms/admm/core/tolerances.jl")
 include("distributed_algorithms/admm/core/rho_update.jl")
 
 include("distributed_algorithms/aladin/core/zone_helpers.jl")
+include("distributed_algorithms/aladin/core/coordinator_qp.jl")
 
 include("distributed_algorithms/aladin/dc/zone_data.jl")
 include("distributed_algorithms/aladin/dc/sensitivities.jl")

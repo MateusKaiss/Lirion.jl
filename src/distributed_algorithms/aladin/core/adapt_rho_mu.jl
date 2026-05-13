@@ -21,10 +21,10 @@ end
 # ============================================================
 
 # ------------------------------------------------------------
-# DC State (single ρ)
+# Default: single ρ + μ
 # ------------------------------------------------------------
 
-function adapt_rho_mu!(ws::DCStateWorkspaceALADIN, params::ALADINParams)
+function adapt_rho_mu!(ws::AbstractALADINWorkspace, params::ALADINParams)
     params.adaptive || return nothing
     rho_changed = _grow_ref!(ws.rho, params.rho_growth, params.rho_upper)
     _grow_ref!(ws.mu, params.mu_growth, params.mu_upper)
@@ -33,19 +33,7 @@ function adapt_rho_mu!(ws::DCStateWorkspaceALADIN, params::ALADINParams)
 end
 
 # ------------------------------------------------------------
-# DC Power (single ρ; primal or pflow proximal mode)
-# ------------------------------------------------------------
-
-function adapt_rho_mu!(ws::DCPowerWorkspaceALADIN, params::ALADINParams)
-    params.adaptive || return nothing
-    rho_changed = _grow_ref!(ws.rho, params.rho_growth, params.rho_upper)
-    _grow_ref!(ws.mu, params.mu_growth, params.mu_upper)
-    rho_changed && refresh_rho!(ws)
-    return nothing
-end
-
-# ------------------------------------------------------------
-# DC Hybrid (ρ_bus + ρ_edge + ρ_inj)
+# DC Hybrid
 # ------------------------------------------------------------
 
 function adapt_rho_mu!(ws::DCHybridWorkspaceALADIN, params::ALADINParams)
@@ -55,43 +43,5 @@ function adapt_rho_mu!(ws::DCHybridWorkspaceALADIN, params::ALADINParams)
     _grow_ref!(ws.rho_inj, params.rho_growth, params.rho_upper)
     _grow_ref!(ws.mu, params.mu_growth, params.mu_upper)
     rho_bus_changed && refresh_rho!(ws)
-    return nothing
-end
-
-# ------------------------------------------------------------
-# AC (State / Power / Hybrid)
-# ------------------------------------------------------------
-
-function adapt_rho_mu!(
-    ws::Union{
-        ACStateWorkspaceALADIN,
-        ACPowerWorkspaceALADIN,
-        ACHybridWorkspaceALADIN,
-    },
-    params::ALADINParams,
-)
-    params.adaptive || return nothing
-    rho_changed = _grow_ref!(ws.rho, params.rho_growth, params.rho_upper)
-    _grow_ref!(ws.mu, params.mu_growth, params.mu_upper)
-    rho_changed && refresh_rho!(ws)
-    return nothing
-end
-
-# ------------------------------------------------------------
-# SOCWR (State / Power / Hybrid)
-# ------------------------------------------------------------
-
-function adapt_rho_mu!(
-    ws::Union{
-        SOCWRStateWorkspaceALADIN,
-        SOCWRPowerWorkspaceALADIN,
-        SOCWRHybridWorkspaceALADIN,
-    },
-    params::ALADINParams,
-)
-    params.adaptive || return nothing
-    rho_changed = _grow_ref!(ws.rho, params.rho_growth, params.rho_upper)
-    _grow_ref!(ws.mu, params.mu_growth, params.mu_upper)
-    rho_changed && refresh_rho!(ws)
     return nothing
 end

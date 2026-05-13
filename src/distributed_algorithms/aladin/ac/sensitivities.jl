@@ -13,9 +13,7 @@ function refresh_sensitivities_ac!(
     sigma_vm::Float64 = 0.0,
     sigma_pg::Float64 = 0.0,
     sigma_qg::Float64 = 0.0,
-    sigma_other::Float64 = 0.0,
-
-    dual_tol::Float64 = 1e-3,
+    sigma_other::Float64 = 0.0, dual_tol::Float64 = 1e-3,
     dep_tol::Float64 = 1e-10,
 )
     model = zone.model

@@ -61,103 +61,75 @@ function build_active_jacobian(
     var_to_col = zone.var_to_col
     n_vars = zone.n_vars
     y = zone.y
-
-    eq_jac = zone.eq_jac
+    has_duals = JuMP.has_duals(model)
 
     ineq_rows = Int[]
     ineq_cols = Int[]
     ineq_vals = Float64[]
-    row_offset = 0
 
-    has_duals = JuMP.has_duals(model)
+    row_offset = _collect_affine_inequality_rows!(
+        ineq_rows, ineq_cols, ineq_vals, 0,
+        model, var_to_col, has_duals;
+        dual_tol = dual_tol,
+    )
 
     for (F, S) in JuMP.list_of_constraint_types(model)
-        F <: JuMP.VariableRef && continue
+        F <: AbstractVector || continue
+        is_rsoc = S <: MOI.RotatedSecondOrderCone
+        is_soc = S <: MOI.SecondOrderCone
+        (is_rsoc || is_soc) || continue
 
-        # --- Scalar affine inequality (angle bounds, etc.) ---
-        if F <: JuMP.AffExpr
-            S === MOI.EqualTo{Float64} && continue
-            for ci in JuMP.all_constraints(model, F, S)
-                has_duals || continue
-                dval = try
-                    JuMP.dual(ci)
-                catch
-                    0.0
-                end
-                (dval isa Real) || continue
-                abs(dval) > dual_tol || continue
-
-                cobj = JuMP.constraint_object(ci)
-                row_offset += 1
-                _push_affine_row_offset!(
-                    ineq_rows, ineq_cols, ineq_vals,
-                    row_offset, cobj.func, var_to_col,
-                )
+        for ci in JuMP.all_constraints(model, F, S)
+            has_duals || continue
+            dval_vec = try
+                JuMP.dual(ci)
+            catch
+                nothing
             end
-            continue
-        end
+            (dval_vec isa AbstractVector) || continue
+            isempty(dval_vec) && continue
+            LinearAlgebra.norm(dval_vec) > cone_tol || continue
 
-        # --- Vector cone constraints (RSOC, SOC) ---
-        if F <: AbstractVector
-            is_rsoc = S <: MOI.RotatedSecondOrderCone
-            is_soc = S <: MOI.SecondOrderCone
-            (is_rsoc || is_soc) || continue
+            cobj = JuMP.constraint_object(ci)
+            func = cobj.func
+            cone_set = cobj.set
 
-            for ci in JuMP.all_constraints(model, F, S)
-                has_duals || continue
-                dval_vec = try
-                    JuMP.dual(ci)
-                catch
-                    nothing
+            m = length(func)
+            v_star = Vector{Float64}(undef, m)
+            ok = true
+            @inbounds for k in 1:m
+                fk = func[k]
+                if fk isa JuMP.AffExpr
+                    v_star[k] = _eval_aff_at_y(fk, y, var_to_col)
+                else
+                    ok = false
+                    break
                 end
-                (dval_vec isa AbstractVector) || continue
-                isempty(dval_vec) && continue
-                LinearAlgebra.norm(dval_vec) > cone_tol || continue
+            end
+            ok || continue
 
-                cobj = JuMP.constraint_object(ci)
-                func = cobj.func
-                cone_set = cobj.set
+            nrm = _cone_active_normal(cone_set, v_star)
 
-                m = length(func)
-                v_star = Vector{Float64}(undef, m)
-                ok = true
-                @inbounds for k in 1:m
-                    fk = func[k]
-                    if fk isa JuMP.AffExpr
-                        v_star[k] = _eval_aff_at_y(fk, y, var_to_col)
-                    else
-                        ok = false
-                        break
-                    end
-                end
-                ok || continue
-
-                nrm = _cone_active_normal(cone_set, v_star)
-
-                row_offset += 1
-                @inbounds for k in 1:m
-                    nk = nrm[k]
-                    nk == 0.0 && continue
-                    fk = func[k]
-                    fk isa JuMP.AffExpr || continue
-                    for (v, coef) in fk.terms
-                        col = get(var_to_col, v, 0)
-                        col == 0 && continue
-                        push!(ineq_rows, row_offset)
-                        push!(ineq_cols, col)
-                        push!(ineq_vals, nk * coef)
-                    end
-                end
+            row_offset += 1
+            @inbounds for k in 1:m
+                nk = nrm[k]
+                nk == 0.0 && continue
+                fk = func[k]
+                fk isa JuMP.AffExpr || continue
+                _push_affine_row!(
+                    ineq_rows, ineq_cols, ineq_vals,
+                    row_offset, fk, var_to_col; scale = nk,
+                )
             end
         end
     end
 
     C_stacked = if row_offset == 0
-        eq_jac
+        zone.eq_jac
     else
         C_ineq =
             SparseArrays.sparse(ineq_rows, ineq_cols, ineq_vals, row_offset, n_vars)
-        vcat(eq_jac, C_ineq)
+        vcat(zone.eq_jac, C_ineq)
     end
 
     return _delete_dependent_rows(C_stacked; tol = dep_tol)

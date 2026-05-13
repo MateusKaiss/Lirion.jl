@@ -6,79 +6,10 @@
     return nothing
 end
 
-function dual_update!(ws::DCStateWorkspaceALADIN)
-    _apply_dual_step!(ws.vars.theta, ws.alpha3)
-    return nothing
-end
-
-function dual_update!(ws::DCPowerWorkspaceALADIN)
+function dual_update!(ws::AbstractALADINWorkspace)
     a3 = ws.alpha3
-    _apply_dual_step!(ws.vars.p_flow, a3)
-    _apply_dual_step!(ws.vars.p_dummy, a3)
-    return nothing
-end
-
-function dual_update!(ws::DCHybridWorkspaceALADIN)
-    a3 = ws.alpha3
-    _apply_dual_step!(ws.vars.theta, a3)
-    _apply_dual_step!(ws.vars.p_flow, a3)
-    _apply_dual_step!(ws.vars.p_inj, a3)
-    _apply_dual_step!(ws.vars.p_dummy, a3)
-    return nothing
-end
-
-function dual_update!(ws::ACStateWorkspaceALADIN)
-    a3 = ws.alpha3
-    _apply_dual_step!(ws.vars.theta, a3)
-    _apply_dual_step!(ws.vars.v_mag, a3)
-    return nothing
-end
-
-function dual_update!(ws::ACPowerWorkspaceALADIN)
-    a3 = ws.alpha3
-    _apply_dual_step!(ws.vars.p_flow, a3)
-    _apply_dual_step!(ws.vars.q_flow, a3)
-    _apply_dual_step!(ws.vars.p_dummy, a3)
-    _apply_dual_step!(ws.vars.q_dummy, a3)
-    return nothing
-end
-
-function dual_update!(ws::ACHybridWorkspaceALADIN)
-    a3 = ws.alpha3
-    _apply_dual_step!(ws.vars.theta, a3)
-    _apply_dual_step!(ws.vars.v_mag, a3)
-    _apply_dual_step!(ws.vars.p_flow, a3)
-    _apply_dual_step!(ws.vars.q_flow, a3)
-    _apply_dual_step!(ws.vars.p_inj, a3)
-    _apply_dual_step!(ws.vars.q_inj, a3)
-    _apply_dual_step!(ws.vars.p_dummy, a3)
-    _apply_dual_step!(ws.vars.q_dummy, a3)
-    return nothing
-end
-
-function dual_update!(ws::SOCWRStateWorkspaceALADIN)
-    a3 = ws.alpha3
-    _apply_dual_step!(ws.vars.v2, a3)
-    _apply_dual_step!(ws.vars.r, a3)
-    _apply_dual_step!(ws.vars.t, a3)
-    return nothing
-end
-
-function dual_update!(ws::SOCWRPowerWorkspaceALADIN)
-    a3 = ws.alpha3
-    _apply_dual_step!(ws.vars.p_flow, a3)
-    _apply_dual_step!(ws.vars.q_flow, a3)
-    return nothing
-end
-
-function dual_update!(ws::SOCWRHybridWorkspaceALADIN)
-    a3 = ws.alpha3
-    _apply_dual_step!(ws.vars.v2, a3)
-    _apply_dual_step!(ws.vars.r, a3)
-    _apply_dual_step!(ws.vars.t, a3)
-    _apply_dual_step!(ws.vars.p_flow, a3)
-    _apply_dual_step!(ws.vars.q_flow, a3)
-    _apply_dual_step!(ws.vars.p_inj, a3)
-    _apply_dual_step!(ws.vars.q_inj, a3)
+    for state in values(ws.vars)
+        _apply_dual_step!(state, a3)
+    end
     return nothing
 end
