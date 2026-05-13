@@ -69,13 +69,16 @@ _print_tag(::AbstractALADINWorkspace) = "[ALADIN]"
 
 @inline function _print_aladin_residuals!(ws::AbstractALADINWorkspace)
     _FAST_USE_LOGS && println(
-        "‖r_primal‖ = $(ws.r_primal) | eps_pri  = $(ws.eps_primal)",
+        "‖r_primal‖      = $(ws.r_primal)      | eps_pri  = $(ws.eps_primal)",
     )
     _FAST_USE_LOGS && println(
-        "‖r_progress‖ = $(ws.r_progress) | eps_prog = $(ws.eps_progress)",
+        "‖r_step_primal‖ = $(ws.r_step_primal) | eps_step = $(ws.eps_step_primal)",
     )
     _FAST_USE_LOGS && println(
-        "‖Δλ‖ = $(ws.lambda_step)  (diagnostic)",
+        "‖r_dual‖        = $(ws.r_dual)        | eps_dual = $(ws.eps_dual)",
+    )
+    _FAST_USE_LOGS && println(
+        "‖Δλ‖            = $(ws.lambda_step)   (diagnostic)",
     )
     return nothing
 end

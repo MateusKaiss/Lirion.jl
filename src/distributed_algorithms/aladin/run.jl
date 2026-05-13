@@ -3,7 +3,9 @@
 # ============================================================
 
 @inline stop_if_converged(ws::AbstractALADINWorkspace) =
-    (ws.r_primal < ws.eps_primal) && (ws.r_progress < ws.eps_progress)
+    (ws.r_primal < ws.eps_primal) &&
+    (ws.r_step_primal < ws.eps_step_primal) &&
+    (ws.r_dual < ws.eps_dual)
 
 @inline _line_search_step!(::AbstractALADINWorkspace) = nothing
 

@@ -81,6 +81,13 @@ end
         kwargs[:sigma_qflow] > 0 ||
             throw(ArgumentError("sigma_qflow must be > 0"))
     end
+    if haskey(kwargs, :stopping_criterion)
+        sc = kwargs[:stopping_criterion]
+        sc in (:boyd, :hfd) ||
+            throw(ArgumentError(
+                "Invalid stopping_criterion=$sc. Allowed: :boyd, :hfd",
+            ))
+    end
 
     return ALADINAlgorithm(coupling, _sectioning(sectioning), max_iter, (; kwargs...))
 end

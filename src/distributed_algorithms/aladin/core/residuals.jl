@@ -1,157 +1,229 @@
-function _progress_sq(zone::AbstractAladinZoneData)::Float64
-    s = 0.0
+# ============================================================
+# ALADIN — Residuals (Boyd 2-norm or HFD ∞-norm)
+# ============================================================
+
+@inline _final_norm(crit::Symbol, sq::Float64, mx::Float64) =
+    crit === :hfd ? mx : sqrt(sq)
+
+# ============================================================
+# Shared primal step / lambda step / dual residual
+# ============================================================
+
+@inline function _progress_norms(zone::AbstractAladinZoneData)
+    s_sq = 0.0
+    s_inf = 0.0
     y = zone.y
     x = zone.x_prev
     @inbounds for k in 1:zone.n_vars
-        d = y[k] - x[k]
-        s += d * d
+        d = abs(y[k] - x[k])
+        s_sq += d * d
+        s_inf = max(s_inf, d)
     end
-    return s
+    return s_sq, s_inf
 end
 
-function _compute_r_progress!(ws::AbstractALADINWorkspace)
-    s = 0.0
+function _compute_r_step_primal!(ws::AbstractALADINWorkspace)
+    s_sq = 0.0
+    s_inf = 0.0
     @inbounds for zone in ws.zones
-        s += _progress_sq(zone)
+        zsq, zinf = _progress_norms(zone)
+        s_sq += zsq
+        s_inf = max(s_inf, zinf)
     end
-    ws.r_progress = sqrt(s)
+    ws.r_step_primal = _final_norm(ws.stopping_criterion, s_sq, s_inf)
     return nothing
 end
 
-@inline function _lambda_step_sq(state::LambdaState)::Float64
-    s = 0.0
+@inline function _lambda_step_norms(state::LambdaState)
+    s_sq = 0.0
+    s_inf = 0.0
     @inbounds for k in eachindex(state.lambda)
-        d = state.lambda[k] - state.lambda_prev[k]
-        s += d * d
+        d = abs(state.lambda[k] - state.lambda_prev[k])
+        s_sq += d * d
+        s_inf = max(s_inf, d)
     end
-    return s
+    return s_sq, s_inf
 end
 
 function _compute_lambda_step!(ws::AbstractALADINWorkspace)
-    s = 0.0
+    s_sq = 0.0
+    s_inf = 0.0
     for state in values(ws.vars)
-        s += _lambda_step_sq(state)
+        ssq, sinf = _lambda_step_norms(state)
+        s_sq += ssq
+        s_inf = max(s_inf, sinf)
     end
-    ws.lambda_step = sqrt(s)
+    ws.lambda_step = _final_norm(ws.stopping_criterion, s_sq, s_inf)
     return nothing
 end
 
-# ---- State ----
+@inline function _compute_r_dual!(ws::AbstractALADINWorkspace)
+    ws.r_dual = ws.mu[] * ws.lambda_step
+    return nothing
+end
 
-function compute_residuals!(ws::DCStateWorkspaceALADIN)
-    r_pri_sq = 0.0
+# ============================================================
+# Per-block consensus accumulators
+# Each returns (sum_of_squares, max_abs)
+# ============================================================
+
+@inline function _r_pri_bus_dc(ws)
+    sq = 0.0; mx = 0.0
     @inbounds for pair in ws.bus_pairs
-        yi = ws.zones[pair.zone_i].y[pair.col_i]
-        yj = ws.zones[pair.zone_j].y[pair.col_j]
-        r_pri_sq += (yi - yj)^2
+        d = abs(ws.zones[pair.zone_i].y[pair.col_i] -
+                ws.zones[pair.zone_j].y[pair.col_j])
+        sq += d * d
+        mx = max(mx, d)
     end
-    ws.r_primal = sqrt(r_pri_sq)
-
-    _compute_r_progress!(ws)
-    _compute_lambda_step!(ws)
-    return nothing
+    return sq, mx
 end
 
-# ---- Power ----
+@inline function _r_pri_edge_dc(ws)
+    sq = 0.0; mx = 0.0
+    @inbounds for pair in ws.interzonal_line_pairs
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        li = pair.line_local_i
+        lj = pair.line_local_j
+        pfi = zi.edge_b[li] * (zi.y[zi.edge_from_cols[li]] - zi.y[zi.edge_to_cols[li]])
+        pfj = zj.edge_b[lj] * (zj.y[zj.edge_from_cols[lj]] - zj.y[zj.edge_to_cols[lj]])
+        d = abs(pfi - pfj)
+        sq += d * d
+        mx = max(mx, d)
+    end
+    return sq, mx
+end
 
-@inline function _dummy_pf_diff_sq(ws)
-    s = 0.0
+@inline function _r_pri_dummy_dc(ws)
+    sq = 0.0; mx = 0.0
     @inbounds for pair in ws.dummy_line_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
         pfi = pair.b_i * (zi.y[pair.from_col_i] - zi.y[pair.to_col_i])
         pfj = pair.b_j * (zj.y[pair.from_col_j] - zj.y[pair.to_col_j])
-        s += (pfi - pfj)^2
+        d = abs(pfi - pfj)
+        sq += d * d
+        mx = max(mx, d)
     end
-    return s
+    return sq, mx
 end
+
+@inline function _r_pri_split_dc(ws)
+    sq = 0.0; mx = 0.0
+    @inbounds for pair in ws.split_bus_pairs
+        d = abs(ws.zones[pair.zone_i].y[pair.p_inj_col_i] +
+                ws.zones[pair.zone_j].y[pair.p_inj_col_j])
+        sq += d * d
+        mx = max(mx, d)
+    end
+    return sq, mx
+end
+
+# ============================================================
+# DC residuals
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
+
+function compute_residuals!(ws::DCStateWorkspaceALADIN)
+    sq, mx = _r_pri_bus_dc(ws)
+    ws.r_primal = _final_norm(ws.stopping_criterion, sq, mx)
+    _compute_r_step_primal!(ws)
+    _compute_lambda_step!(ws)
+    _compute_r_dual!(ws)
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function compute_residuals!(ws::DCPowerWorkspaceALADIN)
-    r_pri_sq = 0.0
-    @inbounds for pair in ws.interzonal_line_pairs
-        zi = ws.zones[pair.zone_i]
-        zj = ws.zones[pair.zone_j]
-        li = pair.line_local_i
-        lj = pair.line_local_j
-        pfi = zi.edge_b[li] * (zi.y[zi.edge_from_cols[li]] - zi.y[zi.edge_to_cols[li]])
-        pfj = zj.edge_b[lj] * (zj.y[zj.edge_from_cols[lj]] - zj.y[zj.edge_to_cols[lj]])
-        r_pri_sq += (pfi - pfj)^2
-    end
-    r_pri_sq += _dummy_pf_diff_sq(ws)
-    ws.r_primal = sqrt(r_pri_sq)
-
-    _compute_r_progress!(ws)
+    sq_e, mx_e = _r_pri_edge_dc(ws)
+    sq_d, mx_d = _r_pri_dummy_dc(ws)
+    ws.r_primal = _final_norm(
+        ws.stopping_criterion, sq_e + sq_d, max(mx_e, mx_d),
+    )
+    _compute_r_step_primal!(ws)
     _compute_lambda_step!(ws)
+    _compute_r_dual!(ws)
     return nothing
 end
 
-# ---- DC Hybrid ----
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
 
 function compute_residuals!(ws::DCHybridWorkspaceALADIN)
-    # Bus consensus block
-    r_pri_bus_sq = 0.0
-    @inbounds for pair in ws.bus_pairs
-        yi = ws.zones[pair.zone_i].y[pair.col_i]
-        yj = ws.zones[pair.zone_j].y[pair.col_j]
-        r_pri_bus_sq += (yi - yj)^2
-    end
-    ws.r_primal_bus = sqrt(r_pri_bus_sq)
+    sq_b, mx_b = _r_pri_bus_dc(ws)
+    sq_e, mx_e = _r_pri_edge_dc(ws)
+    sq_s, mx_s = _r_pri_split_dc(ws)
+    sq_d, mx_d = _r_pri_dummy_dc(ws)
 
-    # Edge consensus block
-    r_pri_edge_sq = 0.0
+    crit = ws.stopping_criterion
+    ws.r_primal_bus = _final_norm(crit, sq_b, mx_b)
+    ws.r_primal_edge = _final_norm(crit, sq_e, mx_e)
+    ws.r_primal = _final_norm(
+        crit, sq_b + sq_e + sq_s + sq_d, max(mx_b, mx_e, mx_s, mx_d),
+    )
+
+    _compute_r_step_primal!(ws)
+    ws.r_step_primal_bus = ws.r_step_primal       # same scalar, kept for diagnostics
+    ws.r_step_primal_edge = ws.r_step_primal
+
+    _compute_lambda_step!(ws)
+    _compute_r_dual!(ws)
+    return nothing
+end
+
+# ============================================================
+# AC consensus accumulators
+# ============================================================
+
+@inline function _r_pri_bus_ac(ws)
+    sq = 0.0; mx = 0.0
+    @inbounds for pair in ws.bus_pairs
+        zi = ws.zones[pair.zone_i]
+        zj = ws.zones[pair.zone_j]
+        dth = abs(zi.y[pair.theta_col_i] - zj.y[pair.theta_col_j])
+        dvm = abs(zi.y[pair.vm_col_i] - zj.y[pair.vm_col_j])
+        sq += dth * dth + dvm * dvm
+        mx = max(mx, dth, dvm)
+    end
+    return sq, mx
+end
+
+@inline function _r_pri_edge_pq_ac(ws)
+    sq = 0.0; mx = 0.0
     @inbounds for pair in ws.interzonal_line_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        li = pair.line_local_i
-        lj = pair.line_local_j
-        pfi = zi.edge_b[li] * (zi.y[zi.edge_from_cols[li]] - zi.y[zi.edge_to_cols[li]])
-        pfj = zj.edge_b[lj] * (zj.y[zj.edge_from_cols[lj]] - zj.y[zj.edge_to_cols[lj]])
-        r_pri_edge_sq += (pfi - pfj)^2
+        dpf = abs(_ac_pf_at(zi, pair.line_local_i) - _ac_pf_at(zj, pair.line_local_j))
+        dqf = abs(_ac_qf_at(zi, pair.line_local_i) - _ac_qf_at(zj, pair.line_local_j))
+        sq += dpf * dpf + dqf * dqf
+        mx = max(mx, dpf, dqf)
     end
-    ws.r_primal_edge = sqrt(r_pri_edge_sq)
-
-    r_pri_split_sq = 0.0
-    @inbounds for pair in ws.split_bus_pairs
-        yi = ws.zones[pair.zone_i].y[pair.p_inj_col_i]
-        yj = ws.zones[pair.zone_j].y[pair.p_inj_col_j]
-        r_pri_split_sq += (yi + yj)^2
-    end
-
-    r_pri_dummy_sq = _dummy_pf_diff_sq(ws)
-
-    ws.r_primal = sqrt(
-        r_pri_bus_sq + r_pri_edge_sq + r_pri_split_sq + r_pri_dummy_sq,
-    )
-
-    _compute_r_progress!(ws)
-    ws.r_progress_bus = ws.r_progress       # same scalar, kept for diagnostics
-    ws.r_progress_edge = ws.r_progress
-
-    _compute_lambda_step!(ws)
-    return nothing
+    return sq, mx
 end
 
-# ------------------------------------------------------------
-# AC residuals
-# ------------------------------------------------------------
-
-function compute_residuals!(ws::ACStateWorkspaceALADIN)
-    r_pri_sq = 0.0
-    @inbounds for pair in ws.bus_pairs
+@inline function _r_pri_split_ac(ws)
+    sq = 0.0; mx = 0.0
+    @inbounds for pair in ws.split_bus_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        theta_i = zi.y[pair.theta_col_i]
-        theta_j = zj.y[pair.theta_col_j]
-        vi = zi.y[pair.vm_col_i]
-        vj = zj.y[pair.vm_col_j]
-        r_pri_sq += (theta_i - theta_j)^2 + (vi - vj)^2
+        dp = abs(zi.y[pair.p_inj_col_i] + zj.y[pair.p_inj_col_j])
+        dq = abs(zi.y[pair.q_inj_col_i] + zj.y[pair.q_inj_col_j])
+        sq += dp * dp + dq * dq
+        mx = max(mx, dp, dq)
     end
-    ws.r_primal = sqrt(r_pri_sq)
-
-    _compute_r_progress!(ws)
-    _compute_lambda_step!(ws)
-    return nothing
+    return sq, mx
 end
+
+# ------------------------------------------------------------
+# AC dummy-line flow helpers
+# ------------------------------------------------------------
 
 @inline function _dummy_ac_pf_at(pair::DummyLinePairAC, y::Vector{Float64}, side::Symbol)
     if side === :i
@@ -205,151 +277,180 @@ end
            tau * vf * vt * (-b * cos(delta_theta) + g * sin(delta_theta))
 end
 
-@inline function _r_pri_dummy_pq_sq_ac(ws)
-    s = 0.0
+@inline function _r_pri_dummy_pq_ac(ws)
+    sq = 0.0; mx = 0.0
     @inbounds for pair in ws.dummy_line_pairs
         yi = ws.zones[pair.zone_i].y
         yj = ws.zones[pair.zone_j].y
-        pfi = _dummy_ac_pf_at(pair, yi, :i)
-        pfj = _dummy_ac_pf_at(pair, yj, :j)
-        qfi = _dummy_ac_qf_at(pair, yi, :i)
-        qfj = _dummy_ac_qf_at(pair, yj, :j)
-        s += (pfi - pfj)^2 + (qfi - qfj)^2
+        dpf = abs(_dummy_ac_pf_at(pair, yi, :i) - _dummy_ac_pf_at(pair, yj, :j))
+        dqf = abs(_dummy_ac_qf_at(pair, yi, :i) - _dummy_ac_qf_at(pair, yj, :j))
+        sq += dpf * dpf + dqf * dqf
+        mx = max(mx, dpf, dqf)
     end
-    return s
+    return sq, mx
 end
+
+# ============================================================
+# AC residuals
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
+
+function compute_residuals!(ws::ACStateWorkspaceALADIN)
+    sq, mx = _r_pri_bus_ac(ws)
+    ws.r_primal = _final_norm(ws.stopping_criterion, sq, mx)
+    _compute_r_step_primal!(ws)
+    _compute_lambda_step!(ws)
+    _compute_r_dual!(ws)
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function compute_residuals!(ws::ACPowerWorkspaceALADIN)
-    r_pri_sq = 0.0
-    @inbounds for pair in ws.interzonal_line_pairs
-        zi = ws.zones[pair.zone_i]
-        zj = ws.zones[pair.zone_j]
-        pfi = _ac_pf_at(zi, pair.line_local_i)
-        pfj = _ac_pf_at(zj, pair.line_local_j)
-        qfi = _ac_qf_at(zi, pair.line_local_i)
-        qfj = _ac_qf_at(zj, pair.line_local_j)
-        r_pri_sq += (pfi - pfj)^2 + (qfi - qfj)^2
-    end
-    r_pri_sq += _r_pri_dummy_pq_sq_ac(ws)
-    ws.r_primal = sqrt(r_pri_sq)
-
-    _compute_r_progress!(ws)
+    sq_e, mx_e = _r_pri_edge_pq_ac(ws)
+    sq_d, mx_d = _r_pri_dummy_pq_ac(ws)
+    ws.r_primal = _final_norm(
+        ws.stopping_criterion, sq_e + sq_d, max(mx_e, mx_d),
+    )
+    _compute_r_step_primal!(ws)
     _compute_lambda_step!(ws)
+    _compute_r_dual!(ws)
     return nothing
 end
+
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
 
 function compute_residuals!(ws::ACHybridWorkspaceALADIN)
-    r_pri_sq = 0.0
-    @inbounds for pair in ws.bus_pairs
-        zi = ws.zones[pair.zone_i]
-        zj = ws.zones[pair.zone_j]
-        theta_i = zi.y[pair.theta_col_i]
-        theta_j = zj.y[pair.theta_col_j]
-        vi = zi.y[pair.vm_col_i]
-        vj = zj.y[pair.vm_col_j]
-        r_pri_sq += (theta_i - theta_j)^2 + (vi - vj)^2
-    end
-    @inbounds for pair in ws.interzonal_line_pairs
-        zi = ws.zones[pair.zone_i]
-        zj = ws.zones[pair.zone_j]
-        pfi = _ac_pf_at(zi, pair.line_local_i)
-        pfj = _ac_pf_at(zj, pair.line_local_j)
-        qfi = _ac_qf_at(zi, pair.line_local_i)
-        qfj = _ac_qf_at(zj, pair.line_local_j)
-        r_pri_sq += (pfi - pfj)^2 + (qfi - qfj)^2
-    end
-    @inbounds for pair in ws.split_bus_pairs
-        zi = ws.zones[pair.zone_i]
-        zj = ws.zones[pair.zone_j]
-        pi_val = zi.y[pair.p_inj_col_i]
-        pj_val = zj.y[pair.p_inj_col_j]
-        qi_val = zi.y[pair.q_inj_col_i]
-        qj_val = zj.y[pair.q_inj_col_j]
-        r_pri_sq += (pi_val + pj_val)^2 + (qi_val + qj_val)^2
-    end
-    r_pri_sq += _r_pri_dummy_pq_sq_ac(ws)
-    ws.r_primal = sqrt(r_pri_sq)
+    sq_b, mx_b = _r_pri_bus_ac(ws)
+    sq_e, mx_e = _r_pri_edge_pq_ac(ws)
+    sq_s, mx_s = _r_pri_split_ac(ws)
+    sq_d, mx_d = _r_pri_dummy_pq_ac(ws)
 
-    _compute_r_progress!(ws)
+    ws.r_primal = _final_norm(
+        ws.stopping_criterion,
+        sq_b + sq_e + sq_s + sq_d,
+        max(mx_b, mx_e, mx_s, mx_d),
+    )
+    _compute_r_step_primal!(ws)
     _compute_lambda_step!(ws)
+    _compute_r_dual!(ws)
     return nothing
 end
 
-@inline function _r_pri_bus_sq_socwr(ws)
-    s = 0.0
+# ============================================================
+# SOCWR consensus accumulators
+# ============================================================
+
+@inline function _r_pri_bus_socwr(ws)
+    sq = 0.0; mx = 0.0
     @inbounds for pair in ws.bus_pairs
-        zi = ws.zones[pair.zone_i]
-        zj = ws.zones[pair.zone_j]
-        d = zi.y[pair.v2_col_i] - zj.y[pair.v2_col_j]
-        s += d * d
+        d = abs(ws.zones[pair.zone_i].y[pair.v2_col_i] -
+                ws.zones[pair.zone_j].y[pair.v2_col_j])
+        sq += d * d
+        mx = max(mx, d)
     end
-    return s
+    return sq, mx
 end
 
-@inline function _r_pri_rt_sq_socwr(ws)
-    s = 0.0
+@inline function _r_pri_rt_socwr(ws)
+    sq = 0.0; mx = 0.0
     @inbounds for pair in ws.interzonal_line_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        ri = zi.y[zi.edge_r_cols[pair.line_local_i]]
-        rj = zj.y[zj.edge_r_cols[pair.line_local_j]]
-        ti = zi.y[zi.edge_t_cols[pair.line_local_i]]
-        tj = zj.y[zj.edge_t_cols[pair.line_local_j]]
-        s += (ri - rj)^2 + (ti - tj)^2
+        dr = abs(zi.y[zi.edge_r_cols[pair.line_local_i]] -
+                 zj.y[zj.edge_r_cols[pair.line_local_j]])
+        dt = abs(zi.y[zi.edge_t_cols[pair.line_local_i]] -
+                 zj.y[zj.edge_t_cols[pair.line_local_j]])
+        sq += dr * dr + dt * dt
+        mx = max(mx, dr, dt)
     end
-    return s
+    return sq, mx
 end
 
-@inline function _r_pri_pq_sq_socwr(ws)
-    s = 0.0
+@inline function _r_pri_pq_socwr(ws)
+    sq = 0.0; mx = 0.0
     @inbounds for pair in ws.interzonal_line_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pfi = _socwr_flow_value_at_y(zi, pair.line_local_i, :p)
-        pfj = _socwr_flow_value_at_y(zj, pair.line_local_j, :p)
-        qfi = _socwr_flow_value_at_y(zi, pair.line_local_i, :q)
-        qfj = _socwr_flow_value_at_y(zj, pair.line_local_j, :q)
-        s += (pfi - pfj)^2 + (qfi - qfj)^2
+        dpf = abs(_socwr_flow_value_at_y(zi, pair.line_local_i, :p) -
+                  _socwr_flow_value_at_y(zj, pair.line_local_j, :p))
+        dqf = abs(_socwr_flow_value_at_y(zi, pair.line_local_i, :q) -
+                  _socwr_flow_value_at_y(zj, pair.line_local_j, :q))
+        sq += dpf * dpf + dqf * dqf
+        mx = max(mx, dpf, dqf)
     end
-    return s
+    return sq, mx
 end
 
-@inline function _r_pri_split_pq_sq_socwr(ws)
-    s = 0.0
+@inline function _r_pri_split_socwr(ws)
+    sq = 0.0; mx = 0.0
     @inbounds for pair in ws.split_bus_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pi_val = zi.y[pair.p_inj_col_i]
-        pj_val = zj.y[pair.p_inj_col_j]
-        qi_val = zi.y[pair.q_inj_col_i]
-        qj_val = zj.y[pair.q_inj_col_j]
-        s += (pi_val + pj_val)^2 + (qi_val + qj_val)^2
+        dp = abs(zi.y[pair.p_inj_col_i] + zj.y[pair.p_inj_col_j])
+        dq = abs(zi.y[pair.q_inj_col_i] + zj.y[pair.q_inj_col_j])
+        sq += dp * dp + dq * dq
+        mx = max(mx, dp, dq)
     end
-    return s
+    return sq, mx
 end
+
+# ============================================================
+# SOCWR residuals
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 function compute_residuals!(ws::SOCWRStateWorkspaceALADIN)
-    ws.r_primal = sqrt(_r_pri_bus_sq_socwr(ws) + _r_pri_rt_sq_socwr(ws))
-    _compute_r_progress!(ws)
+    sq_b, mx_b = _r_pri_bus_socwr(ws)
+    sq_rt, mx_rt = _r_pri_rt_socwr(ws)
+    ws.r_primal = _final_norm(
+        ws.stopping_criterion, sq_b + sq_rt, max(mx_b, mx_rt),
+    )
+    _compute_r_step_primal!(ws)
     _compute_lambda_step!(ws)
+    _compute_r_dual!(ws)
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function compute_residuals!(ws::SOCWRPowerWorkspaceALADIN)
-    ws.r_primal = sqrt(_r_pri_pq_sq_socwr(ws))
-    _compute_r_progress!(ws)
+    sq, mx = _r_pri_pq_socwr(ws)
+    ws.r_primal = _final_norm(ws.stopping_criterion, sq, mx)
+    _compute_r_step_primal!(ws)
     _compute_lambda_step!(ws)
+    _compute_r_dual!(ws)
     return nothing
 end
 
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
+
 function compute_residuals!(ws::SOCWRHybridWorkspaceALADIN)
-    ws.r_primal = sqrt(
-        _r_pri_bus_sq_socwr(ws) +
-        _r_pri_rt_sq_socwr(ws) +
-        _r_pri_pq_sq_socwr(ws) +
-        _r_pri_split_pq_sq_socwr(ws),
+    sq_b, mx_b = _r_pri_bus_socwr(ws)
+    sq_rt, mx_rt = _r_pri_rt_socwr(ws)
+    sq_pq, mx_pq = _r_pri_pq_socwr(ws)
+    sq_s, mx_s = _r_pri_split_socwr(ws)
+    ws.r_primal = _final_norm(
+        ws.stopping_criterion,
+        sq_b + sq_rt + sq_pq + sq_s,
+        max(mx_b, mx_rt, mx_pq, mx_s),
     )
-    _compute_r_progress!(ws)
+    _compute_r_step_primal!(ws)
     _compute_lambda_step!(ws)
+    _compute_r_dual!(ws)
     return nothing
 end

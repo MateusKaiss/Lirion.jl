@@ -26,6 +26,7 @@ struct ALADINParams
     rho_upper::Float64
     mu_growth::Float64
     mu_upper::Float64
+    stopping_criterion::Symbol
 end
 
 # ============================================================
@@ -42,6 +43,7 @@ end
         cfg.rho_upper,
         cfg.mu_growth,
         cfg.mu_upper,
+        cfg.stopping_criterion,
     )
 end
 

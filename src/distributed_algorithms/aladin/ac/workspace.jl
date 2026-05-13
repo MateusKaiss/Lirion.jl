@@ -34,10 +34,13 @@ Base.@kwdef mutable struct ACStateWorkspaceALADIN <: AbstractALADINWorkspace
     sigma_other::Float64 = 1.0
 
     r_primal::Float64 = 0.0
-    r_progress::Float64 = 0.0
+    r_step_primal::Float64 = 0.0
     lambda_step::Float64 = 0.0
     eps_primal::Float64 = 0.0
-    eps_progress::Float64 = 0.0
+    eps_step_primal::Float64 = 0.0
+    r_dual::Float64 = 0.0
+    eps_dual::Float64 = 0.0
+    stopping_criterion::Symbol = :boyd
     iter::Int = 0
     hist::ALADINHistory = ALADINHistory()
 end
@@ -82,10 +85,13 @@ Base.@kwdef mutable struct ACPowerWorkspaceALADIN <: AbstractALADINWorkspace
     proximal_mode::Symbol = :primal
 
     r_primal::Float64 = 0.0
-    r_progress::Float64 = 0.0
+    r_step_primal::Float64 = 0.0
     lambda_step::Float64 = 0.0
     eps_primal::Float64 = 0.0
-    eps_progress::Float64 = 0.0
+    eps_step_primal::Float64 = 0.0
+    r_dual::Float64 = 0.0
+    eps_dual::Float64 = 0.0
+    stopping_criterion::Symbol = :boyd
     iter::Int = 0
     hist::ALADINHistory = ALADINHistory()
 end
@@ -135,10 +141,13 @@ Base.@kwdef mutable struct ACHybridWorkspaceALADIN <: AbstractALADINWorkspace
     sigma_other::Float64 = 1.0
 
     r_primal::Float64 = 0.0
-    r_progress::Float64 = 0.0
+    r_step_primal::Float64 = 0.0
     lambda_step::Float64 = 0.0
     eps_primal::Float64 = 0.0
-    eps_progress::Float64 = 0.0
+    eps_step_primal::Float64 = 0.0
+    r_dual::Float64 = 0.0
+    eps_dual::Float64 = 0.0
+    stopping_criterion::Symbol = :boyd
     iter::Int = 0
     hist::ALADINHistory = ALADINHistory()
 end
@@ -183,6 +192,7 @@ function build_workspace(
             v_mag = LambdaState(n_bus),
         ),
         qp_optimizer = _resolve_qp_optimizer(cfg.qp_optimizer),
+        stopping_criterion = cfg.stopping_criterion,
         rho = Ref(cfg.rho),
         mu = Ref(cfg.mu),
         alpha1 = cfg.alpha1,
@@ -227,6 +237,7 @@ function build_workspace(
             q_dummy = LambdaState(n_dummy),
         ),
         qp_optimizer = _resolve_qp_optimizer(cfg.qp_optimizer),
+        stopping_criterion = cfg.stopping_criterion,
         rho = Ref(cfg.rho),
         mu = Ref(cfg.mu),
         alpha1 = cfg.alpha1,
@@ -304,6 +315,7 @@ function build_workspace(
             q_dummy = LambdaState(n_dummy),
         ),
         qp_optimizer = _resolve_qp_optimizer(cfg.qp_optimizer),
+        stopping_criterion = cfg.stopping_criterion,
         rho = Ref(cfg.rho),
         mu = Ref(cfg.mu),
         alpha1 = cfg.alpha1,

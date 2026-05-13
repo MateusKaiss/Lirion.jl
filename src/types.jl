@@ -487,6 +487,7 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
     mu_upper::Float64
     proximal_mode::Symbol
     qp_optimizer::Any
+    stopping_criterion::Symbol
 
     function ALADINConfig(
         base_model::Type{<:OPFModel},
@@ -513,6 +514,7 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
         mu_upper::Real = 1e6,
         proximal_mode::Symbol = :primal,
         qp_optimizer = nothing,
+        stopping_criterion::Symbol = :boyd,
     )
         base_model in (DC, AC, SOCWR) ||
             throw(
@@ -577,6 +579,12 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
                     "Invalid proximal_mode=$proximal_mode. Allowed: :primal, :pflow",
                 ),
             )
+        stopping_criterion in (:boyd, :hfd) ||
+            throw(
+                ArgumentError(
+                    "Invalid stopping_criterion=$stopping_criterion. Allowed: :boyd, :hfd",
+                ),
+            )
         proximal_mode === :pflow && !(coupling in (:power, :hybrid)) &&
             throw(
                 ArgumentError(
@@ -620,6 +628,7 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
             Float64(mu_upper),
             proximal_mode,
             qp_optimizer,
+            stopping_criterion,
         )
     end
 end

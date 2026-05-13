@@ -1,5 +1,5 @@
 # ============================================================
-# ALADIN — Convergence tolerances (Boyd-style, HFD-aligned)
+# ALADIN — Convergence tolerances (Boyd-style and HFD-style)
 # ============================================================
 
 @inline function _norm_sq(v::Vector{Float64})::Float64
@@ -9,6 +9,10 @@
     end
     return s
 end
+
+# ============================================================
+# Boyd-style scaling helpers
+# ============================================================
 
 function _progress_tol(
     ws::AbstractALADINWorkspace,
@@ -26,11 +30,26 @@ function _progress_tol(
     return sqrt(max(n, 1)) * eps_abs + eps_rel * max(sqrt(ny_sq), sqrt(nx_sq))
 end
 
-# ------------------------------------------------------------
-# Boyd-style ε_pri finalisation (shared across DC/AC/SOCWR)
-# ------------------------------------------------------------
+function _dual_tol(
+    ws::AbstractALADINWorkspace,
+    eps_abs::Float64,
+    eps_rel::Float64,
+)::Float64
+    n = 0
+    norm_max = 0.0
+    for state in values(ws.vars)
+        n += length(state.lambda)
+        nl = sqrt(_norm_sq(state.lambda))
+        norm_max = max(norm_max, nl)
+    end
+    return sqrt(max(n, 1)) * eps_abs + eps_rel * norm_max
+end
 
-@inline function _finalize_eps_primal!(
+# ============================================================
+# Boyd / HFD branch — final ε assignment
+# ============================================================
+
+@inline function _finalize_eps!(
     ws::AbstractALADINWorkspace,
     n_pairs::Int,
     norm_i_sq::Float64,
@@ -38,14 +57,27 @@ end
     eps_abs::Float64,
     eps_rel::Float64,
 )
-    ws.eps_primal =
-        sqrt(max(n_pairs, 1)) * eps_abs +
-        eps_rel * max(sqrt(norm_i_sq), sqrt(norm_j_sq))
-    ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
+    if ws.stopping_criterion === :hfd
+        ws.eps_primal = eps_abs
+        ws.eps_step_primal = eps_abs
+        ws.eps_dual = eps_abs
+    else
+        ws.eps_primal =
+            sqrt(max(n_pairs, 1)) * eps_abs +
+            eps_rel * max(sqrt(norm_i_sq), sqrt(norm_j_sq))
+        ws.eps_step_primal = _progress_tol(ws, eps_abs, eps_rel)
+        ws.eps_dual = _dual_tol(ws, eps_abs, eps_rel)
+    end
     return nothing
 end
 
-# ---- State ----
+# ============================================================
+# DC tolerances
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 function compute_tolerances!(
     ws::DCStateWorkspaceALADIN,
@@ -61,11 +93,13 @@ function compute_tolerances!(
         norm_i += yi * yi
         norm_j += yj * yj
     end
-    _finalize_eps_primal!(ws, n, norm_i, norm_j, eps_abs, eps_rel)
+    _finalize_eps!(ws, n, norm_i, norm_j, eps_abs, eps_rel)
     return nothing
 end
 
-# ---- Power ----
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 @inline function _dummy_pf_norms(ws)
     ni = 0.0
@@ -102,17 +136,26 @@ function compute_tolerances!(
     nd_i, nd_j = _dummy_pf_norms(ws)
     norm_i += nd_i
     norm_j += nd_j
-    _finalize_eps_primal!(ws, n, norm_i, norm_j, eps_abs, eps_rel)
+    _finalize_eps!(ws, n, norm_i, norm_j, eps_abs, eps_rel)
     return nothing
 end
 
-# ---- Hybrid ----
+# ------------------------------------------------------------
+# Hybrid (Pythagoras of per-block ε for Boyd path)
+# ------------------------------------------------------------
 
 function compute_tolerances!(
     ws::DCHybridWorkspaceALADIN,
     eps_abs::Float64,
     eps_rel::Float64,
 )
+    if ws.stopping_criterion === :hfd
+        ws.eps_primal = eps_abs
+        ws.eps_step_primal = eps_abs
+        ws.eps_dual = eps_abs
+        return nothing
+    end
+
     # Bus block
     n_bus = length(ws.bus_pairs)
     norm_i_bus = 0.0
@@ -145,7 +188,7 @@ function compute_tolerances!(
         sqrt(max(n_edge, 1)) * eps_abs +
         eps_rel * max(sqrt(norm_i_edge), sqrt(norm_j_edge))
 
-    # SplitBus block: norm on p_inj values (sign-flipped consensus)
+    # SplitBus block
     n_split = length(ws.split_bus_pairs)
     norm_i_split = 0.0
     norm_j_split = 0.0
@@ -159,7 +202,7 @@ function compute_tolerances!(
         sqrt(max(n_split, 1)) * eps_abs +
         eps_rel * max(sqrt(norm_i_split), sqrt(norm_j_split))
 
-    # DummyBus block: p_flow norms on half-branches
+    # DummyBus block
     n_dummy = length(ws.dummy_line_pairs)
     nd_i, nd_j = _dummy_pf_norms(ws)
     eps_pri_dummy =
@@ -169,12 +212,17 @@ function compute_tolerances!(
     ws.eps_primal = sqrt(
         eps_pri_bus^2 + eps_pri_edge^2 + eps_pri_split^2 + eps_pri_dummy^2,
     )
-    ws.eps_progress = _progress_tol(ws, eps_abs, eps_rel)
+    ws.eps_step_primal = _progress_tol(ws, eps_abs, eps_rel)
+    ws.eps_dual = _dual_tol(ws, eps_abs, eps_rel)
     return nothing
 end
 
-# ------------------------------------------------------------
+# ============================================================
 # AC tolerances
+# ============================================================
+
+# ------------------------------------------------------------
+# State
 # ------------------------------------------------------------
 
 function compute_tolerances!(
@@ -195,9 +243,13 @@ function compute_tolerances!(
         norm_i += theta_i * theta_i + vi * vi
         norm_j += theta_j * theta_j + vj * vj
     end
-    _finalize_eps_primal!(ws, n, norm_i, norm_j, eps_abs, eps_rel)
+    _finalize_eps!(ws, n, norm_i, norm_j, eps_abs, eps_rel)
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 @inline function _norms_dummy_pq_ac(ws)
     ni = 0.0
@@ -236,9 +288,13 @@ function compute_tolerances!(
     nd_i, nd_j = _norms_dummy_pq_ac(ws)
     norm_i += nd_i
     norm_j += nd_j
-    _finalize_eps_primal!(ws, n, norm_i, norm_j, eps_abs, eps_rel)
+    _finalize_eps!(ws, n, norm_i, norm_j, eps_abs, eps_rel)
     return nothing
 end
+
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
 
 function compute_tolerances!(
     ws::ACHybridWorkspaceALADIN,
@@ -283,13 +339,13 @@ function compute_tolerances!(
     nd_i, nd_j = _norms_dummy_pq_ac(ws)
     norm_i += nd_i
     norm_j += nd_j
-    _finalize_eps_primal!(ws, n, norm_i, norm_j, eps_abs, eps_rel)
+    _finalize_eps!(ws, n, norm_i, norm_j, eps_abs, eps_rel)
     return nothing
 end
 
-# ------------------------------------------------------------
+# ============================================================
 # SOCWR tolerances
-# ------------------------------------------------------------
+# ============================================================
 
 @inline function _norms_bus_v2_socwr(ws)
     ni = 0.0
@@ -363,7 +419,7 @@ function compute_tolerances!(
     ni_rt, nj_rt = _norms_edge_rt_socwr(ws)
     ni = ni_b + ni_rt
     nj = nj_b + nj_rt
-    _finalize_eps_primal!(ws, n, ni, nj, eps_abs, eps_rel)
+    _finalize_eps!(ws, n, ni, nj, eps_abs, eps_rel)
     return nothing
 end
 
@@ -374,7 +430,7 @@ function compute_tolerances!(
 )
     n = 2 * length(ws.interzonal_line_pairs)
     ni, nj = _norms_edge_pq_socwr(ws)
-    _finalize_eps_primal!(ws, n, ni, nj, eps_abs, eps_rel)
+    _finalize_eps!(ws, n, ni, nj, eps_abs, eps_rel)
     return nothing
 end
 
@@ -392,6 +448,6 @@ function compute_tolerances!(
     ni_sp, nj_sp = _norms_split_pq_socwr(ws)
     ni = ni_b + ni_rt + ni_pq + ni_sp
     nj = nj_b + nj_rt + nj_pq + nj_sp
-    _finalize_eps_primal!(ws, n, ni, nj, eps_abs, eps_rel)
+    _finalize_eps!(ws, n, ni, nj, eps_abs, eps_rel)
     return nothing
 end
