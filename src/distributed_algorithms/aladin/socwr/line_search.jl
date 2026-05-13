@@ -1,5 +1,5 @@
 # ============================================================
-# ALADIN-SOCWR — Armijo line search on the HFD 2016 merit function
+# ALADIN-SOCWR — Phase 2 line search (Armijo backtracking)
 # ============================================================
 
 const _SOCWRPhase2Workspace = Union{
@@ -8,22 +8,41 @@ const _SOCWRPhase2Workspace = Union{
     SOCWRHybridWorkspaceALADIN,
 }
 
-@inline function _socwr_cost_at_trial(zone::AladinZoneDataSOCWR, α::Float64)
+# ============================================================
+# Per-zone cost trial evaluations
+# ============================================================
+
+@inline function _socwr_cost_at_trial(zone::AladinZoneDataSOCWR, alpha::Float64)
     acc = 0.0
     y = zone.y
     delta = zone.delta
     @inbounds for k in eachindex(zone.pg_cols)
         col = zone.pg_cols[k]
-        xk = y[col] + α * delta[col]
+        xk = y[col] + alpha * delta[col]
         acc += 0.5 * zone.pg_c2_sbase2[k] * xk * xk + zone.pg_c1_sbase[k] * xk
     end
     return acc
 end
 
+@inline function _socwr_cost_dir_deriv_0(zone::AladinZoneDataSOCWR)
+    acc = 0.0
+    y = zone.y
+    delta = zone.delta
+    @inbounds for k in eachindex(zone.pg_cols)
+        col = zone.pg_cols[k]
+        acc += (zone.pg_c2_sbase2[k] * y[col] + zone.pg_c1_sbase[k]) * delta[col]
+    end
+    return acc
+end
+
+# ============================================================
+# SOCWR flow trial evaluations
+# ============================================================
+
 @inline function _socwr_flow_at_trial(
     zone::AladinZoneDataSOCWR,
     le::Int,
-    α::Float64,
+    alpha::Float64,
     which::Symbol,
 )::Float64
     cols = zone.edge_flow_cols[le]
@@ -34,7 +53,7 @@ end
     delta = zone.delta
     @inbounds for i in eachindex(cols)
         c = cols[i]
-        acc += coefs[i] * (y[c] + α * delta[c])
+        acc += coefs[i] * (y[c] + alpha * delta[c])
     end
     return acc
 end
@@ -54,33 +73,30 @@ end
     return acc
 end
 
-@inline function _socwr_cost_dir_deriv_0(zone::AladinZoneDataSOCWR)
-    acc = 0.0
-    y = zone.y
-    delta = zone.delta
-    @inbounds for k in eachindex(zone.pg_cols)
-        col = zone.pg_cols[k]
-        acc += (zone.pg_c2_sbase2[k] * y[col] + zone.pg_c1_sbase[k]) * delta[col]
-    end
-    return acc
-end
+# ============================================================
+# Merit function phi(alpha)
+# ============================================================
 
-function _socwr_merit(ws::SOCWRStateWorkspaceALADIN, α::Float64)
-    Φ = 0.0
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
+
+function _socwr_merit(ws::SOCWRStateWorkspaceALADIN, alpha::Float64)
+    phi = 0.0
     for zone in ws.zones
-        Φ += _socwr_cost_at_trial(zone, α)
+        phi += _socwr_cost_at_trial(zone, alpha)
     end
 
     r_sq = 0.0
-    λr = 0.0
+    lambda_r = 0.0
     @inbounds for (k, pair) in enumerate(ws.bus_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        xi = zi.y[pair.v2_col_i] + α * zi.delta[pair.v2_col_i]
-        xj = zj.y[pair.v2_col_j] + α * zj.delta[pair.v2_col_j]
+        xi = zi.y[pair.v2_col_i] + alpha * zi.delta[pair.v2_col_i]
+        xj = zj.y[pair.v2_col_j] + alpha * zj.delta[pair.v2_col_j]
         d = xi - xj
         r_sq += d * d
-        λr += ws.vars.v2.lambda[k] * d
+        lambda_r += ws.vars.v2.lambda[k] * d
     end
     @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
@@ -89,59 +105,67 @@ function _socwr_merit(ws::SOCWRStateWorkspaceALADIN, α::Float64)
         rj_col = zj.edge_r_cols[pair.line_local_j]
         ti_col = zi.edge_t_cols[pair.line_local_i]
         tj_col = zj.edge_t_cols[pair.line_local_j]
-        dr = (zi.y[ri_col] + α * zi.delta[ri_col]) -
-             (zj.y[rj_col] + α * zj.delta[rj_col])
-        dt = (zi.y[ti_col] + α * zi.delta[ti_col]) -
-             (zj.y[tj_col] + α * zj.delta[tj_col])
+        dr = (zi.y[ri_col] + alpha * zi.delta[ri_col]) -
+             (zj.y[rj_col] + alpha * zj.delta[rj_col])
+        dt = (zi.y[ti_col] + alpha * zi.delta[ti_col]) -
+             (zj.y[tj_col] + alpha * zj.delta[tj_col])
         r_sq += dr * dr + dt * dt
-        λr += ws.vars.r.lambda[k] * dr + ws.vars.t.lambda[k] * dt
+        lambda_r += ws.vars.r.lambda[k] * dr + ws.vars.t.lambda[k] * dt
     end
 
     mu = ws.mu[]
-    return Φ + λr + 0.5 * mu * r_sq
+    return phi + lambda_r + 0.5 * mu * r_sq
 end
 
-function _socwr_merit(ws::SOCWRPowerWorkspaceALADIN, α::Float64)
-    Φ = 0.0
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
+function _socwr_merit(ws::SOCWRPowerWorkspaceALADIN, alpha::Float64)
+    phi = 0.0
     for zone in ws.zones
-        Φ += _socwr_cost_at_trial(zone, α)
+        phi += _socwr_cost_at_trial(zone, alpha)
     end
 
     r_sq = 0.0
-    λr = 0.0
+    lambda_r = 0.0
     @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pi_val = _socwr_flow_at_trial(zi, pair.line_local_i, α, :p)
-        pj_val = _socwr_flow_at_trial(zj, pair.line_local_j, α, :p)
-        qi_val = _socwr_flow_at_trial(zi, pair.line_local_i, α, :q)
-        qj_val = _socwr_flow_at_trial(zj, pair.line_local_j, α, :q)
+        pi_val = _socwr_flow_at_trial(zi, pair.line_local_i, alpha, :p)
+        pj_val = _socwr_flow_at_trial(zj, pair.line_local_j, alpha, :p)
+        qi_val = _socwr_flow_at_trial(zi, pair.line_local_i, alpha, :q)
+        qj_val = _socwr_flow_at_trial(zj, pair.line_local_j, alpha, :q)
         dp = pi_val - pj_val
         dq = qi_val - qj_val
         r_sq += dp * dp + dq * dq
-        λr += ws.vars.p_flow.lambda[k] * dp + ws.vars.q_flow.lambda[k] * dq
+        lambda_r += ws.vars.p_flow.lambda[k] * dp + ws.vars.q_flow.lambda[k] * dq
     end
 
     mu = ws.mu[]
-    return Φ + λr + 0.5 * mu * r_sq
+    return phi + lambda_r + 0.5 * mu * r_sq
 end
 
-function _socwr_merit(ws::SOCWRHybridWorkspaceALADIN, α::Float64)
-    Φ = 0.0
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
+
+function _socwr_merit(ws::SOCWRHybridWorkspaceALADIN, alpha::Float64)
+    phi = 0.0
     for zone in ws.zones
-        Φ += _socwr_cost_at_trial(zone, α)
+        phi += _socwr_cost_at_trial(zone, alpha)
     end
 
     r_sq = 0.0
-    λr = 0.0
+    lambda_r = 0.0
     @inbounds for (k, pair) in enumerate(ws.bus_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        xi = zi.y[pair.v2_col_i] + α * zi.delta[pair.v2_col_i]
-        xj = zj.y[pair.v2_col_j] + α * zj.delta[pair.v2_col_j]
+        xi = zi.y[pair.v2_col_i] + alpha * zi.delta[pair.v2_col_i]
+        xj = zj.y[pair.v2_col_j] + alpha * zj.delta[pair.v2_col_j]
         d = xi - xj
         r_sq += d * d
-        λr += ws.vars.v2.lambda[k] * d
+        lambda_r += ws.vars.v2.lambda[k] * d
     end
     @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
@@ -150,40 +174,40 @@ function _socwr_merit(ws::SOCWRHybridWorkspaceALADIN, α::Float64)
         rj_col = zj.edge_r_cols[pair.line_local_j]
         ti_col = zi.edge_t_cols[pair.line_local_i]
         tj_col = zj.edge_t_cols[pair.line_local_j]
-        dr = (zi.y[ri_col] + α * zi.delta[ri_col]) -
-             (zj.y[rj_col] + α * zj.delta[rj_col])
-        dt = (zi.y[ti_col] + α * zi.delta[ti_col]) -
-             (zj.y[tj_col] + α * zj.delta[tj_col])
+        dr = (zi.y[ri_col] + alpha * zi.delta[ri_col]) -
+             (zj.y[rj_col] + alpha * zj.delta[rj_col])
+        dt = (zi.y[ti_col] + alpha * zi.delta[ti_col]) -
+             (zj.y[tj_col] + alpha * zj.delta[tj_col])
 
-        pi_val = _socwr_flow_at_trial(zi, pair.line_local_i, α, :p)
-        pj_val = _socwr_flow_at_trial(zj, pair.line_local_j, α, :p)
-        qi_val = _socwr_flow_at_trial(zi, pair.line_local_i, α, :q)
-        qj_val = _socwr_flow_at_trial(zj, pair.line_local_j, α, :q)
+        pi_val = _socwr_flow_at_trial(zi, pair.line_local_i, alpha, :p)
+        pj_val = _socwr_flow_at_trial(zj, pair.line_local_j, alpha, :p)
+        qi_val = _socwr_flow_at_trial(zi, pair.line_local_i, alpha, :q)
+        qj_val = _socwr_flow_at_trial(zj, pair.line_local_j, alpha, :q)
         dp = pi_val - pj_val
         dq = qi_val - qj_val
 
         r_sq += dr * dr + dt * dt + dp * dp + dq * dq
-        λr +=
+        lambda_r +=
             ws.vars.r.lambda[k] * dr + ws.vars.t.lambda[k] * dt +
             ws.vars.p_flow.lambda[k] * dp + ws.vars.q_flow.lambda[k] * dq
     end
 
     mu = ws.mu[]
-    return Φ + λr + 0.5 * mu * r_sq
+    return phi + lambda_r + 0.5 * mu * r_sq
 end
 
+# ============================================================
+# Directional derivative dphi/dalpha at alpha = 0
+# ============================================================
+
 # ------------------------------------------------------------
-# Analytical directional derivative dΦ/dα at α = 0.
-# Φ(α) = Σ cost_i(y + αδ) + λᵀ·r(α) + (μ/2)‖r(α)‖² is polynomial in α:
-# cost is quadratic (derivative ∇cost·δ), consensus residuals r(α) are
-# affine (r(α) = r₀ + α·Δr). So
-#   dΦ/dα|_{α=0} = Σ ∇cost_i(y)·δ + (λ + μ·r₀)ᵀ·Δr.
+# State
 # ------------------------------------------------------------
 
-function _socwr_dΦ0(ws::SOCWRStateWorkspaceALADIN)
-    dΦ = 0.0
+function _socwr_dphi_0(ws::SOCWRStateWorkspaceALADIN)
+    dphi = 0.0
     for zone in ws.zones
-        dΦ += _socwr_cost_dir_deriv_0(zone)
+        dphi += _socwr_cost_dir_deriv_0(zone)
     end
     mu = ws.mu[]
 
@@ -191,8 +215,8 @@ function _socwr_dΦ0(ws::SOCWRStateWorkspaceALADIN)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
         r0 = zi.y[pair.v2_col_i] - zj.y[pair.v2_col_j]
-        Δr = zi.delta[pair.v2_col_i] - zj.delta[pair.v2_col_j]
-        dΦ += (ws.vars.v2.lambda[k] + mu * r0) * Δr
+        dr = zi.delta[pair.v2_col_i] - zj.delta[pair.v2_col_j]
+        dphi += (ws.vars.v2.lambda[k] + mu * r0) * dr
     end
     @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
@@ -203,20 +227,24 @@ function _socwr_dΦ0(ws::SOCWRStateWorkspaceALADIN)
         tj_col = zj.edge_t_cols[pair.line_local_j]
 
         r0_r = zi.y[ri_col] - zj.y[rj_col]
-        Δr_r = zi.delta[ri_col] - zj.delta[rj_col]
+        dr_r = zi.delta[ri_col] - zj.delta[rj_col]
         r0_t = zi.y[ti_col] - zj.y[tj_col]
-        Δr_t = zi.delta[ti_col] - zj.delta[tj_col]
+        dr_t = zi.delta[ti_col] - zj.delta[tj_col]
 
-        dΦ += (ws.vars.r.lambda[k] + mu * r0_r) * Δr_r
-        dΦ += (ws.vars.t.lambda[k] + mu * r0_t) * Δr_t
+        dphi += (ws.vars.r.lambda[k] + mu * r0_r) * dr_r
+        dphi += (ws.vars.t.lambda[k] + mu * r0_t) * dr_t
     end
-    return dΦ
+    return dphi
 end
 
-function _socwr_dΦ0(ws::SOCWRPowerWorkspaceALADIN)
-    dΦ = 0.0
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
+function _socwr_dphi_0(ws::SOCWRPowerWorkspaceALADIN)
+    dphi = 0.0
     for zone in ws.zones
-        dΦ += _socwr_cost_dir_deriv_0(zone)
+        dphi += _socwr_cost_dir_deriv_0(zone)
     end
     mu = ws.mu[]
 
@@ -234,20 +262,24 @@ function _socwr_dΦ0(ws::SOCWRPowerWorkspaceALADIN)
         dqj = _socwr_flow_dir_deriv(zj, pair.line_local_j, :q)
 
         r0_p = pi_val - pj_val
-        Δr_p = dpi - dpj
+        dr_p = dpi - dpj
         r0_q = qi_val - qj_val
-        Δr_q = dqi - dqj
+        dr_q = dqi - dqj
 
-        dΦ += (ws.vars.p_flow.lambda[k] + mu * r0_p) * Δr_p
-        dΦ += (ws.vars.q_flow.lambda[k] + mu * r0_q) * Δr_q
+        dphi += (ws.vars.p_flow.lambda[k] + mu * r0_p) * dr_p
+        dphi += (ws.vars.q_flow.lambda[k] + mu * r0_q) * dr_q
     end
-    return dΦ
+    return dphi
 end
 
-function _socwr_dΦ0(ws::SOCWRHybridWorkspaceALADIN)
-    dΦ = 0.0
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
+
+function _socwr_dphi_0(ws::SOCWRHybridWorkspaceALADIN)
+    dphi = 0.0
     for zone in ws.zones
-        dΦ += _socwr_cost_dir_deriv_0(zone)
+        dphi += _socwr_cost_dir_deriv_0(zone)
     end
     mu = ws.mu[]
 
@@ -255,8 +287,8 @@ function _socwr_dΦ0(ws::SOCWRHybridWorkspaceALADIN)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
         r0 = zi.y[pair.v2_col_i] - zj.y[pair.v2_col_j]
-        Δr = zi.delta[pair.v2_col_i] - zj.delta[pair.v2_col_j]
-        dΦ += (ws.vars.v2.lambda[k] + mu * r0) * Δr
+        dr = zi.delta[pair.v2_col_i] - zj.delta[pair.v2_col_j]
+        dphi += (ws.vars.v2.lambda[k] + mu * r0) * dr
     end
 
     @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
@@ -268,9 +300,9 @@ function _socwr_dΦ0(ws::SOCWRHybridWorkspaceALADIN)
         tj_col = zj.edge_t_cols[pair.line_local_j]
 
         r0_r = zi.y[ri_col] - zj.y[rj_col]
-        Δr_r = zi.delta[ri_col] - zj.delta[rj_col]
+        dr_r = zi.delta[ri_col] - zj.delta[rj_col]
         r0_t = zi.y[ti_col] - zj.y[tj_col]
-        Δr_t = zi.delta[ti_col] - zj.delta[tj_col]
+        dr_t = zi.delta[ti_col] - zj.delta[tj_col]
 
         pi_val = _socwr_flow_at_trial(zi, pair.line_local_i, 0.0, :p)
         pj_val = _socwr_flow_at_trial(zj, pair.line_local_j, 0.0, :p)
@@ -282,48 +314,50 @@ function _socwr_dΦ0(ws::SOCWRHybridWorkspaceALADIN)
         dqj = _socwr_flow_dir_deriv(zj, pair.line_local_j, :q)
 
         r0_p = pi_val - pj_val
-        Δr_p = dpi - dpj
+        dr_p = dpi - dpj
         r0_q = qi_val - qj_val
-        Δr_q = dqi - dqj
+        dr_q = dqi - dqj
 
-        dΦ += (ws.vars.r.lambda[k] + mu * r0_r) * Δr_r
-        dΦ += (ws.vars.t.lambda[k] + mu * r0_t) * Δr_t
-        dΦ += (ws.vars.p_flow.lambda[k] + mu * r0_p) * Δr_p
-        dΦ += (ws.vars.q_flow.lambda[k] + mu * r0_q) * Δr_q
+        dphi += (ws.vars.r.lambda[k] + mu * r0_r) * dr_r
+        dphi += (ws.vars.t.lambda[k] + mu * r0_t) * dr_t
+        dphi += (ws.vars.p_flow.lambda[k] + mu * r0_p) * dr_p
+        dphi += (ws.vars.q_flow.lambda[k] + mu * r0_q) * dr_q
     end
-    return dΦ
+    return dphi
 end
+
+# ============================================================
+# Armijo backtracking step
+# ============================================================
 
 function _line_search_step!(
     ws::_SOCWRPhase2Workspace;
     c1::Float64 = 1e-4,
     max_backtrack::Int = 25,
-    α_min::Float64 = 1e-3,
+    alpha_min::Float64 = 1e-3,
 )
     ws.line_search || return nothing
 
-    Φ_0 = _socwr_merit(ws, 0.0)
-    dΦ_0 = _socwr_dΦ0(ws)
+    phi_0 = _socwr_merit(ws, 0.0)
+    dphi_0 = _socwr_dphi_0(ws)
 
-    # If the QP direction is not descent, fall back to α_min to keep
-    # the iteration making progress via the strong prox pull.
-    if !isfinite(dΦ_0) || dΦ_0 >= 0.0
-        ws.alpha2 = α_min
+    if !isfinite(dphi_0) || dphi_0 >= 0.0
+        ws.alpha2 = alpha_min
         return nothing
     end
 
-    α = ws.alpha2_init
+    alpha = ws.alpha2_init
     @inbounds for _ in 1:max_backtrack
-        Φ_α = _socwr_merit(ws, α)
-        if isfinite(Φ_α) && Φ_α <= Φ_0 + c1 * α * dΦ_0
-            ws.alpha2 = α
+        phi_alpha = _socwr_merit(ws, alpha)
+        if isfinite(phi_alpha) && phi_alpha <= phi_0 + c1 * alpha * dphi_0
+            ws.alpha2 = alpha
             return nothing
         end
-        α *= 0.5
-        if α < α_min
+        alpha *= 0.5
+        if alpha < alpha_min
             break
         end
     end
-    ws.alpha2 = α_min
+    ws.alpha2 = alpha_min
     return nothing
 end

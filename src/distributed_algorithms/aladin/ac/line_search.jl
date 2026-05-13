@@ -1,5 +1,5 @@
 # ============================================================
-# ALADIN-AC — Armijo line search on the HFD 2016 merit function
+# ALADIN-AC — Phase 2 line search (Armijo backtracking)
 # ============================================================
 
 const _ACPhase2Workspace = Union{
@@ -8,17 +8,17 @@ const _ACPhase2Workspace = Union{
     ACHybridWorkspaceALADIN,
 }
 
-# ------------------------------------------------------------
-# Cost evaluation at trial point
-# ------------------------------------------------------------
+# ============================================================
+# Per-zone cost trial evaluations
+# ============================================================
 
-@inline function _ac_cost_at_trial(zone::AladinZoneDataAC, α::Float64)
+@inline function _ac_cost_at_trial(zone::AladinZoneDataAC, alpha::Float64)
     acc = 0.0
     y = zone.y
     delta = zone.delta
     @inbounds for k in eachindex(zone.pg_cols)
         col = zone.pg_cols[k]
-        xk = y[col] + α * delta[col]
+        xk = y[col] + alpha * delta[col]
         acc += 0.5 * zone.pg_c2_sbase2[k] * xk * xk + zone.pg_c1_sbase[k] * xk
     end
     return acc
@@ -35,348 +35,379 @@ end
     return acc
 end
 
-# ------------------------------------------------------------
-# Trial-point flow evaluation (analytic, exact in α)
-# ------------------------------------------------------------
+# ============================================================
+# Interzonal AC flow trial evaluations
+# ============================================================
 
-@inline function _ac_pf_at_trial(zone::AladinZoneDataAC, le::Int, α::Float64)
-    fcol_θ = zone.edge_from_theta_col[le]
-    tcol_θ = zone.edge_to_theta_col[le]
+@inline function _ac_pf_at_trial(zone::AladinZoneDataAC, le::Int, alpha::Float64)
+    fcol_theta = zone.edge_from_theta_col[le]
+    tcol_theta = zone.edge_to_theta_col[le]
     fcol_v = zone.edge_from_vm_col[le]
     tcol_v = zone.edge_to_vm_col[le]
-    θf = zone.y[fcol_θ] + α * zone.delta[fcol_θ]
-    θt = zone.y[tcol_θ] + α * zone.delta[tcol_θ]
-    vf = zone.y[fcol_v] + α * zone.delta[fcol_v]
-    vt = zone.y[tcol_v] + α * zone.delta[tcol_v]
+    theta_f = zone.y[fcol_theta] + alpha * zone.delta[fcol_theta]
+    theta_t = zone.y[tcol_theta] + alpha * zone.delta[tcol_theta]
+    vf = zone.y[fcol_v] + alpha * zone.delta[fcol_v]
+    vt = zone.y[tcol_v] + alpha * zone.delta[tcol_v]
     g = zone.edge_g[le]
     b = zone.edge_b[le]
     tau = zone.edge_inv_tap[le]
-    Δθ = θf - θt - zone.edge_tap_angle[le]
-    return g * (tau * vf)^2 - tau * vf * vt * (g * cos(Δθ) + b * sin(Δθ))
+    delta_theta = theta_f - theta_t - zone.edge_tap_angle[le]
+    return g * (tau * vf)^2 -
+           tau * vf * vt * (g * cos(delta_theta) + b * sin(delta_theta))
 end
 
-@inline function _ac_qf_at_trial(zone::AladinZoneDataAC, le::Int, α::Float64)
-    fcol_θ = zone.edge_from_theta_col[le]
-    tcol_θ = zone.edge_to_theta_col[le]
+@inline function _ac_qf_at_trial(zone::AladinZoneDataAC, le::Int, alpha::Float64)
+    fcol_theta = zone.edge_from_theta_col[le]
+    tcol_theta = zone.edge_to_theta_col[le]
     fcol_v = zone.edge_from_vm_col[le]
     tcol_v = zone.edge_to_vm_col[le]
-    θf = zone.y[fcol_θ] + α * zone.delta[fcol_θ]
-    θt = zone.y[tcol_θ] + α * zone.delta[tcol_θ]
-    vf = zone.y[fcol_v] + α * zone.delta[fcol_v]
-    vt = zone.y[tcol_v] + α * zone.delta[tcol_v]
+    theta_f = zone.y[fcol_theta] + alpha * zone.delta[fcol_theta]
+    theta_t = zone.y[tcol_theta] + alpha * zone.delta[tcol_theta]
+    vf = zone.y[fcol_v] + alpha * zone.delta[fcol_v]
+    vt = zone.y[tcol_v] + alpha * zone.delta[tcol_v]
     g = zone.edge_g[le]
     b = zone.edge_b[le]
     b_sh = zone.edge_b_sh[le]
     tau = zone.edge_inv_tap[le]
-    Δθ = θf - θt - zone.edge_tap_angle[le]
+    delta_theta = theta_f - theta_t - zone.edge_tap_angle[le]
     return -(b + b_sh / 2) * (tau * vf)^2 -
-           tau * vf * vt * (-b * cos(Δθ) + g * sin(Δθ))
+           tau * vf * vt * (-b * cos(delta_theta) + g * sin(delta_theta))
 end
 
-# ------------------------------------------------------------
-# Analytic directional derivatives dpf/dα and dqf/dα at α = 0
-# ------------------------------------------------------------
+# ============================================================
+# Interzonal AC directional derivatives at alpha = 0
+# ============================================================
 
 @inline function _ac_pf_dir_deriv(zone::AladinZoneDataAC, le::Int)
-    fcol_θ = zone.edge_from_theta_col[le]
-    tcol_θ = zone.edge_to_theta_col[le]
+    fcol_theta = zone.edge_from_theta_col[le]
+    tcol_theta = zone.edge_to_theta_col[le]
     fcol_v = zone.edge_from_vm_col[le]
     tcol_v = zone.edge_to_vm_col[le]
-    θf = zone.y[fcol_θ]
-    θt = zone.y[tcol_θ]
+    theta_f = zone.y[fcol_theta]
+    theta_t = zone.y[tcol_theta]
     vf = zone.y[fcol_v]
     vt = zone.y[tcol_v]
-    δθf = zone.delta[fcol_θ]
-    δθt = zone.delta[tcol_θ]
-    δvf = zone.delta[fcol_v]
-    δvt = zone.delta[tcol_v]
+    dtheta_f = zone.delta[fcol_theta]
+    dtheta_t = zone.delta[tcol_theta]
+    dvf = zone.delta[fcol_v]
+    dvt = zone.delta[tcol_v]
     g = zone.edge_g[le]
     b = zone.edge_b[le]
     tau = zone.edge_inv_tap[le]
-    Δθ = θf - θt - zone.edge_tap_angle[le]
-    cΔ = cos(Δθ)
-    sΔ = sin(Δθ)
-    dpf_dvf = 2 * g * tau * tau * vf - tau * vt * (g * cΔ + b * sΔ)
-    dpf_dvt = -tau * vf * (g * cΔ + b * sΔ)
-    dpf_dθf = tau * vf * vt * (g * sΔ - b * cΔ)
-    return dpf_dvf * δvf + dpf_dvt * δvt + dpf_dθf * (δθf - δθt)
+    delta_theta = theta_f - theta_t - zone.edge_tap_angle[le]
+    c_delta = cos(delta_theta)
+    s_delta = sin(delta_theta)
+    dpf_dvf = 2 * g * tau * tau * vf - tau * vt * (g * c_delta + b * s_delta)
+    dpf_dvt = -tau * vf * (g * c_delta + b * s_delta)
+    dpf_dtheta_f = tau * vf * vt * (g * s_delta - b * c_delta)
+    return dpf_dvf * dvf + dpf_dvt * dvt + dpf_dtheta_f * (dtheta_f - dtheta_t)
 end
 
 @inline function _ac_qf_dir_deriv(zone::AladinZoneDataAC, le::Int)
-    fcol_θ = zone.edge_from_theta_col[le]
-    tcol_θ = zone.edge_to_theta_col[le]
+    fcol_theta = zone.edge_from_theta_col[le]
+    tcol_theta = zone.edge_to_theta_col[le]
     fcol_v = zone.edge_from_vm_col[le]
     tcol_v = zone.edge_to_vm_col[le]
-    θf = zone.y[fcol_θ]
-    θt = zone.y[tcol_θ]
+    theta_f = zone.y[fcol_theta]
+    theta_t = zone.y[tcol_theta]
     vf = zone.y[fcol_v]
     vt = zone.y[tcol_v]
-    δθf = zone.delta[fcol_θ]
-    δθt = zone.delta[tcol_θ]
-    δvf = zone.delta[fcol_v]
-    δvt = zone.delta[tcol_v]
+    dtheta_f = zone.delta[fcol_theta]
+    dtheta_t = zone.delta[tcol_theta]
+    dvf = zone.delta[fcol_v]
+    dvt = zone.delta[tcol_v]
     g = zone.edge_g[le]
     b = zone.edge_b[le]
     b_sh = zone.edge_b_sh[le]
     tau = zone.edge_inv_tap[le]
-    Δθ = θf - θt - zone.edge_tap_angle[le]
-    cΔ = cos(Δθ)
-    sΔ = sin(Δθ)
-    dqf_dvf = -2 * (b + b_sh / 2) * tau * tau * vf - tau * vt * (-b * cΔ + g * sΔ)
-    dqf_dvt = -tau * vf * (-b * cΔ + g * sΔ)
-    dqf_dθf = -tau * vf * vt * (b * sΔ + g * cΔ)
-    return dqf_dvf * δvf + dqf_dvt * δvt + dqf_dθf * (δθf - δθt)
+    delta_theta = theta_f - theta_t - zone.edge_tap_angle[le]
+    c_delta = cos(delta_theta)
+    s_delta = sin(delta_theta)
+    dqf_dvf = -2 * (b + b_sh / 2) * tau * tau * vf -
+              tau * vt * (-b * c_delta + g * s_delta)
+    dqf_dvt = -tau * vf * (-b * c_delta + g * s_delta)
+    dqf_dtheta_f = -tau * vf * vt * (b * s_delta + g * c_delta)
+    return dqf_dvf * dvf + dqf_dvt * dvt + dqf_dtheta_f * (dtheta_f - dtheta_t)
 end
 
+# ============================================================
+# Dummy line AC flow trial evaluations
+# ============================================================
+
 @inline function _ac_dummy_pf_at_trial(
-    pair::DummyLinePairAC, zone::AladinZoneDataAC, side::Symbol, α::Float64,
+    pair::DummyLinePairAC, zone::AladinZoneDataAC, side::Symbol, alpha::Float64,
 )
     if side === :i
-        fc_θ, tc_θ = pair.from_theta_col_i, pair.to_theta_col_i
+        fc_theta, tc_theta = pair.from_theta_col_i, pair.to_theta_col_i
         fc_v, tc_v = pair.from_vm_col_i, pair.to_vm_col_i
         g, b, tau, ta = pair.g_i, pair.b_i, pair.inv_tap_i, pair.tap_angle_i
     else
-        fc_θ, tc_θ = pair.from_theta_col_j, pair.to_theta_col_j
+        fc_theta, tc_theta = pair.from_theta_col_j, pair.to_theta_col_j
         fc_v, tc_v = pair.from_vm_col_j, pair.to_vm_col_j
         g, b, tau, ta = pair.g_j, pair.b_j, pair.inv_tap_j, pair.tap_angle_j
     end
-    θf = zone.y[fc_θ] + α * zone.delta[fc_θ]
-    θt = zone.y[tc_θ] + α * zone.delta[tc_θ]
-    vf = zone.y[fc_v] + α * zone.delta[fc_v]
-    vt = zone.y[tc_v] + α * zone.delta[tc_v]
-    Δθ = θf - θt - ta
-    return g * (tau * vf)^2 - tau * vf * vt * (g * cos(Δθ) + b * sin(Δθ))
+    theta_f = zone.y[fc_theta] + alpha * zone.delta[fc_theta]
+    theta_t = zone.y[tc_theta] + alpha * zone.delta[tc_theta]
+    vf = zone.y[fc_v] + alpha * zone.delta[fc_v]
+    vt = zone.y[tc_v] + alpha * zone.delta[tc_v]
+    delta_theta = theta_f - theta_t - ta
+    return g * (tau * vf)^2 -
+           tau * vf * vt * (g * cos(delta_theta) + b * sin(delta_theta))
 end
 
 @inline function _ac_dummy_qf_at_trial(
-    pair::DummyLinePairAC, zone::AladinZoneDataAC, side::Symbol, α::Float64,
+    pair::DummyLinePairAC, zone::AladinZoneDataAC, side::Symbol, alpha::Float64,
 )
     if side === :i
-        fc_θ, tc_θ = pair.from_theta_col_i, pair.to_theta_col_i
+        fc_theta, tc_theta = pair.from_theta_col_i, pair.to_theta_col_i
         fc_v, tc_v = pair.from_vm_col_i, pair.to_vm_col_i
         g, b, b_sh = pair.g_i, pair.b_i, pair.b_sh_i
         tau, ta = pair.inv_tap_i, pair.tap_angle_i
     else
-        fc_θ, tc_θ = pair.from_theta_col_j, pair.to_theta_col_j
+        fc_theta, tc_theta = pair.from_theta_col_j, pair.to_theta_col_j
         fc_v, tc_v = pair.from_vm_col_j, pair.to_vm_col_j
         g, b, b_sh = pair.g_j, pair.b_j, pair.b_sh_j
         tau, ta = pair.inv_tap_j, pair.tap_angle_j
     end
-    θf = zone.y[fc_θ] + α * zone.delta[fc_θ]
-    θt = zone.y[tc_θ] + α * zone.delta[tc_θ]
-    vf = zone.y[fc_v] + α * zone.delta[fc_v]
-    vt = zone.y[tc_v] + α * zone.delta[tc_v]
-    Δθ = θf - θt - ta
+    theta_f = zone.y[fc_theta] + alpha * zone.delta[fc_theta]
+    theta_t = zone.y[tc_theta] + alpha * zone.delta[tc_theta]
+    vf = zone.y[fc_v] + alpha * zone.delta[fc_v]
+    vt = zone.y[tc_v] + alpha * zone.delta[tc_v]
+    delta_theta = theta_f - theta_t - ta
     return -(b + b_sh / 2) * (tau * vf)^2 -
-           tau * vf * vt * (-b * cos(Δθ) + g * sin(Δθ))
+           tau * vf * vt * (-b * cos(delta_theta) + g * sin(delta_theta))
 end
+
+# ============================================================
+# Dummy line AC directional derivatives at alpha = 0
+# ============================================================
 
 @inline function _ac_dummy_pf_dir_deriv(
     pair::DummyLinePairAC, zone::AladinZoneDataAC, side::Symbol,
 )
     if side === :i
-        fc_θ, tc_θ = pair.from_theta_col_i, pair.to_theta_col_i
+        fc_theta, tc_theta = pair.from_theta_col_i, pair.to_theta_col_i
         fc_v, tc_v = pair.from_vm_col_i, pair.to_vm_col_i
         g, b, tau, ta = pair.g_i, pair.b_i, pair.inv_tap_i, pair.tap_angle_i
     else
-        fc_θ, tc_θ = pair.from_theta_col_j, pair.to_theta_col_j
+        fc_theta, tc_theta = pair.from_theta_col_j, pair.to_theta_col_j
         fc_v, tc_v = pair.from_vm_col_j, pair.to_vm_col_j
         g, b, tau, ta = pair.g_j, pair.b_j, pair.inv_tap_j, pair.tap_angle_j
     end
-    θf = zone.y[fc_θ]
-    θt = zone.y[tc_θ]
+    theta_f = zone.y[fc_theta]
+    theta_t = zone.y[tc_theta]
     vf = zone.y[fc_v]
     vt = zone.y[tc_v]
-    δθf = zone.delta[fc_θ]
-    δθt = zone.delta[tc_θ]
-    δvf = zone.delta[fc_v]
-    δvt = zone.delta[tc_v]
-    Δθ = θf - θt - ta
-    cΔ = cos(Δθ)
-    sΔ = sin(Δθ)
-    dpf_dvf = 2 * g * tau * tau * vf - tau * vt * (g * cΔ + b * sΔ)
-    dpf_dvt = -tau * vf * (g * cΔ + b * sΔ)
-    dpf_dθf = tau * vf * vt * (g * sΔ - b * cΔ)
-    return dpf_dvf * δvf + dpf_dvt * δvt + dpf_dθf * (δθf - δθt)
+    dtheta_f = zone.delta[fc_theta]
+    dtheta_t = zone.delta[tc_theta]
+    dvf = zone.delta[fc_v]
+    dvt = zone.delta[tc_v]
+    delta_theta = theta_f - theta_t - ta
+    c_delta = cos(delta_theta)
+    s_delta = sin(delta_theta)
+    dpf_dvf = 2 * g * tau * tau * vf - tau * vt * (g * c_delta + b * s_delta)
+    dpf_dvt = -tau * vf * (g * c_delta + b * s_delta)
+    dpf_dtheta_f = tau * vf * vt * (g * s_delta - b * c_delta)
+    return dpf_dvf * dvf + dpf_dvt * dvt + dpf_dtheta_f * (dtheta_f - dtheta_t)
 end
 
 @inline function _ac_dummy_qf_dir_deriv(
     pair::DummyLinePairAC, zone::AladinZoneDataAC, side::Symbol,
 )
     if side === :i
-        fc_θ, tc_θ = pair.from_theta_col_i, pair.to_theta_col_i
+        fc_theta, tc_theta = pair.from_theta_col_i, pair.to_theta_col_i
         fc_v, tc_v = pair.from_vm_col_i, pair.to_vm_col_i
         g, b, b_sh = pair.g_i, pair.b_i, pair.b_sh_i
         tau, ta = pair.inv_tap_i, pair.tap_angle_i
     else
-        fc_θ, tc_θ = pair.from_theta_col_j, pair.to_theta_col_j
+        fc_theta, tc_theta = pair.from_theta_col_j, pair.to_theta_col_j
         fc_v, tc_v = pair.from_vm_col_j, pair.to_vm_col_j
         g, b, b_sh = pair.g_j, pair.b_j, pair.b_sh_j
         tau, ta = pair.inv_tap_j, pair.tap_angle_j
     end
-    θf = zone.y[fc_θ]
-    θt = zone.y[tc_θ]
+    theta_f = zone.y[fc_theta]
+    theta_t = zone.y[tc_theta]
     vf = zone.y[fc_v]
     vt = zone.y[tc_v]
-    δθf = zone.delta[fc_θ]
-    δθt = zone.delta[tc_θ]
-    δvf = zone.delta[fc_v]
-    δvt = zone.delta[tc_v]
-    Δθ = θf - θt - ta
-    cΔ = cos(Δθ)
-    sΔ = sin(Δθ)
-    dqf_dvf = -2 * (b + b_sh / 2) * tau * tau * vf - tau * vt * (-b * cΔ + g * sΔ)
-    dqf_dvt = -tau * vf * (-b * cΔ + g * sΔ)
-    dqf_dθf = -tau * vf * vt * (b * sΔ + g * cΔ)
-    return dqf_dvf * δvf + dqf_dvt * δvt + dqf_dθf * (δθf - δθt)
+    dtheta_f = zone.delta[fc_theta]
+    dtheta_t = zone.delta[tc_theta]
+    dvf = zone.delta[fc_v]
+    dvt = zone.delta[tc_v]
+    delta_theta = theta_f - theta_t - ta
+    c_delta = cos(delta_theta)
+    s_delta = sin(delta_theta)
+    dqf_dvf = -2 * (b + b_sh / 2) * tau * tau * vf -
+              tau * vt * (-b * c_delta + g * s_delta)
+    dqf_dvt = -tau * vf * (-b * c_delta + g * s_delta)
+    dqf_dtheta_f = -tau * vf * vt * (b * s_delta + g * c_delta)
+    return dqf_dvf * dvf + dqf_dvt * dvt + dqf_dtheta_f * (dtheta_f - dtheta_t)
 end
 
+# ============================================================
+# Merit function phi(alpha)
+# ============================================================
+
 # ------------------------------------------------------------
-# Merit function Φ(α)
+# State
 # ------------------------------------------------------------
 
-function _ac_merit(ws::ACStateWorkspaceALADIN, α::Float64)
-    Φ = 0.0
+function _ac_merit(ws::ACStateWorkspaceALADIN, alpha::Float64)
+    phi = 0.0
     for zone in ws.zones
-        Φ += _ac_cost_at_trial(zone, α)
+        phi += _ac_cost_at_trial(zone, alpha)
     end
     r_sq = 0.0
-    λr = 0.0
+    lambda_r = 0.0
     @inbounds for (k, pair) in enumerate(ws.bus_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        θ_i = zi.y[pair.theta_col_i] + α * zi.delta[pair.theta_col_i]
-        θ_j = zj.y[pair.theta_col_j] + α * zj.delta[pair.theta_col_j]
-        v_i = zi.y[pair.vm_col_i] + α * zi.delta[pair.vm_col_i]
-        v_j = zj.y[pair.vm_col_j] + α * zj.delta[pair.vm_col_j]
-        dθ = θ_i - θ_j
+        theta_i = zi.y[pair.theta_col_i] + alpha * zi.delta[pair.theta_col_i]
+        theta_j = zj.y[pair.theta_col_j] + alpha * zj.delta[pair.theta_col_j]
+        v_i = zi.y[pair.vm_col_i] + alpha * zi.delta[pair.vm_col_i]
+        v_j = zj.y[pair.vm_col_j] + alpha * zj.delta[pair.vm_col_j]
+        dtheta = theta_i - theta_j
         dv = v_i - v_j
-        r_sq += dθ * dθ + dv * dv
-        λr += ws.vars.theta.lambda[k] * dθ + ws.vars.v_mag.lambda[k] * dv
+        r_sq += dtheta * dtheta + dv * dv
+        lambda_r += ws.vars.theta.lambda[k] * dtheta + ws.vars.v_mag.lambda[k] * dv
     end
-    return Φ + λr + 0.5 * ws.mu[] * r_sq
+    return phi + lambda_r + 0.5 * ws.mu[] * r_sq
 end
 
-function _ac_merit(ws::ACPowerWorkspaceALADIN, α::Float64)
-    Φ = 0.0
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
+function _ac_merit(ws::ACPowerWorkspaceALADIN, alpha::Float64)
+    phi = 0.0
     for zone in ws.zones
-        Φ += _ac_cost_at_trial(zone, α)
+        phi += _ac_cost_at_trial(zone, alpha)
     end
     r_sq = 0.0
-    λr = 0.0
+    lambda_r = 0.0
     @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pi_val = _ac_pf_at_trial(zi, pair.line_local_i, α)
-        pj_val = _ac_pf_at_trial(zj, pair.line_local_j, α)
-        qi_val = _ac_qf_at_trial(zi, pair.line_local_i, α)
-        qj_val = _ac_qf_at_trial(zj, pair.line_local_j, α)
+        pi_val = _ac_pf_at_trial(zi, pair.line_local_i, alpha)
+        pj_val = _ac_pf_at_trial(zj, pair.line_local_j, alpha)
+        qi_val = _ac_qf_at_trial(zi, pair.line_local_i, alpha)
+        qj_val = _ac_qf_at_trial(zj, pair.line_local_j, alpha)
         dp = pi_val - pj_val
         dq = qi_val - qj_val
         r_sq += dp * dp + dq * dq
-        λr += ws.vars.p_flow.lambda[k] * dp + ws.vars.q_flow.lambda[k] * dq
+        lambda_r += ws.vars.p_flow.lambda[k] * dp + ws.vars.q_flow.lambda[k] * dq
     end
     @inbounds for (k, pair) in enumerate(ws.dummy_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pi_val = _ac_dummy_pf_at_trial(pair, zi, :i, α)
-        pj_val = _ac_dummy_pf_at_trial(pair, zj, :j, α)
-        qi_val = _ac_dummy_qf_at_trial(pair, zi, :i, α)
-        qj_val = _ac_dummy_qf_at_trial(pair, zj, :j, α)
+        pi_val = _ac_dummy_pf_at_trial(pair, zi, :i, alpha)
+        pj_val = _ac_dummy_pf_at_trial(pair, zj, :j, alpha)
+        qi_val = _ac_dummy_qf_at_trial(pair, zi, :i, alpha)
+        qj_val = _ac_dummy_qf_at_trial(pair, zj, :j, alpha)
         dp = pi_val - pj_val
         dq = qi_val - qj_val
         r_sq += dp * dp + dq * dq
-        λr += ws.vars.p_dummy.lambda[k] * dp + ws.vars.q_dummy.lambda[k] * dq
+        lambda_r += ws.vars.p_dummy.lambda[k] * dp + ws.vars.q_dummy.lambda[k] * dq
     end
-    return Φ + λr + 0.5 * ws.mu[] * r_sq
+    return phi + lambda_r + 0.5 * ws.mu[] * r_sq
 end
 
-function _ac_merit(ws::ACHybridWorkspaceALADIN, α::Float64)
-    Φ = 0.0
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
+
+function _ac_merit(ws::ACHybridWorkspaceALADIN, alpha::Float64)
+    phi = 0.0
     for zone in ws.zones
-        Φ += _ac_cost_at_trial(zone, α)
+        phi += _ac_cost_at_trial(zone, alpha)
     end
     r_sq = 0.0
-    λr = 0.0
+    lambda_r = 0.0
     @inbounds for (k, pair) in enumerate(ws.bus_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        θ_i = zi.y[pair.theta_col_i] + α * zi.delta[pair.theta_col_i]
-        θ_j = zj.y[pair.theta_col_j] + α * zj.delta[pair.theta_col_j]
-        v_i = zi.y[pair.vm_col_i] + α * zi.delta[pair.vm_col_i]
-        v_j = zj.y[pair.vm_col_j] + α * zj.delta[pair.vm_col_j]
-        dθ = θ_i - θ_j
+        theta_i = zi.y[pair.theta_col_i] + alpha * zi.delta[pair.theta_col_i]
+        theta_j = zj.y[pair.theta_col_j] + alpha * zj.delta[pair.theta_col_j]
+        v_i = zi.y[pair.vm_col_i] + alpha * zi.delta[pair.vm_col_i]
+        v_j = zj.y[pair.vm_col_j] + alpha * zj.delta[pair.vm_col_j]
+        dtheta = theta_i - theta_j
         dv = v_i - v_j
-        r_sq += dθ * dθ + dv * dv
-        λr += ws.vars.theta.lambda[k] * dθ + ws.vars.v_mag.lambda[k] * dv
+        r_sq += dtheta * dtheta + dv * dv
+        lambda_r += ws.vars.theta.lambda[k] * dtheta + ws.vars.v_mag.lambda[k] * dv
     end
     @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pi_val = _ac_pf_at_trial(zi, pair.line_local_i, α)
-        pj_val = _ac_pf_at_trial(zj, pair.line_local_j, α)
-        qi_val = _ac_qf_at_trial(zi, pair.line_local_i, α)
-        qj_val = _ac_qf_at_trial(zj, pair.line_local_j, α)
+        pi_val = _ac_pf_at_trial(zi, pair.line_local_i, alpha)
+        pj_val = _ac_pf_at_trial(zj, pair.line_local_j, alpha)
+        qi_val = _ac_qf_at_trial(zi, pair.line_local_i, alpha)
+        qj_val = _ac_qf_at_trial(zj, pair.line_local_j, alpha)
         dp = pi_val - pj_val
         dq = qi_val - qj_val
         r_sq += dp * dp + dq * dq
-        λr += ws.vars.p_flow.lambda[k] * dp + ws.vars.q_flow.lambda[k] * dq
+        lambda_r += ws.vars.p_flow.lambda[k] * dp + ws.vars.q_flow.lambda[k] * dq
     end
     @inbounds for (k, pair) in enumerate(ws.dummy_line_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pi_val = _ac_dummy_pf_at_trial(pair, zi, :i, α)
-        pj_val = _ac_dummy_pf_at_trial(pair, zj, :j, α)
-        qi_val = _ac_dummy_qf_at_trial(pair, zi, :i, α)
-        qj_val = _ac_dummy_qf_at_trial(pair, zj, :j, α)
+        pi_val = _ac_dummy_pf_at_trial(pair, zi, :i, alpha)
+        pj_val = _ac_dummy_pf_at_trial(pair, zj, :j, alpha)
+        qi_val = _ac_dummy_qf_at_trial(pair, zi, :i, alpha)
+        qj_val = _ac_dummy_qf_at_trial(pair, zj, :j, alpha)
         dp = pi_val - pj_val
         dq = qi_val - qj_val
         r_sq += dp * dp + dq * dq
-        λr += ws.vars.p_dummy.lambda[k] * dp + ws.vars.q_dummy.lambda[k] * dq
+        lambda_r += ws.vars.p_dummy.lambda[k] * dp + ws.vars.q_dummy.lambda[k] * dq
     end
     @inbounds for (k, pair) in enumerate(ws.split_bus_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        pi = zi.y[pair.p_inj_col_i] + α * zi.delta[pair.p_inj_col_i]
-        pj = zj.y[pair.p_inj_col_j] + α * zj.delta[pair.p_inj_col_j]
-        qi = zi.y[pair.q_inj_col_i] + α * zi.delta[pair.q_inj_col_i]
-        qj = zj.y[pair.q_inj_col_j] + α * zj.delta[pair.q_inj_col_j]
-        # split-bus consensus is x_i + x_j = 0 (sign-flipped sum convention).
+        pi = zi.y[pair.p_inj_col_i] + alpha * zi.delta[pair.p_inj_col_i]
+        pj = zj.y[pair.p_inj_col_j] + alpha * zj.delta[pair.p_inj_col_j]
+        qi = zi.y[pair.q_inj_col_i] + alpha * zi.delta[pair.q_inj_col_i]
+        qj = zj.y[pair.q_inj_col_j] + alpha * zj.delta[pair.q_inj_col_j]
         dp = pi + pj
         dq = qi + qj
         r_sq += dp * dp + dq * dq
-        λr += ws.vars.p_inj.lambda[k] * dp + ws.vars.q_inj.lambda[k] * dq
+        lambda_r += ws.vars.p_inj.lambda[k] * dp + ws.vars.q_inj.lambda[k] * dq
     end
-    return Φ + λr + 0.5 * ws.mu[] * r_sq
+    return phi + lambda_r + 0.5 * ws.mu[] * r_sq
 end
 
+# ============================================================
+# Directional derivative dphi/dalpha at alpha = 0
+# ============================================================
+
 # ------------------------------------------------------------
-# Analytical directional derivative at trial origin
+# State
 # ------------------------------------------------------------
 
-function _ac_dΦ0(ws::ACStateWorkspaceALADIN)
-    dΦ = 0.0
+function _ac_dphi_0(ws::ACStateWorkspaceALADIN)
+    dphi = 0.0
     for zone in ws.zones
-        dΦ += _ac_cost_dir_deriv_0(zone)
+        dphi += _ac_cost_dir_deriv_0(zone)
     end
     mu = ws.mu[]
     @inbounds for (k, pair) in enumerate(ws.bus_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        r0_θ = zi.y[pair.theta_col_i] - zj.y[pair.theta_col_j]
-        Δr_θ = zi.delta[pair.theta_col_i] - zj.delta[pair.theta_col_j]
+        r0_theta = zi.y[pair.theta_col_i] - zj.y[pair.theta_col_j]
+        dr_theta = zi.delta[pair.theta_col_i] - zj.delta[pair.theta_col_j]
         r0_v = zi.y[pair.vm_col_i] - zj.y[pair.vm_col_j]
-        Δr_v = zi.delta[pair.vm_col_i] - zj.delta[pair.vm_col_j]
-        dΦ += (ws.vars.theta.lambda[k] + mu * r0_θ) * Δr_θ
-        dΦ += (ws.vars.v_mag.lambda[k] + mu * r0_v) * Δr_v
+        dr_v = zi.delta[pair.vm_col_i] - zj.delta[pair.vm_col_j]
+        dphi += (ws.vars.theta.lambda[k] + mu * r0_theta) * dr_theta
+        dphi += (ws.vars.v_mag.lambda[k] + mu * r0_v) * dr_v
     end
-    return dΦ
+    return dphi
 end
 
-function _ac_dΦ0(ws::ACPowerWorkspaceALADIN)
-    dΦ = 0.0
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
+function _ac_dphi_0(ws::ACPowerWorkspaceALADIN)
+    dphi = 0.0
     for zone in ws.zones
-        dΦ += _ac_cost_dir_deriv_0(zone)
+        dphi += _ac_cost_dir_deriv_0(zone)
     end
     mu = ws.mu[]
     @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
@@ -385,17 +416,17 @@ function _ac_dΦ0(ws::ACPowerWorkspaceALADIN)
         r0_p =
             _ac_pf_at_trial(zi, pair.line_local_i, 0.0) -
             _ac_pf_at_trial(zj, pair.line_local_j, 0.0)
-        Δr_p =
+        dr_p =
             _ac_pf_dir_deriv(zi, pair.line_local_i) -
             _ac_pf_dir_deriv(zj, pair.line_local_j)
         r0_q =
             _ac_qf_at_trial(zi, pair.line_local_i, 0.0) -
             _ac_qf_at_trial(zj, pair.line_local_j, 0.0)
-        Δr_q =
+        dr_q =
             _ac_qf_dir_deriv(zi, pair.line_local_i) -
             _ac_qf_dir_deriv(zj, pair.line_local_j)
-        dΦ += (ws.vars.p_flow.lambda[k] + mu * r0_p) * Δr_p
-        dΦ += (ws.vars.q_flow.lambda[k] + mu * r0_q) * Δr_q
+        dphi += (ws.vars.p_flow.lambda[k] + mu * r0_p) * dr_p
+        dphi += (ws.vars.q_flow.lambda[k] + mu * r0_q) * dr_q
     end
     @inbounds for (k, pair) in enumerate(ws.dummy_line_pairs)
         zi = ws.zones[pair.zone_i]
@@ -403,34 +434,38 @@ function _ac_dΦ0(ws::ACPowerWorkspaceALADIN)
         r0_p =
             _ac_dummy_pf_at_trial(pair, zi, :i, 0.0) -
             _ac_dummy_pf_at_trial(pair, zj, :j, 0.0)
-        Δr_p = _ac_dummy_pf_dir_deriv(pair, zi, :i) -
+        dr_p = _ac_dummy_pf_dir_deriv(pair, zi, :i) -
                _ac_dummy_pf_dir_deriv(pair, zj, :j)
         r0_q =
             _ac_dummy_qf_at_trial(pair, zi, :i, 0.0) -
             _ac_dummy_qf_at_trial(pair, zj, :j, 0.0)
-        Δr_q = _ac_dummy_qf_dir_deriv(pair, zi, :i) -
+        dr_q = _ac_dummy_qf_dir_deriv(pair, zi, :i) -
                _ac_dummy_qf_dir_deriv(pair, zj, :j)
-        dΦ += (ws.vars.p_dummy.lambda[k] + mu * r0_p) * Δr_p
-        dΦ += (ws.vars.q_dummy.lambda[k] + mu * r0_q) * Δr_q
+        dphi += (ws.vars.p_dummy.lambda[k] + mu * r0_p) * dr_p
+        dphi += (ws.vars.q_dummy.lambda[k] + mu * r0_q) * dr_q
     end
-    return dΦ
+    return dphi
 end
 
-function _ac_dΦ0(ws::ACHybridWorkspaceALADIN)
-    dΦ = 0.0
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
+
+function _ac_dphi_0(ws::ACHybridWorkspaceALADIN)
+    dphi = 0.0
     for zone in ws.zones
-        dΦ += _ac_cost_dir_deriv_0(zone)
+        dphi += _ac_cost_dir_deriv_0(zone)
     end
     mu = ws.mu[]
     @inbounds for (k, pair) in enumerate(ws.bus_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        r0_θ = zi.y[pair.theta_col_i] - zj.y[pair.theta_col_j]
-        Δr_θ = zi.delta[pair.theta_col_i] - zj.delta[pair.theta_col_j]
+        r0_theta = zi.y[pair.theta_col_i] - zj.y[pair.theta_col_j]
+        dr_theta = zi.delta[pair.theta_col_i] - zj.delta[pair.theta_col_j]
         r0_v = zi.y[pair.vm_col_i] - zj.y[pair.vm_col_j]
-        Δr_v = zi.delta[pair.vm_col_i] - zj.delta[pair.vm_col_j]
-        dΦ += (ws.vars.theta.lambda[k] + mu * r0_θ) * Δr_θ
-        dΦ += (ws.vars.v_mag.lambda[k] + mu * r0_v) * Δr_v
+        dr_v = zi.delta[pair.vm_col_i] - zj.delta[pair.vm_col_j]
+        dphi += (ws.vars.theta.lambda[k] + mu * r0_theta) * dr_theta
+        dphi += (ws.vars.v_mag.lambda[k] + mu * r0_v) * dr_v
     end
     @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         zi = ws.zones[pair.zone_i]
@@ -438,17 +473,17 @@ function _ac_dΦ0(ws::ACHybridWorkspaceALADIN)
         r0_p =
             _ac_pf_at_trial(zi, pair.line_local_i, 0.0) -
             _ac_pf_at_trial(zj, pair.line_local_j, 0.0)
-        Δr_p =
+        dr_p =
             _ac_pf_dir_deriv(zi, pair.line_local_i) -
             _ac_pf_dir_deriv(zj, pair.line_local_j)
         r0_q =
             _ac_qf_at_trial(zi, pair.line_local_i, 0.0) -
             _ac_qf_at_trial(zj, pair.line_local_j, 0.0)
-        Δr_q =
+        dr_q =
             _ac_qf_dir_deriv(zi, pair.line_local_i) -
             _ac_qf_dir_deriv(zj, pair.line_local_j)
-        dΦ += (ws.vars.p_flow.lambda[k] + mu * r0_p) * Δr_p
-        dΦ += (ws.vars.q_flow.lambda[k] + mu * r0_q) * Δr_q
+        dphi += (ws.vars.p_flow.lambda[k] + mu * r0_p) * dr_p
+        dphi += (ws.vars.q_flow.lambda[k] + mu * r0_q) * dr_q
     end
     @inbounds for (k, pair) in enumerate(ws.dummy_line_pairs)
         zi = ws.zones[pair.zone_i]
@@ -456,62 +491,61 @@ function _ac_dΦ0(ws::ACHybridWorkspaceALADIN)
         r0_p =
             _ac_dummy_pf_at_trial(pair, zi, :i, 0.0) -
             _ac_dummy_pf_at_trial(pair, zj, :j, 0.0)
-        Δr_p = _ac_dummy_pf_dir_deriv(pair, zi, :i) -
+        dr_p = _ac_dummy_pf_dir_deriv(pair, zi, :i) -
                _ac_dummy_pf_dir_deriv(pair, zj, :j)
         r0_q =
             _ac_dummy_qf_at_trial(pair, zi, :i, 0.0) -
             _ac_dummy_qf_at_trial(pair, zj, :j, 0.0)
-        Δr_q = _ac_dummy_qf_dir_deriv(pair, zi, :i) -
+        dr_q = _ac_dummy_qf_dir_deriv(pair, zi, :i) -
                _ac_dummy_qf_dir_deriv(pair, zj, :j)
-        dΦ += (ws.vars.p_dummy.lambda[k] + mu * r0_p) * Δr_p
-        dΦ += (ws.vars.q_dummy.lambda[k] + mu * r0_q) * Δr_q
+        dphi += (ws.vars.p_dummy.lambda[k] + mu * r0_p) * dr_p
+        dphi += (ws.vars.q_dummy.lambda[k] + mu * r0_q) * dr_q
     end
     @inbounds for (k, pair) in enumerate(ws.split_bus_pairs)
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        # split-bus consensus is x_i + x_j = 0 (sign-flipped sum convention).
         r0_p = zi.y[pair.p_inj_col_i] + zj.y[pair.p_inj_col_j]
-        Δr_p = zi.delta[pair.p_inj_col_i] + zj.delta[pair.p_inj_col_j]
+        dr_p = zi.delta[pair.p_inj_col_i] + zj.delta[pair.p_inj_col_j]
         r0_q = zi.y[pair.q_inj_col_i] + zj.y[pair.q_inj_col_j]
-        Δr_q = zi.delta[pair.q_inj_col_i] + zj.delta[pair.q_inj_col_j]
-        dΦ += (ws.vars.p_inj.lambda[k] + mu * r0_p) * Δr_p
-        dΦ += (ws.vars.q_inj.lambda[k] + mu * r0_q) * Δr_q
+        dr_q = zi.delta[pair.q_inj_col_i] + zj.delta[pair.q_inj_col_j]
+        dphi += (ws.vars.p_inj.lambda[k] + mu * r0_p) * dr_p
+        dphi += (ws.vars.q_inj.lambda[k] + mu * r0_q) * dr_q
     end
-    return dΦ
+    return dphi
 end
 
-# ------------------------------------------------------------
-# Armijo backtracking with analytic dΦ/dα|_{α=0}
-# ------------------------------------------------------------
+# ============================================================
+# Armijo backtracking step
+# ============================================================
 
 function _line_search_step!(
     ws::_ACPhase2Workspace;
     c1::Float64 = 1e-4,
     max_backtrack::Int = 25,
-    α_min::Float64 = 1e-3,
+    alpha_min::Float64 = 1e-3,
 )
     ws.line_search || return nothing
 
-    Φ_0 = _ac_merit(ws, 0.0)
-    dΦ_0 = _ac_dΦ0(ws)
+    phi_0 = _ac_merit(ws, 0.0)
+    dphi_0 = _ac_dphi_0(ws)
 
-    if !isfinite(dΦ_0) || dΦ_0 >= 0.0
-        ws.alpha2 = α_min
+    if !isfinite(dphi_0) || dphi_0 >= 0.0
+        ws.alpha2 = alpha_min
         return nothing
     end
 
-    α = ws.alpha2_init
+    alpha = ws.alpha2_init
     @inbounds for _ in 1:max_backtrack
-        Φ_α = _ac_merit(ws, α)
-        if isfinite(Φ_α) && Φ_α <= Φ_0 + c1 * α * dΦ_0
-            ws.alpha2 = α
+        phi_alpha = _ac_merit(ws, alpha)
+        if isfinite(phi_alpha) && phi_alpha <= phi_0 + c1 * alpha * dphi_0
+            ws.alpha2 = alpha
             return nothing
         end
-        α *= 0.5
-        if α < α_min
+        alpha *= 0.5
+        if alpha < alpha_min
             break
         end
     end
-    ws.alpha2 = α_min
+    ws.alpha2 = alpha_min
     return nothing
 end
