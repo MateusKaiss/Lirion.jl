@@ -242,7 +242,7 @@ The full documentation is available online and includes:
 - Solver configuration  
 - Examples and API reference  
 
-https://your-docs-link-here.com
+The full documentation site is being prepared; the link will appear here once it is published.
 
 For a detailed explanation of the update rules and their theoretical motivation, upcoming documentation will address it: **ADMM Parameter Tuning Guide** (Upcoming)
 
@@ -267,7 +267,7 @@ This software is part of an ongoing research program. The following works have b
 1. **[White Paper]** - *Lirion.jl: A Distributed Framework for Power Systems* (In Preparation).
 2. *On the Impact of Network Sectioning and Coupling Variable Choices in ADMM-Based Distributed Optimal Power Flow* (In Preparation).
 3. **BSc Thesis** - *Desenvolvimento de Ferramenta para Determinação do Fluxo de Potência Ótimo em Redes Elétricas*, Mateus Kaiss, UFPR (2025). [Link to University Repository/PDF]
-4. **Official Documentation** - Available at [lirionlabs.github.io/Lirion.jl](https://github.io)
+4. **Official Documentation** — Coming soon.
 
 
 ## Funding
@@ -306,7 +306,6 @@ See the [LICENSE](LICENSE) file for details.
 
 ## To-dos:
 
-- [ ] Add infraestructuremodels licensing 
-- [ ] Implement ALADIN method
+- [ ] Add InfrastructureModels licensing attribution
 - [ ] Further expand examples on README
-- [ ] Test in other 
+- [ ] Test on additional benchmark cases

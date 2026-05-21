@@ -49,3 +49,7 @@ test/*/*.toml
 *.out
 *.jlser
 *.xml
+
+# Editor / tool scratch
+.claude/
+*.bak

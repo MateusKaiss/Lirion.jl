@@ -1,4 +1,4 @@
-# =======================================================================
+# ============================================================
 # QC — Quadratic-Convex relaxation of AC OPF (Hijazi-Coffrin-Van Hentenryck
 # 2017, "Convex quadratic relaxations for mixed-integer nonlinear programs
 # in power systems", Math. Prog. Comp.). Recursive-McCormick variant (QCRM).
@@ -36,7 +36,7 @@
 #   Thermal SOC on (rate_a, p, q)
 #   tan(angmin)·wr ≤ wi ≤ tan(angmax)·wr
 #   Lifted Nonlinear Cuts (LNC) — Coffrin-Hijazi-Van Hentenryck 2015
-# =======================================================================
+# ============================================================
 
 function add_qc_bus_variables!(model::JuMP.Model, bus::BusData)
     add_voltage_angle_variables!(model, bus)

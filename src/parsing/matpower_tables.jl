@@ -6,13 +6,13 @@ const _mp_data_names = [
     "mpc.gencost_timeseries",
 ]
 
-# ==============================================================================
+# ============================================================
 # Token helpers
 # ------------------------------------------------------------------------------
 # All helpers are `@inline`, type-stable, and allocation-free on the hot path.
 # `tryparse` handles every numeric case natively (incl. Inf/NaN), so no manual
 # fast paths are needed.
-# ==============================================================================
+# ============================================================
 
 @inline _nrows(data::Vector{Vector{String}}) = length(data)
 

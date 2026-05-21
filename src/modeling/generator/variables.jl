@@ -1,9 +1,9 @@
 @inline has_curtailment(gen::GenData, g::Int) =
     gen.existing[g] && gen.plant_type[g] == "R"
 
-# =====================================================================
+# ============================================================
 # VARIABLES
-# =====================================================================
+# ============================================================
 
 function add_active_generation_variables!(model::JuMP.Model, gen::GenData)
     T = get(model.ext, :time_periods, 1)
@@ -126,9 +126,9 @@ function add_curtailment_variables!(model::JuMP.Model, gen::GenData)
     return nothing
 end
 
-# =====================================================================
+# ============================================================
 # IVR generator variables: current (crg, cig) + power-current link
-# =====================================================================
+# ============================================================
 
 function add_ivr_generator_variables!(model::JuMP.Model, gen::GenData, bus::BusData)
     T = get(model.ext, :time_periods, 1)

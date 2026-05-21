@@ -16,9 +16,9 @@ function storages!(
     return nothing
 end
 
-# =======================================================================
+# ============================================================
 # VARIABLES
-# =======================================================================
+# ============================================================
 
 function add_storage_variables!(model::JuMP.Model, stor::StorageData)
     add_storage_energy_variables!(model, stor)
@@ -27,9 +27,9 @@ function add_storage_variables!(model::JuMP.Model, stor::StorageData)
     return nothing
 end
 
-# =======================================================================
+# ============================================================
 # CONSTRAINTS
-# =======================================================================
+# ============================================================
 
 function add_storage_constraints!(model::JuMP.Model, stor::StorageData, ::Type{DC})
     return add_dc_storage_constraints!(model, stor)

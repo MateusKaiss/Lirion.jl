@@ -1,4 +1,4 @@
-# ==============================================================================
+# ============================================================
 # Lirion.jl — Matlab/Matpower minimal parser (adapted from InfrastructureModels)
 #
 # LICENSE NOTE:
@@ -6,7 +6,7 @@
 # Keep a copy of the original license text in:
 #   licenses/InfrastructureModels_LICENSE.txt
 # and clearly mark modifications (this file is modified/adapted).
-# ==============================================================================
+# ============================================================
 
 # ------------------------------------------------------------------------------
 # Result type

@@ -1,14 +1,5 @@
 module Lirion
 
-# ------------------------------------------------------------------
-# Threading — Lirion does NOT touch BLAS / OpenMP thread counts at load
-# time. Respecting the user's environment is the Julia-ecosystem norm.
-#
-# Distributed solves (ADMM / ALADIN) temporarily pin BLAS threads to 1
-# inside `run_distributed` to avoid oversubscription when multiple Julia
-# threads each call into BLAS. The previous value is restored on exit.
-# ------------------------------------------------------------------
-
 using LinearAlgebra
 using SparseArrays
 
@@ -167,8 +158,6 @@ include("distributed_algorithms/shared/traits.jl")
 include("distributed_algorithms/shared/totals.jl")
 include("distributed_algorithms/shared/sectioning_helpers.jl")
 
-# `aladin/params.jl` defines AbstractALADINWorkspace + LambdaState used
-# by shared/history.jl, shared/local_solve.jl, shared/logging.jl below.
 include("distributed_algorithms/aladin/params.jl")
 
 include("distributed_algorithms/shared/history.jl")

@@ -1,4 +1,4 @@
-# =======================================================================
+# ============================================================
 # SDPWRM — Semidefinite W-matrix relaxation (Bai-Wei-Fujisawa 2008).
 #
 # Variables per time step t:
@@ -13,7 +13,7 @@
 # `v_magnitude_sq[b,t]`, `R[l,t]`, `T_var[l,t]` as JuMP expressions that
 # alias the matrix entries, so `add_socwr_branch_expressions!` can be
 # reused verbatim.
-# =======================================================================
+# ============================================================
 
 function _sdpwrm_buspair_bounds(bus::BusData, br::BranchData)
     n = bus.n

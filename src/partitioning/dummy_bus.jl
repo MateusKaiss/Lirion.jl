@@ -1,4 +1,4 @@
-# ==============================================================================
+# ============================================================
 # Sectioning dispatch: Dummy Bus (Method 2 — Harris et al. 2022, Fig. 1b)
 # ------------------------------------------------------------------------------
 # For each tie-line (i→j) between zones A and B:
@@ -10,7 +10,7 @@
 #
 # The ONLY connection between zones is through the dummy bus — no ghost copies
 # of original buses are created (unlike TieLine / Method 1).
-# ==============================================================================
+# ============================================================
 
 function prepare_distributed_partitions(full::CaseRaw, ::DummyBus)
     cas = deepcopy(full)

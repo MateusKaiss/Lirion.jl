@@ -1,6 +1,6 @@
-# =======================================================================
+# ============================================================
 # NFA (Network Flow Approximation)
-# =======================================================================
+# ============================================================
 # Simplest OPF model: pure active-power network flow.
 # No voltages, no angles, no reactive power, no Ohm's law.
 # Each branch has a single free active-power flow variable bounded by

@@ -1,4 +1,4 @@
-# ==============================================================================
+# ============================================================
 # Sectioning dispatch: Split Bus (Method 3 — Harris et al. 2022, Fig. 1c)
 # ------------------------------------------------------------------------------
 # For each tie-line (f → t) crossing zones A (= zone(f)) and B (= zone(t)):
@@ -15,7 +15,7 @@
 # Implementation note: the p_inj variables are added later at the ADMM layer
 # (see `init_hybrid_partition!` for DC). This file only prepares the partition
 # geometry and records `bus_pairs` for the consensus bookkeeping.
-# ==============================================================================
+# ============================================================
 
 function prepare_distributed_partitions(full::CaseRaw, ::SplitBus)
     full_bus_ids = full.bus.bus_i

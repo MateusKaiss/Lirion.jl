@@ -1,6 +1,6 @@
-# ==============================================================================
+# ============================================================
 # Interzonal branches (tie lines) finder
-# ==============================================================================
+# ============================================================
 
 # DummyBus sectioning does not have classical tie-lines (each split half is
 # internal to one zone, the dummy bus is shared). Branch pairs are carried

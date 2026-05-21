@@ -9,9 +9,9 @@ function branches!(
     return nothing
 end
 
-# =======================================================================
+# ============================================================
 # VARIABLES
-# =======================================================================
+# ============================================================
 
 function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{DC})
     return nothing
@@ -59,9 +59,9 @@ function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{NFA})
     return add_nfa_branch_variables!(model, sys.branch)
 end
 
-# =======================================================================
+# ============================================================
 # EXPRESSIONS
-# =======================================================================
+# ============================================================
 
 function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{DC})
     return add_dc_branch_expressions!(model, sys.branch)
@@ -107,9 +107,9 @@ function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{NFA}
     return add_nfa_branch_expressions!(model, sys.branch)
 end
 
-# =======================================================================
+# ============================================================
 # CONSTRAINTS
-# =======================================================================
+# ============================================================
 
 function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{DC})
     return add_dc_branch_constraints!(model, sys.branch)

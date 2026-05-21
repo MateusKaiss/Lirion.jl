@@ -21,9 +21,9 @@ function generators!(
     return nothing
 end
 
-# =======================================================================
+# ============================================================
 # VARIABLES
-# =======================================================================
+# ============================================================
 
 function add_generator_variables!(model::JuMP.Model, gen::GenData, ::Type{DC})
     add_active_generation_variables!(model, gen)
@@ -89,9 +89,9 @@ function add_generator_variables!(model::JuMP.Model, gen::GenData, ::Type{NFA})
     return add_curtailment_variables!(model, gen)
 end
 
-# =======================================================================
+# ============================================================
 # CONSTRAINTS
-# =======================================================================
+# ============================================================
 
 function add_generator_constraints!(model::JuMP.Model, gen::GenData, ::Type{DC})
     return add_curtailment_constraints!(model, gen)

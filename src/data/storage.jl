@@ -62,7 +62,7 @@ function get_storage_parameters(case_raw::CaseRaw)
     return (
         n = n,
         bus = storage_raw.storage_bus,
-        min_storage = storage_raw.energy,
+        min_storage = zeros(Float64, n),
         max_storage = storage_raw.energy_rating,
         energy_start = storage_raw.energy,
         charge_ramp = storage_raw.charge_rating,

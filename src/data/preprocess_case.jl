@@ -112,6 +112,9 @@ end
 
 function convert_to_pu!(raw_case::CaseRaw)
     Sbase = raw_case.baseMVA
+    Sbase > 0 || throw(ArgumentError(
+        "baseMVA must be positive (got $(Sbase)); cannot convert case to per-unit.",
+    ))
 
     if raw_case.bus !== nothing
         b = raw_case.bus
@@ -158,6 +161,9 @@ end
 
 function convert_timeseries_to_pu!(raw_case::CaseRaw)
     Sbase = raw_case.baseMVA
+    Sbase > 0 || throw(ArgumentError(
+        "baseMVA must be positive (got $(Sbase)); cannot convert time series to per-unit.",
+    ))
 
     if raw_case.bus_timeseries !== nothing
         ts = raw_case.bus_timeseries

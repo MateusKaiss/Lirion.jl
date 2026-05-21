@@ -1,11 +1,11 @@
-# ==============================================================================
+# ============================================================
 # Sectioning dispatch: Tie Line
 # ------------------------------------------------------------------------------
 # Builds the per-zone `CaseRaw` subproblems for tie-line decomposition. All
 # membership tests use dense `Vector{Bool}` scratch buffers indexed by bus id
 # (allocated once, reused across zones via `fill!`). Returns parallel arrays
 # `(zone_ids, parts)` already sorted by `zone_id`.
-# ==============================================================================
+# ============================================================
 
 function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
     full_bus_ids = full.bus.bus_i

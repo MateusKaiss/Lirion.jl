@@ -1,6 +1,6 @@
-# =======================================================================
+# ============================================================
 # STORAGE — energy / charge / discharge / (P, Q) variables.
-# =======================================================================
+# ============================================================
 
 function add_storage_energy_variables!(model::JuMP.Model, stor::StorageData)
     T = get(model.ext, :time_periods, 1)
@@ -9,7 +9,7 @@ function add_storage_energy_variables!(model::JuMP.Model, stor::StorageData)
     @variable(
         model,
         storage[b in 1:B, t in 1:T],
-        lower_bound = 0.0,
+        lower_bound = stor.min_storage[b],
         upper_bound = stor.max_storage[b],
         start = stor.energy_start[b],
     )
