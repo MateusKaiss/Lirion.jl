@@ -1,3 +1,7 @@
+# ============================================================
+# Static tables
+# ============================================================
+
 abstract type AbstractRawTable end
 
 struct BusNameRaw <: AbstractRawTable
@@ -143,9 +147,9 @@ struct GencostRaw{T <: Real} <: AbstractRawTable
     cost_coefficients::Vector{Vector{T}}
 end
 
-# -------------------------
-# Timeseries case_raw tables
-# -------------------------
+# ============================================================
+# Timeseries tables
+# ============================================================
 
 struct BusTimeseriesRaw{T <: Real} <: AbstractRawTable
     time::Vector{Int}
@@ -182,6 +186,10 @@ struct GenTimeseriesRaw{T <: Real} <: AbstractRawTable
     qmax::Vector{T}
     qmin::Vector{T}
 end
+
+# ============================================================
+# Empty constructors
+# ============================================================
 
 @inline _empty_vec(::Type{T}) where {T} = T[]
 
@@ -232,9 +240,9 @@ function empty_gencost_raw(::Type{T} = Float64) where {T <: Real}
     return GencostRaw{T}(Int[], _empty_vec(T), _empty_vec(T), Int[], Vector{Vector{T}}())
 end
 
-# -------------------------
-# Index maps container
-# -------------------------
+# ============================================================
+# Index maps and distributed metadata
+# ============================================================
 
 mutable struct CaseIndexMaps
     bus_idx_map::Vector{Int}
@@ -283,9 +291,9 @@ mutable struct DistributedRawMeta
     end
 end
 
-# -------------------------
-# CaseRaw
-# -------------------------
+# ============================================================
+# CaseRaw container
+# ============================================================
 
 mutable struct CaseRaw
     # core meta
@@ -335,6 +343,10 @@ mutable struct CaseRaw
         )
     end
 end
+
+# ============================================================
+# Timeseries slicing
+# ============================================================
 
 @inline function _slice_vec(v::AbstractVector, idx::AbstractVector{<:Integer})
     return v[idx]

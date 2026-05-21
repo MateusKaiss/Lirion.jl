@@ -1,3 +1,7 @@
+# ============================================================
+# Struct
+# ============================================================
+
 struct GenData
     n::Int
     bus::Vector{Int}
@@ -28,6 +32,10 @@ struct GenData
     qmax_ts::Matrix{Float64}
     qmin_ts::Matrix{Float64}
 end
+
+# ============================================================
+# Parameter extraction
+# ============================================================
 
 function get_gen_parameters(case_raw::CaseRaw)
     gen_raw = case_raw.gen::GenRaw{Float64}
@@ -103,6 +111,10 @@ function get_gen_parameters(case_raw::CaseRaw)
         qmin_ts = qmin_ts,
     )
 end
+
+# ============================================================
+# Builder
+# ============================================================
 
 function build_gen_data(case_raw::CaseRaw)::GenData
     params = get_gen_parameters(case_raw)

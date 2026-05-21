@@ -1,3 +1,7 @@
+# ============================================================
+# Struct
+# ============================================================
+
 struct PowerFlowData
     bus_ids::Vector{Int}
     bus_idx_map::Vector{Int}
@@ -31,8 +35,12 @@ struct PowerFlowData
     qd_ts::Matrix{Float64}
 end
 
+# ============================================================
+# Parameter extraction
+# ============================================================
+
 # ------------------------------------------------------------
-# Timeseries snapshot builder (bus × time dense aggregation)
+# Timeseries snapshot builder
 # ------------------------------------------------------------
 
 @inline function _aggregate_bus_time!(
@@ -53,6 +61,10 @@ end
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Main extraction
+# ------------------------------------------------------------
 
 function get_power_flow_parameters(case_raw::CaseRaw)
     @assert case_raw.bus !== nothing && case_raw.branch !== nothing
@@ -148,6 +160,10 @@ function get_power_flow_parameters(case_raw::CaseRaw)
         qd_ts = qd_ts,
     )
 end
+
+# ============================================================
+# Builder
+# ============================================================
 
 function build_power_flow_data(case_raw::CaseRaw)::PowerFlowData
     params = get_power_flow_parameters(case_raw)

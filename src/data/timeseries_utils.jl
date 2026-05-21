@@ -1,3 +1,7 @@
+# ============================================================
+# Time-grid discovery and alignment
+# ============================================================
+
 function get_model_times(case::CaseRaw)
     time_vecs = Vector{Vector{Int}}()
 
@@ -39,6 +43,10 @@ function check_time_alignment(case::CaseRaw)
         end
     end
 end
+
+# ============================================================
+# Seed timeseries from static tables
+# ============================================================
 
 function ensure_bus_timeseries!(case::CaseRaw, T::Int)
     if case.bus_timeseries !== nothing && !isempty(case.bus_timeseries.time)
@@ -106,6 +114,10 @@ function ensure_gencost_timeseries!(case::CaseRaw, T::Int)
     return
 end
 
+# ============================================================
+# Extend timeseries to full horizon
+# ============================================================
+
 function _extend_generic_timeseries!(
     times::Vector{Int},
     ids::Vector{Int},
@@ -168,6 +180,10 @@ function extend_gen_timeseries!(case::CaseRaw, T::Int)
     cols = AbstractVector[ts.pmax, ts.pmin, ts.qmax, ts.qmin]
     return _extend_generic_timeseries!(ts.time, ts.gen_id, cols, T, "gen_timeseries")
 end
+
+# ============================================================
+# Sorting
+# ============================================================
 
 function sort_timeseries_by_time_and_id!(case::CaseRaw)
     if case.bus_timeseries !== nothing

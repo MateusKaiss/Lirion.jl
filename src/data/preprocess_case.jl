@@ -1,3 +1,7 @@
+# ============================================================
+# Index maps
+# ============================================================
+
 function _build_bus_idx_map(bus_ids::AbstractVector{<:Integer})::Vector{Int}
     n = length(bus_ids)
     n == 0 && return Int[]
@@ -68,6 +72,10 @@ function add_case_index_maps!(raw_case::CaseRaw)
     return raw_case
 end
 
+# ============================================================
+# Angle conversion
+# ============================================================
+
 function convert_angles_to_rad!(raw_case::CaseRaw)
     deg2rad = π / 180
 
@@ -97,6 +105,10 @@ function convert_angles_to_rad!(raw_case::CaseRaw)
 
     return raw_case
 end
+
+# ============================================================
+# Per-unit conversion
+# ============================================================
 
 function convert_to_pu!(raw_case::CaseRaw)
     Sbase = raw_case.baseMVA
@@ -174,11 +186,10 @@ end
     return v
 end
 
-# ---------------------------------------------------------------------
-# NOTE / TODO (Timeseries review needed)
-#
-# This whole timeseries preprocessing pipeline still needs a full review.
-# ---------------------------------------------------------------------
+# ============================================================
+# Main entry point
+# ============================================================
+# TODO: timeseries preprocessing pipeline still needs full review.
 
 function preprocess_case_data!(
     raw_case::CaseRaw,
