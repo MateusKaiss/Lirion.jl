@@ -1,6 +1,6 @@
-# -------------------------
-# helpers
-# -------------------------
+# ============================================================
+# Helpers
+# ============================================================
 
 @inline _sym(s::AbstractString) = Symbol(String(s))
 
@@ -98,6 +98,10 @@ end
 @inline function _safe_f64(x, default::Float64 = 0.0)::Float64
     return (x === missing || x === nothing) ? default : Float64(x)
 end
+
+# ============================================================
+# Gencost parsing
+# ============================================================
 
 function _parse_gencost_csv(path::String)::GencostRaw{Float64}
     df = _read_csv(path)
@@ -211,6 +215,10 @@ function _parse_gencost_timeseries_csv(path::String)::GencostTimeseriesRaw{Float
         time, gen_id, model, startup, shutdown, ncost, coeffs, tou, fit,
     )
 end
+
+# ============================================================
+# Generic CSV table parser
+# ============================================================
 
 function _parse_csv_table_dict(path::String, columns::Vector{Tuple{String, Type}})
     df = _read_csv(path)

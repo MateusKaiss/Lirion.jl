@@ -23,7 +23,11 @@ function run_lirion(inputs::DistributedInputs)::LirionResult
     @info "Model: $(inputs.model_type)"
     @info "Optimizer (raw): $(inputs.optimizer)"
 
-    return run_distributed(inputs)
+    t0 = time_ns()
+    partitions, ws, iter_done = solve_distributed(inputs)
+    return build_lirion_result_distributed(
+        partitions, ws, inputs.model_type, iter_done, t0, inputs.system,
+    )
 end
 
 function solve(

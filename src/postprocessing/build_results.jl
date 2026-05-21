@@ -1,3 +1,7 @@
+# ============================================================
+# Result dictionary builder
+# ============================================================
+
 function build_result_dict(model::JuMP.Model, sys::SystemData)
     T = get(model.ext, :time_periods, sys.T)
     result = Dict{String, Any}()

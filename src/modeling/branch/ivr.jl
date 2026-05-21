@@ -1,3 +1,7 @@
+# ============================================================
+# Variables
+# ============================================================
+
 function add_ivr_branch_variables!(model::JuMP.Model, br::BranchData)
     T = get(model.ext, :time_periods, 1)
     active = br.active
@@ -9,6 +13,10 @@ function add_ivr_branch_variables!(model::JuMP.Model, br::BranchData)
 
     return nothing
 end
+
+# ============================================================
+# Constraints
+# ============================================================
 
 function add_ivr_branch_constraints!(
     model::JuMP.Model,

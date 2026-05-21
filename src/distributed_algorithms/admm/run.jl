@@ -44,8 +44,8 @@ function run_algorithm(
     sys::DistributedSystem,
     config::ADMMConfig;
     optimizer_factory = nothing,
-)::LirionResult
-    t0 = time_ns()
+)
+    t0_solver = time_ns()
     tag = ADMM{_variant_type(Val(config.coupling)), config.base_model}()
 
     params = build_params(config)
@@ -63,12 +63,10 @@ function run_algorithm(
     if _FAST_USE_LOGS
         _print_summary!(
             tag_str, "ADMM",
-            _finalize(ws.partitions, t0, ws.iter);
+            _finalize(ws.partitions, t0_solver, ws.iter);
             rho_lines = rho_lines,
         )
     end
 
-    return build_lirion_result_distributed(
-        ws.partitions, ws, config, ws.iter, t0, sys,
-    )
+    return ws.partitions, ws, ws.iter
 end

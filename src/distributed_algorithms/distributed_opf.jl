@@ -38,7 +38,7 @@ end
 # Entry point
 # ============================================================
 
-function run_distributed(inputs::DistributedInputs)::LirionResult
+function solve_distributed(inputs::DistributedInputs)
     cfg = inputs.model_type
     sys = inputs.system
 

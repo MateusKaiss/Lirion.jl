@@ -1,3 +1,7 @@
+# ============================================================
+# Initial angle helpers
+# ============================================================
+
 @inline function initial_bus_angle(bus::BusData)::Float64
     ref = bus.reference_bus
     ref == 0 && return 0.0
@@ -10,6 +14,10 @@ end
 @inline function normalize_initial_angle(va_b::Float64, theta_ref::Float64)
     return isnan(va_b) ? 0.0 : va_b - theta_ref
 end
+
+# ============================================================
+# Voltage angle / magnitude
+# ============================================================
 
 function add_voltage_angle_variables!(model::JuMP.Model, bus::BusData)
     T = get(model.ext, :time_periods, 1)
@@ -63,6 +71,10 @@ function add_voltage_magnitude_variables!(model::JuMP.Model, bus::BusData)
     return nothing
 end
 
+# ============================================================
+# Rectangular variables (ACR / IVR)
+# ============================================================
+
 function add_rectangular_bus_variables!(model::JuMP.Model, bus::BusData)
     T = get(model.ext, :time_periods, 1)
     bus_ids = bus.id
@@ -113,6 +125,10 @@ function add_rectangular_bus_variables!(model::JuMP.Model, bus::BusData)
     return nothing
 end
 
+# ============================================================
+# LPAC variables
+# ============================================================
+
 function add_lpac_bus_variables!(model::JuMP.Model, bus::BusData)
     T = get(model.ext, :time_periods, 1)
     bus_ids = bus.id
@@ -139,6 +155,10 @@ function add_lpac_bus_variables!(model::JuMP.Model, bus::BusData)
 
     return nothing
 end
+
+# ============================================================
+# SOCWR variables (v²)
+# ============================================================
 
 function add_socwr_bus_variables!(model::JuMP.Model, bus::BusData)
     T = get(model.ext, :time_periods, 1)

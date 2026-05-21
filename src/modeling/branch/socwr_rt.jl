@@ -1,3 +1,7 @@
+# ============================================================
+# R/T product bounds
+# ============================================================
+
 @inline function _rt_product_bounds(bus::BusData, br::BranchData)
     ang_min = br.ang_min
     ang_max = br.ang_max
@@ -49,6 +53,10 @@
     return R_min, R_max, T_min, T_max
 end
 
+# ============================================================
+# R/T variables with bounds
+# ============================================================
+
 function add_rt_variables_with_bounds!(
     model::JuMP.Model,
     bus::BusData,
@@ -98,6 +106,10 @@ function add_rt_variables_with_bounds!(
 
     return nothing
 end
+
+# ============================================================
+# Tangent angle cuts
+# ============================================================
 
 @inline function _tan_clip(x; eps = 1e-6)
     b = (pi / 2) - eps
