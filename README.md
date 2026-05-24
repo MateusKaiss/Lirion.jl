@@ -102,7 +102,6 @@ For detailed installation instruction and solver selection guidance, please refe
 ### 🔹 Centralized Example
 
 **Case file:**
-
 [`test/matpower_cases/pglib_opf_case118_ieee.m`](https://github.com/MateusKaiss/Lirion.jl/blob/master/test/matpower_cases/pglib_opf_case118_ieee.m)
 
 
@@ -145,7 +144,6 @@ A distributed run uses the same `solve(...)` entry point; you choose the
 **algorithm** (`admm` / `aladin`), the **coupling**, and the **sectioning**.
 
 **Case file:**
-
 [`test/matpower_cases/pglib_opf_case73_ieee_rts.m`](https://github.com/MateusKaiss/Lirion.jl/blob/master/test/matpower_cases/pglib_opf_case73_ieee_rts.m)
 
 #### Run a distributed AC OPF with ADMM (hybrid coupling)
