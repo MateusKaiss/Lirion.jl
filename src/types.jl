@@ -8,10 +8,10 @@ struct DC <: OPFModel end
 struct AC <: OPFModel end     # AC polar (V, θ)
 struct ACR <: OPFModel end    # AC rectangular (vr, vi)
 struct IVR <: OPFModel end    # Current-Voltage rectangular (vr, vi, cr, ci)
-struct LPAC <: OPFModel end   # Linear Power AC (Coffrin & Van Hentenryck 2014)
-struct SOCWR <: OPFModel end  # Jabr SOCP (W-rectangular)
-struct QC <: OPFModel end     # Quadratic-Convex relaxation (Hijazi-Coffrin-VH 2017)
-struct SDPWRM <: OPFModel end # Bai-Wei-Fujisawa SDP (W-rectangular matrix)
+struct LPAC <: OPFModel end   # Linear Power AC
+struct SOCWR <: OPFModel end  # SOCP (W-rectangular)
+struct QC <: OPFModel end     # Quadratic-Convex relaxation
+struct SDPWRM <: OPFModel end # SDP (W-rectangular matrix)
 struct SOCBF <: OPFModel end  # Branch Flow SOCP
 struct BFA <: OPFModel end    # Linear Branch Flow Approx (LinDistFlow)
 struct NFA <: OPFModel end    # Network Flow Approximation (LP, active-only)
@@ -695,10 +695,6 @@ Base.propertynames(c::ADMMConfig, private::Bool = false) =
 abstract type AbstractRunDiagnostics end
 struct NoDiagnostics <: AbstractRunDiagnostics end
 
-# Root of the distributed-workspace hierarchy. Both ADMM and ALADIN
-# workspaces descend from this type so that generic code can dispatch
-# on a single "distributed workspace" concept without having to list
-# the two families separately.
 abstract type AbstractDistributedWorkspace end
 
 abstract type AbstractADMMWorkspace <: AbstractDistributedWorkspace end
