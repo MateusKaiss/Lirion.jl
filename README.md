@@ -253,7 +253,9 @@ create_partition("pglib_opf_case118_ieee.m"; k = 4)
 ```
 
 The resulting zoned case is then solved with any distributed algorithm/sectioning.
-Use `create_partition_split_bus(...)` for a partition compatible with `:split_bus`.
+For `:split_bus`, use `create_partition_split_bus(...)`: unlike the others, it
+requires every boundary bus to border **at most one** other zone (no bus on 3+
+zones), a bilateral constraint the plain partitioner does not enforce.
 
 ## Results
 
