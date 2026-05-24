@@ -27,6 +27,7 @@ struct ALADINParams
     mu_growth::Float64
     mu_upper::Float64
     stopping_criterion::Symbol
+    check_primal_step::Bool
 end
 
 # ============================================================
@@ -44,6 +45,7 @@ end
         cfg.mu_growth,
         cfg.mu_upper,
         cfg.stopping_criterion,
+        cfg.check_primal_step,
     )
 end
 

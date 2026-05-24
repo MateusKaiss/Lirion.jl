@@ -488,6 +488,7 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
     proximal_mode::Symbol
     qp_optimizer::Any
     stopping_criterion::Symbol
+    check_primal_step::Bool
 
     function ALADINConfig(
         base_model::Type{<:OPFModel},
@@ -515,6 +516,7 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
         proximal_mode::Symbol = :primal,
         qp_optimizer = nothing,
         stopping_criterion::Symbol = :boyd,
+        check_primal_step::Bool = false,
     )
         base_model in (DC, AC, SOCWR) ||
             throw(
@@ -629,6 +631,7 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
             proximal_mode,
             qp_optimizer,
             stopping_criterion,
+            check_primal_step,
         )
     end
 end

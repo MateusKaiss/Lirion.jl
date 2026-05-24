@@ -2,10 +2,11 @@
 # Core loop
 # ============================================================
 
-@inline stop_if_converged(ws::AbstractALADINWorkspace) =
-    (ws.r_primal < ws.eps_primal) &&
-    (ws.r_step_primal < ws.eps_step_primal) &&
-    (ws.r_dual < ws.eps_dual)
+@inline function stop_if_converged(ws::AbstractALADINWorkspace, params::ALADINParams)
+    base = (ws.r_primal < ws.eps_primal) && (ws.r_dual < ws.eps_dual)
+    params.check_primal_step || return base
+    return base && (ws.r_step_primal < ws.eps_step_primal)
+end
 
 @inline _line_search_step!(::AbstractALADINWorkspace) = nothing
 
@@ -23,7 +24,7 @@ function run_algorithm!(ws::AbstractALADINWorkspace, params::ALADINParams)
         _record_iter!(ws)
         _print_aladin_residuals!(ws)
 
-        if stop_if_converged(ws)
+        if stop_if_converged(ws, params)
             _print_converged!()
             break
         end
