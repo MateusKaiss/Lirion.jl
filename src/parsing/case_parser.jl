@@ -1,5 +1,5 @@
 # ============================================================
-#  MatPower
+# Matpower
 # ============================================================
 
 function _parse_case(data_string::String, ::MatpowerM)::CaseRaw
@@ -84,10 +84,9 @@ function _parse_case(data_string::String, ::MatpowerM)::CaseRaw
 end
 
 # ============================================================
-#  CSV — implementation lives in ext/CSVExt.jl
+# CSV — implementation lives in ext/CSVExt.jl
 # ============================================================
 
-# Extension hook: CSVExt defines _csv_parse_case(dir::String)::CaseRaw
 function _csv_parse_case end
 
 function _parse_case(dir::String, ::CsvFolder)::CaseRaw

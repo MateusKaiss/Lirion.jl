@@ -1,18 +1,10 @@
-const _mp_data_names = [
-    "mpc.version", "mpc.baseMVA", "mpc.bus", "mpc.gen",
-    "mpc.branch", "mpc.dcline", "mpc.gencost", "mpc.dclinecost",
-    "mpc.bus_name", "mpc.storage", "mpc.switch",
-    "mpc.bus_timeseries",
-    "mpc.gencost_timeseries",
-]
+# ============================================================
+# Matpower table parsers (tokenized rows -> typed *Raw structs)
+# ============================================================
 
-# ============================================================
+# ------------------------------------------------------------
 # Token helpers
-# ------------------------------------------------------------------------------
-# All helpers are `@inline`, type-stable, and allocation-free on the hot path.
-# `tryparse` handles every numeric case natively (incl. Inf/NaN), so no manual
-# fast paths are needed.
-# ============================================================
+# ------------------------------------------------------------
 
 @inline _nrows(data::Vector{Vector{String}}) = length(data)
 
@@ -50,6 +42,10 @@ end
     v = tryparse(Float64, s)
     return v === nothing ? default : v
 end
+
+# ------------------------------------------------------------
+# Static tables (bus / gen / branch / dcline / storage / switch)
+# ------------------------------------------------------------
 
 function _bus_from_mat(data::Vector{Vector{String}})
     n = _nrows(data)
@@ -391,6 +387,10 @@ function _switch_from_mat(data::Vector{Vector{String}})
     return SwitchRaw{Float64}(f_bus, t_bus, psw, qsw, state, thermal_rating, status)
 end
 
+# ------------------------------------------------------------
+# Time-series tables
+# ------------------------------------------------------------
+
 function _bus_ts_from_mat(data::Vector{Vector{String}})
     n = _nrows(data)
 
@@ -419,8 +419,6 @@ function _gen_ts_from_mat(data::Vector{Vector{String}})
     qmax = Vector{Float64}(undef, n)
     qmin = Vector{Float64}(undef, n)
 
-    # Columns 4-6 are optional. Absent tokens become NaN, which downstream
-    # code treats as "use the static gen.* field".
     @inbounds for i in 1:n
         row = data[i]
         time[i] = _as_int(_tok(row, 1, "0"), 0)
@@ -433,6 +431,10 @@ function _gen_ts_from_mat(data::Vector{Vector{String}})
 
     return GenTimeseriesRaw{Float64}(time, gen_id, pmax, pmin, qmax, qmin)
 end
+
+# ------------------------------------------------------------
+# Generator cost tables
+# ------------------------------------------------------------
 
 function _parse_gencost_table_raw(data::Vector{Vector{String}})
     n = _nrows(data)
