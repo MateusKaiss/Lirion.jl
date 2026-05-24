@@ -263,7 +263,7 @@ For a detailed explanation of the update rules and their theoretical motivation,
 
 Lirion.jl is the result of a collective research effort under the coordination of the Federal University of Parana. The project was conceptualized by Mateus Kaiss and Daniel Gebbran, evolving towards a comprehensive open-source framework. The key collaborators of this work are:
 
-- **Mateus Kaiss**: Researcher and Lead Developer. Responsible for R\&D, implementation, maintenance, and technical architecture of the project.
+- **Mateus Kaiss**: Researcher and Principal Developer. Responsible for R\&D, implementation, maintenance, and technical architecture of the project.
 
 - **Daniel Gebbran, PhD**: Research Lead. Established the scientific workflow \& logic, and provides continuous high-level technical direction, including system architecture design, collaborative debugging, and feature implementation oversight. 
 
