@@ -1,9 +1,17 @@
+# ============================================================
+# Input validation
+# ============================================================
+
 @inline function _assert_valid_path(path::AbstractString)::String
     p = abspath(String(path))
     (isfile(p) || isdir(p)) ||
         throw(ArgumentError("Invalid path: $p is not a file or directory."))
     return p
 end
+
+# ============================================================
+# Internal runners (centralized / distributed dispatch)
+# ============================================================
 
 function run_lirion(inputs::CentralizedInputs)::LirionResult
     @info "Case: $(inputs.database_path)"
@@ -29,6 +37,10 @@ function run_lirion(inputs::DistributedInputs)::LirionResult
         partitions, ws, inputs.model_type, iter_done, t0, inputs.system,
     )
 end
+
+# ============================================================
+# Public API — solve
+# ============================================================
 
 function solve(
     path::AbstractString;
@@ -59,6 +71,7 @@ function solve(
     algorithm::AbstractAlgorithm = centralized(),
     optimizer = nothing,
     outputs::Bool = false,
+    plots::Bool = false,
 )::LirionResult
     inputs = _build_inputs(
         case,
@@ -67,5 +80,9 @@ function solve(
         optimizer = optimizer,
         outputs = outputs,
     )
-    return run_lirion(inputs)
+    out = run_lirion(inputs)
+    # No source path here: plots are written relative to the case name,
+    # i.e. into ./plots_outputs in the current working directory.
+    _maybe_build_plots!(plots, inputs.database_path, inputs.model_type, out)
+    return out
 end
