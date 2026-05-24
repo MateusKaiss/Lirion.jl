@@ -259,6 +259,15 @@ For a detailed explanation of the update rules and their theoretical motivation,
 
 ---
 
+## Scientific Outputs & Deliverables
+
+This software is part of an ongoing research program. The following works have been produced as part of this project's development:
+
+1. **[White Paper]** - *Lirion.jl: A Distributed Framework for Power Systems* (In Preparation).
+2. *On the Impact of Network Sectioning and Coupling Variable Choices in ADMM-Based Distributed Optimal Power Flow* (In Preparation).
+3. **BSc Thesis** - *Desenvolvimento de Ferramenta para Determinação do Fluxo de Potência Ótimo em Redes Elétricas*, Mateus Kaiss, UFPR (2025). [Link to University Repository/PDF]
+4. **Official Documentation** — Coming soon.
+
 ## Acknowledgments
 
 Lirion.jl is the result of a collective research effort under the coordination of the Federal University of Parana. The project was conceptualized by Mateus Kaiss and Daniel Gebbran, evolving towards a comprehensive open-source framework. The key collaborators of this work are:
@@ -270,15 +279,6 @@ Lirion.jl is the result of a collective research effort under the coordination o
 - **Prof. Dr. Kristie Kaminski Küster**: Academic Advisor. Provides critical guidance in power systems engineering, reviews the project's logic and implementation, and coordinates the research group's scientific strategy.
 
 - **Andressa Mathias Pedroso**: Lead Web Developer. Responsible for the design and development of the official Lirion platform and online presence.
-
-## Scientific Outputs & Deliverables
-
-This software is part of an ongoing research program. The following works have been produced as part of this project's development:
-
-1. **[White Paper]** - *Lirion.jl: A Distributed Framework for Power Systems* (In Preparation).
-2. *On the Impact of Network Sectioning and Coupling Variable Choices in ADMM-Based Distributed Optimal Power Flow* (In Preparation).
-3. **BSc Thesis** - *Desenvolvimento de Ferramenta para Determinação do Fluxo de Potência Ótimo em Redes Elétricas*, Mateus Kaiss, UFPR (2025). [Link to University Repository/PDF]
-4. **Official Documentation** — Coming soon.
 
 ## Julia community
 
