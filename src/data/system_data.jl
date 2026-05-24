@@ -34,11 +34,7 @@ struct DistributedSystem
 
     full_shared_bus_ids::Vector{Int}
     interzonal_branches::Vector{Int}
-    # DummyBus branch pairs: (branch_a_global, zone_a_pos, branch_b_global, zone_b_pos).
-    # Empty for TieLine/SplitBus; populated for DummyBus.
     branch_pairs::Vector{NTuple{4, Int}}
-    # SplitBus bus pairs: (bus_id, zone_a_pos, zone_b_pos).
-    # Empty for TieLine/DummyBus; populated for SplitBus.
     bus_pairs::Vector{NTuple{3, Int}}
 end
 

@@ -35,7 +35,7 @@ function get_objective_parameters(
         ts = gencost_timeseries
         @inbounds for i in eachindex(ts.time)
             t = ts.time[i]
-            g = ts.gen_id[i]                 # 1-based global gen index
+            g = ts.gen_id[i]
             (t < 1 || t > T_eff) && continue
             (g < 1 || g > ng) && continue
             generator_costs[t][g] = ts.cost_coefficients[i]

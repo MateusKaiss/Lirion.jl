@@ -30,7 +30,6 @@ struct BranchData
     g::Vector{Float64}
     b::Vector{Float64}
 
-    # Pi-model shunts per side (standard matpower: g_fr = g_to = 0, b_fr = b_to = b_sh/2)
     g_fr::Vector{Float64}
     b_fr::Vector{Float64}
     g_to::Vector{Float64}
@@ -109,7 +108,6 @@ function get_branch_parameters(case_raw::CaseRaw)
         status[i] == 1 && push!(active, i)
     end
 
-    # Pi-model shunts: standard matpower has g_fr = g_to = 0, b_fr = b_to = b_sh/2.
     b_sh = branch_raw.br_b
     g_fr = zeros(Float64, n)
     b_fr = b_sh ./ 2

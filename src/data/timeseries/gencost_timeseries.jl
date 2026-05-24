@@ -1,3 +1,7 @@
+# ============================================================
+# Generator cost time-series data
+# ============================================================
+
 struct GencostTimeseriesData
     has_timeseries::Bool
     time::Vector{Int}

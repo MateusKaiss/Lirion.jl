@@ -172,12 +172,6 @@ struct GencostTimeseriesRaw{T <: Real} <: AbstractRawTable
     feed_in_tariff::Vector{T}
 end
 
-# Per-period generator envelope. `pmax` is the time-varying upper bound
-# on `p_generation[g,t]`; for curtailable gens (plant_type == "R") it
-# defines the dispatchable availability. The optional `pmin`, `qmax`,
-# `qmin` fields override the corresponding static bounds when they are
-# tighter (smaller upper bound or larger lower bound) than the nameplate.
-# Missing entries carry NaN and fall back to the static `gen.*` field.
 struct GenTimeseriesRaw{T <: Real} <: AbstractRawTable
     time::Vector{Int}
     gen_id::Vector{Int}
@@ -270,13 +264,7 @@ mutable struct DistributedRawMeta
     branch_idx_full_to_zone::Vector{Int}
     zone_shared_bus_ids::Vector{Int}
     full_shared_bus_ids::Vector{Int}
-    # Branch pairs produced by DummyBus sectioning: each tuple
-    # (branch_a_global, zone_a_pos, branch_b_global, zone_b_pos).
-    # Empty for TieLine and SplitBus.
     branch_pairs::Vector{NTuple{4, Int}}
-    # Bus pairs produced by SplitBus sectioning (Method 3): each tuple
-    # (bus_id, zone_a_pos, zone_b_pos), where zone_a owns the physical
-    # content and zone_b holds the ghost copy. Empty for TieLine/DummyBus.
     bus_pairs::Vector{NTuple{3, Int}}
 
     function DistributedRawMeta()
@@ -296,7 +284,6 @@ end
 # ============================================================
 
 mutable struct CaseRaw
-    # core meta
     name::String
     source_type::String
     source_version::String
@@ -308,18 +295,15 @@ mutable struct CaseRaw
     branch::BranchRaw{Float64}
     gencost::GencostRaw{Float64}
 
-    # optional tables
     dcline::Union{Nothing, DCLineRaw{Float64}}
     bus_name::Union{Nothing, BusNameRaw}
     storage::Union{Nothing, StorageRaw{Float64}}
     switch::Union{Nothing, SwitchRaw{Float64}}
 
-    # timeseries
     bus_timeseries::Union{Nothing, BusTimeseriesRaw{Float64}}
     gencost_timeseries::Union{Nothing, GencostTimeseriesRaw{Float64}}
     gen_timeseries::Union{Nothing, GenTimeseriesRaw{Float64}}
 
-    # maps/meta
     maps::CaseIndexMaps
     dist::DistributedRawMeta
 

@@ -1,12 +1,5 @@
 # ============================================================
 # Storage data
-#
-# Internal representation of the `mpc.storage` table. The name "storage"
-# matches both the matpower input convention and the more general
-# physical model (batteries, pumped hydro, flywheels, …). The
-# parametrisation here assumes a battery-like charge/discharge unit with
-# efficiencies and ramp limits, but the struct is not restricted to
-# electrochemical storage.
 # ============================================================
 
 struct StorageData

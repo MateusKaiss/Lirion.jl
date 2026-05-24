@@ -24,9 +24,6 @@ struct GenData
 
     curtailable::Vector{Int}
 
-    # Time-varying envelope for each generator (size n × T). Default to
-    # the static nameplate (pmax, pmin, qmax, qmin) replicated across
-    # periods; overridden where `gen_timeseries` provides finite entries.
     pmax_ts::Matrix{Float64}
     pmin_ts::Matrix{Float64}
     qmax_ts::Matrix{Float64}
