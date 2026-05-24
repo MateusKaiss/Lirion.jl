@@ -233,6 +233,17 @@ the **Performance & Threading** page in the documentation.
 
 ---
 
+## Mathematical Foundations Website
+
+Lirion is accompanied by a dedicated technical \& instructive website, providing learning resources for any person who might be interested in expanding their knowledge in such topics.
+
+The website contains deeper mathematical material underlying Lirion’s design, including:
+
+- OPF formulations (DC, AC, ACR, IVR, LPAC, SOCWR, SOCBF, BFA, NFA)
+- ADMM and ALADIN derivations and penalty update rules
+- Coupling-variable design theory
+- Structural and decomposition analysis
+
 ## Documentation
 
 The full documentation is available online and includes:
@@ -252,7 +263,7 @@ For a detailed explanation of the update rules and their theoretical motivation,
 
 Lirion.jl is the result of a collective research effort under the coordination of the Federal University of Parana. The project was conceptualized by Mateus Kaiss and Daniel Gebbran, evolving towards a comprehensive open-source framework. The key collaborators of this work are:
 
-- **Mateus Kaiss**: Researcher and Lead Developer. Responsible for R\&D, and implementation, maintenance, and technical architecture of the project.
+- **Mateus Kaiss**: Researcher and Lead Developer. Responsible for R\&D, implementation, maintenance, and technical architecture of the project.
 
 - **Daniel Gebbran, PhD**: Research Lead. Established the scientific workflow \& logic, and provides continuous high-level technical direction, including system architecture design, collaborative debugging, and feature implementation oversight. 
 
@@ -285,27 +296,8 @@ Lirion does not aim to replicate PowerModels, but rather to explore complementar
 https://github.com/lanl-ansi/PowerModels.jl
 
 
-## Mathematical Foundations Website
-
-Lirion is accompanied by a dedicated technical \& instructive website, providing learning resources for any person who might be interested in expanding their knowledge in such topics.
-
-The website contains deeper mathematical material underlying Lirion’s design, including:
-
-- OPF formulations (DC, AC, ACR, IVR, LPAC, SOCWR, SOCBF, BFA, NFA)
-- ADMM and ALADIN derivations and penalty update rules
-- Coupling-variable design theory
-- Structural and decomposition analysis
-
-
 ## License
 
 Lirion.jl is released under the MIT License.
 
 See the [LICENSE](LICENSE) file for details.
-
-
-## To-dos:
-
-- [ ] Add InfrastructureModels licensing attribution
-- [ ] Further expand examples on README
-- [ ] Test on additional benchmark cases
