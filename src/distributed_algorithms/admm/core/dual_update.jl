@@ -601,8 +601,8 @@ end
 # ------------------------------------------------------------
 
 function dual_update!(ws::SOCWRHybridWorkspace{DummyBus})
-    rho_p = ws.vars.p_flow.rho[]
-    rho_q = ws.vars.q_flow.rho[]
+    rho_p = ws.vars.p_dummy.rho[]
+    rho_q = ws.vars.q_dummy.rho[]
 
     _update_bus_duals_single!(
         ws.vars.v2.duals,
@@ -612,17 +612,17 @@ function dual_update!(ws::SOCWRHybridWorkspace{DummyBus})
         snapshot_v2_shared!,
     )
     _update_branch_pairs_duals_single!(
-        ws.vars.p_flow.duals,
+        ws.vars.p_dummy.duals,
         ws.partitions,
-        ws.vars.p_flow.consensus,
+        ws.vars.p_dummy.consensus,
         rho_p,
         ws.branch_pairs,
         _socwr_p_value,
     )
     _update_branch_pairs_duals_single!(
-        ws.vars.q_flow.duals,
+        ws.vars.q_dummy.duals,
         ws.partitions,
-        ws.vars.q_flow.consensus,
+        ws.vars.q_dummy.consensus,
         rho_q,
         ws.branch_pairs,
         _socwr_q_value,
