@@ -235,7 +235,7 @@ the **Performance & Threading** page in the documentation.
 
 ## Mathematical Foundations Website
 
-Lirion is accompanied by a dedicated technical \& instructive website, providing learning resources for any person who might be interested in expanding their knowledge in such topics.
+Lirion is accompanied by a dedicated technical & instructive website, created by Andressa Mathias Pedroso and Mateus Kaiss, providing learning resources for anyone interested in expanding their knowledge of these topics.
 
 The website contains deeper mathematical material underlying Lirion’s design, including:
 
