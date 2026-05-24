@@ -10,9 +10,6 @@ function create_partition(::CaseRaw; kwargs...)
     return _metis_not_loaded_error()
 end
 
-# SplitBus-compatible partition: guarantees that every boundary bus has tie-lines
-# to at most ONE neighbor zone, which is the requirement for `Lirion.SplitBus()`
-# sectioning (Method 3 — Harris et al. 2022, Fig. 1c).
 function create_partition_split_bus(::AbstractString; kwargs...)
     return _metis_not_loaded_error()
 end
