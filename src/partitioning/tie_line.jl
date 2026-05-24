@@ -1,10 +1,5 @@
 # ============================================================
 # Sectioning dispatch: Tie Line
-# ------------------------------------------------------------------------------
-# Builds the per-zone `CaseRaw` subproblems for tie-line decomposition. All
-# membership tests use dense `Vector{Bool}` scratch buffers indexed by bus id
-# (allocated once, reused across zones via `fill!`). Returns parallel arrays
-# `(zone_ids, parts)` already sorted by `zone_id`.
 # ============================================================
 
 function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
@@ -22,11 +17,8 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
     n_zones = length(zone_ids)
     parts = Vector{CaseRaw}(undef, n_zones)
 
-    # Scratch membership buffers (reused across zones via `fill!`).
     zone_internal_membership = zeros(Bool, max_bus_id)
     zone_subprob_membership = zeros(Bool, max_bus_id)
-
-    # Count how many zones each bus belongs to (for shared-bus identification).
     bus_zone_count = zeros(Int, max_bus_id)
 
     @inbounds for (i, zone_id) in enumerate(zone_ids)
@@ -90,8 +82,6 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
 
         add_case_index_maps!(zone_case)
 
-        # Tally which buses are in this zone's subproblem (internal + virtual).
-        # Used after the loop to identify shared buses (count > 1).
         for b in zone_case.bus.bus_i
             bus_zone_count[b] += 1
         end
@@ -99,8 +89,6 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
         parts[i] = zone_case
     end
 
-    # Shared buses are those that appear in ≥ 2 zones (internal in one, virtual
-    # in one or more others). Iterating 1..max_bus_id yields sorted output.
     full_shared_bus_ids = Int[]
     @inbounds for b in 1:max_bus_id
         bus_zone_count[b] > 1 && push!(full_shared_bus_ids, b)

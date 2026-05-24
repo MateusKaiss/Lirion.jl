@@ -1,15 +1,9 @@
 # ============================================================
-# Interzonal branches (tie lines) finder
+# TieLine — interzonal branch finder
 # ============================================================
 
-# DummyBus sectioning does not have classical tie-lines (each split half is
-# internal to one zone, the dummy bus is shared). Branch pairs are carried
-# separately via `DistributedRawMeta.branch_pairs`.
 _find_interzonal_branches(::CaseRaw, ::DummyBus) = Int[]
 
-# SplitBus sectioning has no interzonal branches either: every original
-# tie-line becomes internal to the zone that owns its `to` endpoint.
-# Bus pairs are carried via `DistributedRawMeta.bus_pairs`.
 _find_interzonal_branches(::CaseRaw, ::SplitBus) = Int[]
 
 function _find_interzonal_branches(full::CaseRaw, ::TieLine)
@@ -21,8 +15,6 @@ function _find_interzonal_branches(full::CaseRaw, ::TieLine)
 
     n_bus = length(full_bus_ids)
     max_bus_id = n_bus == 0 ? 0 : maximum(full_bus_ids)
-
-    # Dense map: bus_id -> zone id (0 if absent).
     bus_to_zone = zeros(Int, max_bus_id)
     @inbounds for i in 1:n_bus
         bus_to_zone[full_bus_ids[i]] = full_bus_zones[i]
@@ -50,16 +42,14 @@ function _find_interzonal_branches(full::CaseRaw, ::TieLine)
     return interzonal_branches
 end
 
-# ------------------------------------------------------------------------------
-# Generic helpers
-# ------------------------------------------------------------------------------
+# ============================================================
+# Generic helpers (shared across sectionings)
+# ============================================================
 
 @inline function branch_in_service_mask(branch::BranchRaw{Float64})
     return branch.br_status .== 1
 end
 
-# Mark `zone_internal_membership[bus_id] = true` for all internal buses of
-# `zone_id`. Assumes the caller `fill!(membership, false)` before calling.
 @inline function _mark_internal_membership!(
     zone_internal_membership::Vector{Bool},
     full_bus_ids::AbstractVector{<:Integer},
@@ -73,8 +63,6 @@ end
     return nothing
 end
 
-# Extend `zone_subprob_membership` (which starts as a copy of the internal
-# membership) with external neighbors connected via any in-service branch.
 @inline function _collect_external_neighbor_buses!(
     zone_subprob_membership::Vector{Bool},
     zone_internal_membership::Vector{Bool},
@@ -100,8 +88,6 @@ end
     return nothing
 end
 
-# Collect global bus indices (positions in `full_bus_ids`) whose id is marked
-# in `membership`. Output is naturally in ascending position order.
 @inline function _collect_member_positions(
     full_bus_ids::AbstractVector{<:Integer},
     membership::Vector{Bool},
@@ -321,9 +307,6 @@ end
 
     if full.gencost_timeseries !== nothing
         ts = full.gencost_timeseries
-
-        # Remap global gen ids to zone-local gen ids (1..length(zone_gen_idx)).
-        # `zone_gen_idx[k]` is the GLOBAL gen id of local gen `k`.
         n_global_gen = length(full.gen.gen_bus)
         global_to_local_gen = zeros(Int, n_global_gen)
         @inbounds for (local_k, global_k) in enumerate(zone_gen_idx)
@@ -388,5 +371,71 @@ end
         )
     end
 
+    return nothing
+end
+
+# ============================================================
+# DummyBus — branch + dummy generator push helpers
+# ============================================================
+
+function _push_branch!(br, f, t, r, x, b_sh, ra, rb, rc, tap, shift, amin, amax)
+    push!(br.f_bus, f)
+    push!(br.t_bus, t)
+    push!(br.br_r, r)
+    push!(br.br_x, x)
+    push!(br.br_b, b_sh)
+    push!(br.rate_a, ra)
+    push!(br.rate_b, rb)
+    push!(br.rate_c, rc)
+    push!(br.tap, tap)
+    push!(br.shift, shift)
+    push!(br.br_status, 1)
+    push!(br.angmin, amin)
+    push!(br.angmax, amax)
+    push!(br.pf, 0.0)
+    push!(br.qf, 0.0)
+    push!(br.pt, 0.0)
+    push!(br.qt, 0.0)
+    push!(br.mu_sf, 0.0)
+    push!(br.mu_st, 0.0)
+    push!(br.mu_angmin, 0.0)
+    push!(br.mu_angmax, 0.0)
+    return nothing
+end
+
+function _push_dummy_gen!(gen, gc, bus_id::Int, baseMVA::Float64)
+    push!(gen.gen_bus, bus_id)
+    push!(gen.pg, 0.0)
+    push!(gen.qg, 0.0)
+    push!(gen.qmax, 1e4)
+    push!(gen.qmin, -1e4)
+    push!(gen.vg, 1.0)
+    push!(gen.mbase, baseMVA)
+    push!(gen.gen_status, 1)
+    push!(gen.pmax, 1e4)
+    push!(gen.pmin, -1e4)
+    push!(gen.pc1, 0.0)
+    push!(gen.pc2, 0.0)
+    push!(gen.qc1min, 0.0)
+    push!(gen.qc1max, 0.0)
+    push!(gen.qc2min, 0.0)
+    push!(gen.qc2max, 0.0)
+    push!(gen.ramp_agc, 0.0)
+    push!(gen.ramp_10, 0.0)
+    push!(gen.ramp_30, 0.0)
+    push!(gen.ramp_q, 0.0)
+    push!(gen.apf, 0.0)
+    push!(gen.mu_pmax, 0.0)
+    push!(gen.mu_pmin, 0.0)
+    push!(gen.mu_qmax, 0.0)
+    push!(gen.mu_qmin, 0.0)
+    push!(gen.plant_type, "artificial")
+    push!(gen.curtailment_cost, 0.0)
+
+    push!(gc.model, 2)
+    push!(gc.startup, 0.0)
+    push!(gc.shutdown, 0.0)
+    push!(gc.ncost, 2)
+    push!(gc.cost_coefficients, [0.0, 0.0])
     return nothing
 end

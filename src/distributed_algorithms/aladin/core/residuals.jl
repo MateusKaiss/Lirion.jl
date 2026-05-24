@@ -68,7 +68,8 @@ end
 # ============================================================
 
 @inline function _r_pri_bus_dc(ws)
-    sq = 0.0; mx = 0.0
+    sq = 0.0
+    mx = 0.0
     @inbounds for pair in ws.bus_pairs
         d = abs(ws.zones[pair.zone_i].y[pair.col_i] -
                 ws.zones[pair.zone_j].y[pair.col_j])
@@ -79,7 +80,8 @@ end
 end
 
 @inline function _r_pri_edge_dc(ws)
-    sq = 0.0; mx = 0.0
+    sq = 0.0
+    mx = 0.0
     @inbounds for pair in ws.interzonal_line_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
@@ -95,7 +97,8 @@ end
 end
 
 @inline function _r_pri_dummy_dc(ws)
-    sq = 0.0; mx = 0.0
+    sq = 0.0
+    mx = 0.0
     @inbounds for pair in ws.dummy_line_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
@@ -109,10 +112,13 @@ end
 end
 
 @inline function _r_pri_split_dc(ws)
-    sq = 0.0; mx = 0.0
+    sq = 0.0
+    mx = 0.0
     @inbounds for pair in ws.split_bus_pairs
-        d = abs(ws.zones[pair.zone_i].y[pair.p_inj_col_i] +
-                ws.zones[pair.zone_j].y[pair.p_inj_col_j])
+        d = abs(
+            ws.zones[pair.zone_i].y[pair.p_inj_col_i] +
+            ws.zones[pair.zone_j].y[pair.p_inj_col_j],
+        )
         sq += d * d
         mx = max(mx, d)
     end
@@ -183,7 +189,8 @@ end
 # ============================================================
 
 @inline function _r_pri_bus_ac(ws)
-    sq = 0.0; mx = 0.0
+    sq = 0.0
+    mx = 0.0
     @inbounds for pair in ws.bus_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
@@ -196,7 +203,8 @@ end
 end
 
 @inline function _r_pri_edge_pq_ac(ws)
-    sq = 0.0; mx = 0.0
+    sq = 0.0
+    mx = 0.0
     @inbounds for pair in ws.interzonal_line_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
@@ -209,7 +217,8 @@ end
 end
 
 @inline function _r_pri_split_ac(ws)
-    sq = 0.0; mx = 0.0
+    sq = 0.0
+    mx = 0.0
     @inbounds for pair in ws.split_bus_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
@@ -278,7 +287,8 @@ end
 end
 
 @inline function _r_pri_dummy_pq_ac(ws)
-    sq = 0.0; mx = 0.0
+    sq = 0.0
+    mx = 0.0
     @inbounds for pair in ws.dummy_line_pairs
         yi = ws.zones[pair.zone_i].y
         yj = ws.zones[pair.zone_j].y
@@ -349,10 +359,13 @@ end
 # ============================================================
 
 @inline function _r_pri_bus_socwr(ws)
-    sq = 0.0; mx = 0.0
+    sq = 0.0
+    mx = 0.0
     @inbounds for pair in ws.bus_pairs
-        d = abs(ws.zones[pair.zone_i].y[pair.v2_col_i] -
-                ws.zones[pair.zone_j].y[pair.v2_col_j])
+        d = abs(
+            ws.zones[pair.zone_i].y[pair.v2_col_i] -
+            ws.zones[pair.zone_j].y[pair.v2_col_j],
+        )
         sq += d * d
         mx = max(mx, d)
     end
@@ -360,14 +373,19 @@ end
 end
 
 @inline function _r_pri_rt_socwr(ws)
-    sq = 0.0; mx = 0.0
+    sq = 0.0
+    mx = 0.0
     @inbounds for pair in ws.interzonal_line_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        dr = abs(zi.y[zi.edge_r_cols[pair.line_local_i]] -
-                 zj.y[zj.edge_r_cols[pair.line_local_j]])
-        dt = abs(zi.y[zi.edge_t_cols[pair.line_local_i]] -
-                 zj.y[zj.edge_t_cols[pair.line_local_j]])
+        dr = abs(
+            zi.y[zi.edge_r_cols[pair.line_local_i]] -
+            zj.y[zj.edge_r_cols[pair.line_local_j]],
+        )
+        dt = abs(
+            zi.y[zi.edge_t_cols[pair.line_local_i]] -
+            zj.y[zj.edge_t_cols[pair.line_local_j]],
+        )
         sq += dr * dr + dt * dt
         mx = max(mx, dr, dt)
     end
@@ -375,14 +393,19 @@ end
 end
 
 @inline function _r_pri_pq_socwr(ws)
-    sq = 0.0; mx = 0.0
+    sq = 0.0
+    mx = 0.0
     @inbounds for pair in ws.interzonal_line_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]
-        dpf = abs(_socwr_flow_value_at_y(zi, pair.line_local_i, :p) -
-                  _socwr_flow_value_at_y(zj, pair.line_local_j, :p))
-        dqf = abs(_socwr_flow_value_at_y(zi, pair.line_local_i, :q) -
-                  _socwr_flow_value_at_y(zj, pair.line_local_j, :q))
+        dpf = abs(
+            _socwr_flow_value_at_y(zi, pair.line_local_i, :p) -
+            _socwr_flow_value_at_y(zj, pair.line_local_j, :p),
+        )
+        dqf = abs(
+            _socwr_flow_value_at_y(zi, pair.line_local_i, :q) -
+            _socwr_flow_value_at_y(zj, pair.line_local_j, :q),
+        )
         sq += dpf * dpf + dqf * dqf
         mx = max(mx, dpf, dqf)
     end
@@ -390,7 +413,8 @@ end
 end
 
 @inline function _r_pri_split_socwr(ws)
-    sq = 0.0; mx = 0.0
+    sq = 0.0
+    mx = 0.0
     @inbounds for pair in ws.split_bus_pairs
         zi = ws.zones[pair.zone_i]
         zj = ws.zones[pair.zone_j]

@@ -105,10 +105,12 @@ function _socwr_merit(ws::SOCWRStateWorkspaceALADIN, alpha::Float64)
         rj_col = zj.edge_r_cols[pair.line_local_j]
         ti_col = zi.edge_t_cols[pair.line_local_i]
         tj_col = zj.edge_t_cols[pair.line_local_j]
-        dr = (zi.y[ri_col] + alpha * zi.delta[ri_col]) -
-             (zj.y[rj_col] + alpha * zj.delta[rj_col])
-        dt = (zi.y[ti_col] + alpha * zi.delta[ti_col]) -
-             (zj.y[tj_col] + alpha * zj.delta[tj_col])
+        dr =
+            (zi.y[ri_col] + alpha * zi.delta[ri_col]) -
+            (zj.y[rj_col] + alpha * zj.delta[rj_col])
+        dt =
+            (zi.y[ti_col] + alpha * zi.delta[ti_col]) -
+            (zj.y[tj_col] + alpha * zj.delta[tj_col])
         r_sq += dr * dr + dt * dt
         lambda_r += ws.vars.r.lambda[k] * dr + ws.vars.t.lambda[k] * dt
     end
@@ -174,10 +176,12 @@ function _socwr_merit(ws::SOCWRHybridWorkspaceALADIN, alpha::Float64)
         rj_col = zj.edge_r_cols[pair.line_local_j]
         ti_col = zi.edge_t_cols[pair.line_local_i]
         tj_col = zj.edge_t_cols[pair.line_local_j]
-        dr = (zi.y[ri_col] + alpha * zi.delta[ri_col]) -
-             (zj.y[rj_col] + alpha * zj.delta[rj_col])
-        dt = (zi.y[ti_col] + alpha * zi.delta[ti_col]) -
-             (zj.y[tj_col] + alpha * zj.delta[tj_col])
+        dr =
+            (zi.y[ri_col] + alpha * zi.delta[ri_col]) -
+            (zj.y[rj_col] + alpha * zj.delta[rj_col])
+        dt =
+            (zi.y[ti_col] + alpha * zi.delta[ti_col]) -
+            (zj.y[tj_col] + alpha * zj.delta[tj_col])
 
         pi_val = _socwr_flow_at_trial(zi, pair.line_local_i, alpha, :p)
         pj_val = _socwr_flow_at_trial(zj, pair.line_local_j, alpha, :p)
