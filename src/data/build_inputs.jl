@@ -41,12 +41,10 @@ end
 @inline _load(path::AbstractString, csv::CsvFolder)::CaseRaw =
     _parse_case(String(path), csv)
 
-function load_input_data(path::AbstractString)::CaseRaw
+function load_inputs(path::AbstractString)::CaseRaw
     params = abspath(String(path))
     return _load(params, detect_input(params))
 end
-
-const load = load_input_data
 
 # ============================================================
 # Inputs builder
@@ -64,7 +62,7 @@ function _build_inputs(
     outputs::Bool,
 )::AbstractLirionInputs
     return _build_inputs(
-        load_input_data(path), algorithm;
+        load_inputs(path), algorithm;
         model, optimizer, outputs, label = path,
     )
 end
@@ -90,9 +88,21 @@ end
 # ------------------------------------------------------------
 
 _make_config(algorithm::ADMMAlgorithm, model::Type{<:OPFModel}) =
-    ADMMConfig(model, algorithm.coupling, algorithm.sectioning, algorithm.max_iter; algorithm.kwargs...)
+    ADMMConfig(
+        model,
+        algorithm.coupling,
+        algorithm.sectioning,
+        algorithm.max_iter;
+        algorithm.kwargs...,
+    )
 _make_config(algorithm::ALADINAlgorithm, model::Type{<:OPFModel}) =
-    ALADINConfig(model, algorithm.coupling, algorithm.sectioning, algorithm.max_iter; algorithm.kwargs...)
+    ALADINConfig(
+        model,
+        algorithm.coupling,
+        algorithm.sectioning,
+        algorithm.max_iter;
+        algorithm.kwargs...,
+    )
 
 function _build_inputs(
     raw_case::CaseRaw,

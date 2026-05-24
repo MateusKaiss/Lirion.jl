@@ -6,10 +6,11 @@ using OSQP
 using Clarabel
 using JuMP: optimizer_with_attributes
 
-# PowerModels is only needed for the opt-in gold test that re-solves
-# against PM directly (env var LIRION_TEST_VS_PM=1) and by the fixture
-# regeneration script (test/scripts/regen_fixtures.jl). The default fast
-# suite uses frozen fixtures in test/fixtures/ and does not import PM.
+# PowerModels is a test-only dependency (declared in [extras] / [targets], so
+# `Pkg.test()` provides it). It is used by the multi-period tests (which
+# cross-validate against PM's multi-network OPF), by the opt-in gold test
+# (env var LIRION_TEST_VS_PM=1), and by the fixture regeneration script. The
+# centralized fixture suite itself is frozen and PM-free.
 const LIRION_TEST_VS_PM = get(ENV, "LIRION_TEST_VS_PM", "0") == "1"
 if LIRION_TEST_VS_PM
     using PowerModels

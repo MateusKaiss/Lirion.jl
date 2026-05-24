@@ -69,9 +69,6 @@ end
 # ============================================================
 
 function _metis_partition(g::SimpleWeightedGraph, k::Int)
-    # Metis.jl requires integer edge weights, so rebuild the graph with
-    # rounded / clamped integer weights (preserving topology and relative
-    # magnitudes via the same scaling used by `_to_metis_weights`).
     n = Graphs.nv(g)
     g_int = SimpleWeightedGraph(n)
     for e in edges(g)
@@ -81,7 +78,7 @@ function _metis_partition(g::SimpleWeightedGraph, k::Int)
     end
     mg = Metis.graph(g_int; weights = true)
     parts = Metis.partition(mg, k; alg = :KWAY)
-    return Int.(parts)   # Metis returns Int32; downstream helpers assume Int
+    return Int.(parts)
 end
 
 # ============================================================
@@ -408,7 +405,7 @@ function Lirion.create_partition(
     max_refine_passes::Int = 50,
     seed::Int = 42,
 )
-    case = Lirion.load_input_data(path)
+    case = Lirion.load_inputs(path)
     _do_partition!(case; k, refine, max_refine_passes, seed)
 
     k_actual = maximum(case.bus.zone)
@@ -425,13 +422,9 @@ function Lirion.create_partition(
 end
 
 # ============================================================
-# SplitBus-compatible partition (Method 3 bilateral constraint)
-# ------------------------------------------------------------
-# Guarantees: every bus has neighbors in AT MOST ONE foreign zone. Equivalently,
-# no bus sits at the boundary of 3+ zones. Required by `Lirion.SplitBus()`.
+# SplitBus-compatible partition (bilateral constraint)
 # ============================================================
 
-# Count how many buses violate the bilateral constraint (≥ 2 foreign zones).
 function _count_split_bus_violations(zone::Vector{Int}, adj::Vector{Vector{Int}})
     violations = 0
     for i in eachindex(zone)
@@ -447,8 +440,6 @@ function _count_split_bus_violations(zone::Vector{Int}, adj::Vector{Vector{Int}}
     return violations
 end
 
-# Iteratively move violating buses to their dominant foreign zone until no
-# violations remain (or max_passes exhausted).
 function _enforce_split_bus_compatible!(
     case::Lirion.CaseRaw,
     zone::Vector{Int},
@@ -471,7 +462,6 @@ function _enforce_split_bus_compatible!(
             end
             length(foreign_set) >= 2 || continue
 
-            # Pick dominant foreign zone (most neighbors of i located there).
             empty!(zone_count)
             for v in adj[i]
                 zv = zone[v]
@@ -487,7 +477,6 @@ function _enforce_split_bus_compatible!(
             end
             best_zone == z && continue
 
-            # Safety: do not orphan a zone's generator and do not disconnect it.
             _zone_connected_after_remove(zone, adj, i, z) || continue
             _has_gen_after_remove(case, zone, id_to_idx, i, z) || continue
 
@@ -497,7 +486,6 @@ function _enforce_split_bus_compatible!(
         changed || break
     end
 
-    # Final validation: raise an explicit error if any violation remains.
     for i in 1:n
         empty!(foreign_set)
         z = zone[i]
@@ -548,7 +536,6 @@ function _do_partition_split_bus!(
         _remap_zones!(zone)
     end
 
-    # SplitBus-specific repair: moves buses until bilateral constraint holds.
     _enforce_split_bus_compatible!(
         case, zone, adj, id_to_idx;
         max_passes = max_repair_passes,
@@ -556,7 +543,6 @@ function _do_partition_split_bus!(
     _fix_connectivity!(zone, adj)
     _remap_zones!(zone)
 
-    # Write zones back to the bus table.
     for i in eachindex(case.bus.bus_i)
         idx = id_to_idx[case.bus.bus_i[i]]
         case.bus.zone[i] = zone[idx]
@@ -597,7 +583,7 @@ function Lirion.create_partition_split_bus(
     max_repair_passes::Int = 100,
     seed::Int = 42,
 )
-    case = Lirion.load_input_data(path)
+    case = Lirion.load_inputs(path)
     _do_partition_split_bus!(
         case;
         k = k,

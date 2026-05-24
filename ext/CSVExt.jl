@@ -252,7 +252,6 @@ function _gencost_from_df(df::DataFrame)
     ncost    = _icol(df, "ncost",    0)
     coeffs   = Vector{Vector{Float64}}(undef, n)
 
-    # Preload coefficient columns once (O(ncols_max)); each is Union{Vector,Nothing}.
     max_k = isempty(ncost) ? 0 : maximum(ncost)
     props = propertynames(df)
     coef_cols = Vector{Union{Vector{Float64}, Nothing}}(undef, max_k)
@@ -425,7 +424,6 @@ end
 function Lirion.to_csvs(result::Lirion.LirionResult, outdir::AbstractString)
     mkpath(outdir)
 
-    # Summary — one-row table.
     summary_df = DataFrame(
         algorithm = [String(result.algorithm)],
         base_model = [String(result.base_model)],
@@ -438,12 +436,10 @@ function Lirion.to_csvs(result::Lirion.LirionResult, outdir::AbstractString)
     )
     CSV.write(joinpath(outdir, "summary.csv"), summary_df)
 
-    # Merged tables.
     nrow(result.bus) > 0 && CSV.write(joinpath(outdir, "bus.csv"), result.bus)
     nrow(result.gen) > 0 && CSV.write(joinpath(outdir, "gen.csv"), result.gen)
     nrow(result.branch) > 0 && CSV.write(joinpath(outdir, "branch.csv"), result.branch)
 
-    # Distributed extras.
     if result.consensus !== nothing && nrow(result.consensus) > 0
         CSV.write(joinpath(outdir, "consensus.csv"), result.consensus)
     end
@@ -460,4 +456,4 @@ function Lirion.to_csvs(result::Lirion.LirionResult, outdir::AbstractString)
     return outdir
 end
 
-end # module
+end 

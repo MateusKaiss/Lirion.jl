@@ -7,9 +7,6 @@ using PlotlyLight
 # Primitives
 # ============================================================
 
-# Plotly log axes choke on values ≤ 0 (NaN/Inf in log domain). Substitute
-# a small positive sentinel so the trace stays visible without breaking
-# the axis scale.
 @inline _log_safe(v::Real) = (isfinite(v) && v > 0.0) ? Float64(v) : 1e-16
 @inline _log_safe(xs::AbstractVector) = Float64[_log_safe(x) for x in xs]
 
@@ -160,4 +157,4 @@ function Lirion.build_plots(
     return nothing
 end
 
-end # module
+end

@@ -1,5 +1,5 @@
 # ============================================================
-# Sectioning dispatch: Dummy Bus (Method 2 — Harris et al. 2022, Fig. 1b)
+# Sectioning dispatch: Dummy Bus
 # ============================================================
 
 function prepare_distributed_partitions(full::CaseRaw, ::DummyBus)
