@@ -20,21 +20,20 @@ function _refresh_hess_diag!(
 )
     copyto!(zone.hess_diag, zone.base_hess_diag)
 
-    if rho > 0.0
-        add_rho_sigma! = (col_set, sigma) -> begin
-            s = rho * sigma
-            s > 0.0 || return
-            @inbounds for c in col_set
-                zone.hess_diag[c] += s
-            end
-        end
-        add_rho_sigma!(zone.theta_cols, sigma_theta)
-        add_rho_sigma!(zone.v2_cols, sigma_v2)
-        add_rho_sigma!(zone.r_cols, sigma_r)
-        add_rho_sigma!(zone.t_cols, sigma_t)
-        add_rho_sigma!(zone.pg_cols, sigma_pg)
-        add_rho_sigma!(zone.qg_cols, sigma_qg)
-        add_rho_sigma!(zone.curt_cols, sigma_other)
+    hd = zone.hess_diag
+    _accumulate_prox_diagonal!(
+        rho,
+        (
+            (zone.theta_cols, sigma_theta),
+            (zone.v2_cols, sigma_v2),
+            (zone.r_cols, sigma_r),
+            (zone.t_cols, sigma_t),
+            (zone.pg_cols, sigma_pg),
+            (zone.qg_cols, sigma_qg),
+            (zone.curt_cols, sigma_other),
+        ),
+    ) do c, s
+        return hd[c] += s
     end
 
     @inbounds for c in 1:zone.n_vars

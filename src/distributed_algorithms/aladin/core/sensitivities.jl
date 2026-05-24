@@ -52,3 +52,23 @@ function detect_active_bounds!(
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Proximal curvature ρ·σ deposited on diagonal column classes
+# ------------------------------------------------------------
+
+@inline function _accumulate_prox_diagonal!(
+    deposit!::F,
+    rho::Float64,
+    classes,
+) where {F}
+    rho > 0.0 || return nothing
+    @inbounds for (cols, sigma) in classes
+        s = rho * sigma
+        s > 0.0 || continue
+        for c in cols
+            deposit!(c, s)
+        end
+    end
+    return nothing
+end
