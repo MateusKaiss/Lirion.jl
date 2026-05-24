@@ -81,8 +81,6 @@ function solve(
         outputs = outputs,
     )
     out = run_lirion(inputs)
-    # No source path here: plots are written relative to the case name,
-    # i.e. into ./plots_outputs in the current working directory.
     _maybe_build_plots!(plots, inputs.database_path, inputs.model_type, out)
     return out
 end

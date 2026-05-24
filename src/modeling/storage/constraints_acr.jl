@@ -1,8 +1,5 @@
 # ============================================================
 # ACR storage constraints
-# -----------------------------------------------------------------------
-# Mirrors `add_ac_storage_constraints!` but uses rectangular voltage:
-#   |V_bus|² = v_real[bus]² + v_imag[bus]²
 # ============================================================
 
 function add_acr_storage_constraints!(model::JuMP.Model, stor::StorageData)

@@ -1,3 +1,7 @@
+# ============================================================
+# DC (linear DC power flow)
+# ============================================================
+
 function add_dc_branch_expressions!(model::JuMP.Model, br::BranchData)
     T = get(model.ext, :time_periods, 1)
     active = br.active

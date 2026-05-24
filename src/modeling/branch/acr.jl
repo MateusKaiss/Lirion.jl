@@ -1,3 +1,7 @@
+# ============================================================
+# ACR (rectangular vr, vi)
+# ============================================================
+
 function add_acr_branch_expressions!(model::JuMP.Model, br::BranchData)
     T = get(model.ext, :time_periods, 1)
     active = br.active

@@ -1,3 +1,7 @@
+# ============================================================
+# Active power balance
+# ============================================================
+
 function compute_active_power_balance(
     model::JuMP.Model,
     sys::SystemData,

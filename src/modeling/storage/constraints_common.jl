@@ -1,3 +1,7 @@
+# ============================================================
+# Storage constraints (shared helpers)
+# ============================================================
+
 function _storage_energy_balance!(model::JuMP.Model, stor::StorageData)
     T = get(model.ext, :time_periods, 1)
     B = stor.n

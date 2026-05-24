@@ -1,6 +1,6 @@
-# =========================
+# ============================================================
 # Utils
-# =========================
+# ============================================================
 
 @inline _select_default_optimizer(::Type{DC}) = OSQP.Optimizer
 @inline _select_default_optimizer(::Type{<:OPFModel}) = Ipopt.Optimizer
@@ -23,9 +23,9 @@
     return something(user_opt, input_opt, _select_default_optimizer(model_type))
 end
 
-# =========================
+# ============================================================
 # TIMES (CENTRALIZED)
-# =========================
+# ============================================================
 
 function get_model_times(sys::SystemData)
     time_vecs = Vector{Vector{Int}}()
@@ -42,9 +42,9 @@ function get_model_times(sys::SystemData)
     return times
 end
 
-# =========================
+# ============================================================
 # SUBPROBLEM PIPELINE
-# =========================
+# ============================================================
 
 @inline function assemble_opf!(
     model::JuMP.Model,
@@ -61,9 +61,9 @@ end
     return nothing
 end
 
-# =========================
+# ============================================================
 # BUILDER (single / multi)
-# =========================
+# ============================================================
 
 function _build_singleperiod_model(sys::SystemData, model_type::Type{<:OPFModel}, optimizer)
     model = JuMP.Model(optimizer)
@@ -101,9 +101,9 @@ function build_model(
     return _build_multiperiod_model(sys, model_type, opt, times)
 end
 
-# =========================
+# ============================================================
 # BUILDER
-# =========================
+# ============================================================
 
 function build_model(inputs::CentralizedInputs; optimizer = nothing)
     sys = inputs.system
