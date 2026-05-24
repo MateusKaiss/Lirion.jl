@@ -239,7 +239,7 @@ sectioning = :dummy_bus      # tie-lines split by dummy buses
 sectioning = :split_bus      # boundary buses cloned across zones
 ```
 
-#### Automatic partitioning (Metis)
+#### Automatic partitioning
 
 You can let Lirion assign the zones automatically with impedance-weighted **Metis**
 graph partitioning (balanced zones, connectivity-repaired). This needs the optional
