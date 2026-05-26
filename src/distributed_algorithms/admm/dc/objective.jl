@@ -295,9 +295,10 @@ function update_objective!(
         ws.vars.theta.rho[],
     )
 
-    lin_p_inj = build_linear_p_inj_term(
+    lin_p_inj = build_linear_p_inj_term_groups(
         part,
-        ws.bus_pairs,
+        ws.inj_groups,
+        ws.inj_copy_zone,
         ws.p_inj_vars,
         ws.vars.p_inj.consensus,
         view(ws.vars.p_inj.duals, :, part.position),

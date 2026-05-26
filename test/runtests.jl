@@ -82,6 +82,11 @@ include(joinpath(@__DIR__, "distributed", "test_aladin_socwr.jl"))
     run_admm_dc_dummybus_hybrid_tests(; rtol = 0.05)
     run_admm_dc_dummybus_power_tests(; rtol = 0.05)
     run_admm_dc_splitbus_hybrid_tests(; rtol = 0.01)
+    run_admm_dc_splitbus_3zone_tests(;
+        rtol = 0.02,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
 
     # Distributed AC
     run_admm_ac_state_tests(;

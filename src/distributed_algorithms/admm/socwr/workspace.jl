@@ -268,6 +268,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
             partitions, sys, optimizer_factory, sectioning, inter,
         )
     elseif sectioning isa SplitBus
+        _assert_bilateral_split(sys, "ADMM{Hybrid, SOCWR}")
         n_flow = 0
         n_dummy = 0
         n_rt = 0

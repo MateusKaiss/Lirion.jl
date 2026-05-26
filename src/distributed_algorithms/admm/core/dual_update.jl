@@ -322,12 +322,13 @@ function dual_update!(ws::DCHybridWorkspace{SplitBus})
         ws.vars.theta.rho[],
         snapshot_theta_shared!,
     )
-    _update_bus_pairs_duals_signed!(
+    _update_inj_groups_duals!(
         ws.vars.p_inj.duals,
         ws.partitions,
         ws.vars.p_inj.consensus,
         ws.vars.p_inj.rho[],
-        ws.bus_pairs,
+        ws.inj_groups,
+        ws.inj_copy_zone,
         ws.p_inj_vars,
     )
     return nothing

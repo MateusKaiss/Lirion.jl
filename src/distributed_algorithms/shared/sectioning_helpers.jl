@@ -19,6 +19,9 @@ function _attach_p_inj_variables!(
             push!(zone_split_bus_ids, fbus)
         end
     end
+    # A split bus shared by >2 zones appears in several pairs that name this
+    # zone; create exactly one injection variable per (zone, bus).
+    unique!(zone_split_bus_ids)
     isempty(zone_split_bus_ids) && return nothing
 
     bal_con = model[:active_power_balance]
@@ -56,6 +59,9 @@ function _attach_pq_inj_variables_ac!(
             push!(zone_split_bus_ids, fbus)
         end
     end
+    # A split bus shared by >2 zones appears in several pairs that name this
+    # zone; create exactly one injection variable per (zone, bus).
+    unique!(zone_split_bus_ids)
     isempty(zone_split_bus_ids) && return nothing
 
     bal_p = model[:active_power_balance]
@@ -107,6 +113,9 @@ function _attach_pq_inj_variables_socwr!(
             push!(zone_split_bus_ids, fbus)
         end
     end
+    # A split bus shared by >2 zones appears in several pairs that name this
+    # zone; create exactly one injection variable per (zone, bus).
+    unique!(zone_split_bus_ids)
     isempty(zone_split_bus_ids) && return nothing
 
     bal_p = model[:active_power_balance]

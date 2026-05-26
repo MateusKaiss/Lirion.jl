@@ -132,19 +132,9 @@ function prepare_distributed_partitions(full::CaseRaw, ::SplitBus)
         push!(get!(neighbor_zones_of, fbus, Int[]), zb)
     end
 
-    # NOTE: N-way split bus (a boundary bus shared by >2 zones) is being rolled
-    # out per model. Until every consumer reads `bus_groups`, reject >2-zone
-    # boundaries here so unmigrated models never see an unsupported topology.
-    for (fbus, zs) in neighbor_zones_of
-        if length(unique(zs)) > 1
-            error(
-                "SplitBus: bus $fbus is a split point for multiple neighbor " *
-                "zones $(unique(zs)); N-way consensus is not enabled yet. " *
-                "Use a partitioning where each boundary bus borders a single " *
-                "neighbor zone.",
-            )
-        end
-    end
+    # N-way SplitBus (a boundary bus shared by >2 zones) is allowed here. Models
+    # not yet migrated to the bus_groups consensus guard against it at
+    # workspace-build time (see `_assert_bilateral_split`).
 
     # Pairwise representation (one entry per (split bus, neighbor zone)).
     # Correct for bilateral boundaries; the not-yet-N-way models guard against

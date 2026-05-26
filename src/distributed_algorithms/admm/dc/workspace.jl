@@ -68,6 +68,11 @@ Base.@kwdef mutable struct DCHybridWorkspace{S <: Sectioning} <: AbstractADMMWor
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
         Vector{Dict{Int, JuMP.VariableRef}}()
 
+    # SplitBus N-way injection: one copy per (split bus, zone). `inj_groups[g] =
+    # (bus_id, [copy_idx...])`; `inj_copy_zone[c]` is copy c's zone position.
+    inj_groups::Vector{Tuple{Int, Vector{Int}}} = Tuple{Int, Vector{Int}}[]
+    inj_copy_zone::Vector{Int} = Int[]
+
     vars::NamedTuple{(:theta, :p_flow, :p_dummy, :p_inj),
         Tuple{VarState, VarState, VarState, VarState}}
 
@@ -197,6 +202,10 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
 
     p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
 
+    inj_groups = Tuple{Int, Vector{Int}}[]
+    inj_copy_zone = Int[]
+    n_p_inj = 0
+
     sectioning = config.sectioning
     if sectioning isa TieLine
         n_p_flow = n_inter
@@ -213,6 +222,16 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
     elseif sectioning isa SplitBus
         n_p_flow = 0
         n_p_dummy = 0
+        # Flatten N-way groups into per-(bus, zone) copies.
+        for (bid, zones) in sys.bus_groups
+            cidxs = Int[]
+            for z in zones
+                n_p_inj += 1
+                push!(cidxs, n_p_inj)
+                push!(inj_copy_zone, z)
+            end
+            push!(inj_groups, (bid, cidxs))
+        end
         init_hybrid_partition!(
             partitions, sys, optimizer_factory, sectioning, inter,
             bpairs, p_inj_vars,
@@ -226,7 +245,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
         theta = VarState(n_shared, n_zones, config.rho_theta),
         p_flow = p_flow,
         p_dummy = VarState(n_p_dummy, n_zones, p_flow.rho, p_flow.prev_rho),
-        p_inj = VarState(n_bus_pairs, n_zones, config.rho_p),
+        p_inj = VarState(n_p_inj, n_zones, config.rho_p),
     )
 
     ws = DCHybridWorkspace(;
@@ -238,6 +257,8 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
         pair_counts = fill(2, n_pairs),
         bus_pairs = bpairs,
         p_inj_vars = p_inj_vars,
+        inj_groups = inj_groups,
+        inj_copy_zone = inj_copy_zone,
         vars = vars,
         bus_counts = zeros(Int, n_shared),
         branch_counts = zeros(Int, n_inter),

@@ -180,6 +180,7 @@ include("distributed_algorithms/admm/socwr/partition.jl")
 include("distributed_algorithms/admm/socwr/objective.jl")
 
 include("distributed_algorithms/admm/core/save.jl")
+include("distributed_algorithms/admm/core/split_groups.jl")
 include("distributed_algorithms/admm/core/consensus.jl")
 include("distributed_algorithms/admm/core/dual_update.jl")
 include("distributed_algorithms/admm/core/residuals.jl")

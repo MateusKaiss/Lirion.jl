@@ -367,10 +367,11 @@ function consensus!(ws::DCHybridWorkspace{SplitBus})
         ws.partitions,
         snapshot_theta_shared!,
     )
-    _consensus_bus_pairs_signed!(
+    _consensus_inj_groups!(
         ws.vars.p_inj.consensus,
         ws.partitions,
-        ws.bus_pairs,
+        ws.inj_groups,
+        ws.inj_copy_zone,
         ws.p_inj_vars,
     )
     return nothing

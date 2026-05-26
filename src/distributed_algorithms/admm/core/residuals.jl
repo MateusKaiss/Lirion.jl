@@ -458,16 +458,17 @@ function compute_residuals!(ws::DCHybridWorkspace{SplitBus})
     )
 
     rho_pi = ws.vars.p_inj.rho[]
-    ws.r_primal_bus_pair = _primal_residual_bus_pairs_signed(
+    ws.r_primal_bus_pair = _primal_residual_inj_groups(
         ws.partitions,
         ws.vars.p_inj.consensus,
-        ws.bus_pairs,
+        ws.inj_groups,
+        ws.inj_copy_zone,
         ws.p_inj_vars,
     )
-    ws.r_dual_bus_pair = _dual_residual_bus_pairs_signed(
+    ws.r_dual_bus_pair = _dual_residual_inj_groups(
         ws.vars.p_inj.consensus,
         ws.vars.p_inj.consensus_prev,
-        ws.bus_pairs,
+        ws.inj_groups,
         rho_pi,
     )
 

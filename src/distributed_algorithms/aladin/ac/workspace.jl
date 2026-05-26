@@ -281,6 +281,7 @@ function build_workspace(
         p_inj_vars = Vector{Dict{Int, JuMP.VariableRef}}()
         q_inj_vars = Vector{Dict{Int, JuMP.VariableRef}}()
     elseif sectioning isa SplitBus
+        _assert_bilateral_split(sys, "ALADIN{Hybrid, AC}")
         zones, bus_pairs, interzonal_line_pairs, split_pairs, p_inj_vars, q_inj_vars =
             init_hybrid_partition!(partitions, sys, optimizer_factory, cfg, sectioning)
         dummy_pairs = DummyLinePairAC[]
