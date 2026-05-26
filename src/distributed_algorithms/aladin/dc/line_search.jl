@@ -182,11 +182,12 @@ function _dc_merit(ws::DCHybridWorkspaceALADIN, alpha::Float64)
         lambda_r += ws.vars.p_dummy.lambda[k] * d
     end
     @inbounds for (k, pair) in enumerate(ws.split_bus_pairs)
-        zi = ws.zones[pair.zone_i]
-        zj = ws.zones[pair.zone_j]
-        xi = zi.y[pair.p_inj_col_i] + alpha * zi.delta[pair.p_inj_col_i]
-        xj = zj.y[pair.p_inj_col_j] + alpha * zj.delta[pair.p_inj_col_j]
-        d = xi + xj
+        d = 0.0
+        for c in eachindex(pair.zones)
+            zone = ws.zones[pair.zones[c]]
+            col = pair.p_inj_cols[c]
+            d += zone.y[col] + alpha * zone.delta[col]
+        end
         r_sq += d * d
         lambda_r += ws.vars.p_inj.lambda[k] * d
     end
@@ -292,10 +293,14 @@ function _dc_dphi_0(ws::DCHybridWorkspaceALADIN)
         dphi += (ws.vars.p_dummy.lambda[k] + mu * r0) * dr
     end
     @inbounds for (k, pair) in enumerate(ws.split_bus_pairs)
-        zi = ws.zones[pair.zone_i]
-        zj = ws.zones[pair.zone_j]
-        r0 = zi.y[pair.p_inj_col_i] + zj.y[pair.p_inj_col_j]
-        dr = zi.delta[pair.p_inj_col_i] + zj.delta[pair.p_inj_col_j]
+        r0 = 0.0
+        dr = 0.0
+        for c in eachindex(pair.zones)
+            zone = ws.zones[pair.zones[c]]
+            col = pair.p_inj_cols[c]
+            r0 += zone.y[col]
+            dr += zone.delta[col]
+        end
         dphi += (ws.vars.p_inj.lambda[k] + mu * r0) * dr
     end
     return dphi

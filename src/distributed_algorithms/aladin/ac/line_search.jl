@@ -359,14 +359,15 @@ function _ac_merit(ws::ACHybridWorkspaceALADIN, alpha::Float64)
         lambda_r += ws.vars.p_dummy.lambda[k] * dp + ws.vars.q_dummy.lambda[k] * dq
     end
     @inbounds for (k, pair) in enumerate(ws.split_bus_pairs)
-        zi = ws.zones[pair.zone_i]
-        zj = ws.zones[pair.zone_j]
-        pi = zi.y[pair.p_inj_col_i] + alpha * zi.delta[pair.p_inj_col_i]
-        pj = zj.y[pair.p_inj_col_j] + alpha * zj.delta[pair.p_inj_col_j]
-        qi = zi.y[pair.q_inj_col_i] + alpha * zi.delta[pair.q_inj_col_i]
-        qj = zj.y[pair.q_inj_col_j] + alpha * zj.delta[pair.q_inj_col_j]
-        dp = pi + pj
-        dq = qi + qj
+        dp = 0.0
+        dq = 0.0
+        for c in eachindex(pair.zones)
+            zone = ws.zones[pair.zones[c]]
+            pcol = pair.p_inj_cols[c]
+            qcol = pair.q_inj_cols[c]
+            dp += zone.y[pcol] + alpha * zone.delta[pcol]
+            dq += zone.y[qcol] + alpha * zone.delta[qcol]
+        end
         r_sq += dp * dp + dq * dq
         lambda_r += ws.vars.p_inj.lambda[k] * dp + ws.vars.q_inj.lambda[k] * dq
     end
@@ -502,12 +503,19 @@ function _ac_dphi_0(ws::ACHybridWorkspaceALADIN)
         dphi += (ws.vars.q_dummy.lambda[k] + mu * r0_q) * dr_q
     end
     @inbounds for (k, pair) in enumerate(ws.split_bus_pairs)
-        zi = ws.zones[pair.zone_i]
-        zj = ws.zones[pair.zone_j]
-        r0_p = zi.y[pair.p_inj_col_i] + zj.y[pair.p_inj_col_j]
-        dr_p = zi.delta[pair.p_inj_col_i] + zj.delta[pair.p_inj_col_j]
-        r0_q = zi.y[pair.q_inj_col_i] + zj.y[pair.q_inj_col_j]
-        dr_q = zi.delta[pair.q_inj_col_i] + zj.delta[pair.q_inj_col_j]
+        r0_p = 0.0
+        dr_p = 0.0
+        r0_q = 0.0
+        dr_q = 0.0
+        for c in eachindex(pair.zones)
+            zone = ws.zones[pair.zones[c]]
+            pcol = pair.p_inj_cols[c]
+            qcol = pair.q_inj_cols[c]
+            r0_p += zone.y[pcol]
+            dr_p += zone.delta[pcol]
+            r0_q += zone.y[qcol]
+            dr_q += zone.delta[qcol]
+        end
         dphi += (ws.vars.p_inj.lambda[k] + mu * r0_p) * dr_p
         dphi += (ws.vars.q_inj.lambda[k] + mu * r0_q) * dr_q
     end

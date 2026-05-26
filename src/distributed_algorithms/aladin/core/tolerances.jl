@@ -188,15 +188,19 @@ function compute_tolerances!(
         sqrt(max(n_edge, 1)) * eps_abs +
         eps_rel * max(sqrt(norm_i_edge), sqrt(norm_j_edge))
 
-    # SplitBus block
+    # SplitBus block (first copy scales the "i" side, the rest the "j" side)
     n_split = length(ws.split_bus_pairs)
     norm_i_split = 0.0
     norm_j_split = 0.0
     @inbounds for pair in ws.split_bus_pairs
-        yi = ws.zones[pair.zone_i].y[pair.p_inj_col_i]
-        yj = ws.zones[pair.zone_j].y[pair.p_inj_col_j]
-        norm_i_split += yi * yi
-        norm_j_split += yj * yj
+        for c in eachindex(pair.zones)
+            yc = ws.zones[pair.zones[c]].y[pair.p_inj_cols[c]]
+            if c == 1
+                norm_i_split += yc * yc
+            else
+                norm_j_split += yc * yc
+            end
+        end
     end
     eps_pri_split =
         sqrt(max(n_split, 1)) * eps_abs +
@@ -327,14 +331,16 @@ function compute_tolerances!(
         norm_j += pfj * pfj + qfj * qfj
     end
     @inbounds for pair in ws.split_bus_pairs
-        zi = ws.zones[pair.zone_i]
-        zj = ws.zones[pair.zone_j]
-        pi_val = zi.y[pair.p_inj_col_i]
-        pj_val = zj.y[pair.p_inj_col_j]
-        qi_val = zi.y[pair.q_inj_col_i]
-        qj_val = zj.y[pair.q_inj_col_j]
-        norm_i += pi_val * pi_val + qi_val * qi_val
-        norm_j += pj_val * pj_val + qj_val * qj_val
+        for c in eachindex(pair.zones)
+            zone = ws.zones[pair.zones[c]]
+            pv = zone.y[pair.p_inj_cols[c]]
+            qv = zone.y[pair.q_inj_cols[c]]
+            if c == 1
+                norm_i += pv * pv + qv * qv
+            else
+                norm_j += pv * pv + qv * qv
+            end
+        end
     end
     nd_i, nd_j = _norms_dummy_pq_ac(ws)
     norm_i += nd_i
@@ -381,14 +387,16 @@ end
     ni = 0.0
     nj = 0.0
     @inbounds for pair in ws.split_bus_pairs
-        zi = ws.zones[pair.zone_i]
-        zj = ws.zones[pair.zone_j]
-        pi_val = zi.y[pair.p_inj_col_i]
-        pj_val = zj.y[pair.p_inj_col_j]
-        qi_val = zi.y[pair.q_inj_col_i]
-        qj_val = zj.y[pair.q_inj_col_j]
-        ni += pi_val * pi_val + qi_val * qi_val
-        nj += pj_val * pj_val + qj_val * qj_val
+        for c in eachindex(pair.zones)
+            zone = ws.zones[pair.zones[c]]
+            pv = zone.y[pair.p_inj_cols[c]]
+            qv = zone.y[pair.q_inj_cols[c]]
+            if c == 1
+                ni += pv * pv + qv * qv
+            else
+                nj += pv * pv + qv * qv
+            end
+        end
     end
     return ni, nj
 end

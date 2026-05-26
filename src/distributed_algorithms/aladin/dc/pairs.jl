@@ -36,13 +36,14 @@ end
 # Split bus pair (SplitBus sectioning)
 # ------------------------------------------------------------
 
+# Net-injection consensus over all copies of a split bus: Sigma_z p_z = 0.
+# `zones`/`p_inj_cols` are parallel arrays over the copies (>= 2 of them), so a
+# bus shared by N zones is one pair carrying N columns.
 struct SplitBusPair
     consensus_idx::Int
     bus_id::Int
-    zone_i::Int
-    p_inj_col_i::Int
-    zone_j::Int
-    p_inj_col_j::Int
+    zones::Vector{Int}
+    p_inj_cols::Vector{Int}
 end
 
 # ------------------------------------------------------------
@@ -201,27 +202,28 @@ end
 function _build_split_bus_pairs(
     partitions::Partitions{PartitionDC},
     zones::Vector{AladinZoneData},
-    sys_bus_pairs::Vector{NTuple{3, Int}},
+    bus_groups::Vector{Tuple{Int, Vector{Int}}},
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
 )::Vector{SplitBusPair}
     pairs = SplitBusPair[]
-    isempty(sys_bus_pairs) && return pairs
-    sizehint!(pairs, length(sys_bus_pairs))
+    isempty(bus_groups) && return pairs
+    sizehint!(pairs, length(bus_groups))
 
-    for (consensus_idx, (bus_id, zone_a, zone_b)) in enumerate(sys_bus_pairs)
-        p_inj_var_a = get(p_inj_vars[zone_a], bus_id, nothing)
-        p_inj_var_b = get(p_inj_vars[zone_b], bus_id, nothing)
-        (p_inj_var_a === nothing || p_inj_var_b === nothing) && continue
-        p_inj_col_a = zones[zone_a].var_to_col[p_inj_var_a]
-        p_inj_col_b = zones[zone_b].var_to_col[p_inj_var_b]
-        push!(
-            pairs,
-            SplitBusPair(
-                consensus_idx, bus_id,
-                zone_a, p_inj_col_a,
-                zone_b, p_inj_col_b,
-            ),
-        )
+    for (consensus_idx, (bus_id, group_zones)) in enumerate(bus_groups)
+        copy_zones = Int[]
+        copy_cols = Int[]
+        ok = true
+        for zone in group_zones
+            p_inj_var = get(p_inj_vars[zone], bus_id, nothing)
+            if p_inj_var === nothing
+                ok = false
+                break
+            end
+            push!(copy_zones, zone)
+            push!(copy_cols, zones[zone].var_to_col[p_inj_var])
+        end
+        (ok && length(copy_zones) >= 2) || continue
+        push!(pairs, SplitBusPair(consensus_idx, bus_id, copy_zones, copy_cols))
     end
     return pairs
 end

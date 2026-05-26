@@ -464,13 +464,10 @@ function update_objective!(part::PartitionDC, ws::DCHybridWorkspaceALADIN)
     )
 
     for (k, pair) in enumerate(ws.split_bus_pairs)
-        if pair.zone_i == zone_pos
-            col = pair.p_inj_col_i
-            JuMP.add_to_expression!(lin, ws.vars.p_inj.lambda[k], zdata.all_vars[col])
-        elseif pair.zone_j == zone_pos
-            col = pair.p_inj_col_j
-            JuMP.add_to_expression!(lin, ws.vars.p_inj.lambda[k], zdata.all_vars[col])
-        end
+        c = findfirst(==(zone_pos), pair.zones)
+        c === nothing && continue
+        col = pair.p_inj_cols[c]
+        JuMP.add_to_expression!(lin, ws.vars.p_inj.lambda[k], zdata.all_vars[col])
     end
 
     if ws.proximal_mode === :pflow

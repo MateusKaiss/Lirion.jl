@@ -115,10 +115,11 @@ end
     sq = 0.0
     mx = 0.0
     @inbounds for pair in ws.split_bus_pairs
-        d = abs(
-            ws.zones[pair.zone_i].y[pair.p_inj_col_i] +
-            ws.zones[pair.zone_j].y[pair.p_inj_col_j],
-        )
+        s = 0.0
+        for c in eachindex(pair.zones)
+            s += ws.zones[pair.zones[c]].y[pair.p_inj_cols[c]]
+        end
+        d = abs(s)
         sq += d * d
         mx = max(mx, d)
     end
@@ -220,10 +221,15 @@ end
     sq = 0.0
     mx = 0.0
     @inbounds for pair in ws.split_bus_pairs
-        zi = ws.zones[pair.zone_i]
-        zj = ws.zones[pair.zone_j]
-        dp = abs(zi.y[pair.p_inj_col_i] + zj.y[pair.p_inj_col_j])
-        dq = abs(zi.y[pair.q_inj_col_i] + zj.y[pair.q_inj_col_j])
+        sp = 0.0
+        sq_inj = 0.0
+        for c in eachindex(pair.zones)
+            zone = ws.zones[pair.zones[c]]
+            sp += zone.y[pair.p_inj_cols[c]]
+            sq_inj += zone.y[pair.q_inj_cols[c]]
+        end
+        dp = abs(sp)
+        dq = abs(sq_inj)
         sq += dp * dp + dq * dq
         mx = max(mx, dp, dq)
     end
@@ -416,10 +422,15 @@ end
     sq = 0.0
     mx = 0.0
     @inbounds for pair in ws.split_bus_pairs
-        zi = ws.zones[pair.zone_i]
-        zj = ws.zones[pair.zone_j]
-        dp = abs(zi.y[pair.p_inj_col_i] + zj.y[pair.p_inj_col_j])
-        dq = abs(zi.y[pair.q_inj_col_i] + zj.y[pair.q_inj_col_j])
+        sp = 0.0
+        sq_inj = 0.0
+        for c in eachindex(pair.zones)
+            zone = ws.zones[pair.zones[c]]
+            sp += zone.y[pair.p_inj_cols[c]]
+            sq_inj += zone.y[pair.q_inj_cols[c]]
+        end
+        dp = abs(sp)
+        dq = abs(sq_inj)
         sq += dp * dp + dq * dq
         mx = max(mx, dp, dq)
     end

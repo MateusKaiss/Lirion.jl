@@ -673,14 +673,16 @@ function compute_residuals!(ws::ACHybridWorkspace{SplitBus})
     )
 
     ws.r_primal_p_inj = _primal_residual_inj_groups(
-        ws.partitions, ws.vars.p_inj.consensus, ws.inj_groups, ws.inj_copy_zone, ws.p_inj_vars,
+        ws.partitions, ws.vars.p_inj.consensus, ws.inj_groups, ws.inj_copy_zone,
+        ws.p_inj_vars,
     )
     ws.r_dual_p_inj = _dual_residual_inj_groups(
         ws.vars.p_inj.consensus, ws.vars.p_inj.consensus_prev,
         ws.inj_groups, ws.vars.p_inj.rho[],
     )
     ws.r_primal_q_inj = _primal_residual_inj_groups(
-        ws.partitions, ws.vars.q_inj.consensus, ws.inj_groups, ws.inj_copy_zone, ws.q_inj_vars,
+        ws.partitions, ws.vars.q_inj.consensus, ws.inj_groups, ws.inj_copy_zone,
+        ws.q_inj_vars,
     )
     ws.r_dual_q_inj = _dual_residual_inj_groups(
         ws.vars.q_inj.consensus, ws.vars.q_inj.consensus_prev,
@@ -937,14 +939,16 @@ function compute_residuals!(ws::SOCWRHybridWorkspace{SplitBus})
     )
 
     ws.r_primal_p_inj = _primal_residual_inj_groups(
-        ws.partitions, ws.vars.p_inj.consensus, ws.inj_groups, ws.inj_copy_zone, ws.p_inj_vars,
+        ws.partitions, ws.vars.p_inj.consensus, ws.inj_groups, ws.inj_copy_zone,
+        ws.p_inj_vars,
     )
     ws.r_dual_p_inj = _dual_residual_inj_groups(
         ws.vars.p_inj.consensus, ws.vars.p_inj.consensus_prev,
         ws.inj_groups, ws.vars.p_inj.rho[],
     )
     ws.r_primal_q_inj = _primal_residual_inj_groups(
-        ws.partitions, ws.vars.q_inj.consensus, ws.inj_groups, ws.inj_copy_zone, ws.q_inj_vars,
+        ws.partitions, ws.vars.q_inj.consensus, ws.inj_groups, ws.inj_copy_zone,
+        ws.q_inj_vars,
     )
     ws.r_dual_q_inj = _dual_residual_inj_groups(
         ws.vars.q_inj.consensus, ws.vars.q_inj.consensus_prev,

@@ -636,16 +636,11 @@ end
 )
     zdata = ws.zones[zone_pos]
     @inbounds for (k, pair) in enumerate(ws.split_bus_pairs)
-        if pair.zone_i == zone_pos
-            pcol = pair.p_inj_col_i
-            qcol = pair.q_inj_col_i
-        elseif pair.zone_j == zone_pos
-            pcol = pair.p_inj_col_j
-            qcol = pair.q_inj_col_j
-        else
-            continue
-        end
-        # Sign-flipped consensus: both zones contribute +λ (no sign switch).
+        c = findfirst(==(zone_pos), pair.zones)
+        c === nothing && continue
+        pcol = pair.p_inj_cols[c]
+        qcol = pair.q_inj_cols[c]
+        # Net-injection consensus: every copy contributes +λ (no sign switch).
         JuMP.add_to_expression!(lin, ws.vars.p_inj.lambda[k], zdata.all_vars[pcol])
         JuMP.add_to_expression!(lin, ws.vars.q_inj.lambda[k], zdata.all_vars[qcol])
     end

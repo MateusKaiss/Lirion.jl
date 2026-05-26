@@ -132,13 +132,10 @@ function prepare_distributed_partitions(full::CaseRaw, ::SplitBus)
         push!(get!(neighbor_zones_of, fbus, Int[]), zb)
     end
 
-    # N-way SplitBus (a boundary bus shared by >2 zones) is allowed here. Models
-    # not yet migrated to the bus_groups consensus guard against it at
-    # workspace-build time (see `_assert_bilateral_split`).
-
-    # Pairwise representation (one entry per (split bus, neighbor zone)).
-    # Correct for bilateral boundaries; the not-yet-N-way models guard against
-    # >2-zone groups at workspace-build time.
+    # N-way SplitBus (a boundary bus shared by >2 zones) is fully supported: the
+    # net-injection consensus is driven by `bus_groups` below. `bus_pairs` is the
+    # legacy pairwise view (one entry per (split bus, neighbor zone)), kept for
+    # postprocessing/diagnostics.
     bus_pairs = NTuple{3, Int}[]
     sizehint!(bus_pairs, length(split_set))
     for (fbus, zb) in split_set

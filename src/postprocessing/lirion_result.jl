@@ -542,17 +542,22 @@ function _push_admm_interzonal_rows!(rows, ws, partitions)
 end
 
 function _push_split_bus_consensus_rows!(rows, ws, partitions)
+    hasproperty(ws, :zones) || return nothing
     for pair in ws.split_bus_pairs
-        zi = pair.zone_i
-        zj = pair.zone_j
         bid = pair.bus_id
-        if hasproperty(pair, :p_inj_col_i) && hasproperty(ws, :zones)
-            _push_bus_reading!(rows, :p_inj, bid, zi, ws.zones[zi].y[pair.p_inj_col_i])
-            _push_bus_reading!(rows, :p_inj, bid, zj, ws.zones[zj].y[pair.p_inj_col_j])
-            if hasproperty(pair, :q_inj_col_i)
-                _push_bus_reading!(rows, :q_inj, bid, zi, ws.zones[zi].y[pair.q_inj_col_i])
-                _push_bus_reading!(rows, :q_inj, bid, zj, ws.zones[zj].y[pair.q_inj_col_j])
-            end
+        has_q = hasproperty(pair, :q_inj_cols)
+        for c in eachindex(pair.zones)
+            zone = pair.zones[c]
+            _push_bus_reading!(
+                rows,
+                :p_inj,
+                bid,
+                zone,
+                ws.zones[zone].y[pair.p_inj_cols[c]],
+            )
+            has_q && _push_bus_reading!(
+                rows, :q_inj, bid, zone, ws.zones[zone].y[pair.q_inj_cols[c]],
+            )
         end
     end
     return nothing
@@ -562,18 +567,16 @@ function _push_admm_split_bus_consensus_rows!(rows, ws, partitions)
     hasproperty(ws, :p_inj_vars) || return nothing
     p_inj_vars = ws.p_inj_vars
     q_inj_vars = hasproperty(ws, :q_inj_vars) ? ws.q_inj_vars : nothing
-    for (bid, zi, zj) in ws.bus_pairs
-        va = _admm_pinj_value(partitions.parts[zi], p_inj_vars[zi], bid)
-        vb = _admm_pinj_value(partitions.parts[zj], p_inj_vars[zj], bid)
-        (va === nothing || vb === nothing) && continue
-        _push_bus_reading!(rows, :p_inj, bid, zi, va)
-        _push_bus_reading!(rows, :p_inj, bid, zj, vb)
-        if q_inj_vars !== nothing
-            qa = _admm_pinj_value(partitions.parts[zi], q_inj_vars[zi], bid)
-            qb = _admm_pinj_value(partitions.parts[zj], q_inj_vars[zj], bid)
-            if qa !== nothing && qb !== nothing
-                _push_bus_reading!(rows, :q_inj, bid, zi, qa)
-                _push_bus_reading!(rows, :q_inj, bid, zj, qb)
+    # One row per (split bus, zone copy); iterating the per-zone stores keeps a
+    # bus shared by >2 zones from being counted once per pairwise edge.
+    for zone in eachindex(p_inj_vars)
+        for bid in keys(p_inj_vars[zone])
+            v = _admm_pinj_value(partitions.parts[zone], p_inj_vars[zone], bid)
+            v === nothing && continue
+            _push_bus_reading!(rows, :p_inj, bid, zone, v)
+            if q_inj_vars !== nothing
+                q = _admm_pinj_value(partitions.parts[zone], q_inj_vars[zone], bid)
+                q !== nothing && _push_bus_reading!(rows, :q_inj, bid, zone, q)
             end
         end
     end

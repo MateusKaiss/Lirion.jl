@@ -179,6 +179,6 @@ function init_hybrid_partition!(
     end
     bus_pairs = _build_shared_bus_pairs(partitions, zones)
     interzonal_line_pairs = _build_interzonal_line_pairs(partitions, inter)
-    split_pairs = _build_split_bus_pairs(zones, sys_bus_pairs, p_inj_vars, q_inj_vars)
+    split_pairs = _build_split_bus_pairs(zones, sys.bus_groups, p_inj_vars, q_inj_vars)
     return zones, bus_pairs, interzonal_line_pairs, split_pairs, p_inj_vars, q_inj_vars
 end

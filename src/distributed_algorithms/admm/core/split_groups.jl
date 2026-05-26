@@ -1,16 +1,3 @@
-# Guard for models that have not been migrated to N-way SplitBus yet: error if
-# any split bus is shared by more than two zones.
-@inline function _assert_bilateral_split(sys, who::AbstractString)
-    @inbounds for (bid, zones) in sys.bus_groups
-        length(zones) > 2 && error(
-            "$(who): N-way SplitBus (bus $(bid) shared by $(length(zones)) " *
-            "zones) is not supported for this model yet. Use a partition where " *
-            "each boundary bus borders a single neighbor zone.",
-        )
-    end
-    return nothing
-end
-
 # ============================================================
 # SplitBus N-way injection consensus (Σ p_z = 0 over all copies)
 # ============================================================

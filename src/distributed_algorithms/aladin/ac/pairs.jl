@@ -38,15 +38,15 @@ end
 # Split bus pair (SplitBus sectioning)
 # ------------------------------------------------------------
 
+# Net-injection consensus over all copies of a split bus: Sigma_z p_z = 0 and
+# Sigma_z q_z = 0. `zones`/`p_inj_cols`/`q_inj_cols` are parallel arrays over
+# the copies (>= 2), so a bus shared by N zones is one pair carrying N columns.
 struct SplitBusPairAC
     consensus_idx::Int
     bus_id::Int
-    zone_i::Int
-    p_inj_col_i::Int
-    q_inj_col_i::Int
-    zone_j::Int
-    p_inj_col_j::Int
-    q_inj_col_j::Int
+    zones::Vector{Int}
+    p_inj_cols::Vector{Int}
+    q_inj_cols::Vector{Int}
 end
 
 # ------------------------------------------------------------
@@ -231,35 +231,32 @@ end
 
 function _build_split_bus_pairs(
     zones::Vector{AladinZoneDataAC},
-    sys_bus_pairs::Vector{NTuple{3, Int}},
+    bus_groups::Vector{Tuple{Int, Vector{Int}}},
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
     q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
 )::Vector{SplitBusPairAC}
     pairs = SplitBusPairAC[]
-    isempty(sys_bus_pairs) && return pairs
-    sizehint!(pairs, length(sys_bus_pairs))
+    isempty(bus_groups) && return pairs
+    sizehint!(pairs, length(bus_groups))
 
-    for (consensus_idx, (bus_id, zone_a, zone_b)) in enumerate(sys_bus_pairs)
-        p_inj_var_a = get(p_inj_vars[zone_a], bus_id, nothing)
-        q_inj_var_a = get(q_inj_vars[zone_a], bus_id, nothing)
-        p_inj_var_b = get(p_inj_vars[zone_b], bus_id, nothing)
-        q_inj_var_b = get(q_inj_vars[zone_b], bus_id, nothing)
-        (
-            p_inj_var_a === nothing || q_inj_var_a === nothing ||
-            p_inj_var_b === nothing || q_inj_var_b === nothing
-        ) && continue
-        p_inj_col_a = zones[zone_a].var_to_col[p_inj_var_a]
-        q_inj_col_a = zones[zone_a].var_to_col[q_inj_var_a]
-        p_inj_col_b = zones[zone_b].var_to_col[p_inj_var_b]
-        q_inj_col_b = zones[zone_b].var_to_col[q_inj_var_b]
-        push!(
-            pairs,
-            SplitBusPairAC(
-                consensus_idx, bus_id,
-                zone_a, p_inj_col_a, q_inj_col_a,
-                zone_b, p_inj_col_b, q_inj_col_b,
-            ),
-        )
+    for (consensus_idx, (bus_id, group_zones)) in enumerate(bus_groups)
+        copy_zones = Int[]
+        p_cols = Int[]
+        q_cols = Int[]
+        ok = true
+        for zone in group_zones
+            p_inj_var = get(p_inj_vars[zone], bus_id, nothing)
+            q_inj_var = get(q_inj_vars[zone], bus_id, nothing)
+            if p_inj_var === nothing || q_inj_var === nothing
+                ok = false
+                break
+            end
+            push!(copy_zones, zone)
+            push!(p_cols, zones[zone].var_to_col[p_inj_var])
+            push!(q_cols, zones[zone].var_to_col[q_inj_var])
+        end
+        (ok && length(copy_zones) >= 2) || continue
+        push!(pairs, SplitBusPairAC(consensus_idx, bus_id, copy_zones, p_cols, q_cols))
     end
     return pairs
 end
