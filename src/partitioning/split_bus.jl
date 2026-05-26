@@ -131,17 +131,24 @@ function prepare_distributed_partitions(full::CaseRaw, ::SplitBus)
     for (fbus, zb) in split_set
         push!(get!(neighbor_zones_of, fbus, Int[]), zb)
     end
+
+    # NOTE: N-way split bus (a boundary bus shared by >2 zones) is being rolled
+    # out per model. Until every consumer reads `bus_groups`, reject >2-zone
+    # boundaries here so unmigrated models never see an unsupported topology.
     for (fbus, zs) in neighbor_zones_of
         if length(unique(zs)) > 1
             error(
                 "SplitBus: bus $fbus is a split point for multiple neighbor " *
-                "zones $(unique(zs)); multi-zone consensus is not supported. " *
+                "zones $(unique(zs)); N-way consensus is not enabled yet. " *
                 "Use a partitioning where each boundary bus borders a single " *
                 "neighbor zone.",
             )
         end
     end
 
+    # Pairwise representation (one entry per (split bus, neighbor zone)).
+    # Correct for bilateral boundaries; the not-yet-N-way models guard against
+    # >2-zone groups at workspace-build time.
     bus_pairs = NTuple{3, Int}[]
     sizehint!(bus_pairs, length(split_set))
     for (fbus, zb) in split_set
@@ -151,8 +158,23 @@ function prepare_distributed_partitions(full::CaseRaw, ::SplitBus)
             (fbus, zone_id_to_pos[za], zone_id_to_pos[zb]),
         )
     end
-
     full.dist.bus_pairs = bus_pairs
+
+    # N-way representation: (bus_id, [owner_zone_pos, neighbor_zone_pos...]).
+    # Generalizes the pairwise form to a bus shared by more than two zones
+    # (net-injection-zero consensus over all copies, Σ p_z = 0).
+    bus_groups = Tuple{Int, Vector{Int}}[]
+    sizehint!(bus_groups, length(neighbor_zones_of))
+    for (fbus, zbs) in neighbor_zones_of
+        za = bus_to_zone[fbus]
+        zones_pos = Int[zone_id_to_pos[za]]
+        for zb in sort!(unique(zbs))
+            push!(zones_pos, zone_id_to_pos[zb])
+        end
+        push!(bus_groups, (fbus, zones_pos))
+    end
+    sort!(bus_groups; by = g -> g[1])
+    full.dist.bus_groups = bus_groups
 
     return (zone_ids = zone_ids, parts = parts)
 end

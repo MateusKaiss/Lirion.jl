@@ -266,6 +266,9 @@ mutable struct DistributedRawMeta
     full_shared_bus_ids::Vector{Int}
     branch_pairs::Vector{NTuple{4, Int}}
     bus_pairs::Vector{NTuple{3, Int}}
+    # SplitBus N-way groups: (bus_id, [zone_pos...]) with the owner zone first.
+    # Generalizes `bus_pairs` to a bus shared by more than two zones.
+    bus_groups::Vector{Tuple{Int, Vector{Int}}}
 
     function DistributedRawMeta()
         return new(
@@ -275,6 +278,7 @@ mutable struct DistributedRawMeta
             Int[],
             NTuple{4, Int}[],
             NTuple{3, Int}[],
+            Tuple{Int, Vector{Int}}[],
         )
     end
 end

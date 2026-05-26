@@ -36,6 +36,7 @@ struct DistributedSystem
     interzonal_branches::Vector{Int}
     branch_pairs::Vector{NTuple{4, Int}}
     bus_pairs::Vector{NTuple{3, Int}}
+    bus_groups::Vector{Tuple{Int, Vector{Int}}}
 end
 
 # ============================================================
@@ -111,6 +112,7 @@ function build_distributed_system(
     full_shared_bus_ids = case_raw.dist.full_shared_bus_ids
     branch_pairs = case_raw.dist.branch_pairs
     bus_pairs = case_raw.dist.bus_pairs
+    bus_groups = case_raw.dist.bus_groups
 
     return DistributedSystem(
         zones,
@@ -122,5 +124,6 @@ function build_distributed_system(
         interzonal_branches,
         branch_pairs,
         bus_pairs,
+        bus_groups,
     )
 end
