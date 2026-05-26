@@ -412,17 +412,19 @@ function update_objective!(
         ws.vars.v2.rho[],
     )
 
-    lin_p_inj = build_linear_inj_term_socwr(
-        part,
-        ws.bus_pairs,
+    lin_p_inj = build_linear_inj_term_groups(
+        p,
+        ws.inj_groups,
+        ws.inj_copy_zone,
         ws.p_inj_vars,
         ws.vars.p_inj.consensus,
         view(ws.vars.p_inj.duals, :, p),
         ws.vars.p_inj.rho[],
     )
-    lin_q_inj = build_linear_inj_term_socwr(
-        part,
-        ws.bus_pairs,
+    lin_q_inj = build_linear_inj_term_groups(
+        p,
+        ws.inj_groups,
+        ws.inj_copy_zone,
         ws.q_inj_vars,
         ws.vars.q_inj.consensus,
         view(ws.vars.q_inj.duals, :, p),

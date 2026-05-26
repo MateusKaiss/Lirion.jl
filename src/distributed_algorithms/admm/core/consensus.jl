@@ -482,13 +482,13 @@ function consensus!(ws::ACHybridWorkspace{SplitBus})
         ws.bus_counts,
         ws.partitions,
     )
-    _consensus_bus_pairs_signed!(
+    _consensus_inj_groups!(
         ws.vars.p_inj.consensus, ws.partitions,
-        ws.bus_pairs, ws.p_inj_vars,
+        ws.inj_groups, ws.inj_copy_zone, ws.p_inj_vars,
     )
-    _consensus_bus_pairs_signed!(
+    _consensus_inj_groups!(
         ws.vars.q_inj.consensus, ws.partitions,
-        ws.bus_pairs, ws.q_inj_vars,
+        ws.inj_groups, ws.inj_copy_zone, ws.q_inj_vars,
     )
     return nothing
 end
@@ -622,13 +622,13 @@ function consensus!(ws::SOCWRHybridWorkspace{SplitBus})
         ws.partitions,
         snapshot_v2_shared!,
     )
-    _consensus_bus_pairs_signed!(
+    _consensus_inj_groups!(
         ws.vars.p_inj.consensus, ws.partitions,
-        ws.bus_pairs, ws.p_inj_vars,
+        ws.inj_groups, ws.inj_copy_zone, ws.p_inj_vars,
     )
-    _consensus_bus_pairs_signed!(
+    _consensus_inj_groups!(
         ws.vars.q_inj.consensus, ws.partitions,
-        ws.bus_pairs, ws.q_inj_vars,
+        ws.inj_groups, ws.inj_copy_zone, ws.q_inj_vars,
     )
     return nothing
 end

@@ -354,17 +354,19 @@ function update_objective!(
         ws.vars.v_mag.rho[],
     )
 
-    lin_p_inj = build_linear_inj_term_ac(
-        part,
-        ws.bus_pairs,
+    lin_p_inj = build_linear_inj_term_groups(
+        part.position,
+        ws.inj_groups,
+        ws.inj_copy_zone,
         ws.p_inj_vars,
         ws.vars.p_inj.consensus,
         view(ws.vars.p_inj.duals, :, part.position),
         ws.vars.p_inj.rho[],
     )
-    lin_q_inj = build_linear_inj_term_ac(
-        part,
-        ws.bus_pairs,
+    lin_q_inj = build_linear_inj_term_groups(
+        part.position,
+        ws.inj_groups,
+        ws.inj_copy_zone,
         ws.q_inj_vars,
         ws.vars.q_inj.consensus,
         view(ws.vars.q_inj.duals, :, part.position),

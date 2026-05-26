@@ -158,19 +158,18 @@ end
 # Linear proximal term for the injection copies that live in `part`'s zone.
 # `target` is the per-copy consensus vector; `duals_col` is the dual column for
 # this partition (duals[:, part.position]).
-function build_linear_p_inj_term_groups(
-    part::PartitionDC,
+function build_linear_inj_term_groups(
+    pos::Int,
     inj_groups::Vector{Tuple{Int, Vector{Int}}},
     inj_copy_zone::Vector{Int},
-    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+    inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
     target::AbstractVector{Float64},
     duals_col::AbstractVector{Float64},
     rho::Float64,
 )::JuMP.AffExpr
     lin = zero(JuMP.AffExpr)
     isempty(inj_groups) && return lin
-    pos = part.position
-    store = p_inj_vars[pos]
+    store = inj_vars[pos]
     isempty(store) && return lin
     @inbounds for (bid, cidxs) in inj_groups
         for c in cidxs

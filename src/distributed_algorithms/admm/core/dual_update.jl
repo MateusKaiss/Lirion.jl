@@ -467,15 +467,15 @@ function dual_update!(ws::ACHybridWorkspace{SplitBus})
         ws.vars.theta.rho[],
         ws.vars.v_mag.rho[],
     )
-    _update_bus_pairs_duals_signed!(
+    _update_inj_groups_duals!(
         ws.vars.p_inj.duals, ws.partitions,
         ws.vars.p_inj.consensus, ws.vars.p_inj.rho[],
-        ws.bus_pairs, ws.p_inj_vars,
+        ws.inj_groups, ws.inj_copy_zone, ws.p_inj_vars,
     )
-    _update_bus_pairs_duals_signed!(
+    _update_inj_groups_duals!(
         ws.vars.q_inj.duals, ws.partitions,
         ws.vars.q_inj.consensus, ws.vars.q_inj.rho[],
-        ws.bus_pairs, ws.q_inj_vars,
+        ws.inj_groups, ws.inj_copy_zone, ws.q_inj_vars,
     )
     return nothing
 end
@@ -643,15 +643,15 @@ function dual_update!(ws::SOCWRHybridWorkspace{SplitBus})
         ws.vars.v2.rho[],
         snapshot_v2_shared!,
     )
-    _update_bus_pairs_duals_signed!(
+    _update_inj_groups_duals!(
         ws.vars.p_inj.duals, ws.partitions,
         ws.vars.p_inj.consensus, ws.vars.p_inj.rho[],
-        ws.bus_pairs, ws.p_inj_vars,
+        ws.inj_groups, ws.inj_copy_zone, ws.p_inj_vars,
     )
-    _update_bus_pairs_duals_signed!(
+    _update_inj_groups_duals!(
         ws.vars.q_inj.duals, ws.partitions,
         ws.vars.q_inj.consensus, ws.vars.q_inj.rho[],
-        ws.bus_pairs, ws.q_inj_vars,
+        ws.inj_groups, ws.inj_copy_zone, ws.q_inj_vars,
     )
     return nothing
 end

@@ -654,19 +654,19 @@ function compute_tolerances!(
         eps_rel,
     )
 
-    eps_r_p_inj = _eps_primal_bus_pairs_signed(
-        ws.partitions, ws.vars.p_inj.consensus, ws.bus_pairs,
+    eps_r_p_inj = _eps_primal_inj_groups(
+        ws.partitions, ws.vars.p_inj.consensus, ws.inj_groups, ws.inj_copy_zone,
         ws.p_inj_vars, eps_abs, eps_rel,
     )
-    eps_s_p_inj = _eps_dual_bus_pairs_signed(
-        ws.vars.p_inj.duals, ws.bus_pairs, eps_abs, eps_rel,
+    eps_s_p_inj = _eps_dual_inj_groups(
+        ws.vars.p_inj.duals, ws.inj_groups, ws.inj_copy_zone, eps_abs, eps_rel,
     )
-    eps_r_q_inj = _eps_primal_bus_pairs_signed(
-        ws.partitions, ws.vars.q_inj.consensus, ws.bus_pairs,
+    eps_r_q_inj = _eps_primal_inj_groups(
+        ws.partitions, ws.vars.q_inj.consensus, ws.inj_groups, ws.inj_copy_zone,
         ws.q_inj_vars, eps_abs, eps_rel,
     )
-    eps_s_q_inj = _eps_dual_bus_pairs_signed(
-        ws.vars.q_inj.duals, ws.bus_pairs, eps_abs, eps_rel,
+    eps_s_q_inj = _eps_dual_inj_groups(
+        ws.vars.q_inj.duals, ws.inj_groups, ws.inj_copy_zone, eps_abs, eps_rel,
     )
 
     ws.eps_primal = sqrt(eps_r_bus^2 + eps_r_p_inj^2 + eps_r_q_inj^2)
@@ -933,19 +933,19 @@ function compute_tolerances!(
         eps_rel,
     )
 
-    eps_r_p_inj = _eps_primal_bus_pairs_signed(
-        ws.partitions, ws.vars.p_inj.consensus, ws.bus_pairs,
+    eps_r_p_inj = _eps_primal_inj_groups(
+        ws.partitions, ws.vars.p_inj.consensus, ws.inj_groups, ws.inj_copy_zone,
         ws.p_inj_vars, eps_abs, eps_rel,
     )
-    eps_s_p_inj = _eps_dual_bus_pairs_signed(
-        ws.vars.p_inj.duals, ws.bus_pairs, eps_abs, eps_rel,
+    eps_s_p_inj = _eps_dual_inj_groups(
+        ws.vars.p_inj.duals, ws.inj_groups, ws.inj_copy_zone, eps_abs, eps_rel,
     )
-    eps_r_q_inj = _eps_primal_bus_pairs_signed(
-        ws.partitions, ws.vars.q_inj.consensus, ws.bus_pairs,
+    eps_r_q_inj = _eps_primal_inj_groups(
+        ws.partitions, ws.vars.q_inj.consensus, ws.inj_groups, ws.inj_copy_zone,
         ws.q_inj_vars, eps_abs, eps_rel,
     )
-    eps_s_q_inj = _eps_dual_bus_pairs_signed(
-        ws.vars.q_inj.duals, ws.bus_pairs, eps_abs, eps_rel,
+    eps_s_q_inj = _eps_dual_inj_groups(
+        ws.vars.q_inj.duals, ws.inj_groups, ws.inj_copy_zone, eps_abs, eps_rel,
     )
 
     ws.eps_primal = sqrt(eps_r_bus^2 + eps_r_p_inj^2 + eps_r_q_inj^2)

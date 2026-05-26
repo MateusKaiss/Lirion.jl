@@ -87,6 +87,10 @@ Base.@kwdef mutable struct ACHybridWorkspace{S <: Sectioning} <: AbstractADMMWor
     q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
         Vector{Dict{Int, JuMP.VariableRef}}()
 
+    # SplitBus N-way injection copies (shared by p_inj and q_inj).
+    inj_groups::Vector{Tuple{Int, Vector{Int}}} = Tuple{Int, Vector{Int}}[]
+    inj_copy_zone::Vector{Int} = Int[]
+
     vars::NamedTuple{
         (:theta, :v_mag, :p_flow, :q_flow, :p_dummy, :q_dummy, :p_inj, :q_inj),
         Tuple{
@@ -248,6 +252,10 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC})
     p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
     q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
 
+    inj_groups = Tuple{Int, Vector{Int}}[]
+    inj_copy_zone = Int[]
+    n_inj = 0
+
     sectioning = config.sectioning
     if sectioning isa TieLine
         n_flow = n_inter
@@ -262,9 +270,17 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC})
             partitions, sys, optimizer_factory, sectioning, inter,
         )
     elseif sectioning isa SplitBus
-        _assert_bilateral_split(sys, "ADMM{Hybrid, AC}")
         n_flow = 0
         n_dummy = 0
+        for (bid, zones) in sys.bus_groups
+            cidxs = Int[]
+            for z in zones
+                n_inj += 1
+                push!(cidxs, n_inj)
+                push!(inj_copy_zone, z)
+            end
+            push!(inj_groups, (bid, cidxs))
+        end
         init_hybrid_partition!(
             partitions, sys, optimizer_factory, sectioning, inter,
             bpairs, p_inj_vars, q_inj_vars,
@@ -282,8 +298,8 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC})
         q_flow = q_flow,
         p_dummy = VarState(n_dummy, n_zones, p_flow.rho, p_flow.prev_rho),
         q_dummy = VarState(n_dummy, n_zones, q_flow.rho, q_flow.prev_rho),
-        p_inj = VarState(n_bus_pairs, n_zones, config.rho_p),
-        q_inj = VarState(n_bus_pairs, n_zones, config.rho_q),
+        p_inj = VarState(n_inj, n_zones, config.rho_p),
+        q_inj = VarState(n_inj, n_zones, config.rho_q),
     )
 
     ws = ACHybridWorkspace(;
@@ -296,6 +312,8 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC})
         bus_pairs = bpairs,
         p_inj_vars = p_inj_vars,
         q_inj_vars = q_inj_vars,
+        inj_groups = inj_groups,
+        inj_copy_zone = inj_copy_zone,
         vars = vars,
         sin_sum = zeros(n_shared),
         cos_sum = zeros(n_shared),
