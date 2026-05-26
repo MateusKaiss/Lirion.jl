@@ -146,6 +146,11 @@ include(joinpath(@__DIR__, "distributed", "test_aladin_socwr.jl"))
         central_optimizer = DEFAULT_SOCWR_SOLVER,
         distributed_optimizer = DEFAULT_SOCWR_SOLVER,
     )
+    run_admm_socwr_splitbus_3zone_tests(;
+        rtol = 0.05,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
+    )
     run_admm_socwr_dummybus_hybrid_tests(;
         rtol = 0.05,
         central_optimizer = DEFAULT_SOCWR_SOLVER,
@@ -230,6 +235,11 @@ include(joinpath(@__DIR__, "distributed", "test_aladin_socwr.jl"))
         distributed_optimizer = DEFAULT_SOCWR_SOLVER,
     )
     run_aladin_socwr_splitbus_hybrid_tests(;
+        rtol = 0.05,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
+    )
+    run_aladin_socwr_splitbus_3zone_tests(;
         rtol = 0.05,
         central_optimizer = DEFAULT_SOCWR_SOLVER,
         distributed_optimizer = DEFAULT_SOCWR_SOLVER,

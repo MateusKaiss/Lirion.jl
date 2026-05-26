@@ -22,6 +22,13 @@ const ALADIN_SOCWR_SPLITBUS_HYBRID_CASES = [
     "pglib_opf_case14_ieee.m",
 ]
 
+# N-way SplitBus: hub bus 1 of this 6-bus case borders zones 2 and 3, so it is a
+# boundary bus shared by three zones. Impedances/reactive headroom are tuned to
+# keep the SOCWR relaxation well-conditioned.
+const ALADIN_SOCWR_SPLITBUS_3ZONE_CASES = [
+    "case6_3zone_hub.m",
+]
+
 # ============================================================
 # OBJECTIVE EXTRACTORS
 # ============================================================
@@ -366,6 +373,52 @@ function run_aladin_socwr_splitbus_hybrid_tests(;
         make_algorithm = make_alg,
         defaults = defaults,
         overrides = overrides,
+        rtol = rtol,
+        atol = atol,
+    )
+end
+
+# ============================================================
+# ALADIN SOCWR - SPLIT-BUS HYBRID, N-WAY (boundary bus shared by 3 zones)
+# ============================================================
+function run_aladin_socwr_splitbus_3zone_tests(;
+    rtol = 0.05,
+    atol = 1e-6,
+    central_optimizer = nothing,
+    distributed_optimizer = nothing,
+)
+    test_dir = @__DIR__
+
+    make_alg(p) = Lirion.aladin(;
+        coupling = :hybrid,
+        sectioning = Lirion.SplitBus(),
+        max_iter = p.max_iter,
+        rho = p.rho,
+        mu = p.mu,
+        eps_abs = p.eps_abs,
+        eps_rel = p.eps_rel,
+    )
+
+    defaults(_) = (
+        max_iter = 8000,
+        rho = 10000.0,
+        mu = 1000.0,
+        eps_abs = 2e-4,
+        eps_rel = 2e-4,
+    )
+
+    return run_case_suite(;
+        label = "ALADIN-SOCWR SPLITBUS 3-ZONE",
+        test_dir = test_dir,
+        case_list = ALADIN_SOCWR_SPLITBUS_3ZONE_CASES,
+        model = Lirion.socwr(),
+        central_optimizer = central_optimizer,
+        distributed_optimizer = distributed_optimizer,
+        objective_central = aladin_central_obj_socwr,
+        objective_dist = aladin_dist_obj_socwr,
+        make_algorithm = make_alg,
+        defaults = defaults,
+        overrides = _ -> NamedTuple(),
         rtol = rtol,
         atol = atol,
     )
