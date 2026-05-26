@@ -251,10 +251,9 @@ using Lirion, Metis, Graphs, SimpleWeightedGraphs
 create_partition("pglib_opf_case118_ieee.m"; k = 4)
 ```
 
-The resulting zoned case is then solved with any distributed algorithm/sectioning.
-For `:split_bus`, use `create_partition_split_bus(...)`: unlike the others, it
-requires every boundary bus to border **at most one** other zone (no bus on 3+
-zones), a bilateral constraint the plain partitioner does not enforce.
+The resulting zoned case is then solved with any distributed algorithm and any
+sectioning (`:tie_line`, `:dummy_bus`, `:split_bus`) — including partitions where
+a boundary bus is shared by three or more zones.
 
 ## Results
 
