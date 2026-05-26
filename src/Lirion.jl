@@ -273,7 +273,7 @@ end
 export solve, load_inputs,
     dc, ac, acr, ivr, lpac, socwr, qc, sdpwrm, socbf, bfa, nfa,
     centralized, admm, aladin,
-    create_partition, create_partition_split_bus, write_matpower,
+    create_partition, write_matpower,
     LirionResult, to_csvs
 
 end

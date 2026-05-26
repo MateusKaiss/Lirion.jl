@@ -10,14 +10,6 @@ function create_partition(::CaseRaw; kwargs...)
     return _metis_not_loaded_error()
 end
 
-function create_partition_split_bus(::AbstractString; kwargs...)
-    return _metis_not_loaded_error()
-end
-
-function create_partition_split_bus(::CaseRaw; kwargs...)
-    return _metis_not_loaded_error()
-end
-
 function _metis_not_loaded_error()
     return error(
         "create_partition requires Metis.jl, Graphs.jl and SimpleWeightedGraphs.jl.\n" *
