@@ -191,9 +191,9 @@ function _eps_primal_bus_pairs_signed(
     dim = 0
     norm_x_sq = 0.0
     norm_z_sq = 0.0
-    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
-        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], bid)
-        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], bid)
+    @inbounds for (k, (b_id, za, zb)) in enumerate(bus_pairs)
+        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], b_id)
+        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], b_id)
         dim += 2
         norm_x_sq += va^2 + vb^2
         norm_z_sq += 2 * consensus[k]^2

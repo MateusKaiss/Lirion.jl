@@ -3,6 +3,8 @@
 # ============================================================
 
 function prepare_distributed_partitions(full::CaseRaw, ::SplitBus)
+    _require_interzonal_branches(full, "SplitBus")
+
     full_bus_ids = full.bus.bus_i
     full_bus_zones = full.bus.zone
     full_f = full.branch.f_bus

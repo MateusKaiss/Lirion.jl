@@ -393,18 +393,18 @@ function _push_bus_consensus_rows!(rows, ws, partitions)
     for pair in ws.bus_pairs
         zi = pair.zone_i
         zj = pair.zone_j
-        bid = pair.bus_id
+        b_id = pair.bus_id
         if hasproperty(pair, :col_i)
-            _push_bus_reading!(rows, :theta, bid, zi, ws.zones[zi].y[pair.col_i])
-            _push_bus_reading!(rows, :theta, bid, zj, ws.zones[zj].y[pair.col_j])
+            _push_bus_reading!(rows, :theta, b_id, zi, ws.zones[zi].y[pair.col_i])
+            _push_bus_reading!(rows, :theta, b_id, zj, ws.zones[zj].y[pair.col_j])
         elseif hasproperty(pair, :theta_col_i)
-            _push_bus_reading!(rows, :theta, bid, zi, ws.zones[zi].y[pair.theta_col_i])
-            _push_bus_reading!(rows, :theta, bid, zj, ws.zones[zj].y[pair.theta_col_j])
-            _push_bus_reading!(rows, :v_mag, bid, zi, ws.zones[zi].y[pair.vm_col_i])
-            _push_bus_reading!(rows, :v_mag, bid, zj, ws.zones[zj].y[pair.vm_col_j])
+            _push_bus_reading!(rows, :theta, b_id, zi, ws.zones[zi].y[pair.theta_col_i])
+            _push_bus_reading!(rows, :theta, b_id, zj, ws.zones[zj].y[pair.theta_col_j])
+            _push_bus_reading!(rows, :v_mag, b_id, zi, ws.zones[zi].y[pair.vm_col_i])
+            _push_bus_reading!(rows, :v_mag, b_id, zj, ws.zones[zj].y[pair.vm_col_j])
         elseif hasproperty(pair, :v2_col_i)
-            _push_bus_reading!(rows, :v2, bid, zi, ws.zones[zi].y[pair.v2_col_i])
-            _push_bus_reading!(rows, :v2, bid, zj, ws.zones[zj].y[pair.v2_col_j])
+            _push_bus_reading!(rows, :v2, b_id, zi, ws.zones[zi].y[pair.v2_col_i])
+            _push_bus_reading!(rows, :v2, b_id, zj, ws.zones[zj].y[pair.v2_col_j])
         end
     end
     return nothing
@@ -422,16 +422,16 @@ function _push_edge_consensus_rows!(rows, ws, partitions)
         li = partitions.parts[zi].branch_idx_full_to_zone[gi]
         gj = partitions.parts[zj].zone_edges[le_j]
         lj = partitions.parts[zj].branch_idx_full_to_zone[gj]
-        bid = pair.line_global
+        b_id = pair.line_global
         if haskey(mi, :p_flow_branches) && haskey(mj, :p_flow_branches)
-            _push_branch_reading!(rows, :p_flow, bid, zi,
+            _push_branch_reading!(rows, :p_flow, b_id, zi,
                 _safe_value(mi[:p_flow_branches][li, 1]))
-            _push_branch_reading!(rows, :p_flow, bid, zj,
+            _push_branch_reading!(rows, :p_flow, b_id, zj,
                 _safe_value(mj[:p_flow_branches][lj, 1]))
             if haskey(mi, :q_flow_branches) && haskey(mj, :q_flow_branches)
-                _push_branch_reading!(rows, :q_flow, bid, zi,
+                _push_branch_reading!(rows, :q_flow, b_id, zi,
                     _safe_value(mi[:q_flow_branches][li, 1]))
-                _push_branch_reading!(rows, :q_flow, bid, zj,
+                _push_branch_reading!(rows, :q_flow, b_id, zj,
                     _safe_value(mj[:q_flow_branches][lj, 1]))
             end
         end
@@ -472,20 +472,20 @@ function _push_admm_bus_consensus_rows!(rows, partitions, sys)
     isempty(shared) && return nothing
 
     parts = partitions.parts
-    for bid in shared
+    for b_id in shared
         hosts = Tuple{Int, JuMP.Model}[]
         for (zpos, part) in enumerate(parts)
-            bid in part.bus.id && push!(hosts, (zpos, part.model::JuMP.Model))
+            b_id in part.bus.id && push!(hosts, (zpos, part.model::JuMP.Model))
         end
         length(hosts) >= 2 || continue
         # Emit one reading per zone that hosts this shared bus.
         for (zone, m) in hosts
             haskey(m, :theta) && _push_bus_reading!(
-                rows, :theta, bid, zone, _safe_value(m[:theta][bid, 1]))
+                rows, :theta, b_id, zone, _safe_value(m[:theta][b_id, 1]))
             haskey(m, :v_magnitude) && _push_bus_reading!(
-                rows, :v_mag, bid, zone, _safe_value(m[:v_magnitude][bid, 1]))
+                rows, :v_mag, b_id, zone, _safe_value(m[:v_magnitude][b_id, 1]))
             haskey(m, :v_magnitude_sq) && _push_bus_reading!(
-                rows, :v2, bid, zone, _safe_value(m[:v_magnitude_sq][bid, 1]))
+                rows, :v2, b_id, zone, _safe_value(m[:v_magnitude_sq][b_id, 1]))
         end
     end
     return nothing
@@ -544,19 +544,19 @@ end
 function _push_split_bus_consensus_rows!(rows, ws, partitions)
     hasproperty(ws, :zones) || return nothing
     for pair in ws.split_bus_pairs
-        bid = pair.bus_id
+        b_id = pair.bus_id
         has_q = hasproperty(pair, :q_inj_cols)
         for c in eachindex(pair.zones)
             zone = pair.zones[c]
             _push_bus_reading!(
                 rows,
                 :p_inj,
-                bid,
+                b_id,
                 zone,
                 ws.zones[zone].y[pair.p_inj_cols[c]],
             )
             has_q && _push_bus_reading!(
-                rows, :q_inj, bid, zone, ws.zones[zone].y[pair.q_inj_cols[c]],
+                rows, :q_inj, b_id, zone, ws.zones[zone].y[pair.q_inj_cols[c]],
             )
         end
     end
@@ -570,21 +570,21 @@ function _push_admm_split_bus_consensus_rows!(rows, ws, partitions)
     # One row per (split bus, zone copy); iterating the per-zone stores keeps a
     # bus shared by >2 zones from being counted once per pairwise edge.
     for zone in eachindex(p_inj_vars)
-        for bid in keys(p_inj_vars[zone])
-            v = _admm_pinj_value(partitions.parts[zone], p_inj_vars[zone], bid)
+        for b_id in keys(p_inj_vars[zone])
+            v = _admm_pinj_value(partitions.parts[zone], p_inj_vars[zone], b_id)
             v === nothing && continue
-            _push_bus_reading!(rows, :p_inj, bid, zone, v)
+            _push_bus_reading!(rows, :p_inj, b_id, zone, v)
             if q_inj_vars !== nothing
-                q = _admm_pinj_value(partitions.parts[zone], q_inj_vars[zone], bid)
-                q !== nothing && _push_bus_reading!(rows, :q_inj, bid, zone, q)
+                q = _admm_pinj_value(partitions.parts[zone], q_inj_vars[zone], b_id)
+                q !== nothing && _push_bus_reading!(rows, :q_inj, b_id, zone, q)
             end
         end
     end
     return nothing
 end
 
-@inline function _admm_pinj_value(part, store, bid)
-    v = get(store, bid, nothing)
+@inline function _admm_pinj_value(part, store, b_id)
+    v = get(store, b_id, nothing)
     v === nothing && return nothing
     m = part.model::JuMP.Model
     JuMP.has_values(m) || return nothing
@@ -608,13 +608,13 @@ function _merge_bus_rows(zones_vec)
     df = vcat([z.bus for z in zones_vec]...; cols = :union)
     ids = sort!(unique(df.bus_i))
     rows = NamedTuple[]
-    for bid in ids
-        sub = df[df.bus_i.==bid, :]
+    for b_id in ids
+        sub = df[df.bus_i.==b_id, :]
         # Owner's row is the one with non-zero demand (ghosts have pd=qd=0
         # by construction in `create_partition`). Fall back to the first row.
         own_idx = findfirst(i -> sub.pd[i] != 0 || sub.qd[i] != 0, 1:nrow(sub))
         own = own_idx === nothing ? 1 : own_idx
-        row = (; bus_i = bid, zone = sub.zone[own], pd = sub.pd[own], qd = sub.qd[own])
+        row = (; bus_i = b_id, zone = sub.zone[own], pd = sub.pd[own], qd = sub.qd[own])
         # Mean the consensus-carrying columns across zones that see the bus.
         for col in (:va, :vm, :vm_sq)
             if col in propertynames(sub)

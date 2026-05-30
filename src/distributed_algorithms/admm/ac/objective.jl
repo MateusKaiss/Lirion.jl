@@ -222,15 +222,15 @@ function build_linear_inj_term_ac(
     pos = part.position
     store = inj_vars[pos]
     isempty(store) && return lin
-    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
+    @inbounds for (k, (b_id, za, zb)) in enumerate(bus_pairs)
         z = consensus[k]
         lam = duals[k]
         if za == pos
-            v = get(store, bid, nothing)
+            v = get(store, b_id, nothing)
             v === nothing && continue
             lin += (lam - rho * z) * v
         elseif zb == pos
-            v = get(store, bid, nothing)
+            v = get(store, b_id, nothing)
             v === nothing && continue
             lin += (lam + rho * z) * v
         end

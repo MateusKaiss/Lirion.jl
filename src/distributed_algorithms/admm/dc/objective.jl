@@ -184,15 +184,15 @@ function build_linear_p_inj_term(
     store = p_inj_vars[pos]
     isempty(store) && return lin
 
-    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
+    @inbounds for (k, (b_id, za, zb)) in enumerate(bus_pairs)
         z = p_inj_consensus[k]
         lam = p_inj_duals[k]
         if za == pos
-            v = get(store, bid, nothing)
+            v = get(store, b_id, nothing)
             v === nothing && continue
             lin += (lam - rho * z) * v
         elseif zb == pos
-            v = get(store, bid, nothing)
+            v = get(store, b_id, nothing)
             v === nothing && continue
             lin += (lam + rho * z) * v
         end

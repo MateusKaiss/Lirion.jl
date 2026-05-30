@@ -203,10 +203,10 @@ function _update_bus_pairs_duals_signed!(
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
 )
     isempty(bus_pairs) && return nothing
-    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
+    @inbounds for (k, (b_id, za, zb)) in enumerate(bus_pairs)
         z = consensus[k]
-        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], bid)
-        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], bid)
+        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], b_id)
+        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], b_id)
         duals[k, za] += rho * (va - z)
         duals[k, zb] += rho * (vb + z)
     end

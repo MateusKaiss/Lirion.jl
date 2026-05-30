@@ -76,9 +76,9 @@ end
 @inline function _p_inj_value(
     part::AbstractPartition,
     store::Dict{Int, JuMP.VariableRef},
-    bid::Int,
+    b_id::Int,
 )
-    v = get(store, bid, nothing)
+    v = get(store, b_id, nothing)
     v === nothing && return 0.0
     m = part.model::JuMP.Model
     return JuMP.has_values(m) ? JuMP.value(v) : 0.0

@@ -275,10 +275,10 @@ function _primal_residual_bus_pairs_signed(
 )
     isempty(bus_pairs) && return 0.0
     acc = 0.0
-    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
+    @inbounds for (k, (b_id, za, zb)) in enumerate(bus_pairs)
         z = consensus[k]
-        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], bid)
-        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], bid)
+        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], b_id)
+        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], b_id)
         acc += (va - z)^2 + (vb + z)^2
     end
     return sqrt(acc)

@@ -353,10 +353,10 @@ appear here once it is published.
 
 ## Mathematical Foundations Website
 
-Lirion is accompanied by a dedicated technical & instructive website, created by Andressa Mathias Pedroso and Mateus Kaiss, providing learning resources for anyone interested in expanding their knowledge of these topics.
+Lirion is accompanied by a dedicated technical & instructive website, providing learning resources for anyone interested in expanding their knowledge of these topics.
 
 Rather than just cataloguing the formulations, the site builds the theory **from
-the ground up** — based on Mateus Kaiss's studies — deriving each model from first
+the ground up** deriving each model from first
 principles, including:
 
 - **Physical foundations** — from Maxwell's equations and circuit laws to the power-flow equations
@@ -374,8 +374,8 @@ principles, including:
 
 This software is part of an ongoing research program. The following works have been produced as part of this project's development:
 
-1. **[White Paper]** - *Lirion.jl: A Distributed Framework for Power Systems*, Mateus Kaiss et al. (In Preparation).
-2. *On the Impact of Network Sectioning and Coupling Variable Choices in ADMM-Based Distributed Optimal Power Flow*, Mateus Kaiss et al. (In Preparation).
+1. **[White Paper]** - *Lirion.jl: A Distributed Framework for Power Systems*, (In Preparation).
+2. *On the Impact of Network Sectioning and Coupling Variable Choices in ADMM-Based Distributed Optimal Power Flow*, (In Preparation).
 3. **BSc Thesis** - *Desenvolvimento de Ferramenta para Determinação do Fluxo de Potência Ótimo em Redes Elétricas*, Mateus Kaiss, UFPR (2025). [Link to University Repository/PDF]
 
 ## Citing Lirion
@@ -384,7 +384,7 @@ If you find Lirion useful in your work, we kindly request that you cite it:
 
 ```bibtex
 @software{kaiss2026lirion,
-  author  = {Kaiss, Mateus and Gebbran, Daniel and Küster, Kristie Kaminski},
+  author  = {Kaiss, Mateus and Küster, Kristie Kaminski and Gebbran, Daniel},
   title   = {{Lirion.jl}: A {Julia} Framework for Centralized and Distributed Optimal Power Flow},
   year    = {2026},
   version = {0.1.0},

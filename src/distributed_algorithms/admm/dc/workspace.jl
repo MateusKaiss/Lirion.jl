@@ -222,15 +222,14 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, DC})
     elseif sectioning isa SplitBus
         n_p_flow = 0
         n_p_dummy = 0
-        # Flatten N-way groups into per-(bus, zone) copies.
-        for (bid, zones) in sys.bus_groups
+        for (b_id, zones) in sys.bus_groups
             cidxs = Int[]
             for z in zones
                 n_p_inj += 1
                 push!(cidxs, n_p_inj)
                 push!(inj_copy_zone, z)
             end
-            push!(inj_groups, (bid, cidxs))
+            push!(inj_groups, (b_id, cidxs))
         end
         init_hybrid_partition!(
             partitions, sys, optimizer_factory, sectioning, inter,

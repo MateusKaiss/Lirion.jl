@@ -3,6 +3,8 @@
 # ============================================================
 
 function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
+    _require_interzonal_branches(full, "TieLine")
+
     full_bus_ids = full.bus.bus_i
     full_bus_zones = full.bus.zone
     full_f_bus_ids = full.branch.f_bus

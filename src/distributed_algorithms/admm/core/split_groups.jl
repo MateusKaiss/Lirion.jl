@@ -1,19 +1,7 @@
 # ============================================================
 # SplitBus N-way injection consensus (Σ p_z = 0 over all copies)
 # ============================================================
-#
-# Generalizes the pairwise `_*_bus_pairs_signed` helpers to a boundary bus
-# shared by any number of zones. Each split bus is a "group" with one copy per
-# zone; the physical constraint is that the net injection summed over all copies
-# is zero. The exchange-ADMM consensus target for a copy is its local value
-# minus the group mean:  target_c = v_c - mean(v over the group).  Since the
-# targets of a group sum to zero, this enforces Σ v_z → 0. For a 2-zone group
-# this reduces exactly to the pairwise `±0.5(v_a - v_b)` formulation.
-#
-# Storage is flattened per copy: `inj_groups[g] = (bus_id, [copy_idx...])` and
-# `inj_copy_zone[c]` gives the zone position of copy `c`. The per-copy target is
-# held in the p_inj VarState `consensus` vector (so save_prev! tracks its prev),
-# and the per-copy dual lives at `duals[c, zone_of_copy(c)]`.
+
 
 function _consensus_inj_groups!(
     target::AbstractVector{Float64},
@@ -24,16 +12,16 @@ function _consensus_inj_groups!(
 )
     isempty(inj_groups) && return nothing
     fill!(target, 0.0)
-    @inbounds for (bid, cidxs) in inj_groups
+    @inbounds for (b_id, cidxs) in inj_groups
         s = 0.0
         for c in cidxs
             z = inj_copy_zone[c]
-            s += _p_inj_value(partitions.parts[z], p_inj_vars[z], bid)
+            s += _p_inj_value(partitions.parts[z], p_inj_vars[z], b_id)
         end
         m = s / length(cidxs)
         for c in cidxs
             z = inj_copy_zone[c]
-            v = _p_inj_value(partitions.parts[z], p_inj_vars[z], bid)
+            v = _p_inj_value(partitions.parts[z], p_inj_vars[z], b_id)
             target[c] = v - m
         end
     end
@@ -50,10 +38,10 @@ function _update_inj_groups_duals!(
     p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
 )
     isempty(inj_groups) && return nothing
-    @inbounds for (bid, cidxs) in inj_groups
+    @inbounds for (b_id, cidxs) in inj_groups
         for c in cidxs
             z = inj_copy_zone[c]
-            v = _p_inj_value(partitions.parts[z], p_inj_vars[z], bid)
+            v = _p_inj_value(partitions.parts[z], p_inj_vars[z], b_id)
             duals[c, z] += rho * (v - target[c])
         end
     end
@@ -69,10 +57,10 @@ function _primal_residual_inj_groups(
 )
     isempty(inj_groups) && return 0.0
     acc = 0.0
-    @inbounds for (bid, cidxs) in inj_groups
+    @inbounds for (b_id, cidxs) in inj_groups
         for c in cidxs
             z = inj_copy_zone[c]
-            v = _p_inj_value(partitions.parts[z], p_inj_vars[z], bid)
+            v = _p_inj_value(partitions.parts[z], p_inj_vars[z], b_id)
             acc += (v - target[c])^2
         end
     end
@@ -109,10 +97,10 @@ function _eps_primal_inj_groups(
     dim = 0
     norm_x_sq = 0.0
     norm_z_sq = 0.0
-    @inbounds for (bid, cidxs) in inj_groups
+    @inbounds for (b_id, cidxs) in inj_groups
         for c in cidxs
             z = inj_copy_zone[c]
-            v = _p_inj_value(partitions.parts[z], p_inj_vars[z], bid)
+            v = _p_inj_value(partitions.parts[z], p_inj_vars[z], b_id)
             dim += 1
             norm_x_sq += v^2
             norm_z_sq += target[c]^2
@@ -158,10 +146,10 @@ function build_linear_inj_term_groups(
     isempty(inj_groups) && return lin
     store = inj_vars[pos]
     isempty(store) && return lin
-    @inbounds for (bid, cidxs) in inj_groups
+    @inbounds for (b_id, cidxs) in inj_groups
         for c in cidxs
             inj_copy_zone[c] == pos || continue
-            v = get(store, bid, nothing)
+            v = get(store, b_id, nothing)
             v === nothing && continue
             lin += (duals_col[c] - rho * target[c]) * v
         end

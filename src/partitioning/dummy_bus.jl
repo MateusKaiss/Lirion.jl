@@ -3,6 +3,8 @@
 # ============================================================
 
 function prepare_distributed_partitions(full::CaseRaw, ::DummyBus)
+    _require_interzonal_branches(full, "DummyBus")
+
     cas = deepcopy(full)
 
     bus = cas.bus
@@ -11,8 +13,8 @@ function prepare_distributed_partitions(full::CaseRaw, ::DummyBus)
     gc = cas.gencost
 
     bus_id_to_idx = Dict{Int, Int}()
-    for (i, bid) in enumerate(bus.bus_i)
-        bus_id_to_idx[bid] = i
+    for (i, b_id) in enumerate(bus.bus_i)
+        bus_id_to_idx[b_id] = i
     end
 
     tie_idxs = Int[]
@@ -27,56 +29,38 @@ function prepare_distributed_partitions(full::CaseRaw, ::DummyBus)
         end
     end
 
-    isempty(tie_idxs) && return prepare_distributed_partitions(cas, TieLine())
-
     dummy_bus_ids = Set{Int}()
     next_bus_id = maximum(bus.bus_i) + 1
-    half_a_globals = Int[]  # global idx of (from → dummy) branch
-    half_b_globals = Int[]  # global idx of (dummy → to) branch
+    half_a_globals = Int[]
+    half_b_globals = Int[]
 
     for b in tie_idxs
+        # 1. Mint a dummy bus that inherits the from-bus's area/base_kv/zone.
         dummy_id = next_bus_id
         next_bus_id += 1
-
         fi = bus_id_to_idx[br.f_bus[b]]
-
-        push!(bus.bus_i, dummy_id)
-        push!(bus.bus_type, 1)
-        push!(bus.pd, 0.0)
-        push!(bus.qd, 0.0)
-        push!(bus.gs, 0.0)
-        push!(bus.bs, 0.0)
-        push!(bus.area, bus.area[fi])
-        push!(bus.vm, 1.0)
-        push!(bus.va, 0.0)
-        push!(bus.base_kv, bus.base_kv[fi])
-        push!(bus.zone, bus.zone[fi])
-        push!(bus.vmax, 1.1)
-        push!(bus.vmin, 0.9)
-        push!(bus.lam_p, 0.0)
-        push!(bus.lam_q, 0.0)
-        push!(bus.mu_vmax, 0.0)
-        push!(bus.mu_vmin, 0.0)
-        push!(bus.is_virtual, false)
+        _push_dummy_bus!(bus, dummy_id, bus.area[fi], bus.base_kv[fi], bus.zone[fi])
         bus_id_to_idx[dummy_id] = length(bus.bus_i)
         push!(dummy_bus_ids, dummy_id)
+
         f_orig = br.f_bus[b]
         t_orig = br.t_bus[b]
         r_h = br.br_r[b] / 2.0
         x_h = br.br_x[b] / 2.0
         b_h = br.br_b[b] / 2.0
-
         has_xfmr = (br.tap[b] != 0.0) || (br.shift[b] != 0.0)
 
-        _push_branch!(br, f_orig, dummy_id, r_h, x_h, b_h, br.rate_a[b],
-            br.rate_b[b], br.rate_c[b],
+        _push_branch!(br, f_orig, dummy_id, r_h, x_h, b_h,
+            br.rate_a[b], br.rate_b[b], br.rate_c[b],
             has_xfmr ? br.tap[b] : 0.0,
             has_xfmr ? br.shift[b] : 0.0,
             br.angmin[b], br.angmax[b])
         push!(half_a_globals, length(br.f_bus))
 
-        _push_branch!(br, dummy_id, t_orig, r_h, x_h, b_h, br.rate_a[b],
-            br.rate_b[b], br.rate_c[b], 0.0, 0.0, br.angmin[b], br.angmax[b])
+        _push_branch!(br, dummy_id, t_orig, r_h, x_h, b_h,
+            br.rate_a[b], br.rate_b[b], br.rate_c[b],
+            0.0, 0.0,
+            br.angmin[b], br.angmax[b])
         push!(half_b_globals, length(br.f_bus))
 
         br.br_status[b] = 0

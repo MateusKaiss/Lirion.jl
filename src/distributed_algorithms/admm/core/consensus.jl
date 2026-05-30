@@ -264,9 +264,9 @@ function _consensus_bus_pairs_signed!(
 )
     isempty(bus_pairs) && return nothing
     fill!(consensus, 0.0)
-    @inbounds for (k, (bid, za, zb)) in enumerate(bus_pairs)
-        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], bid)
-        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], bid)
+    @inbounds for (k, (b_id, za, zb)) in enumerate(bus_pairs)
+        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], b_id)
+        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], b_id)
         consensus[k] = 0.5 * (va - vb)
     end
     return nothing

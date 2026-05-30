@@ -42,6 +42,16 @@ function _find_interzonal_branches(full::CaseRaw, ::TieLine)
     return interzonal_branches
 end
 
+@inline function _require_interzonal_branches(full::CaseRaw, who::AbstractString)
+    isempty(_find_interzonal_branches(full, TieLine())) && error(
+        "$who: the system is electrically decoupled — no interzonal branches " *
+        "found. The zones form independent islands with nothing to couple. " *
+        "Use `centralized()` on each zone separately, or check the `bus.zone` " *
+        "assignments.",
+    )
+    return nothing
+end
+
 # ============================================================
 # Generic helpers (shared across sectionings)
 # ============================================================
@@ -375,8 +385,36 @@ end
 end
 
 # ============================================================
-# DummyBus — branch + dummy generator push helpers
+# DummyBus — dummy bus / branch / dummy generator push helpers
 # ============================================================
+
+function _push_dummy_bus!(
+    bus::BusRaw{Float64},
+    bus_id::Int,
+    area::Int,
+    base_kv::Float64,
+    zone::Int,
+)
+    push!(bus.bus_i, bus_id)
+    push!(bus.bus_type, 1)
+    push!(bus.pd, 0.0)
+    push!(bus.qd, 0.0)
+    push!(bus.gs, 0.0)
+    push!(bus.bs, 0.0)
+    push!(bus.area, area)
+    push!(bus.vm, 1.0)
+    push!(bus.va, 0.0)
+    push!(bus.base_kv, base_kv)
+    push!(bus.zone, zone)
+    push!(bus.vmax, 1.1)
+    push!(bus.vmin, 0.9)
+    push!(bus.lam_p, 0.0)
+    push!(bus.lam_q, 0.0)
+    push!(bus.mu_vmax, 0.0)
+    push!(bus.mu_vmin, 0.0)
+    push!(bus.is_virtual, false)
+    return nothing
+end
 
 function _push_branch!(br, f, t, r, x, b_sh, ra, rb, rc, tap, shift, amin, amax)
     push!(br.f_bus, f)
