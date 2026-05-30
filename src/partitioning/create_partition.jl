@@ -110,14 +110,14 @@ function _write_branch_table(io::IO, br::BranchRaw)
     return println(io)
 end
 
-function _write_gencost_table(io::IO, gc::GencostRaw)
-    isempty(gc.model) && return
+function _write_gencost_table(io::IO, gen_cost::GencostRaw)
+    isempty(gen_cost.model) && return
     println(io, "%% generator cost data")
     println(io, "mpc.gencost = [")
-    for i in eachindex(gc.model)
-        print(io, "\t", gc.model[i], "\t", _fmt(gc.startup[i]), "\t")
-        print(io, _fmt(gc.shutdown[i]), "\t", gc.ncost[i])
-        for c in gc.cost_coefficients[i]
+    for i in eachindex(gen_cost.model)
+        print(io, "\t", gen_cost.model[i], "\t", _fmt(gen_cost.startup[i]), "\t")
+        print(io, _fmt(gen_cost.shutdown[i]), "\t", gen_cost.ncost[i])
+        for c in gen_cost.cost_coefficients[i]
             print(io, "\t", _fmt(c))
         end
         println(io, ";")

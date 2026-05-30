@@ -10,7 +10,7 @@ function prepare_distributed_partitions(full::CaseRaw, ::DummyBus)
     bus = cas.bus
     br = cas.branch
     gen = cas.gen
-    gc = cas.gencost
+    gen_cost = cas.gencost
 
     bus_id_to_idx = Dict{Int, Int}()
     for (i, b_id) in enumerate(bus.bus_i)
@@ -35,7 +35,6 @@ function prepare_distributed_partitions(full::CaseRaw, ::DummyBus)
     half_b_globals = Int[]
 
     for b in tie_idxs
-        # 1. Mint a dummy bus that inherits the from-bus's area/base_kv/zone.
         dummy_id = next_bus_id
         next_bus_id += 1
         fi = bus_id_to_idx[br.f_bus[b]]
@@ -64,7 +63,7 @@ function prepare_distributed_partitions(full::CaseRaw, ::DummyBus)
         push!(half_b_globals, length(br.f_bus))
 
         br.br_status[b] = 0
-        _push_dummy_gen!(gen, gc, dummy_id, cas.baseMVA)
+        _push_dummy_gen!(gen, gen_cost, dummy_id, cas.baseMVA)
     end
 
     full_bus_ids = cas.bus.bus_i

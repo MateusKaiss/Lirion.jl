@@ -215,14 +215,14 @@ end
     full::CaseRaw,
     zone_gen_idx::Vector{Int},
 )
-    gc = full.gencost
+    gen_cost = full.gencost
 
     zone_case.gencost = GencostRaw{Float64}(
-        gc.model[zone_gen_idx],
-        gc.startup[zone_gen_idx],
-        gc.shutdown[zone_gen_idx],
-        gc.ncost[zone_gen_idx],
-        gc.cost_coefficients[zone_gen_idx],
+        gen_cost.model[zone_gen_idx],
+        gen_cost.startup[zone_gen_idx],
+        gen_cost.shutdown[zone_gen_idx],
+        gen_cost.ncost[zone_gen_idx],
+        gen_cost.cost_coefficients[zone_gen_idx],
     )
 
     return nothing
@@ -441,7 +441,7 @@ function _push_branch!(br, f, t, r, x, b_sh, ra, rb, rc, tap, shift, amin, amax)
     return nothing
 end
 
-function _push_dummy_gen!(gen, gc, bus_id::Int, baseMVA::Float64)
+function _push_dummy_gen!(gen, gen_cost, bus_id::Int, baseMVA::Float64)
     push!(gen.gen_bus, bus_id)
     push!(gen.pg, 0.0)
     push!(gen.qg, 0.0)
@@ -470,10 +470,10 @@ function _push_dummy_gen!(gen, gc, bus_id::Int, baseMVA::Float64)
     push!(gen.plant_type, "artificial")
     push!(gen.curtailment_cost, 0.0)
 
-    push!(gc.model, 2)
-    push!(gc.startup, 0.0)
-    push!(gc.shutdown, 0.0)
-    push!(gc.ncost, 2)
-    push!(gc.cost_coefficients, [0.0, 0.0])
+    push!(gen_cost.model, 2)
+    push!(gen_cost.startup, 0.0)
+    push!(gen_cost.shutdown, 0.0)
+    push!(gen_cost.ncost, 2)
+    push!(gen_cost.cost_coefficients, [0.0, 0.0])
     return nothing
 end
