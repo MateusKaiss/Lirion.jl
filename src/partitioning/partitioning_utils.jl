@@ -98,6 +98,32 @@ end
     return nothing
 end
 
+@inline function _collect_external_dummy_neighbors!(
+    zone_subprob_membership::Vector{Bool},
+    zone_internal_membership::Vector{Bool},
+    full_f_bus_ids::AbstractVector{Int},
+    full_t_bus_ids::AbstractVector{Int},
+    full_branch_in_service_mask::AbstractVector{Bool},
+    dummy_bus_ids::Set{Int},
+)
+    @inbounds for i in eachindex(full_f_bus_ids)
+        full_branch_in_service_mask[i] || continue
+
+        f_bus_id = full_f_bus_ids[i]
+        t_bus_id = full_t_bus_ids[i]
+
+        f_in_zone = zone_internal_membership[f_bus_id]
+        t_in_zone = zone_internal_membership[t_bus_id]
+
+        if f_in_zone && !t_in_zone && (t_bus_id in dummy_bus_ids)
+            zone_subprob_membership[t_bus_id] = true
+        elseif t_in_zone && !f_in_zone && (f_bus_id in dummy_bus_ids)
+            zone_subprob_membership[f_bus_id] = true
+        end
+    end
+    return nothing
+end
+
 @inline function _collect_member_positions(
     full_bus_ids::AbstractVector{<:Integer},
     membership::Vector{Bool},
@@ -106,6 +132,15 @@ end
     sizehint!(out, count(membership))
     @inbounds for i in eachindex(full_bus_ids)
         membership[full_bus_ids[i]] && push!(out, i)
+    end
+    return out
+end
+
+@inline function _compute_zone_id_to_pos(zone_ids::AbstractVector{<:Integer})
+    out = Dict{Int, Int}()
+    sizehint!(out, length(zone_ids))
+    @inbounds for (pos, zone_id) in enumerate(zone_ids)
+        out[zone_id] = pos
     end
     return out
 end
@@ -162,6 +197,22 @@ end
         end
     end
 
+    return nothing
+end
+
+@inline function _zero_clone_loads!(
+    bus::BusRaw{Float64},
+    zone_internal_membership::Vector{Bool},
+)
+    @inbounds for i in eachindex(bus.bus_i)
+        bus_id = bus.bus_i[i]
+        zone_internal_membership[bus_id] && continue
+        bus.is_virtual[i] = false
+        bus.pd[i] = 0.0
+        bus.qd[i] = 0.0
+        bus.gs[i] = 0.0
+        bus.bs[i] = 0.0
+    end
     return nothing
 end
 
@@ -245,6 +296,65 @@ end
         end
     end
     return out
+end
+
+@inline function _filter_branches_inside_subprob(
+    full_f_bus_ids::AbstractVector{<:Integer},
+    full_t_bus_ids::AbstractVector{<:Integer},
+    full_branch_in_service_mask::AbstractVector{Bool},
+    zone_subprob_membership::Vector{Bool},
+)
+    out = Int[]
+    sizehint!(out, length(full_f_bus_ids))
+    @inbounds for i in eachindex(full_f_bus_ids)
+        full_branch_in_service_mask[i] || continue
+        f = Int(full_f_bus_ids[i])
+        t = Int(full_t_bus_ids[i])
+        if zone_subprob_membership[f] && zone_subprob_membership[t]
+            push!(out, i)
+        end
+    end
+    return out
+end
+
+@inline function _filter_branches_owned_by_zone(
+    full_branch_in_service_mask::AbstractVector{Bool},
+    branch_owner::Vector{Int},
+    zone_id::Int,
+)
+    out = Int[]
+    sizehint!(out, length(branch_owner))
+    @inbounds for b in eachindex(branch_owner)
+        full_branch_in_service_mask[b] || continue
+        branch_owner[b] == zone_id || continue
+        push!(out, b)
+    end
+    return out
+end
+
+@inline function _compute_branch_owner_and_split_set(
+    full_f_bus_ids::AbstractVector{<:Integer},
+    full_t_bus_ids::AbstractVector{<:Integer},
+    full_branch_in_service_mask::AbstractVector{Bool},
+    bus_to_zone::Vector{Int},
+    n_full_branches::Int,
+)
+    branch_owner = zeros(Int, n_full_branches)
+    split_set = Set{Tuple{Int, Int}}()
+    @inbounds for b in eachindex(full_f_bus_ids)
+        full_branch_in_service_mask[b] || continue
+        f = full_f_bus_ids[b]
+        t = full_t_bus_ids[b]
+        zf = bus_to_zone[f]
+        zt = bus_to_zone[t]
+        if zf == zt
+            branch_owner[b] = zf
+        else
+            branch_owner[b] = zt
+            push!(split_set, (f, zt))
+        end
+    end
+    return branch_owner, split_set
 end
 
 @inline function _slice_branch(full_branch::BranchRaw{Float64}, keep::Vector{Int})

@@ -68,110 +68,102 @@ function prepare_distributed_partitions(full::CaseRaw, ::DummyBus)
 
     full_bus_ids = cas.bus.bus_i
     full_bus_zones = cas.bus.zone
-    full_f = cas.branch.f_bus
-    full_t = cas.branch.t_bus
-    full_mask = branch_in_service_mask(cas.branch)
+    full_f_bus_ids = cas.branch.f_bus
+    full_t_bus_ids = cas.branch.t_bus
+    full_branch_in_service_mask = branch_in_service_mask(cas.branch)
 
     n_full_bus = length(full_bus_ids)
-    n_full_branches = length(full_f)
-    max_bus_id_val = maximum(full_bus_ids)
+    n_full_branches = length(full_f_bus_ids)
+    max_bus_id = maximum(full_bus_ids)
 
     zone_ids = sort!(unique(full_bus_zones))
     n_zones = length(zone_ids)
     parts = Vector{CaseRaw}(undef, n_zones)
 
-    zone_internal = zeros(Bool, max_bus_id_val)
-    zone_subprob = zeros(Bool, max_bus_id_val)
-    bus_zone_count = zeros(Int, max_bus_id_val)
+    zone_internal_membership = zeros(Bool, max_bus_id)
+    zone_subprob_membership = zeros(Bool, max_bus_id)
+    bus_zone_count = zeros(Int, max_bus_id)
 
-    @inbounds for (i, zid) in enumerate(zone_ids)
-        fill!(zone_internal, false)
-        _mark_internal_membership!(zone_internal, full_bus_ids, full_bus_zones, zid)
+    @inbounds for (i, zone_id) in enumerate(zone_ids)
+        fill!(zone_internal_membership, false)
+        _mark_internal_membership!(zone_internal_membership, full_bus_ids, full_bus_zones, zone_id)
 
-        copyto!(zone_subprob, zone_internal)
+        copyto!(zone_subprob_membership, zone_internal_membership)
+        _collect_external_dummy_neighbors!(
+            zone_subprob_membership,
+            zone_internal_membership,
+            full_f_bus_ids,
+            full_t_bus_ids,
+            full_branch_in_service_mask,
+            dummy_bus_ids,
+        )
 
-        for bi in eachindex(full_f)
-            full_mask[bi] || continue
-            fid = full_f[bi]
-            tid = full_t[bi]
-            f_in = zone_internal[fid]
-            t_in = zone_internal[tid]
+        zone_subprob_bus_idx_full = _collect_member_positions(full_bus_ids, zone_subprob_membership)
 
-            if f_in && !t_in && (tid in dummy_bus_ids)
-                zone_subprob[tid] = true
-            elseif t_in && !f_in && (fid in dummy_bus_ids)
-                zone_subprob[fid] = true
-            end
-        end
+        zone_case = _build_zone_meta(cas, zone_id)
+        zone_case.bus = _slice_bus(cas.bus, zone_subprob_bus_idx_full)
+        _mark_virtual_buses!(zone_case.bus, zone_internal_membership)
+        zone_gen_idx = _filter_by_zone_bus(cas.gen.gen_bus, zone_subprob_membership)
+        zone_case.gen = _slice_gen(cas.gen, zone_gen_idx)
+        _slice_gencosts!(zone_case, cas, zone_gen_idx)
 
-        bus_idx_full = _collect_member_positions(full_bus_ids, zone_subprob)
-
-        zc = _build_zone_meta(cas, zid)
-        zc.bus = _slice_bus(cas.bus, bus_idx_full)
-        _mark_virtual_buses!(zc.bus, zone_internal)
-        gen_idx = _filter_by_zone_bus(cas.gen.gen_bus, zone_subprob)
-        zc.gen = _slice_gen(cas.gen, gen_idx)
-        _slice_gencosts!(zc, cas, gen_idx)
-
-        br_idx = Int[]
-        for bi in eachindex(full_f)
-            full_mask[bi] || continue
-            zone_subprob[full_f[bi]] && zone_subprob[full_t[bi]] && push!(br_idx, bi)
-        end
-        zc.branch = _slice_branch(cas.branch, br_idx)
+        zone_branch_idx_in_full = _filter_branches_inside_subprob(
+            full_f_bus_ids,
+            full_t_bus_ids,
+            full_branch_in_service_mask,
+            zone_subprob_membership,
+        )
+        zone_case.branch = _slice_branch(cas.branch, zone_branch_idx_in_full)
 
         if cas.storage !== nothing
-            sidx = _filter_by_zone_bus(cas.storage.storage_bus, zone_internal)
-            zc.storage = _slice_storage(cas.storage, sidx)
+            zone_storage_idx = _filter_by_zone_bus(cas.storage.storage_bus, zone_internal_membership)
+            zone_case.storage = _slice_storage(cas.storage, zone_storage_idx)
         end
 
-        _filter_timeseries!(zc, cas, zone_internal, gen_idx)
+        _filter_timeseries!(zone_case, cas, zone_internal_membership, zone_gen_idx)
 
-        zc.dist.zone_branch_idx_in_full = br_idx
-        zc.dist.branch_idx_full_to_zone = zeros(Int, n_full_branches)
-        for (li, gi) in enumerate(br_idx)
-            zc.dist.branch_idx_full_to_zone[gi] = li
+        zone_case.dist.zone_branch_idx_in_full = zone_branch_idx_in_full
+        zone_case.dist.branch_idx_full_to_zone = zeros(Int, n_full_branches)
+        for (local_idx, global_idx) in enumerate(zone_branch_idx_in_full)
+            zone_case.dist.branch_idx_full_to_zone[global_idx] = local_idx
         end
 
-        add_case_index_maps!(zc)
+        add_case_index_maps!(zone_case)
 
-        for b in zc.bus.bus_i
+        for b in zone_case.bus.bus_i
             bus_zone_count[b] += 1
         end
 
-        parts[i] = zc
+        parts[i] = zone_case
     end
 
-    full_shared = Int[]
-    @inbounds for b in 1:max_bus_id_val
-        bus_zone_count[b] > 1 && push!(full_shared, b)
+    full_shared_bus_ids = Int[]
+    @inbounds for b in 1:max_bus_id
+        bus_zone_count[b] > 1 && push!(full_shared_bus_ids, b)
     end
-    shared_mask = zeros(Bool, max_bus_id_val)
-    for b in full_shared
-        shared_mask[b] = true
+    full_shared_membership = zeros(Bool, max_bus_id)
+    for b in full_shared_bus_ids
+        full_shared_membership[b] = true
     end
-    cas.dist.full_shared_bus_ids = full_shared
-    full.dist.full_shared_bus_ids = full_shared
-    for zc in parts
-        zc.dist.zone_shared_bus_ids = [b for b in zc.bus.bus_i if shared_mask[b]]
+    cas.dist.full_shared_bus_ids = full_shared_bus_ids
+    full.dist.full_shared_bus_ids = full_shared_bus_ids
+    for zone_case in parts
+        zone_case.dist.zone_shared_bus_ids = [b for b in zone_case.bus.bus_i if full_shared_membership[b]]
     end
-    zone_id_to_pos = Dict{Int, Int}()
-    for (pos, zid) in enumerate(zone_ids)
-        zone_id_to_pos[zid] = pos
-    end
+    zone_id_to_pos = _compute_zone_id_to_pos(zone_ids)
 
-    pairs_nt = NTuple{4, Int}[]
+    branch_pairs = NTuple{4, Int}[]
     for k in eachindex(tie_idxs)
         za_id, zb_id = tie_orig_zones[k]
-        ga = half_a_globals[k]
-        gb = half_b_globals[k]
-        push!(pairs_nt,
-            (ga, zone_id_to_pos[za_id], gb, zone_id_to_pos[zb_id]),
+        half_a_global = half_a_globals[k]
+        half_b_global = half_b_globals[k]
+        push!(branch_pairs,
+            (half_a_global, zone_id_to_pos[za_id], half_b_global, zone_id_to_pos[zb_id]),
         )
     end
 
-    full.dist.branch_pairs = pairs_nt
-    cas.dist.branch_pairs = pairs_nt
+    full.dist.branch_pairs = branch_pairs
+    cas.dist.branch_pairs = branch_pairs
 
     return (zone_ids = zone_ids, parts = parts)
 end
