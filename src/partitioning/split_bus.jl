@@ -21,7 +21,6 @@ function prepare_distributed_partitions(full::CaseRaw, ::SplitBus)
 
     zone_ids = sort!(unique(full_bus_zones))
     n_zones = length(zone_ids)
-    zone_id_to_pos = _compute_zone_id_to_pos(zone_ids)
 
     branch_owner, split_set = _compute_branch_owner_and_split_set(
         full_f_bus_ids,
@@ -111,6 +110,8 @@ function prepare_distributed_partitions(full::CaseRaw, ::SplitBus)
     for (fbus, zb) in split_set
         push!(get!(neighbor_zones_of, fbus, Int[]), zb)
     end
+
+    zone_id_to_pos = _compute_zone_id_to_pos(zone_ids)
 
     bus_pairs = NTuple{3, Int}[]
     sizehint!(bus_pairs, length(split_set))

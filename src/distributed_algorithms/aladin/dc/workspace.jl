@@ -126,9 +126,6 @@ Base.@kwdef mutable struct DCHybridWorkspaceALADIN <: AbstractALADINWorkspace
     sigma_theta_shared::Float64 = 10.0
     sigma_pg::Float64 = 1.0
     sigma_other::Float64 = 1.0
-    # Smaller default than Power's σ_pflow: in Hybrid the pflow prox is
-    # ADDED on top of σ_theta_shared (not in place of), so 10·b² on each
-    # edge endpoint quickly over-regularises the local NLP.
     sigma_pflow::Float64 = 1.0
     proximal_mode::Symbol = :primal
 

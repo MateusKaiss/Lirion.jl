@@ -51,7 +51,6 @@ function prepare_distributed_partitions(full::CaseRaw, ::TieLine)
 
         zone_gen_idx = _filter_by_zone_bus(full.gen.gen_bus, zone_internal_membership)
         zone_case.gen = _slice_gen(full.gen, zone_gen_idx)
-
         _slice_gencosts!(zone_case, full, zone_gen_idx)
 
         zone_branch_idx_in_full = _filter_branches_incident_to_zone(
