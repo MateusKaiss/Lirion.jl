@@ -36,9 +36,6 @@ end
 # Split bus pair (SplitBus sectioning)
 # ------------------------------------------------------------
 
-# Net-injection consensus over all copies of a split bus: Sigma_z p_z = 0.
-# `zones`/`p_inj_cols` are parallel arrays over the copies (>= 2 of them), so a
-# bus shared by N zones is one pair carrying N columns.
 struct SplitBusPair
     consensus_idx::Int
     bus_id::Int

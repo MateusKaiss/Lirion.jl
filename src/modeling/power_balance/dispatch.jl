@@ -7,8 +7,6 @@ function active_power_balance!(
     return nothing
 end
 
-# IVR: current balance replaces both active AND reactive power balance.
-# Called once from active_power_balance!; reactive is a no-op.
 function active_power_balance!(
     model::JuMP.Model,
     sys::SystemData,

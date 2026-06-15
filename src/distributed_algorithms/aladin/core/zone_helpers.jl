@@ -17,8 +17,6 @@ function _build_var_layout(model::JuMP.Model)
     return all_vars, n, var_to_col
 end
 
-# Initial `x_prev` from JuMP `start_value` (warm-start). Falls back
-# to 0.0 when no start value is set. Used by every zone-data builder.
 function _init_from_start_values(all_vars::Vector{JuMP.VariableRef})
     n = length(all_vars)
     v = Vector{Float64}(undef, n)
@@ -49,6 +47,41 @@ function _collect_bounds(all_vars::Vector{JuMP.VariableRef})
     return lb, ub
 end
 
+
+@inline function _push_affine_row!(
+    rows::Vector{Int},
+    cols::Vector{Int},
+    vals::Vector{Float64},
+    row::Int,
+    func::JuMP.AffExpr,
+    var_to_col::Dict{JuMP.VariableRef, Int};
+    scale::Float64 = 1.0,
+)
+    for (v, coef) in func.terms
+        col = get(var_to_col, v, 0)
+        col == 0 && continue
+        push!(rows, row)
+        push!(cols, col)
+        push!(vals, scale * coef)
+    end
+    return nothing
+end
+
+@inline function _push_affine_row!(
+    ::Vector{Int},
+    ::Vector{Int},
+    ::Vector{Float64},
+    ::Int,
+    func,
+    ::Dict,
+)
+    return error(
+        "ALADIN sensitivity extraction: expected affine equality constraint, " *
+        "got $(typeof(func)). Canonical ALADIN DC/SOCWR only supports linear " *
+        "local equalities.",
+    )
+end
+
 # ============================================================
 # Equality Jacobian (sparse, from JuMP affine constraints)
 # ============================================================
@@ -76,41 +109,6 @@ function _extract_equality_jacobian(
     end
 
     return SparseArrays.sparse(rows, cols, vals, nrows, n_vars)
-end
-
-@inline function _push_affine_row!(
-    rows::Vector{Int},
-    cols::Vector{Int},
-    vals::Vector{Float64},
-    row::Int,
-    func::JuMP.AffExpr,
-    var_to_col::Dict{JuMP.VariableRef, Int};
-    scale::Float64 = 1.0,
-)
-    for (v, coef) in func.terms
-        col = get(var_to_col, v, 0)
-        col == 0 && continue
-        push!(rows, row)
-        push!(cols, col)
-        push!(vals, scale * coef)
-    end
-    return nothing
-end
-
-# Non-affine function — shouldn't happen in DC/SOCWR, but guard anyway.
-@inline function _push_affine_row!(
-    ::Vector{Int},
-    ::Vector{Int},
-    ::Vector{Float64},
-    ::Int,
-    func,
-    ::Dict,
-)
-    return error(
-        "ALADIN sensitivity extraction: expected affine equality constraint, " *
-        "got $(typeof(func)). Canonical ALADIN DC/SOCWR only supports linear " *
-        "local equalities.",
-    )
 end
 
 # ============================================================

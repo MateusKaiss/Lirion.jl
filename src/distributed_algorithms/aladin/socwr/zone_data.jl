@@ -130,25 +130,24 @@ function _collect_socwr_cols(
         end
     end
 
+    # `obj.generator_status[g] == 1` ⇔ JuMP sparse axis `gen.existing[g]`
+    # (both derived from `gen_raw.gen_status`), so `pg_var[g, 1]` / `qg_var[g, 1]`
+    # are guaranteed to exist whenever the status filter passes.
     if haskey(model, :p_generation)
         pg_var = model[:p_generation]
         for g in 1:obj.number_of_generators
             obj.generator_status[g] == 1 || continue
-            v = try
-                pg_var[g, 1]
-            catch
-                continue
-            end
+            v = pg_var[g, 1]
             col = get(var_to_col, v, 0)
             col == 0 && continue
             push!(pg_cols, col)
 
-            coefs =
-                (g <= length(obj.generator_costs[1])) ? obj.generator_costs[1][g] :
-                Float64[]
-            @assert length(coefs) <= 3 "ALADIN: generator cost must be at most quadratic (got degree $(length(coefs)-1))"
+            # `obj.generator_costs[1]` is pre-allocated with `obj.number_of_generators`
+            # entries in `build_objective_data`, so direct indexing is safe.
             # Matpower convention: descending degrees. For quadratic (len 3)
             # coefs = [c2, c1, c0].
+            coefs = obj.generator_costs[1][g]
+            @assert length(coefs) <= 3 "ALADIN: generator cost must be at most quadratic (got degree $(length(coefs)-1))"
             c2 = (length(coefs) >= 3) ? coefs[end-2] : 0.0
             c1 = (length(coefs) >= 2) ? coefs[end-1] : 0.0
             push!(pg_c2_sbase2, 2.0 * c2 * sbase^2)
@@ -160,11 +159,7 @@ function _collect_socwr_cols(
         qg_var = model[:q_generation]
         for g in 1:obj.number_of_generators
             obj.generator_status[g] == 1 || continue
-            v = try
-                qg_var[g, 1]
-            catch
-                continue
-            end
+            v = qg_var[g, 1]
             col = get(var_to_col, v, 0)
             col == 0 && continue
             push!(qg_cols, col)
