@@ -595,16 +595,6 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
                     "proximal_mode=:primal.",
                 ),
             )
-        proximal_mode === :pflow && base_model === AC &&
-            throw(
-                ArgumentError(
-                    "proximal_mode=:pflow is not supported in AC: p_flow_branches " *
-                    "is a non-linear expression in (V, θ), so (p_flow − p_prev)² " *
-                    "is not quadratic in primal variables. Use base_model=DC or " *
-                    "SOCWR with :pflow, or proximal_mode=:primal in AC.",
-                ),
-            )
-
         return new(
             base_model,
             coupling,
