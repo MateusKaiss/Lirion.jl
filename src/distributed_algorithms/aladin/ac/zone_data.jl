@@ -7,7 +7,11 @@
 # ============================================================
 
 mutable struct AladinZoneDataAC <: AbstractAladinZoneData
-    model::JuMP.Model
+    # Local subproblem (LP in DC, NLP in AC, SOCP in SOCWR) solved by Ipopt at
+    # each ALADIN iteration. Persistent across iterations — only its objective
+    # is updated by update_objective!. Distinct from the coordinator QP
+    # (created on-the-fly in _build_qp_skeleton and solved by OSQP).
+    local_model::JuMP.Model
 
     all_vars::Vector{JuMP.VariableRef}
     n_vars::Int
@@ -245,7 +249,7 @@ function build_aladin_zone_data(
     include_edges::Bool = false,
 )::AladinZoneDataAC
     obj = part.objective_params
-    model = part.model::JuMP.Model
+    model = part.local_model::JuMP.Model
 
     all_vars, n_vars, var_to_col = _build_var_layout(model)
     cols = _collect_ac_cols(model, var_to_col, obj)

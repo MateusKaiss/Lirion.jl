@@ -109,27 +109,27 @@ end
 # ------------------------------------------------------------
 
 function solve_coordinator_qp!(ws::DCStateWorkspaceALADIN)
-    model, dy_all, qp_obj = _build_qp_skeleton(ws)
+    qp_model, dy_all, qp_obj = _build_qp_skeleton(ws)
 
     n_pairs = length(ws.bus_pairs)
-    s = JuMP.@variable(model, [1:n_pairs], base_name = "s")
+    s = JuMP.@variable(qp_model, [1:n_pairs], base_name = "s")
 
     mu = ws.mu[]
     @inbounds for k in 1:n_pairs
         JuMP.add_to_expression!(qp_obj, ws.vars.theta.lambda[k], s[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s[k], s[k])
     end
-    JuMP.@objective(model, Min, qp_obj)
+    JuMP.@objective(qp_model, Min, qp_obj)
 
     cons_refs = Vector{JuMP.ConstraintRef}(undef, n_pairs)
     @inbounds for k in 1:n_pairs
         expr = zero(JuMP.AffExpr)
         _bus_coupling_expr!(expr, ws.zones, dy_all, ws.bus_pairs[k])
-        cons_refs[k] = JuMP.@constraint(model, expr == s[k])
+        cons_refs[k] = JuMP.@constraint(qp_model, expr == s[k])
     end
 
-    JuMP.optimize!(model)
-    _check_qp_status!(model, "ALADIN-state/DC coordinator QP")
+    JuMP.optimize!(qp_model)
+    _check_qp_status!(qp_model, "ALADIN-state/DC coordinator QP")
 
     _extract_delta!(ws, dy_all)
 
@@ -145,12 +145,12 @@ end
 # ------------------------------------------------------------
 
 function solve_coordinator_qp!(ws::DCPowerWorkspaceALADIN)
-    model, dy_all, qp_obj = _build_qp_skeleton(ws)
+    qp_model, dy_all, qp_obj = _build_qp_skeleton(ws)
 
     n_pairs = length(ws.interzonal_line_pairs)
     n_dummy = length(ws.dummy_line_pairs)
-    s = JuMP.@variable(model, [1:n_pairs], base_name = "s")
-    s_dummy = JuMP.@variable(model, [1:n_dummy], base_name = "sd")
+    s = JuMP.@variable(qp_model, [1:n_pairs], base_name = "s")
+    s_dummy = JuMP.@variable(qp_model, [1:n_dummy], base_name = "sd")
 
     mu = ws.mu[]
     @inbounds for k in 1:n_pairs
@@ -161,24 +161,24 @@ function solve_coordinator_qp!(ws::DCPowerWorkspaceALADIN)
         JuMP.add_to_expression!(qp_obj, ws.vars.p_dummy.lambda[k], s_dummy[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_dummy[k], s_dummy[k])
     end
-    JuMP.@objective(model, Min, qp_obj)
+    JuMP.@objective(qp_model, Min, qp_obj)
 
     cons_refs = Vector{JuMP.ConstraintRef}(undef, n_pairs)
     @inbounds for k in 1:n_pairs
         expr = zero(JuMP.AffExpr)
         _edge_coupling_expr!(expr, ws.zones, dy_all, ws.interzonal_line_pairs[k])
-        cons_refs[k] = JuMP.@constraint(model, expr == s[k])
+        cons_refs[k] = JuMP.@constraint(qp_model, expr == s[k])
     end
 
     cons_dummy_refs = Vector{JuMP.ConstraintRef}(undef, n_dummy)
     @inbounds for k in 1:n_dummy
         expr = zero(JuMP.AffExpr)
         _dummy_edge_coupling_expr!(expr, ws.zones, dy_all, ws.dummy_line_pairs[k])
-        cons_dummy_refs[k] = JuMP.@constraint(model, expr == s_dummy[k])
+        cons_dummy_refs[k] = JuMP.@constraint(qp_model, expr == s_dummy[k])
     end
 
-    JuMP.optimize!(model)
-    _check_qp_status!(model, "ALADIN-power/DC coordinator QP")
+    JuMP.optimize!(qp_model)
+    _check_qp_status!(qp_model, "ALADIN-power/DC coordinator QP")
 
     _extract_delta!(ws, dy_all)
 
@@ -198,16 +198,16 @@ end
 # ------------------------------------------------------------
 
 function solve_coordinator_qp!(ws::DCHybridWorkspaceALADIN)
-    model, dy_all, qp_obj = _build_qp_skeleton(ws)
+    qp_model, dy_all, qp_obj = _build_qp_skeleton(ws)
 
     n_bus = length(ws.bus_pairs)
     n_edge = length(ws.interzonal_line_pairs)
     n_split = length(ws.split_bus_pairs)
     n_dummy = length(ws.dummy_line_pairs)
-    s_bus = JuMP.@variable(model, [1:n_bus], base_name = "sb")
-    s_edge = JuMP.@variable(model, [1:n_edge], base_name = "se")
-    s_split = JuMP.@variable(model, [1:n_split], base_name = "sp")
-    s_dummy = JuMP.@variable(model, [1:n_dummy], base_name = "sd")
+    s_bus = JuMP.@variable(qp_model, [1:n_bus], base_name = "sb")
+    s_edge = JuMP.@variable(qp_model, [1:n_edge], base_name = "se")
+    s_split = JuMP.@variable(qp_model, [1:n_split], base_name = "sp")
+    s_dummy = JuMP.@variable(qp_model, [1:n_dummy], base_name = "sd")
 
     mu = ws.mu[]
     @inbounds for k in 1:n_bus
@@ -226,38 +226,38 @@ function solve_coordinator_qp!(ws::DCHybridWorkspaceALADIN)
         JuMP.add_to_expression!(qp_obj, ws.vars.p_dummy.lambda[k], s_dummy[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_dummy[k], s_dummy[k])
     end
-    JuMP.@objective(model, Min, qp_obj)
+    JuMP.@objective(qp_model, Min, qp_obj)
 
     cons_bus_refs = Vector{JuMP.ConstraintRef}(undef, n_bus)
     @inbounds for k in 1:n_bus
         expr = zero(JuMP.AffExpr)
         _bus_coupling_expr!(expr, ws.zones, dy_all, ws.bus_pairs[k])
-        cons_bus_refs[k] = JuMP.@constraint(model, expr == s_bus[k])
+        cons_bus_refs[k] = JuMP.@constraint(qp_model, expr == s_bus[k])
     end
 
     cons_edge_refs = Vector{JuMP.ConstraintRef}(undef, n_edge)
     @inbounds for k in 1:n_edge
         expr = zero(JuMP.AffExpr)
         _edge_coupling_expr!(expr, ws.zones, dy_all, ws.interzonal_line_pairs[k])
-        cons_edge_refs[k] = JuMP.@constraint(model, expr == s_edge[k])
+        cons_edge_refs[k] = JuMP.@constraint(qp_model, expr == s_edge[k])
     end
 
     cons_split_refs = Vector{JuMP.ConstraintRef}(undef, n_split)
     @inbounds for k in 1:n_split
         expr = zero(JuMP.AffExpr)
         _split_bus_coupling_expr!(expr, ws.zones, dy_all, ws.split_bus_pairs[k])
-        cons_split_refs[k] = JuMP.@constraint(model, expr == s_split[k])
+        cons_split_refs[k] = JuMP.@constraint(qp_model, expr == s_split[k])
     end
 
     cons_dummy_refs = Vector{JuMP.ConstraintRef}(undef, n_dummy)
     @inbounds for k in 1:n_dummy
         expr = zero(JuMP.AffExpr)
         _dummy_edge_coupling_expr!(expr, ws.zones, dy_all, ws.dummy_line_pairs[k])
-        cons_dummy_refs[k] = JuMP.@constraint(model, expr == s_dummy[k])
+        cons_dummy_refs[k] = JuMP.@constraint(qp_model, expr == s_dummy[k])
     end
 
-    JuMP.optimize!(model)
-    _check_qp_status!(model, "ALADIN-hybrid/DC coordinator QP")
+    JuMP.optimize!(qp_model)
+    _check_qp_status!(qp_model, "ALADIN-hybrid/DC coordinator QP")
 
     _extract_delta!(ws, dy_all)
 

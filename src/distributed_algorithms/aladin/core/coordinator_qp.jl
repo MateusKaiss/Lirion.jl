@@ -7,13 +7,13 @@
 # ============================================================
 
 function _build_qp_skeleton(ws::AbstractALADINWorkspace)
-    model = JuMP.Model(ws.qp_optimizer)
+    qp_model = JuMP.Model(ws.qp_optimizer)
     n_zones = length(ws.zones)
 
     dy_all = Vector{Vector{JuMP.VariableRef}}(undef, n_zones)
     @inbounds for i in 1:n_zones
         dy_all[i] =
-            JuMP.@variable(model, [1:ws.zones[i].n_vars], base_name = "dy$(i)")
+            JuMP.@variable(qp_model, [1:ws.zones[i].n_vars], base_name = "dy$(i)")
     end
 
     qp_obj = zero(JuMP.QuadExpr)
@@ -22,11 +22,11 @@ function _build_qp_skeleton(ws::AbstractALADINWorkspace)
     end
 
     @inbounds for i in 1:n_zones
-        _add_active_constraints!(model, ws.zones[i], dy_all[i])
-        _add_active_bound_constraints!(model, ws.zones[i], dy_all[i])
+        _add_active_constraints!(qp_model, ws.zones[i], dy_all[i])
+        _add_active_bound_constraints!(qp_model, ws.zones[i], dy_all[i])
     end
 
-    return model, dy_all, qp_obj
+    return qp_model, dy_all, qp_obj
 end
 
 # ============================================================

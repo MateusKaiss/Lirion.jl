@@ -170,8 +170,8 @@ function _build_dummy_line_pairs(
         from_b = part_b.branch.from[local_b]
         to_b = part_b.branch.to[local_b]
 
-        theta_var_a = part_a.model[:theta]
-        theta_var_b = part_b.model[:theta]
+        theta_var_a = part_a.local_model[:theta]
+        theta_var_b = part_b.local_model[:theta]
         from_col_i = zone_data_a.var_to_col[theta_var_a[from_a, 1]]
         to_col_i = zone_data_a.var_to_col[theta_var_a[to_a, 1]]
         from_col_j = zone_data_b.var_to_col[theta_var_b[from_b, 1]]

@@ -7,9 +7,12 @@
 # ============================================================
 
 mutable struct AladinZoneDataSOCWR <: AbstractAladinZoneData
-    # JuMP model reference — used every iteration to walk constraints
-    # and extract active-inequality duals.
-    model::JuMP.Model
+    # Local subproblem (LP in DC, NLP in AC, SOCP in SOCWR) solved by Ipopt at
+    # each ALADIN iteration. Persistent across iterations — only its objective
+    # is updated by update_objective!. Distinct from the coordinator QP
+    # (created on-the-fly in _build_qp_skeleton and solved by OSQP).
+    # Used every iteration to walk constraints and extract active-inequality duals.
+    local_model::JuMP.Model
 
     # Flat variable layout.
     all_vars::Vector{JuMP.VariableRef}
@@ -324,7 +327,7 @@ function build_aladin_zone_data(
     include_edges::Bool = true,
 )::AladinZoneDataSOCWR
     obj = part.objective_params
-    model = part.model::JuMP.Model
+    model = part.local_model::JuMP.Model
 
     all_vars, n_vars, var_to_col = _build_var_layout(model)
 

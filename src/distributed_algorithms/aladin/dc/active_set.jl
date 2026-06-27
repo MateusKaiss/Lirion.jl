@@ -13,7 +13,7 @@ function build_active_jacobian(
 
     row_offset = _collect_affine_inequality_rows!(
         ineq_rows, ineq_cols, ineq_vals, 0,
-        zone.model, zone.var_to_col, JuMP.has_duals(zone.model);
+        zone.local_model, zone.var_to_col, JuMP.has_duals(zone.local_model);
         dual_tol = dual_tol,
     )
 

@@ -7,7 +7,7 @@ function _solve_zones_parallel!(ws, post_solve_hook)
 
     Threads.@threads for i in eachindex(parts)
         part = parts[i]
-        model = part.model
+        model = part.local_model
 
         update_objective!(part, ws)
         JuMP.optimize!(model)
@@ -36,7 +36,7 @@ local_solve!(ws::AbstractADMMWorkspace) =
 
 function _aladin_post_solve!(ws::AbstractALADINWorkspace, i::Integer, part)
     zone = ws.zones[i]
-    extract_solve_values!(zone, part.model)
+    extract_solve_values!(zone, part.local_model)
 
     if ws.iter == 1
         copyto!(zone.x_prev, zone.y)

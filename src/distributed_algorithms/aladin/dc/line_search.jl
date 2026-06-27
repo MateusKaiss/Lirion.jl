@@ -40,19 +40,19 @@ end
 # ============================================================
 
 @inline function _dc_pflow_at(zone::AladinZoneData, le::Int, alpha::Float64)
-    fcol = zone.edge_from_cols[le]
-    tcol = zone.edge_to_cols[le]
-    bval = zone.edge_b[le]
-    yf = zone.y[fcol] + alpha * zone.delta[fcol]
-    yt = zone.y[tcol] + alpha * zone.delta[tcol]
-    return bval * (yf - yt)
+    from_col = zone.edge_from_cols[le]
+    to_col = zone.edge_to_cols[le]
+    b_val = zone.edge_b[le]
+    yf = zone.y[from_col] + alpha * zone.delta[from_col]
+    yt = zone.y[to_col] + alpha * zone.delta[to_col]
+    return b_val * (yf - yt)
 end
 
 @inline function _dc_pflow_dir_deriv(zone::AladinZoneData, le::Int)
-    fcol = zone.edge_from_cols[le]
-    tcol = zone.edge_to_cols[le]
-    bval = zone.edge_b[le]
-    return bval * (zone.delta[fcol] - zone.delta[tcol])
+    from_col = zone.edge_from_cols[le]
+    to_col = zone.edge_to_cols[le]
+    b_val = zone.edge_b[le]
+    return b_val * (zone.delta[from_col] - zone.delta[to_col])
 end
 
 # ============================================================
@@ -61,19 +61,19 @@ end
 
 @inline function _dc_dummy_pflow_at(
     zone::AladinZoneData,
-    fcol::Int, tcol::Int, bval::Float64,
+    from_col::Int, to_col::Int, b_val::Float64,
     alpha::Float64,
 )
-    yf = zone.y[fcol] + alpha * zone.delta[fcol]
-    yt = zone.y[tcol] + alpha * zone.delta[tcol]
-    return bval * (yf - yt)
+    yf = zone.y[from_col] + alpha * zone.delta[from_col]
+    yt = zone.y[to_col] + alpha * zone.delta[to_col]
+    return b_val * (yf - yt)
 end
 
 @inline function _dc_dummy_pflow_dir_deriv(
     zone::AladinZoneData,
-    fcol::Int, tcol::Int, bval::Float64,
+    from_col::Int, to_col::Int, b_val::Float64,
 )
-    return bval * (zone.delta[fcol] - zone.delta[tcol])
+    return b_val * (zone.delta[from_col] - zone.delta[to_col])
 end
 
 # ============================================================

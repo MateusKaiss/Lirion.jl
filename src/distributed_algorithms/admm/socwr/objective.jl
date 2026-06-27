@@ -24,7 +24,7 @@ function build_quad_branch_rt_expr!(
     rho_t::Float64,
     zone_edges::Vector{Int},
 )
-    m = part.model::JuMP.Model
+    m = part.local_model::JuMP.Model
     quad = zero(JuMP.QuadExpr)
 
     @inbounds for e in zone_edges
@@ -49,7 +49,7 @@ function build_quad_branch_pq_expr!(
     zone_edges::Vector{Int},
     branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )
-    m = part.model::JuMP.Model
+    m = part.local_model::JuMP.Model
     quad = zero(JuMP.QuadExpr)
 
     @inbounds for e in zone_edges
@@ -151,7 +151,7 @@ function build_linear_branch_rt_term(
     rho_r::Float64,
     rho_t::Float64,
 )::JuMP.AffExpr
-    m = part.model::JuMP.Model
+    m = part.local_model::JuMP.Model
     lin = zero(JuMP.AffExpr)
 
     @inbounds for (k, e) in enumerate(interzonal)
@@ -184,7 +184,7 @@ function build_linear_branch_pq_term(
     rho_p::Float64,
     rho_q::Float64,
 )::JuMP.AffExpr
-    m = part.model::JuMP.Model
+    m = part.local_model::JuMP.Model
     lin = zero(JuMP.AffExpr)
 
     @inbounds for (k, e) in enumerate(interzonal)
@@ -213,7 +213,7 @@ function build_linear_dummy_pq_term(
     rho_p::Float64,
     rho_q::Float64,
 )::JuMP.AffExpr
-    m = part.model::JuMP.Model
+    m = part.local_model::JuMP.Model
     lin = zero(JuMP.AffExpr)
     isempty(branch_pairs) && return lin
 
@@ -307,7 +307,7 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRStateWorkspace)
         ws.vars.t.rho[],
     )
 
-    @objective(part.model, Min, part.obj_static + lin_bus + lin_rt)
+    @objective(part.local_model, Min, part.obj_static + lin_bus + lin_rt)
 end
 
 # ------------------------------------------------------------
@@ -338,7 +338,7 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRPowerWorkspace)
         ws.vars.q_dummy.rho[],
     )
 
-    @objective(part.model, Min, part.obj_static + lin_pq + lin_dummy)
+    @objective(part.local_model, Min, part.obj_static + lin_pq + lin_dummy)
 end
 
 # ------------------------------------------------------------
@@ -392,7 +392,7 @@ function update_objective!(
     )
 
     @objective(
-        part.model,
+        part.local_model,
         Min,
         part.obj_static + lin_bus + lin_pq + lin_dummy + lin_rt,
     )
@@ -432,7 +432,7 @@ function update_objective!(
     )
 
     @objective(
-        part.model, Min,
+        part.local_model, Min,
         part.obj_static + lin_bus + lin_p_inj + lin_q_inj,
     )
     return nothing

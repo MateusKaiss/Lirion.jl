@@ -57,7 +57,7 @@ function build_active_jacobian(
     cone_tol::Float64 = 1e-6,
     dep_tol::Float64 = 1e-10,
 )::SparseArrays.SparseMatrixCSC{Float64, Int}
-    model = zone.model
+    model = zone.local_model
     var_to_col = zone.var_to_col
     n_vars = zone.n_vars
     y = zone.y

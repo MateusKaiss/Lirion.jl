@@ -182,10 +182,10 @@ function _build_dummy_line_pairs(
         zone_data_a = zones[zone_a]
         zone_data_b = zones[zone_b]
 
-        theta_var_a = part_a.model[:theta]
-        theta_var_b = part_b.model[:theta]
-        vm_var_a = part_a.model[:v_magnitude]
-        vm_var_b = part_b.model[:v_magnitude]
+        theta_var_a = part_a.local_model[:theta]
+        theta_var_b = part_b.local_model[:theta]
+        vm_var_a = part_a.local_model[:v_magnitude]
+        vm_var_b = part_b.local_model[:v_magnitude]
 
         from_a = part_a.branch.from[local_a]
         to_a = part_a.branch.to[local_a]

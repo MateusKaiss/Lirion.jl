@@ -265,7 +265,7 @@ end
 # ------------------------------------------------------------
 
 function _build_zone_result(part::AbstractPartition, zone_sys::SystemData)::NamedTuple
-    model = part.model::JuMP.Model
+    model = part.local_model::JuMP.Model
     bus_df = _build_bus_df(model, part.bus)
     gen_df = _build_gen_df(model, zone_sys.gen)
     # Pass the global mapping so the zone DF can expose `branch_id_global`.
@@ -293,7 +293,7 @@ function _build_consensus_df(ws::Any, partitions, sys)::DataFrame
     # ALADIN workspaces carry explicit `SharedBusPair` / `InterzonalLinePair`
     # structs AND a `zones` field with cached `y` buffers. ADMM uses
     # `NTuple`-based `bus_pairs` / `branch_pairs` for DummyBus/SplitBus
-    # bookkeeping and exposes per-zone state via `partitions.parts[k].model`.
+    # bookkeeping and exposes per-zone state via `partitions.parts[k].local_model`.
     is_aladin =
         hasproperty(ws, :zones) &&
         hasproperty(ws, :bus_pairs) && !isempty(ws.bus_pairs) &&
@@ -414,8 +414,8 @@ function _push_edge_consensus_rows!(rows, ws, partitions)
     for pair in ws.interzonal_line_pairs
         zi = pair.zone_i
         zj = pair.zone_j
-        mi = partitions.parts[zi].model
-        mj = partitions.parts[zj].model
+        mi = partitions.parts[zi].local_model
+        mj = partitions.parts[zj].local_model
         le_i = pair.line_local_i
         le_j = pair.line_local_j
         gi = partitions.parts[zi].zone_edges[le_i]
@@ -443,8 +443,8 @@ function _push_dummy_consensus_rows!(rows, ws, partitions)
     for pair in ws.dummy_line_pairs
         zi = pair.zone_i
         zj = pair.zone_j
-        mi = partitions.parts[zi].model
-        mj = partitions.parts[zj].model
+        mi = partitions.parts[zi].local_model
+        mj = partitions.parts[zj].local_model
         li = hasproperty(pair, :local_i) ? pair.local_i : nothing
         li === nothing && continue
         lj = pair.local_j
@@ -475,7 +475,7 @@ function _push_admm_bus_consensus_rows!(rows, partitions, sys)
     for b_id in shared
         hosts = Tuple{Int, JuMP.Model}[]
         for (zpos, part) in enumerate(parts)
-            b_id in part.bus.id && push!(hosts, (zpos, part.model::JuMP.Model))
+            b_id in part.bus.id && push!(hosts, (zpos, part.local_model::JuMP.Model))
         end
         length(hosts) >= 2 || continue
         # Emit one reading per zone that hosts this shared bus.
@@ -529,7 +529,7 @@ function _push_admm_interzonal_rows!(rows, ws, partitions)
         end
         length(hosts) >= 2 || continue
         for (zone, local_idx) in hosts
-            m = parts[zone].model::JuMP.Model
+            m = parts[zone].local_model::JuMP.Model
             haskey(m, :p_flow_branches) && _push_branch_reading!(
                 rows, :p_flow, e, zone,
                 _safe_value(m[:p_flow_branches][local_idx, 1]))
@@ -586,7 +586,7 @@ end
 @inline function _admm_pinj_value(part, store, b_id)
     v = get(store, b_id, nothing)
     v === nothing && return nothing
-    m = part.model::JuMP.Model
+    m = part.local_model::JuMP.Model
     JuMP.has_values(m) || return nothing
     return _safe_value(v)
 end

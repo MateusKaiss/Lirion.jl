@@ -15,7 +15,7 @@ end
 ) where {M <: OPFModel}
     prepare_hotpaths!(part)
     model = build_model(sys_zone, M; optimizer = optimizer_factory)
-    part.model = model
+    part.local_model = model
     part.obj_base = model[:generation_cost]
     return model
 end

@@ -71,7 +71,7 @@ function _eps_primal_branch(
     norm_x_sq = 0.0
     norm_z_sq = 0.0
     for part in partitions
-        m = part.model
+        m = part.local_model
         has_vals = JuMP.has_values(m)
         @inbounds for (k, e) in enumerate(interzonal)
             l = part.branch_idx_full_to_zone[e]
@@ -136,7 +136,7 @@ function _eps_primal_branch_pairs(
         la = pa.branch_idx_full_to_zone[ga]
         if la != 0
             dim += 1
-            m = pa.model
+            m = pa.local_model
             if JuMP.has_values(m)
                 xv = JuMP.value(m[sym][la, 1])
                 isfinite(xv) && (norm_x_sq += xv * xv)
@@ -147,7 +147,7 @@ function _eps_primal_branch_pairs(
         lb = pb.branch_idx_full_to_zone[gb]
         if lb != 0
             dim += 1
-            m = pb.model
+            m = pb.local_model
             if JuMP.has_values(m)
                 xv = JuMP.value(m[sym][lb, 1])
                 isfinite(xv) && (norm_x_sq += xv * xv)

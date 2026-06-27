@@ -152,14 +152,14 @@ end
 # ------------------------------------------------------------
 
 function solve_coordinator_qp!(ws::SOCWRStateWorkspaceALADIN)
-    model, dy_all, qp_obj = _build_qp_skeleton(ws)
+    qp_model, dy_all, qp_obj = _build_qp_skeleton(ws)
 
     n_bus = length(ws.bus_pairs)
     n_edge = length(ws.interzonal_line_pairs)
 
-    s_v2 = JuMP.@variable(model, [1:n_bus], base_name = "sv2")
-    s_r = JuMP.@variable(model, [1:n_edge], base_name = "sr")
-    s_t = JuMP.@variable(model, [1:n_edge], base_name = "st")
+    s_v2 = JuMP.@variable(qp_model, [1:n_bus], base_name = "sv2")
+    s_r = JuMP.@variable(qp_model, [1:n_edge], base_name = "sr")
+    s_t = JuMP.@variable(qp_model, [1:n_edge], base_name = "st")
 
     mu = ws.mu[]
     @inbounds for k in 1:n_bus
@@ -172,7 +172,7 @@ function solve_coordinator_qp!(ws::SOCWRStateWorkspaceALADIN)
         JuMP.add_to_expression!(qp_obj, ws.vars.t.lambda[k], s_t[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_t[k], s_t[k])
     end
-    JuMP.@objective(model, Min, qp_obj)
+    JuMP.@objective(qp_model, Min, qp_obj)
 
     cons_v2 = Vector{JuMP.ConstraintRef}(undef, n_bus)
     cons_r = Vector{JuMP.ConstraintRef}(undef, n_edge)
@@ -181,20 +181,20 @@ function solve_coordinator_qp!(ws::SOCWRStateWorkspaceALADIN)
     @inbounds for k in 1:n_bus
         ev = zero(JuMP.AffExpr)
         _bus_v2_expr_socwr!(ev, ws.zones, dy_all, ws.bus_pairs[k])
-        cons_v2[k] = JuMP.@constraint(model, ev == s_v2[k])
+        cons_v2[k] = JuMP.@constraint(qp_model, ev == s_v2[k])
     end
     @inbounds for k in 1:n_edge
         er = zero(JuMP.AffExpr)
         _edge_r_expr_socwr!(er, ws.zones, dy_all, ws.interzonal_line_pairs[k])
-        cons_r[k] = JuMP.@constraint(model, er == s_r[k])
+        cons_r[k] = JuMP.@constraint(qp_model, er == s_r[k])
 
         et = zero(JuMP.AffExpr)
         _edge_t_expr_socwr!(et, ws.zones, dy_all, ws.interzonal_line_pairs[k])
-        cons_t[k] = JuMP.@constraint(model, et == s_t[k])
+        cons_t[k] = JuMP.@constraint(qp_model, et == s_t[k])
     end
 
-    JuMP.optimize!(model)
-    _check_qp_status!(model, "ALADIN-state/SOCWR coordinator QP")
+    JuMP.optimize!(qp_model)
+    _check_qp_status!(qp_model, "ALADIN-state/SOCWR coordinator QP")
 
     _extract_delta!(ws, dy_all)
 
@@ -216,12 +216,12 @@ end
 # ------------------------------------------------------------
 
 function solve_coordinator_qp!(ws::SOCWRPowerWorkspaceALADIN)
-    model, dy_all, qp_obj = _build_qp_skeleton(ws)
+    qp_model, dy_all, qp_obj = _build_qp_skeleton(ws)
 
     n_edge = length(ws.interzonal_line_pairs)
 
-    s_p = JuMP.@variable(model, [1:n_edge], base_name = "sp")
-    s_q = JuMP.@variable(model, [1:n_edge], base_name = "sq")
+    s_p = JuMP.@variable(qp_model, [1:n_edge], base_name = "sp")
+    s_q = JuMP.@variable(qp_model, [1:n_edge], base_name = "sq")
 
     mu = ws.mu[]
     @inbounds for k in 1:n_edge
@@ -230,22 +230,22 @@ function solve_coordinator_qp!(ws::SOCWRPowerWorkspaceALADIN)
         JuMP.add_to_expression!(qp_obj, ws.vars.q_flow.lambda[k], s_q[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_q[k], s_q[k])
     end
-    JuMP.@objective(model, Min, qp_obj)
+    JuMP.@objective(qp_model, Min, qp_obj)
 
     cons_p = Vector{JuMP.ConstraintRef}(undef, n_edge)
     cons_q = Vector{JuMP.ConstraintRef}(undef, n_edge)
     @inbounds for k in 1:n_edge
         ep = zero(JuMP.AffExpr)
         _pq_coupling_expr_socwr!(ep, ws.zones, dy_all, ws.interzonal_line_pairs[k], :p)
-        cons_p[k] = JuMP.@constraint(model, ep == s_p[k])
+        cons_p[k] = JuMP.@constraint(qp_model, ep == s_p[k])
 
         eq = zero(JuMP.AffExpr)
         _pq_coupling_expr_socwr!(eq, ws.zones, dy_all, ws.interzonal_line_pairs[k], :q)
-        cons_q[k] = JuMP.@constraint(model, eq == s_q[k])
+        cons_q[k] = JuMP.@constraint(qp_model, eq == s_q[k])
     end
 
-    JuMP.optimize!(model)
-    _check_qp_status!(model, "ALADIN-power/SOCWR coordinator QP")
+    JuMP.optimize!(qp_model)
+    _check_qp_status!(qp_model, "ALADIN-power/SOCWR coordinator QP")
 
     _extract_delta!(ws, dy_all)
 
@@ -263,19 +263,19 @@ end
 # ------------------------------------------------------------
 
 function solve_coordinator_qp!(ws::SOCWRHybridWorkspaceALADIN)
-    model, dy_all, qp_obj = _build_qp_skeleton(ws)
+    qp_model, dy_all, qp_obj = _build_qp_skeleton(ws)
 
     n_bus = length(ws.bus_pairs)
     n_edge = length(ws.interzonal_line_pairs)
     n_split = length(ws.split_bus_pairs)
 
-    s_v2 = JuMP.@variable(model, [1:n_bus], base_name = "sv2")
-    s_r = JuMP.@variable(model, [1:n_edge], base_name = "sr")
-    s_t = JuMP.@variable(model, [1:n_edge], base_name = "st")
-    s_p = JuMP.@variable(model, [1:n_edge], base_name = "sp")
-    s_q = JuMP.@variable(model, [1:n_edge], base_name = "sq")
-    s_pinj = JuMP.@variable(model, [1:n_split], base_name = "spi")
-    s_qinj = JuMP.@variable(model, [1:n_split], base_name = "sqi")
+    s_v2 = JuMP.@variable(qp_model, [1:n_bus], base_name = "sv2")
+    s_r = JuMP.@variable(qp_model, [1:n_edge], base_name = "sr")
+    s_t = JuMP.@variable(qp_model, [1:n_edge], base_name = "st")
+    s_p = JuMP.@variable(qp_model, [1:n_edge], base_name = "sp")
+    s_q = JuMP.@variable(qp_model, [1:n_edge], base_name = "sq")
+    s_pinj = JuMP.@variable(qp_model, [1:n_split], base_name = "spi")
+    s_qinj = JuMP.@variable(qp_model, [1:n_split], base_name = "sqi")
 
     mu = ws.mu[]
     @inbounds for k in 1:n_bus
@@ -298,7 +298,7 @@ function solve_coordinator_qp!(ws::SOCWRHybridWorkspaceALADIN)
         JuMP.add_to_expression!(qp_obj, ws.vars.q_inj.lambda[k], s_qinj[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_qinj[k], s_qinj[k])
     end
-    JuMP.@objective(model, Min, qp_obj)
+    JuMP.@objective(qp_model, Min, qp_obj)
 
     cons_v2 = Vector{JuMP.ConstraintRef}(undef, n_bus)
     cons_r = Vector{JuMP.ConstraintRef}(undef, n_edge)
@@ -311,37 +311,37 @@ function solve_coordinator_qp!(ws::SOCWRHybridWorkspaceALADIN)
     @inbounds for k in 1:n_bus
         ev = zero(JuMP.AffExpr)
         _bus_v2_expr_socwr!(ev, ws.zones, dy_all, ws.bus_pairs[k])
-        cons_v2[k] = JuMP.@constraint(model, ev == s_v2[k])
+        cons_v2[k] = JuMP.@constraint(qp_model, ev == s_v2[k])
     end
     @inbounds for k in 1:n_edge
         er = zero(JuMP.AffExpr)
         _edge_r_expr_socwr!(er, ws.zones, dy_all, ws.interzonal_line_pairs[k])
-        cons_r[k] = JuMP.@constraint(model, er == s_r[k])
+        cons_r[k] = JuMP.@constraint(qp_model, er == s_r[k])
 
         et = zero(JuMP.AffExpr)
         _edge_t_expr_socwr!(et, ws.zones, dy_all, ws.interzonal_line_pairs[k])
-        cons_t[k] = JuMP.@constraint(model, et == s_t[k])
+        cons_t[k] = JuMP.@constraint(qp_model, et == s_t[k])
 
         ep = zero(JuMP.AffExpr)
         _pq_coupling_expr_socwr!(ep, ws.zones, dy_all, ws.interzonal_line_pairs[k], :p)
-        cons_p[k] = JuMP.@constraint(model, ep == s_p[k])
+        cons_p[k] = JuMP.@constraint(qp_model, ep == s_p[k])
 
         eq = zero(JuMP.AffExpr)
         _pq_coupling_expr_socwr!(eq, ws.zones, dy_all, ws.interzonal_line_pairs[k], :q)
-        cons_q[k] = JuMP.@constraint(model, eq == s_q[k])
+        cons_q[k] = JuMP.@constraint(qp_model, eq == s_q[k])
     end
     @inbounds for k in 1:n_split
         epi = zero(JuMP.AffExpr)
         _pinj_coupling_expr_socwr!(epi, ws.zones, dy_all, ws.split_bus_pairs[k])
-        cons_pinj[k] = JuMP.@constraint(model, epi == s_pinj[k])
+        cons_pinj[k] = JuMP.@constraint(qp_model, epi == s_pinj[k])
 
         eqi = zero(JuMP.AffExpr)
         _qinj_coupling_expr_socwr!(eqi, ws.zones, dy_all, ws.split_bus_pairs[k])
-        cons_qinj[k] = JuMP.@constraint(model, eqi == s_qinj[k])
+        cons_qinj[k] = JuMP.@constraint(qp_model, eqi == s_qinj[k])
     end
 
-    JuMP.optimize!(model)
-    _check_qp_status!(model, "ALADIN-hybrid/SOCWR coordinator QP")
+    JuMP.optimize!(qp_model)
+    _check_qp_status!(qp_model, "ALADIN-hybrid/SOCWR coordinator QP")
 
     _extract_delta!(ws, dy_all)
 

@@ -11,7 +11,7 @@ function _attach_p_inj_variables!(
     bus_pairs::Vector{NTuple{3, Int}},
     p_inj_store::Dict{Int, JuMP.VariableRef},
 )
-    model = part.model::JuMP.Model
+    model = part.local_model::JuMP.Model
     pos = part.position
     zone_split_bus_ids = Int[]
     for (fbus, za, zb) in bus_pairs
@@ -44,7 +44,7 @@ function _attach_pq_inj_variables_ac!(
     p_inj_store::Dict{Int, JuMP.VariableRef},
     q_inj_store::Dict{Int, JuMP.VariableRef},
 )
-    model = part.model::JuMP.Model
+    model = part.local_model::JuMP.Model
     pos = part.position
     pf = sys_zone.powerflow
     bus_idx_map = pf.bus_idx_map
@@ -100,7 +100,7 @@ function _attach_pq_inj_variables_socwr!(
     p_inj_store::Dict{Int, JuMP.VariableRef},
     q_inj_store::Dict{Int, JuMP.VariableRef},
 )
-    model = part.model::JuMP.Model
+    model = part.local_model::JuMP.Model
     pos = part.position
 
     zone_split_bus_ids = Int[]

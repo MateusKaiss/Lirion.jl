@@ -46,7 +46,7 @@ end
 end
 
 function _build_ac_evaluator(zone::AladinZoneDataAC, dual_tol::Float64)
-    model = zone.model
+    model = zone.local_model
     has_duals = JuMP.has_duals(model)
 
     nlp = MOI.Nonlinear.Model()
@@ -186,8 +186,8 @@ function refresh_sensitivities_ac!(
     evaluator, rows = _build_ac_evaluator(zone, dual_tol)
 
     zone.active_jac = _extract_active_jacobian_ac(evaluator, rows, y, n_vars, dep_tol)
-
     H = _extract_lagrangian_hessian_ac(evaluator, rows, y, n_vars)
+    
     _add_prox_curvature_ac!(
         H, zone, rho;
         sigma_theta = sigma_theta,

@@ -371,7 +371,7 @@ refresh_rho!(ws::SOCWRHybridWorkspaceALADIN) =
         sig == 0.0 && continue
         JuMP.add_to_expression!(lin, -rho * sig * zone.x_prev[k], zone.all_vars[k])
     end
-    return lin
+    return nothing
 end
 
 # ------------------------------------------------------------
@@ -436,7 +436,7 @@ end
             end
         end
     end
-    return lin
+    return nothing
 end
 
 # ------------------------------------------------------------
@@ -445,11 +445,11 @@ end
 
 @inline function _socwr_prox_lin_full!(
     lin::JuMP.AffExpr,
-    zdata::AladinZoneDataSOCWR,
+    zone_data::AladinZoneDataSOCWR,
     ws::_SOCWRLocalWorkspace,
 )
     _socwr_prox_lin!(
-        lin, zdata, ws.rho[];
+        lin, zone_data, ws.rho[];
         sigma_theta = ws.sigma_theta,
         sigma_v2 = ws.sigma_v2,
         sigma_r = ws.sigma_r,
@@ -458,7 +458,7 @@ end
         sigma_qg = ws.sigma_qg,
         sigma_other = ws.sigma_other,
     )
-    return lin
+    return nothing
 end
 
 # ------------------------------------------------------------
@@ -523,7 +523,7 @@ end
             end
         end
     end
-    return lin
+    return nothing
 end
 
 # ============================================================
@@ -539,7 +539,7 @@ end
     ws::Union{SOCWRStateWorkspaceALADIN, SOCWRHybridWorkspaceALADIN},
     zone_pos::Int,
 )
-    zdata = ws.zones[zone_pos]
+    zone_data = ws.zones[zone_pos]
     @inbounds for (k, pair) in enumerate(ws.bus_pairs)
         if pair.zone_i == zone_pos
             col = pair.v2_col_i
@@ -550,9 +550,9 @@ end
         else
             continue
         end
-        JuMP.add_to_expression!(lin, sign * ws.vars.v2.lambda[k], zdata.all_vars[col])
+        JuMP.add_to_expression!(lin, sign * ws.vars.v2.lambda[k], zone_data.all_vars[col])
     end
-    return lin
+    return nothing
 end
 
 # ------------------------------------------------------------
@@ -564,7 +564,7 @@ end
     ws::Union{SOCWRStateWorkspaceALADIN, SOCWRHybridWorkspaceALADIN},
     zone_pos::Int,
 )
-    zdata = ws.zones[zone_pos]
+    zone_data = ws.zones[zone_pos]
     @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         if pair.zone_i == zone_pos
             le = pair.line_local_i
@@ -575,12 +575,12 @@ end
         else
             continue
         end
-        r_col = zdata.edge_r_cols[le]
-        t_col = zdata.edge_t_cols[le]
-        JuMP.add_to_expression!(lin, sign * ws.vars.r.lambda[k], zdata.all_vars[r_col])
-        JuMP.add_to_expression!(lin, sign * ws.vars.t.lambda[k], zdata.all_vars[t_col])
+        r_col = zone_data.edge_r_cols[le]
+        t_col = zone_data.edge_t_cols[le]
+        JuMP.add_to_expression!(lin, sign * ws.vars.r.lambda[k], zone_data.all_vars[r_col])
+        JuMP.add_to_expression!(lin, sign * ws.vars.t.lambda[k], zone_data.all_vars[t_col])
     end
-    return lin
+    return nothing
 end
 
 # ------------------------------------------------------------
@@ -595,7 +595,7 @@ end
     ws::Union{SOCWRPowerWorkspaceALADIN, SOCWRHybridWorkspaceALADIN},
     zone_pos::Int,
 )
-    zdata = ws.zones[zone_pos]
+    zone_data = ws.zones[zone_pos]
     @inbounds for (k, pair) in enumerate(ws.interzonal_line_pairs)
         if pair.zone_i == zone_pos
             le = pair.line_local_i
@@ -608,21 +608,21 @@ end
         end
         lp = sign * ws.vars.p_flow.lambda[k]
         lq = sign * ws.vars.q_flow.lambda[k]
-        cols = zdata.edge_flow_cols[le]
-        cp = zdata.edge_pflow_coefs[le]
-        cq = zdata.edge_qflow_coefs[le]
+        cols = zone_data.edge_flow_cols[le]
+        cp = zone_data.edge_pflow_coefs[le]
+        cq = zone_data.edge_qflow_coefs[le]
         @inbounds for i in eachindex(cols)
-            JuMP.add_to_expression!(lin, lp * cp[i], zdata.all_vars[cols[i]])
-            JuMP.add_to_expression!(lin, lq * cq[i], zdata.all_vars[cols[i]])
+            JuMP.add_to_expression!(lin, lp * cp[i], zone_data.all_vars[cols[i]])
+            JuMP.add_to_expression!(lin, lq * cq[i], zone_data.all_vars[cols[i]])
         end
         # The constant offset in the flow expansion does not affect
         # the gradient in x but shifts the Lagrangian value by a
         # constant; we add it to keep the objective consistent when
         # users read part.generation_cost.
-        lin.constant += lp * zdata.edge_pflow_const[le]
-        lin.constant += lq * zdata.edge_qflow_const[le]
+        lin.constant += lp * zone_data.edge_pflow_const[le]
+        lin.constant += lq * zone_data.edge_qflow_const[le]
     end
-    return lin
+    return nothing
 end
 
 # ------------------------------------------------------------
@@ -634,17 +634,17 @@ end
     ws::SOCWRHybridWorkspaceALADIN,
     zone_pos::Int,
 )
-    zdata = ws.zones[zone_pos]
+    zone_data = ws.zones[zone_pos]
     @inbounds for (k, pair) in enumerate(ws.split_bus_pairs)
         c = findfirst(==(zone_pos), pair.zones)
         c === nothing && continue
         pcol = pair.p_inj_cols[c]
         qcol = pair.q_inj_cols[c]
         # Net-injection consensus: every copy contributes +λ (no sign switch).
-        JuMP.add_to_expression!(lin, ws.vars.p_inj.lambda[k], zdata.all_vars[pcol])
-        JuMP.add_to_expression!(lin, ws.vars.q_inj.lambda[k], zdata.all_vars[qcol])
+        JuMP.add_to_expression!(lin, ws.vars.p_inj.lambda[k], zone_data.all_vars[pcol])
+        JuMP.add_to_expression!(lin, ws.vars.q_inj.lambda[k], zone_data.all_vars[qcol])
     end
-    return lin
+    return nothing
 end
 
 # ============================================================
@@ -657,14 +657,14 @@ end
 
 function update_objective!(part::PartitionSOCWR, ws::SOCWRStateWorkspaceALADIN)
     zone_pos = part.position
-    zdata = ws.zones[zone_pos]
+    zone_data = ws.zones[zone_pos]
 
     lin = zero(JuMP.AffExpr)
     _lambda_bus_v2_socwr!(lin, ws, zone_pos)
     _lambda_edge_rt_socwr!(lin, ws, zone_pos)
-    _socwr_prox_lin_full!(lin, zdata, ws)
+    _socwr_prox_lin_full!(lin, zone_data, ws)
 
-    @objective(part.model, Min, part.obj_static + lin)
+    @objective(part.local_model, Min, part.obj_static + lin)
     return nothing
 end
 
@@ -674,14 +674,14 @@ end
 
 function update_objective!(part::PartitionSOCWR, ws::SOCWRPowerWorkspaceALADIN)
     zone_pos = part.position
-    zdata = ws.zones[zone_pos]
+    zone_data = ws.zones[zone_pos]
 
     lin = zero(JuMP.AffExpr)
     _lambda_edge_pq_socwr!(lin, ws, zone_pos)
 
     if ws.proximal_mode == :pflow
         _prox_pflow_lin_socwr!(
-            lin, zdata, ws.interzonal_line_pairs, zone_pos, ws.rho[];
+            lin, zone_data, ws.interzonal_line_pairs, zone_pos, ws.rho[];
             sigma_pflow = ws.sigma_pflow,
             sigma_qflow = ws.sigma_qflow,
             sigma_pg = ws.sigma_pg,
@@ -689,10 +689,10 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRPowerWorkspaceALADIN)
             sigma_other = ws.sigma_other,
         )
     else
-        _socwr_prox_lin_full!(lin, zdata, ws)
+        _socwr_prox_lin_full!(lin, zone_data, ws)
     end
 
-    @objective(part.model, Min, part.obj_static + lin)
+    @objective(part.local_model, Min, part.obj_static + lin)
     return nothing
 end
 
@@ -702,7 +702,7 @@ end
 
 function update_objective!(part::PartitionSOCWR, ws::SOCWRHybridWorkspaceALADIN)
     zone_pos = part.position
-    zdata = ws.zones[zone_pos]
+    zone_data = ws.zones[zone_pos]
 
     lin = zero(JuMP.AffExpr)
     _lambda_bus_v2_socwr!(lin, ws, zone_pos)
@@ -712,7 +712,7 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRHybridWorkspaceALADIN)
 
     if ws.proximal_mode === :pflow
         _prox_lin_hybrid_pflow_socwr!(
-            lin, zdata, ws.interzonal_line_pairs, zone_pos, ws.rho[];
+            lin, zone_data, ws.interzonal_line_pairs, zone_pos, ws.rho[];
             sigma_theta = ws.sigma_theta,
             sigma_v2 = ws.sigma_v2,
             sigma_r = ws.sigma_r,
@@ -724,9 +724,9 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRHybridWorkspaceALADIN)
             sigma_qflow = ws.sigma_qflow,
         )
     else
-        _socwr_prox_lin_full!(lin, zdata, ws)
+        _socwr_prox_lin_full!(lin, zone_data, ws)
     end
 
-    @objective(part.model, Min, part.obj_static + lin)
+    @objective(part.local_model, Min, part.obj_static + lin)
     return nothing
 end

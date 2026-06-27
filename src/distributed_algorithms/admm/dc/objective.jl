@@ -31,7 +31,7 @@ function build_quad_branch_expr!(
     zone_edges::Vector{Int},
     branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )
-    m = part.model::JuMP.Model
+    m = part.local_model::JuMP.Model
     quad = zero(JuMP.QuadExpr)
 
     @inbounds for e in zone_edges
@@ -119,7 +119,7 @@ function build_linear_branch_term(
     interzonal::Vector{Int},
     rho_p::Float64,
 )::JuMP.AffExpr
-    m = part.model::JuMP.Model
+    m = part.local_model::JuMP.Model
     lin = zero(JuMP.AffExpr)
     @inbounds for (k, e) in enumerate(interzonal)
         l = part.branch_idx_full_to_zone[e]
@@ -139,7 +139,7 @@ function build_linear_dummy_term(
     branch_pairs::Vector{NTuple{4, Int}},
     rho_p::Float64,
 )::JuMP.AffExpr
-    m = part.model::JuMP.Model
+    m = part.local_model::JuMP.Model
     lin = zero(JuMP.AffExpr)
     isempty(branch_pairs) && return lin
 
@@ -216,7 +216,7 @@ function update_objective!(part::PartitionDC, ws::DCStateWorkspace)
         ws.vars.theta.rho[],
     )
 
-    @objective(part.model, Min, part.obj_static + lin)
+    @objective(part.local_model, Min, part.obj_static + lin)
 end
 
 # ------------------------------------------------------------
@@ -239,7 +239,7 @@ function update_objective!(part::PartitionDC, ws::DCPowerWorkspace)
         ws.vars.p_dummy.rho[],
     )
 
-    @objective(part.model, Min, part.obj_static + lin_branch + lin_dummy)
+    @objective(part.local_model, Min, part.obj_static + lin_branch + lin_dummy)
 end
 
 # ------------------------------------------------------------
@@ -273,7 +273,7 @@ function update_objective!(
     )
 
     @objective(
-        part.model,
+        part.local_model,
         Min,
         part.obj_static + lin_bus + lin_branch + lin_dummy,
     )
@@ -305,6 +305,6 @@ function update_objective!(
         ws.vars.p_inj.rho[],
     )
 
-    @objective(part.model, Min, part.obj_static + lin_bus + lin_p_inj)
+    @objective(part.local_model, Min, part.obj_static + lin_bus + lin_p_inj)
     return nothing
 end

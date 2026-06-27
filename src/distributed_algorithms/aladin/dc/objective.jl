@@ -60,12 +60,12 @@ function _build_quad_static_pflow_dc!(
         JuMP.add_to_expression!(quad, 0.5 * rho * sig, v, v)
     end
     @inbounds for k in eachindex(zone.edge_from_cols)
-        fcol = zone.edge_from_cols[k]
-        tcol = zone.edge_to_cols[k]
-        bval = zone.edge_b[k]
-        coef_sq = 0.5 * rho * sigma_pflow * bval * bval
-        v_f = zone.all_vars[fcol]
-        v_t = zone.all_vars[tcol]
+        from_col = zone.edge_from_cols[k]
+        to_col = zone.edge_to_cols[k]
+        b_val = zone.edge_b[k]
+        coef_sq = 0.5 * rho * sigma_pflow * b_val * b_val
+        v_f = zone.all_vars[from_col]
+        v_t = zone.all_vars[to_col]
         JuMP.add_to_expression!(quad, coef_sq, v_f, v_f)
         JuMP.add_to_expression!(quad, -2 * coef_sq, v_f, v_t)
         JuMP.add_to_expression!(quad, coef_sq, v_t, v_t)
@@ -94,12 +94,12 @@ function _build_quad_static_hybrid_pflow_dc!(
     )
     quad = zone.quad_static
     @inbounds for k in eachindex(zone.edge_from_cols)
-        fcol = zone.edge_from_cols[k]
-        tcol = zone.edge_to_cols[k]
-        bval = zone.edge_b[k]
-        coef_sq = 0.5 * rho * sigma_pflow * bval * bval
-        v_f = zone.all_vars[fcol]
-        v_t = zone.all_vars[tcol]
+        from_col = zone.edge_from_cols[k]
+        to_col = zone.edge_to_cols[k]
+        b_val = zone.edge_b[k]
+        coef_sq = 0.5 * rho * sigma_pflow * b_val * b_val
+        v_f = zone.all_vars[from_col]
+        v_t = zone.all_vars[to_col]
         JuMP.add_to_expression!(quad, coef_sq, v_f, v_f)
         JuMP.add_to_expression!(quad, -2 * coef_sq, v_f, v_t)
         JuMP.add_to_expression!(quad, coef_sq, v_t, v_t)
@@ -213,7 +213,7 @@ refresh_rho!(ws::DCHybridWorkspaceALADIN) =
         sig == 0.0 && continue
         JuMP.add_to_expression!(lin, -rho * sig * zone.x_prev[k], zone.all_vars[k])
     end
-    return lin
+    return nothing
 end
 
 # ------------------------------------------------------------
@@ -240,15 +240,15 @@ end
     end
 
     @inbounds for k in eachindex(zone.edge_from_cols)
-        fcol = zone.edge_from_cols[k]
-        tcol = zone.edge_to_cols[k]
-        bval = zone.edge_b[k]
-        p_prev = bval * (zone.x_prev[fcol] - zone.x_prev[tcol])
-        coef_lin = -rho * sigma_pflow * bval * p_prev
-        JuMP.add_to_expression!(lin, coef_lin, zone.all_vars[fcol])
-        JuMP.add_to_expression!(lin, -coef_lin, zone.all_vars[tcol])
+        from_col = zone.edge_from_cols[k]
+        to_col = zone.edge_to_cols[k]
+        b_val = zone.edge_b[k]
+        p_prev = b_val * (zone.x_prev[from_col] - zone.x_prev[to_col])
+        coef_lin = -rho * sigma_pflow * b_val * p_prev
+        JuMP.add_to_expression!(lin, coef_lin, zone.all_vars[from_col])
+        JuMP.add_to_expression!(lin, -coef_lin, zone.all_vars[to_col])
     end
-    return lin
+    return nothing
 end
 
 # ------------------------------------------------------------
@@ -271,15 +271,15 @@ end
         sigma_other = sigma_other,
     )
     @inbounds for k in eachindex(zone.edge_from_cols)
-        fcol = zone.edge_from_cols[k]
-        tcol = zone.edge_to_cols[k]
-        bval = zone.edge_b[k]
-        p_prev = bval * (zone.x_prev[fcol] - zone.x_prev[tcol])
-        coef_lin = -rho * sigma_pflow * bval * p_prev
-        JuMP.add_to_expression!(lin, coef_lin, zone.all_vars[fcol])
-        JuMP.add_to_expression!(lin, -coef_lin, zone.all_vars[tcol])
+        from_col = zone.edge_from_cols[k]
+        to_col = zone.edge_to_cols[k]
+        b_val = zone.edge_b[k]
+        p_prev = b_val * (zone.x_prev[from_col] - zone.x_prev[to_col])
+        coef_lin = -rho * sigma_pflow * b_val * p_prev
+        JuMP.add_to_expression!(lin, coef_lin, zone.all_vars[from_col])
+        JuMP.add_to_expression!(lin, -coef_lin, zone.all_vars[to_col])
     end
-    return lin
+    return nothing
 end
 
 # ============================================================
@@ -292,20 +292,20 @@ end
 
 @inline function _lambda_bus_affexpr!(
     lin::JuMP.AffExpr,
-    ws::DCStateWorkspaceALADIN,
+    ws::Union{DCStateWorkspaceALADIN, DCHybridWorkspaceALADIN},
     zone_pos::Int,
 )
-    zdata = ws.zones[zone_pos]
+    zone_data = ws.zones[zone_pos]
     for (k, pair) in enumerate(ws.bus_pairs)
         if pair.zone_i == zone_pos
             col = pair.col_i
-            JuMP.add_to_expression!(lin, ws.vars.theta.lambda[k], zdata.all_vars[col])
+            JuMP.add_to_expression!(lin, ws.vars.theta.lambda[k], zone_data.all_vars[col])
         elseif pair.zone_j == zone_pos
             col = pair.col_j
-            JuMP.add_to_expression!(lin, -ws.vars.theta.lambda[k], zdata.all_vars[col])
+            JuMP.add_to_expression!(lin, -ws.vars.theta.lambda[k], zone_data.all_vars[col])
         end
     end
-    return lin
+    return nothing
 end
 
 # ------------------------------------------------------------
@@ -319,7 +319,7 @@ end
     lambda_edge::Vector{Float64},
     zone_pos::Int,
 )
-    zdata = ws_zones[zone_pos]
+    zone_data = ws_zones[zone_pos]
     for (k, pair) in enumerate(interzonal_line_pairs)
         if pair.zone_i == zone_pos
             le = pair.line_local_i
@@ -330,14 +330,14 @@ end
         else
             continue
         end
-        fcol = zdata.edge_from_cols[le]
-        tcol = zdata.edge_to_cols[le]
-        bval = zdata.edge_b[le]
-        coef = sign * lambda_edge[k] * bval
-        JuMP.add_to_expression!(lin, coef, zdata.all_vars[fcol])
-        JuMP.add_to_expression!(lin, -coef, zdata.all_vars[tcol])
+        from_col = zone_data.edge_from_cols[le]
+        to_col = zone_data.edge_to_cols[le]
+        b_val = zone_data.edge_b[le]
+        coef = sign * lambda_edge[k] * b_val
+        JuMP.add_to_expression!(lin, coef, zone_data.all_vars[from_col])
+        JuMP.add_to_expression!(lin, -coef, zone_data.all_vars[to_col])
     end
-    return lin
+    return nothing
 end
 
 # ------------------------------------------------------------
@@ -353,20 +353,41 @@ end
 )
     for (k, pair) in enumerate(dummy_pairs)
         if pair.zone_i == zone_pos
-            fcol, tcol, bval = pair.from_col_i, pair.to_col_i, pair.b_i
+            from_col, to_col, b_val = pair.from_col_i, pair.to_col_i, pair.b_i
             sign = 1.0
         elseif pair.zone_j == zone_pos
-            fcol, tcol, bval = pair.from_col_j, pair.to_col_j, pair.b_j
+            from_col, to_col, b_val = pair.from_col_j, pair.to_col_j, pair.b_j
             sign = -1.0
         else
             continue
         end
-        zdata = ws_zones[zone_pos]
-        coef = sign * lambda_dummy[k] * bval
-        JuMP.add_to_expression!(lin, coef, zdata.all_vars[fcol])
-        JuMP.add_to_expression!(lin, -coef, zdata.all_vars[tcol])
+        zone_data = ws_zones[zone_pos]
+        coef = sign * lambda_dummy[k] * b_val
+        JuMP.add_to_expression!(lin, coef, zone_data.all_vars[from_col])
+        JuMP.add_to_expression!(lin, -coef, zone_data.all_vars[to_col])
     end
-    return lin
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Split bus (N-way: same sign for all zones in the group)
+# ------------------------------------------------------------
+
+@inline function _lambda_split_affexpr!(
+    lin::JuMP.AffExpr,
+    ws_zones::Vector{AladinZoneData},
+    split_bus_pairs::Vector{SplitBusPair},
+    lambda_inj::Vector{Float64},
+    zone_pos::Int,
+)
+    zone_data = ws_zones[zone_pos]
+    for (k, pair) in enumerate(split_bus_pairs)
+        c = findfirst(==(zone_pos), pair.zones)
+        c === nothing && continue
+        col = pair.p_inj_cols[c]
+        JuMP.add_to_expression!(lin, lambda_inj[k], zone_data.all_vars[col])
+    end
+    return nothing
 end
 
 # ============================================================
@@ -379,18 +400,18 @@ end
 
 function update_objective!(part::PartitionDC, ws::DCStateWorkspaceALADIN)
     zone_pos = part.position
-    zdata = ws.zones[zone_pos]
+    zone_data = ws.zones[zone_pos]
 
     lin = zero(JuMP.AffExpr)
     _lambda_bus_affexpr!(lin, ws, zone_pos)
     _prox_lin_primal_dc!(
-        lin, zdata, ws.rho[];
+        lin, zone_data, ws.rho[];
         sigma_theta_shared = ws.sigma_theta_shared,
         sigma_pg = ws.sigma_pg,
         sigma_other = ws.sigma_other,
     )
 
-    @objective(part.model, Min, part.obj_static + lin)
+    @objective(part.local_model, Min, part.obj_static + lin)
     return nothing
 end
 
@@ -400,7 +421,7 @@ end
 
 function update_objective!(part::PartitionDC, ws::DCPowerWorkspaceALADIN)
     zone_pos = part.position
-    zdata = ws.zones[zone_pos]
+    zone_data = ws.zones[zone_pos]
 
     lin = zero(JuMP.AffExpr)
     _lambda_edge_affexpr!(
@@ -416,21 +437,21 @@ function update_objective!(part::PartitionDC, ws::DCPowerWorkspaceALADIN)
 
     if ws.proximal_mode == :pflow
         _prox_lin_pflow_dc!(
-            lin, zdata, ws.rho[];
+            lin, zone_data, ws.rho[];
             sigma_pflow = ws.sigma_pflow,
             sigma_pg = ws.sigma_pg,
             sigma_other = ws.sigma_other,
         )
     else
         _prox_lin_primal_dc!(
-            lin, zdata, ws.rho[];
+            lin, zone_data, ws.rho[];
             sigma_theta_shared = ws.sigma_theta_shared,
             sigma_pg = ws.sigma_pg,
             sigma_other = ws.sigma_other,
         )
     end
 
-    @objective(part.model, Min, part.obj_static + lin)
+    @objective(part.local_model, Min, part.obj_static + lin)
     return nothing
 end
 
@@ -440,18 +461,10 @@ end
 
 function update_objective!(part::PartitionDC, ws::DCHybridWorkspaceALADIN)
     zone_pos = part.position
-    zdata = ws.zones[zone_pos]
+    zone_data = ws.zones[zone_pos]
 
     lin = zero(JuMP.AffExpr)
-    for (k, pair) in enumerate(ws.bus_pairs)
-        if pair.zone_i == zone_pos
-            col = pair.col_i
-            JuMP.add_to_expression!(lin, ws.vars.theta.lambda[k], zdata.all_vars[col])
-        elseif pair.zone_j == zone_pos
-            col = pair.col_j
-            JuMP.add_to_expression!(lin, -ws.vars.theta.lambda[k], zdata.all_vars[col])
-        end
-    end
+    _lambda_bus_affexpr!(lin, ws, zone_pos)
     _lambda_edge_affexpr!(
         lin,
         ws.zones,
@@ -462,17 +475,13 @@ function update_objective!(part::PartitionDC, ws::DCHybridWorkspaceALADIN)
     _lambda_dummy_affexpr!(
         lin, ws.zones, ws.dummy_line_pairs, ws.vars.p_dummy.lambda, zone_pos,
     )
-
-    for (k, pair) in enumerate(ws.split_bus_pairs)
-        c = findfirst(==(zone_pos), pair.zones)
-        c === nothing && continue
-        col = pair.p_inj_cols[c]
-        JuMP.add_to_expression!(lin, ws.vars.p_inj.lambda[k], zdata.all_vars[col])
-    end
+    _lambda_split_affexpr!(
+        lin, ws.zones, ws.split_bus_pairs, ws.vars.p_inj.lambda, zone_pos,
+    )
 
     if ws.proximal_mode === :pflow
         _prox_lin_hybrid_pflow_dc!(
-            lin, zdata, ws.rho_bus[];
+            lin, zone_data, ws.rho_bus[];
             sigma_theta_shared = ws.sigma_theta_shared,
             sigma_pg = ws.sigma_pg,
             sigma_other = ws.sigma_other,
@@ -480,13 +489,13 @@ function update_objective!(part::PartitionDC, ws::DCHybridWorkspaceALADIN)
         )
     else
         _prox_lin_primal_dc!(
-            lin, zdata, ws.rho_bus[];
+            lin, zone_data, ws.rho_bus[];
             sigma_theta_shared = ws.sigma_theta_shared,
             sigma_pg = ws.sigma_pg,
             sigma_other = ws.sigma_other,
         )
     end
 
-    @objective(part.model, Min, part.obj_static + lin)
+    @objective(part.local_model, Min, part.obj_static + lin)
     return nothing
 end

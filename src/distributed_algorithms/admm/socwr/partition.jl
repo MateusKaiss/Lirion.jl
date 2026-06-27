@@ -13,7 +13,7 @@ function tikhonov_regularization_expr!(
     use_bus::Bool = true,
     use_pq::Bool = true,
 )
-    m = part.model::JuMP.Model
+    m = part.local_model::JuMP.Model
     quad = zero(JuMP.QuadExpr)
 
     if use_bus && haskey(m, :v_magnitude_sq)
@@ -70,7 +70,7 @@ function init_power_partition!(
     interzonal_branches,
 )
     build_local_model!(part, sys_zone, Power, optimizer_factory, interzonal_branches)
-    if is_gurobi(part.model)
+    if is_gurobi(part.local_model)
         tikhonov_regularization_expr!(
             part;
             kappa_v2 = 1e-6,

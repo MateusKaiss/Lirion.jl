@@ -162,7 +162,7 @@ refresh_rho!(ws::ACHybridWorkspaceALADIN) =
         sig == 0.0 && continue
         JuMP.add_to_expression!(lin, -rho * sig * zone.x_prev[k], zone.all_vars[k])
     end
-    return lin
+    return nothing
 end
 
 # ============================================================
@@ -178,7 +178,7 @@ end
     ws::Union{ACStateWorkspaceALADIN, ACHybridWorkspaceALADIN},
     zone_pos::Int,
 )
-    zdata = ws.zones[zone_pos]
+    zone_data = ws.zones[zone_pos]
     for (k, pair) in enumerate(ws.bus_pairs)
         if pair.zone_i == zone_pos
             θ_col = pair.theta_col_i
@@ -191,10 +191,10 @@ end
         else
             continue
         end
-        JuMP.add_to_expression!(lin, sign * ws.vars.theta.lambda[k], zdata.all_vars[θ_col])
-        JuMP.add_to_expression!(lin, sign * ws.vars.v_mag.lambda[k], zdata.all_vars[vm_col])
+        JuMP.add_to_expression!(lin, sign * ws.vars.theta.lambda[k], zone_data.all_vars[θ_col])
+        JuMP.add_to_expression!(lin, sign * ws.vars.v_mag.lambda[k], zone_data.all_vars[vm_col])
     end
-    return lin
+    return nothing
 end
 
 # ------------------------------------------------------------
@@ -209,7 +209,7 @@ function _lambda_edge_pq_ac!(
 )
     part_pf = model[:p_flow_branches]
     part_qf = model[:q_flow_branches]
-    zdata = ws.zones[zone_pos]
+    zone_data = ws.zones[zone_pos]
     branch_map =
         ws.partitions.parts[zone_pos].branch_idx_full_to_zone
 
@@ -271,16 +271,16 @@ end
     ws::ACHybridWorkspaceALADIN,
     zone_pos::Int,
 )
-    zdata = ws.zones[zone_pos]
+    zone_data = ws.zones[zone_pos]
     @inbounds for (k, pair) in enumerate(ws.split_bus_pairs)
         c = findfirst(==(zone_pos), pair.zones)
         c === nothing && continue
         pcol = pair.p_inj_cols[c]
         qcol = pair.q_inj_cols[c]
-        JuMP.add_to_expression!(lin, ws.vars.p_inj.lambda[k], zdata.all_vars[pcol])
-        JuMP.add_to_expression!(lin, ws.vars.q_inj.lambda[k], zdata.all_vars[qcol])
+        JuMP.add_to_expression!(lin, ws.vars.p_inj.lambda[k], zone_data.all_vars[pcol])
+        JuMP.add_to_expression!(lin, ws.vars.q_inj.lambda[k], zone_data.all_vars[qcol])
     end
-    return lin
+    return nothing
 end
 
 # ============================================================
@@ -422,12 +422,12 @@ end
 
 function update_objective!(part::PartitionAC, ws::ACStateWorkspaceALADIN)
     zone_pos = part.position
-    zdata = ws.zones[zone_pos]
+    zone_data = ws.zones[zone_pos]
 
     lin = zero(JuMP.AffExpr)
     _lambda_bus_ac!(lin, ws, zone_pos)
     _ac_prox_lin!(
-        lin, zdata, ws.rho[];
+        lin, zone_data, ws.rho[];
         sigma_theta = ws.sigma_theta,
         sigma_vm = ws.sigma_vm,
         sigma_pg = ws.sigma_pg,
@@ -435,7 +435,7 @@ function update_objective!(part::PartitionAC, ws::ACStateWorkspaceALADIN)
         sigma_other = ws.sigma_other,
     )
 
-    @objective(part.model, Min, part.obj_base + zdata.quad_static + lin)
+    @objective(part.local_model, Min, part.obj_base + zone_data.quad_static + lin)
     return nothing
 end
 
@@ -445,8 +445,8 @@ end
 
 function update_objective!(part::PartitionAC, ws::ACPowerWorkspaceALADIN)
     zone_pos = part.position
-    zdata = ws.zones[zone_pos]
-    model = part.model
+    zone_data = ws.zones[zone_pos]
+    model = part.local_model
 
     pflow_mode = ws.proximal_mode === :pflow
 
@@ -459,7 +459,7 @@ function update_objective!(part::PartitionAC, ws::ACPowerWorkspaceALADIN)
 
     lin = zero(JuMP.AffExpr)
     _ac_prox_lin!(
-        lin, zdata, ws.rho[];
+        lin, zone_data, ws.rho[];
         sigma_theta = sigma_theta_eff,
         sigma_vm = sigma_vm_eff,
         sigma_pg = ws.sigma_pg,
@@ -467,7 +467,7 @@ function update_objective!(part::PartitionAC, ws::ACPowerWorkspaceALADIN)
         sigma_other = ws.sigma_other,
     )
 
-    obj_expr = part.obj_base + zdata.quad_static + lin
+    obj_expr = part.obj_base + zone_data.quad_static + lin
     obj_expr = _lambda_edge_pq_ac!(model, obj_expr, ws, zone_pos)
     obj_expr = _lambda_dummy_pq_ac!(model, obj_expr, ws, zone_pos)
 
@@ -488,8 +488,8 @@ end
 
 function update_objective!(part::PartitionAC, ws::ACHybridWorkspaceALADIN)
     zone_pos = part.position
-    zdata = ws.zones[zone_pos]
-    model = part.model
+    zone_data = ws.zones[zone_pos]
+    model = part.local_model
 
     pflow_mode = ws.proximal_mode === :pflow
 
@@ -500,7 +500,7 @@ function update_objective!(part::PartitionAC, ws::ACHybridWorkspaceALADIN)
     _lambda_bus_ac!(lin, ws, zone_pos)
     _lambda_split_bus_ac!(lin, ws, zone_pos)
     _ac_prox_lin!(
-        lin, zdata, ws.rho[];
+        lin, zone_data, ws.rho[];
         sigma_theta = sigma_theta_eff,
         sigma_vm = sigma_vm_eff,
         sigma_pg = ws.sigma_pg,
@@ -508,7 +508,7 @@ function update_objective!(part::PartitionAC, ws::ACHybridWorkspaceALADIN)
         sigma_other = ws.sigma_other,
     )
 
-    obj_expr = part.obj_base + zdata.quad_static + lin
+    obj_expr = part.obj_base + zone_data.quad_static + lin
     obj_expr = _lambda_edge_pq_ac!(model, obj_expr, ws, zone_pos)
     obj_expr = _lambda_dummy_pq_ac!(model, obj_expr, ws, zone_pos)
 

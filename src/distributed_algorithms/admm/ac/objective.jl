@@ -257,7 +257,7 @@ function update_objective!(part::PartitionAC, ws::ACStateWorkspace)
         ws.vars.v_mag.rho[],
     )
 
-    @objective(part.model, Min, part.obj_base + part.quad_bus_expr + lin)
+    @objective(part.local_model, Min, part.obj_base + part.quad_bus_expr + lin)
 end
 
 # ------------------------------------------------------------
@@ -287,7 +287,7 @@ function update_objective!(part::PartitionAC, ws::ACPowerWorkspace)
     )
 
     @objective(
-        part.model,
+        part.local_model,
         Min,
         part.obj_base + part.quad_branch_expr + lin_branch + lin_dummy,
     )
@@ -333,7 +333,7 @@ function update_objective!(
     )
 
     @objective(
-        part.model, Min,
+        part.local_model, Min,
         part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
         lin_bus + lin_branch + lin_dummy,
     )
@@ -374,7 +374,7 @@ function update_objective!(
     )
 
     @objective(
-        part.model, Min,
+        part.local_model, Min,
         part.obj_base + part.quad_bus_expr +
         part.quad_p_inj_expr + part.quad_q_inj_expr +
         lin_bus + lin_p_inj + lin_q_inj,
