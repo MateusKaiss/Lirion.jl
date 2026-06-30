@@ -46,21 +46,25 @@ function prepare_distributed_partitions(full::CaseRaw, ::DummyBus)
         t_orig = br.t_bus[b]
         r_h = br.br_r[b] / 2.0
         x_h = br.br_x[b] / 2.0
-        b_h = br.br_b[b] / 2.0
+        b_c = br.br_b[b]                       # total π line charging (p.u.)
         has_xfmr = (br.tap[b] != 0.0) || (br.shift[b] != 0.0)
 
-        _push_branch!(br, f_orig, dummy_id, r_h, x_h, b_h,
+        _push_branch!(br, f_orig, dummy_id, r_h, x_h, 0.0,
             br.rate_a[b], br.rate_b[b], br.rate_c[b],
             has_xfmr ? br.tap[b] : 0.0,
             has_xfmr ? br.shift[b] : 0.0,
             br.angmin[b], br.angmax[b])
         push!(half_a_globals, length(br.f_bus))
 
-        _push_branch!(br, dummy_id, t_orig, r_h, x_h, b_h,
+        _push_branch!(br, dummy_id, t_orig, r_h, x_h, 0.0,
             br.rate_a[b], br.rate_b[b], br.rate_c[b],
             0.0, 0.0,
             br.angmin[b], br.angmax[b])
         push!(half_b_globals, length(br.f_bus))
+
+        tap_mag = br.tap[b] == 0.0 ? 1.0 : br.tap[b]
+        bus.bs[fi] += (b_c / 2.0) / tap_mag^2    
+        bus.bs[bus_id_to_idx[t_orig]] += b_c / 2.0 
 
         br.br_status[b] = 0
         _push_dummy_gen!(gen, gen_cost, dummy_id, cas.baseMVA)

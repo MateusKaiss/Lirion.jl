@@ -63,6 +63,7 @@ include(joinpath(@__DIR__, "distributed", "test_admm_socwr.jl"))
 include(joinpath(@__DIR__, "distributed", "test_aladin_dc.jl"))
 include(joinpath(@__DIR__, "distributed", "test_aladin_ac.jl"))
 include(joinpath(@__DIR__, "distributed", "test_aladin_socwr.jl"))
+include(joinpath(@__DIR__, "distributed", "test_dummybus_ybus_equiv.jl"))
 
 @testset "Lirion - All Tests" begin
     # Centralized: fast fixtures (default) + optional PM roundtrip.
@@ -244,6 +245,8 @@ include(joinpath(@__DIR__, "distributed", "test_aladin_socwr.jl"))
         central_optimizer = DEFAULT_SOCWR_SOLVER,
         distributed_optimizer = DEFAULT_SOCWR_SOLVER,
     )
+
+    run_dummybus_ybus_equiv_tests()
 end
 
 print_failures()
