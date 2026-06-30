@@ -107,6 +107,34 @@ function convert_angles_to_rad!(raw_case::CaseRaw)
 end
 
 # ============================================================
+# Angle-difference clamping
+# ============================================================
+
+function clamp_voltage_angle_differences!(
+    raw_case::CaseRaw,
+    default_pad::Float64 = 1.0472,
+)
+    raw_case.branch === nothing && return raw_case
+    amin = raw_case.branch.angmin
+    amax = raw_case.branch.angmax
+    half_pi = π / 2
+
+    @inbounds for i in eachindex(amin)
+        if amin[i] <= -half_pi
+            amin[i] = -default_pad
+        end
+        if amax[i] >= half_pi
+            amax[i] = default_pad
+        end
+        if amin[i] == 0.0 && amax[i] == 0.0
+            amin[i] = -default_pad
+            amax[i] = default_pad
+        end
+    end
+    return raw_case
+end
+
+# ============================================================
 # Per-unit conversion
 # ============================================================
 
@@ -224,6 +252,7 @@ function preprocess_case_data!(
     sort_timeseries_by_time_and_id!(raw_case)
 
     convert_angles_to_rad!(raw_case)
+    clamp_voltage_angle_differences!(raw_case)
     add_case_index_maps!(raw_case)
 
     convert_to_pu!(raw_case)
