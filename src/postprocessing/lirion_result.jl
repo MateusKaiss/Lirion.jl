@@ -500,8 +500,8 @@ function _push_admm_dummy_rows!(rows, ws, partitions)
         lb = pb.branch_idx_full_to_zone[gb]
         la == 0 && continue
         lb == 0 && continue
-        mi = pa.model::JuMP.Model
-        mj = pb.model::JuMP.Model
+        mi = pa.local_model::JuMP.Model
+        mj = pb.local_model::JuMP.Model
         dummy_bus_id = pb.branch.from[lb]
         if haskey(mi, :p_flow_branches) && haskey(mj, :p_flow_branches)
             _push_bus_reading!(rows, :p_flow_dummy, dummy_bus_id, za,
