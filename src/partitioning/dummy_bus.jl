@@ -108,7 +108,7 @@ function prepare_distributed_partitions(full::CaseRaw, ::DummyBus)
         zone_case.bus = _slice_bus(cas.bus, zone_subprob_bus_idx_full)
         _mark_virtual_buses!(zone_case.bus, zone_internal_membership)
         
-        zone_gen_idx = _filter_by_zone_bus(cas.gen.gen_bus, zone_subprob_membership)
+        zone_gen_idx = _filter_by_zone_bus(cas.gen.gen_bus, zone_internal_membership)
         zone_case.gen = _slice_gen(cas.gen, zone_gen_idx)
         _slice_gencosts!(zone_case, cas, zone_gen_idx)
 

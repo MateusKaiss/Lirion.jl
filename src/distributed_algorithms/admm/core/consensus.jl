@@ -252,26 +252,6 @@ function _consensus_branch_pairs_ac!(
     return nothing
 end
 
-# ------------------------------------------------------------
-# Bus pairs
-# ------------------------------------------------------------
-
-function _consensus_bus_pairs_signed!(
-    consensus::AbstractVector{Float64},
-    partitions::Partitions,
-    bus_pairs::Vector{NTuple{3, Int}},
-    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
-)
-    isempty(bus_pairs) && return nothing
-    fill!(consensus, 0.0)
-    @inbounds for (k, (b_id, za, zb)) in enumerate(bus_pairs)
-        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], b_id)
-        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], b_id)
-        consensus[k] = 0.5 * (va - vb)
-    end
-    return nothing
-end
-
 # ============================================================
 # DC
 # ============================================================

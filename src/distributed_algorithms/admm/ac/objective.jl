@@ -205,39 +205,6 @@ function build_linear_dummy_term(
     return lin
 end
 
-# ------------------------------------------------------------
-# Hybrid
-# ------------------------------------------------------------
-
-function build_linear_inj_term_ac(
-    part::PartitionAC,
-    bus_pairs::Vector{NTuple{3, Int}},
-    inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
-    consensus::Vector{Float64},
-    duals::AbstractVector{Float64},
-    rho::Float64,
-)::JuMP.AffExpr
-    lin = zero(JuMP.AffExpr)
-    isempty(bus_pairs) && return lin
-    pos = part.position
-    store = inj_vars[pos]
-    isempty(store) && return lin
-    @inbounds for (k, (b_id, za, zb)) in enumerate(bus_pairs)
-        z = consensus[k]
-        lam = duals[k]
-        if za == pos
-            v = get(store, b_id, nothing)
-            v === nothing && continue
-            lin += (lam - rho * z) * v
-        elseif zb == pos
-            v = get(store, b_id, nothing)
-            v === nothing && continue
-            lin += (lam + rho * z) * v
-        end
-    end
-    return lin
-end
-
 # ============================================================
 # Update objective
 # ============================================================

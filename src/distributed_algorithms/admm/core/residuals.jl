@@ -263,42 +263,6 @@ function _dual_residual_branch_pairs(
     return rho * sqrt(s)
 end
 
-# ------------------------------------------------------------
-# Bus pairs
-# ------------------------------------------------------------
-
-function _primal_residual_bus_pairs_signed(
-    partitions::Partitions,
-    consensus::AbstractVector{Float64},
-    bus_pairs::Vector{NTuple{3, Int}},
-    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
-)
-    isempty(bus_pairs) && return 0.0
-    acc = 0.0
-    @inbounds for (k, (b_id, za, zb)) in enumerate(bus_pairs)
-        z = consensus[k]
-        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], b_id)
-        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], b_id)
-        acc += (va - z)^2 + (vb + z)^2
-    end
-    return sqrt(acc)
-end
-
-function _dual_residual_bus_pairs_signed(
-    consensus::AbstractVector{Float64},
-    consensus_prev::AbstractVector{Float64},
-    bus_pairs::Vector{NTuple{3, Int}},
-    rho::Float64,
-)
-    isempty(bus_pairs) && return 0.0
-    s = 0.0
-    @inbounds for k in eachindex(bus_pairs)
-        d = consensus[k] - consensus_prev[k]
-        s += 2 * d^2
-    end
-    return rho * sqrt(s)
-end
-
 # ============================================================
 # DC
 # ============================================================

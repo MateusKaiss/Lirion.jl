@@ -190,29 +190,6 @@ function _update_branch_pairs_duals_ac!(
     return nothing
 end
 
-# ------------------------------------------------------------
-# Bus pairs
-# ------------------------------------------------------------
-
-function _update_bus_pairs_duals_signed!(
-    duals::AbstractMatrix{Float64},
-    partitions::Partitions,
-    consensus::AbstractVector{Float64},
-    rho::Float64,
-    bus_pairs::Vector{NTuple{3, Int}},
-    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
-)
-    isempty(bus_pairs) && return nothing
-    @inbounds for (k, (b_id, za, zb)) in enumerate(bus_pairs)
-        z = consensus[k]
-        va = _p_inj_value(partitions.parts[za], p_inj_vars[za], b_id)
-        vb = _p_inj_value(partitions.parts[zb], p_inj_vars[zb], b_id)
-        duals[k, za] += rho * (va - z)
-        duals[k, zb] += rho * (vb + z)
-    end
-    return nothing
-end
-
 # ============================================================
 # DC
 # ============================================================
