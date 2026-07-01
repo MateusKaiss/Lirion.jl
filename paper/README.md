@@ -4,6 +4,23 @@ This folder is **not** part of the Lirion package (`Pkg.add("Lirion")`
 does not pull it in). It bundles the reproducible experiment pipeline so
 reviewers can rebuild the cases, partitions, tuning and tables locally.
 
+## Official centralized baseline (T1) — external local dependencies
+
+The official T1 centralized baseline uses external, locally-installed
+solvers. None of their binaries or licenses are stored in this repository.
+
+- **DC** — Gurobi (native LP/QP). Requires `GUROBI_HOME` and
+  `GUROBI_JL_USE_GUROBI_JLL=false` so `Gurobi.jl` links the local install.
+- **AC** — Ipopt + MA57. Requires `LIRION_HSLLIB` pointing to a licensed
+  `libhsl.so`.
+- **SOCWR** — hardened Clarabel settings (no external dependency).
+- Runs use `JULIA_NUM_THREADS=1` and `BLAS.set_num_threads(1)`.
+
+If `GUROBI_HOME`/`GUROBI_JL_USE_GUROBI_JLL` or `LIRION_HSLLIB` are unset,
+`run_centralized.jl` **warns** and the corresponding result is flagged
+non-official (no silent downgrade). No proprietary binaries or licenses
+are stored in this repository.
+
 ## Design: partition vs. sectioning
 
 In current Lirion, **sectioning is a runtime choice**, not a file. The

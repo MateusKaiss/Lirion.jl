@@ -50,6 +50,12 @@ test/*/*.toml
 *.jlser
 *.xml
 
+# Curated paper artifacts are versioned (override the broad *.csv above).
+# Scratch stays under paper/results/ (ignored via **/results/).
+!paper/artifacts/
+!paper/artifacts/**
+!paper/artifacts/**/*.csv
+
 # Editor / tool scratch
 .claude/
 *.bak
