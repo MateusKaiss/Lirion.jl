@@ -82,51 +82,14 @@ function _metis_partition(g::SimpleWeightedGraph, k::Int)
 end
 
 # ============================================================
-# Post-processing: connectivity guarantee (BFS merge)
+# Post-processing: connectivity guarantee
 # ============================================================
-
-function _fix_connectivity!(zone::Vector{Int}, adj::Vector{Vector{Int}})
-    n = length(zone)
-    k = maximum(zone)
-    visited = falses(n)
-
-    for z in 1:k
-        fill!(visited, false)
-        members = findall(==(z), zone)
-        isempty(members) && continue
-
-        queue = [members[1]]
-        visited[members[1]] = true
-        head = 1
-        while head <= length(queue)
-            u = queue[head]
-            head += 1
-            for v in adj[u]
-                if !visited[v] && zone[v] == z
-                    visited[v] = true
-                    push!(queue, v)
-                end
-            end
-        end
-
-        for m in members
-            visited[m] && continue
-            best_z = z
-            best_count = 0
-            for v in adj[m]
-                zv = zone[v]
-                zv == z && continue
-                c = count(==(zv), @view(zone[adj[m]]))
-                if c > best_count
-                    best_count = c
-                    best_z = zv
-                end
-            end
-            zone[m] = best_z
-        end
-    end
-    return nothing
-end
+# The connectivity repair itself is pure graph logic and lives in Lirion
+# core (src/partitioning/connectivity.jl) as
+# `Lirion.enforce_zone_connectivity!` / `Lirion.all_zones_connected`, so
+# it is unit-testable without this extension. It is component-based and
+# iterated: each zone keeps its largest component and reassigns smaller
+# components, as a whole, to the neighbor zone they attach to best.
 
 # ============================================================
 # Post-processing: ensure each zone has ≥1 generator (Pmax>0)
@@ -363,14 +326,20 @@ function _do_partition!(
     zone = _metis_partition(g, kval)
     adj = _build_adjacency(case, id_to_idx)
 
-    _fix_connectivity!(zone, adj)
+    # Guarantee connected zones, then best-effort generation. The second
+    # connectivity pass repairs any disconnection introduced by moving a
+    # generator bus (connectivity is authoritative; generation is
+    # best-effort and may be left incomplete — a data property of the
+    # case, reported by the caller).
+    Lirion.enforce_zone_connectivity!(zone, adj)
     _ensure_generation!(case, zone, id_to_idx)
+    Lirion.enforce_zone_connectivity!(zone, adj)
     _remap_zones!(zone)
 
     if refine
         _refine_partition!(case, zone, adj, id_to_idx;
             max_passes = max_refine_passes)
-        _fix_connectivity!(zone, adj)
+        Lirion.enforce_zone_connectivity!(zone, adj)
         _remap_zones!(zone)
     end
 
@@ -382,6 +351,11 @@ function _do_partition!(
     k_actual = maximum(zone)
     n_shared = _count_shared_buses(zone, adj)
     n_ties = _count_tie_lines(zone, adj)
+    if !Lirion.all_zones_connected(zone, adj)
+        @warn "create_partition: some zones are still disconnected — the " *
+              "electrical graph has more islands than zones can absorb; " *
+              "reduce k or check the case." zones = k_actual buses = n_bus
+    end
     @info "Partition created" zones=k_actual buses=n_bus shared_buses=n_shared tie_lines=n_ties
 
     return case

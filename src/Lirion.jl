@@ -79,6 +79,7 @@ include("data/preprocess_case.jl")
 # Partitioning / Sectioning
 # ============================================================
 include("partitioning/partitioning_utils.jl")
+include("partitioning/connectivity.jl")
 include("partitioning/tie_line.jl")
 include("partitioning/dummy_bus.jl")
 include("partitioning/split_bus.jl")

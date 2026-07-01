@@ -65,6 +65,7 @@ include(joinpath(@__DIR__, "distributed", "test_aladin_ac.jl"))
 include(joinpath(@__DIR__, "distributed", "test_aladin_socwr.jl"))
 include(joinpath(@__DIR__, "distributed", "test_aladin_qp_dual_sign.jl"))
 include(joinpath(@__DIR__, "distributed", "test_dummybus_ybus_equiv.jl"))
+include(joinpath(@__DIR__, "partitioning", "test_connectivity.jl"))
 
 @testset "Lirion - All Tests" begin
     # Centralized: fast fixtures (default) + optional PM roundtrip.
@@ -259,6 +260,10 @@ include(joinpath(@__DIR__, "distributed", "test_dummybus_ybus_equiv.jl"))
 
     run_aladin_qp_dual_sign_tests()
     run_dummybus_ybus_equiv_tests()
+
+    # Partitioner: zone connectivity repair (pure unit tests + guarded e2e)
+    run_partition_connectivity_tests()
+    run_partition_connectivity_e2e_tests()
 end
 
 print_failures()
