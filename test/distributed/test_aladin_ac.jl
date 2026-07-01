@@ -209,6 +209,72 @@ function run_aladin_ac_hybrid_tests(;
 end
 
 # ============================================================
+# ALADIN AC - HYBRID + proximal_mode=:pflow
+# ------------------------------------------------------------
+# Same consensus as the default Hybrid (shared θ/|V| + tie-line p/q_flow); the
+# prox additionally regularises the flow expressions on the tie-lines, and the
+# coordinator-QP Hessian carries the matching Gauss-Newton flow curvature
+# (ρ·σ_pflow·∇p∇pᵀ + ρ·σ_qflow·∇q∇qᵀ) + a PSD safeguard so the nonconvex AC QP
+# never goes indefinite. Uses FIXED ρ/μ (adaptive off) like the SOCWR pflow
+# path — the adaptive μ growth saturates μ_upper and stalls the dual residual.
+# ============================================================
+function run_aladin_ac_hybrid_pflow_tests(;
+    rtol = 0.01,
+    atol = 1e-6,
+    central_optimizer = nothing,
+    distributed_optimizer = nothing,
+)
+    test_dir = @__DIR__
+
+    make_alg(p) = Lirion.aladin(;
+        coupling = :hybrid,
+        sectioning = :tie_line,
+        proximal_mode = :pflow,
+        max_iter = p.max_iter,
+        rho = p.rho,
+        mu = p.mu,
+        rho_growth = p.rho_growth,
+        mu_growth = p.mu_growth,
+        adaptive = p.adaptive,
+        sigma_pflow = p.sigma_pflow,
+        sigma_qflow = p.sigma_qflow,
+        eps_abs = p.eps_abs,
+        eps_rel = p.eps_rel,
+    )
+
+    defaults(_) = (
+        max_iter = 1000,
+        rho = 1000.0,
+        mu = 1000.0,
+        rho_growth = 1.0,
+        mu_growth = 1.0,
+        adaptive = false,
+        sigma_pflow = 1.0,
+        sigma_qflow = 1.0,
+        eps_abs = 1e-4,
+        eps_rel = 1e-4,
+    )
+
+    overrides(_case_name) = NamedTuple()
+
+    return run_case_suite(;
+        label = "ALADIN-AC HYBRID PFLOW",
+        test_dir = test_dir,
+        case_list = ALADIN_AC_HYBRID_CASES,
+        model = Lirion.ac(),
+        central_optimizer = central_optimizer,
+        distributed_optimizer = distributed_optimizer,
+        objective_central = aladin_central_obj_ac,
+        objective_dist = aladin_dist_obj_ac,
+        make_algorithm = make_alg,
+        defaults = defaults,
+        overrides = overrides,
+        rtol = rtol,
+        atol = atol,
+    )
+end
+
+# ============================================================
 # ALADIN AC - SPLIT-BUS HYBRID (Method 3 — Harris et al. 2022, Fig. 1c)
 # ============================================================
 function run_aladin_ac_splitbus_hybrid_tests(;

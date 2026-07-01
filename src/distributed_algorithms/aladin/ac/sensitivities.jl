@@ -202,21 +202,164 @@ function refresh_sensitivities_ac!(
 end
 
 # ============================================================
+# :pflow — Gauss-Newton flow curvature + PSD safeguard (AC only)
+# ============================================================
+
+# Accumulate ρ·σ·(g)(g)ᵀ over the 4 coupling columns of one edge into (I,J,V).
+@inline function _push_flow_outer!(
+    I::Vector{Int}, J::Vector{Int}, V::Vector{Float64},
+    cols::NTuple{4, Int}, grad::NTuple{4, Float64}, coef::Float64,
+)
+    coef == 0.0 && return nothing
+    @inbounds for a in 1:4
+        ga = grad[a]
+        ga == 0.0 && continue
+        ca = cols[a]
+        for b in 1:4
+            v = coef * ga * grad[b]
+            v == 0.0 && continue
+            push!(I, ca)
+            push!(J, cols[b])
+            push!(V, v)
+        end
+    end
+    return nothing
+end
+
+# Gauss-Newton curvature of the :pflow Phase-1 term (ρσ/2)(p − p_prev)²:
+# adds ρ·σ_pflow·∇p∇pᵀ + ρ·σ_qflow·∇q∇qᵀ on each coupling edge's
+# [θ_f, θ_t, v_f, v_t] block. ∇p/∇q are the SAME derivatives the coordinator QP
+# uses to linearise the flow (_ac_flow_linearisation / _dummy_ac_flow_linearisation),
+# so under the QP's linear flow model this is the *exact* Hessian of the Phase-1
+# proximal term — Phase-1 and Phase-2 share one metric. Each ∇∇ᵀ block is PSD.
+function _add_flow_gn_curvature_ac(
+    H::SparseArrays.SparseMatrixCSC{Float64, Int},
+    zone::AladinZoneDataAC,
+    ws,
+    zone_pos::Int,
+    rho::Float64,
+    sigma_pflow::Float64,
+    sigma_qflow::Float64,
+)::SparseArrays.SparseMatrixCSC{Float64, Int}
+    n = zone.n_vars
+    I = Int[]
+    J = Int[]
+    V = Float64[]
+    rp = rho * sigma_pflow
+    rq = rho * sigma_qflow
+
+    @inbounds for pair in ws.interzonal_line_pairs
+        le = pair.zone_i == zone_pos ? pair.line_local_i :
+             (pair.zone_j == zone_pos ? pair.line_local_j : 0)
+        le == 0 && continue
+        lin = _ac_flow_linearisation(zone, le)
+        cols = (
+            zone.edge_from_theta_col[le], zone.edge_to_theta_col[le],
+            zone.edge_from_vm_col[le], zone.edge_to_vm_col[le],
+        )
+        _push_flow_outer!(I, J, V, cols,
+            (lin.dpf_dtheta_f, lin.dpf_dtheta_t, lin.dpf_dvf, lin.dpf_dvt), rp)
+        _push_flow_outer!(I, J, V, cols,
+            (lin.dqf_dtheta_f, lin.dqf_dtheta_t, lin.dqf_dvf, lin.dqf_dvt), rq)
+    end
+
+    @inbounds for pair in ws.dummy_line_pairs
+        if pair.zone_i == zone_pos
+            lin = _dummy_ac_flow_linearisation(
+                zone.y, pair.from_theta_col_i, pair.to_theta_col_i,
+                pair.from_vm_col_i, pair.to_vm_col_i,
+                pair.g_i, pair.b_i, pair.b_sh_i, pair.inv_tap_i, pair.tap_angle_i)
+            cols = (pair.from_theta_col_i, pair.to_theta_col_i,
+                pair.from_vm_col_i, pair.to_vm_col_i)
+        elseif pair.zone_j == zone_pos
+            lin = _dummy_ac_flow_linearisation(
+                zone.y, pair.from_theta_col_j, pair.to_theta_col_j,
+                pair.from_vm_col_j, pair.to_vm_col_j,
+                pair.g_j, pair.b_j, pair.b_sh_j, pair.inv_tap_j, pair.tap_angle_j)
+            cols = (pair.from_theta_col_j, pair.to_theta_col_j,
+                pair.from_vm_col_j, pair.to_vm_col_j)
+        else
+            continue
+        end
+        _push_flow_outer!(I, J, V, cols,
+            (lin.dpf_dtheta_f, lin.dpf_dtheta_t, lin.dpf_dvf, lin.dpf_dvt), rp)
+        _push_flow_outer!(I, J, V, cols,
+            (lin.dqf_dtheta_f, lin.dqf_dtheta_t, lin.dqf_dvf, lin.dqf_dvt), rq)
+    end
+
+    isempty(V) && return H
+    return H + SparseArrays.sparse(I, J, V, n, n)
+end
+
+# PSD safeguard: the Lagrangian Hessian of the nonconvex AC NLP can be indefinite;
+# the GN flow curvature is PSD but does not fix that. Find the smallest diagonal
+# shift δ that makes H PD (incremental shifted Cholesky), so OSQP never receives a
+# non-convex QP. Minimal-shift (no over-regularisation): if H is already PD, δ=0.
+function _ensure_psd_ac!(
+    H::SparseArrays.SparseMatrixCSC{Float64, Int};
+    base::Float64 = 1e-6,
+    max_tries::Int = 40,
+)
+    n = size(H, 1)
+    n == 0 && return H
+    delta = 0.0
+    @inbounds for t in 0:max_tries
+        Htest = delta == 0.0 ? H : H + delta * LinearAlgebra.I
+        ok = try
+            LinearAlgebra.cholesky(LinearAlgebra.Symmetric(Htest))
+            true
+        catch
+            false
+        end
+        if ok
+            if delta != 0.0
+                for c in 1:n
+                    H[c, c] += delta
+                end
+            end
+            return H
+        end
+        delta = delta == 0.0 ? base : delta * 2.0
+    end
+    # Fallback: commit the last (largest) shift.
+    @inbounds for c in 1:n
+        H[c, c] += delta
+    end
+    return H
+end
+
+# ============================================================
 # Sensitivity refresh hook
 # ============================================================
 
-@inline function refresh_lagrangian_hessian!(
+function refresh_lagrangian_hessian!(
     zone::AladinZoneDataAC,
     ws::AbstractALADINWorkspace,
 )
+    # :pflow demotes θ/vm to σ_other and drives boundary consensus through the
+    # flow term (mirrors Phase-1 update_objective!). :primal/:hybrid/state keep
+    # σ_theta/σ_vm and skip the flow curvature + PSD safeguard entirely.
+    pflow = hasproperty(ws, :proximal_mode) && ws.proximal_mode === :pflow
+    sigma_theta_eff = pflow ? ws.sigma_other : ws.sigma_theta
+    sigma_vm_eff = pflow ? ws.sigma_other : ws.sigma_vm
+
     refresh_sensitivities_ac!(
         zone;
         rho = ws.rho[],
-        sigma_theta = ws.sigma_theta,
-        sigma_vm = ws.sigma_vm,
+        sigma_theta = sigma_theta_eff,
+        sigma_vm = sigma_vm_eff,
         sigma_pg = ws.sigma_pg,
         sigma_qg = ws.sigma_qg,
         sigma_other = ws.sigma_other,
     )
+
+    if pflow
+        zone_pos = findfirst(z -> z === zone, ws.zones)::Int
+        zone.hess = _add_flow_gn_curvature_ac(
+            zone.hess, zone, ws, zone_pos, ws.rho[],
+            ws.sigma_pflow, ws.sigma_qflow,
+        )
+        _ensure_psd_ac!(zone.hess)
+    end
     return nothing
 end

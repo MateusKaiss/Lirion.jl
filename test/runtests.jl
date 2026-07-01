@@ -194,6 +194,11 @@ include(joinpath(@__DIR__, "distributed", "test_dummybus_ybus_equiv.jl"))
         central_optimizer = Ipopt.Optimizer,
         distributed_optimizer = Ipopt.Optimizer,
     )
+    run_aladin_ac_hybrid_pflow_tests(;
+        rtol = 0.01,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
     run_aladin_ac_splitbus_hybrid_tests(;
         rtol = 0.05,
         central_optimizer = Ipopt.Optimizer,
