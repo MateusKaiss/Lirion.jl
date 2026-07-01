@@ -1,0 +1,29 @@
+# ============================================================
+# tuning_grid_admm.toml   (PLACEHOLDER — declared, NOT run yet)
+# ============================================================
+# A finite grid fixed BEFORE tuning. The tuning stage reads this and
+# saves every attempt, not only the winner.
+# ============================================================
+
+[global]
+eps_abs  = 1e-4
+eps_rel  = 1e-4
+adaptive = [false, true]        # residual-balancing rho update on/off
+max_iter_small_medium = 5000
+max_iter_large        = 10000
+
+# rho ladders are log-spaced and capped per formulation by conditioning.
+[rho.dc]
+ladder = [1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8]
+
+[rho.ac]
+ladder = [1e0, 1e1, 1e2, 1e3, 1e4, 1e5]
+
+[rho.socwr]
+ladder = [1e0, 1e1, 1e2, 1e3, 1e4, 1e5]
+
+# Coupling-aware starting points (empirical).
+[coupling_bias]
+state  = { start_rho = 1e5, note = "needs high rho to close primal consensus" }
+power  = { start_rho = 1e3, note = "DC may need up to 1e8; AC/SOCWR cannot absorb it" }
+hybrid = { start_rho = 1e3, note = "converges early across cases" }

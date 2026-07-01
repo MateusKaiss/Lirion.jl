@@ -1,0 +1,96 @@
+boundary_buses = [6, 9, 10, 12, 14, 15, 16, 27, 28]
+case = "case30_ieee"
+clean_for_main = false
+k_actual = 2
+k_requested = 2
+method = "metis"
+n_boundary_buses = 9
+n_branch = 41
+n_bus = 30
+n_gen = 6
+n_tie_lines = 6
+optional_or_sensitivity = true
+path_copied = "cases/raw/pglib/api/pglib_opf_case30_ieee__api.m"
+path_original = "/home/mateus-kaiss/Downloads/papers/pglib-opf-master/api/pglib_opf_case30_ieee__api.m"
+path_partitioned = "cases/partitioned/case30_ieee/api/k2/case.m"
+refine = true
+sectionings_planned = ["tie_line", "dummy_bus", "split_bus"]
+seed = 1
+shared_partition = true
+shared_with_reference = "std"
+status = "connected_no_gen"
+tie_lines = [[6, 10, 1, 2], [9, 10, 1, 2], [12, 14, 1, 2], [12, 15, 1, 2], [12, 16, 1, 2], [28, 27, 1, 2]]
+variant = "api"
+warnings = ["some zone has no generator"]
+
+[balance]
+cv = 0.1885618083164127
+imbalance_max_over_mean = 1.1333333333333333
+max = 17
+mean = 15.0
+min = 13
+n_zones = 2
+std = 2.8284271247461903
+
+    [balance.sizes_by_zone]
+    1 = 13
+    2 = 17
+
+[bus_to_zone]
+1 = 1
+10 = 2
+11 = 1
+12 = 1
+13 = 1
+14 = 2
+15 = 2
+16 = 2
+17 = 2
+18 = 2
+19 = 2
+2 = 1
+20 = 2
+21 = 2
+22 = 2
+23 = 2
+24 = 2
+25 = 2
+26 = 2
+27 = 2
+28 = 1
+29 = 2
+3 = 1
+30 = 2
+4 = 1
+5 = 1
+6 = 1
+7 = 1
+8 = 1
+9 = 1
+
+[connectivity]
+all_connected = true
+
+    [connectivity.per_zone]
+    1 = true
+    2 = true
+
+[generation]
+all_zones_have_gen = false
+
+    [generation.per_zone]
+    1 = true
+    2 = false
+
+[sectioning_coupling_counts.dummy_bus]
+coupling_edges = 6
+
+[sectioning_coupling_counts.split_bus]
+split_buses = 9
+
+[sectioning_coupling_counts.tie_line]
+coupling_edges = 6
+
+[zones]
+1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 28]
+2 = [10, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 29, 30]

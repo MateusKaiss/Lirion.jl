@@ -1,0 +1,47 @@
+# ============================================================
+# selection_criteria.toml
+# ============================================================
+# Two independent uses, both declared a priori:
+#   [partition_*]  -> used NOW by 02_build_partitions.jl to pick the
+#                     cleanest partition per (case, k).
+#   [convergence]/[accuracy]/[selection]/[protocol] -> used LATER by
+#                     the tuning stage (placeholder, not run yet).
+# ============================================================
+
+# ---- Partition selection (used in the prepare stage) -------
+[partition_selection]
+# Priority order (lower rank = higher priority) for choosing among the
+# seed x refine attempts of a given (case, k):
+order = [
+    "all_connected",      # 1. every zone connected (hard req for main matrix)
+    "all_zones_have_gen", # 2. every zone has a dispatchable generator
+    "imbalance",          # 3. lowest bus-count coefficient of variation
+    "n_tie_lines",        # 4. fewest tie-lines
+    "refine_true",        # 5. prefer refine=true, then smallest seed
+]
+
+[partition_status]
+# Status buckets recorded in each meta.toml.
+clean            = "all_connected AND all_zones_have_gen"
+connected_no_gen = "all_connected AND NOT all_zones_have_gen"
+not_clean        = "NOT all_connected"
+clean_for_main   = "all_connected AND all_zones_have_gen"
+
+# ---- Tuning selection (placeholder — NOT used in prepare) ---
+[convergence]
+eps_abs = 1e-4
+eps_rel = 1e-4
+stopping = "primal_l2 < eps_abs AND dual_l2 < eps_abs"
+
+[accuracy]
+gap_target_pct = 1.0
+
+[selection]
+primary   = "converged AND gap_pct < gap_target_pct"
+tie_break = ["fewest_iterations", "lowest_wall_time"]
+report_all_attempts = true
+
+[protocol]
+tuning_set = ["case14_ieee", "case30_ieee", "case57_ieee", "case73_ieee_rts",
+              "case118_ieee", "case179_goc", "case300_ieee"]
+test_set   = ["case500_goc", "case588_sdet", "case1354_pegase"]

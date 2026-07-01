@@ -1,0 +1,46 @@
+# ============================================================
+# partitioning.toml
+# ============================================================
+# Reproducible partitioning settings for prepare/02_build_partitions.jl.
+#
+# A partition is ONE bus->zone Metis map per (case, variant, k). The
+# three sectionings (tie_line / dummy_bus / split_bus) are RUNTIME
+# transforms the Lirion solver applies over that same map
+# (prepare_distributed_partitions reads full.bus.zone), so NO
+# per-sectioning files are produced — only case.m + meta.toml.
+#
+# Per (case, k), 02 searches seeds x refine and keeps the cleanest
+# partition by the declared criterion (see selection_criteria.toml).
+# ============================================================
+
+[settings]
+seeds = [42, 1, 2, 3, 4, 5, 10, 20, 50, 100]
+refine = [true, false]
+method = "metis"
+max_refine_passes = 50
+# std/api/sad share topology -> reuse ONE map across variants (verified
+# per case; if a variant differs, it is partitioned independently).
+share_partition_across_variants_when_topology_equal = true
+# Sectionings to be tested downstream (metadata/planning only).
+sectionings_planned = ["tie_line", "dummy_bus", "split_bus"]
+
+# ---- Partition counts k per case ---------------------------
+# Chosen for ~15-40 buses/zone at the largest k; small debug cases go
+# finer. case1354 includes k=2,4 (clean, preserves scale to 1354 buses);
+# its higher k are kept for transparency but flag as not_clean.
+[k]
+case14_ieee     = [2, 3, 4]
+case30_ieee     = [2, 3, 4]
+case57_ieee     = [2, 3, 4]
+case73_ieee_rts = [2, 3, 4]
+case118_ieee    = [2, 4, 8]
+case179_goc     = [2, 4, 8]
+case300_ieee    = [4, 8, 16]
+case500_goc     = [4, 8, 16]
+case588_sdet    = [4, 8, 16]
+case1354_pegase = [2, 4, 8, 16, 32]
+
+# optional / comparison
+case24_ieee_rts = [2, 3, 4]
+case39_epri     = [2, 3, 4]
+case2000_goc    = [16, 32, 64]

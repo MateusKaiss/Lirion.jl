@@ -1,0 +1,37 @@
+# ============================================================
+# tuning_grid_aladin.toml   (PLACEHOLDER — declared, NOT run yet)
+# ============================================================
+# Finite grid fixed BEFORE tuning. The tuning stage reads this and
+# saves every attempt, not only the winner.
+# ============================================================
+
+[global]
+eps_abs  = 1e-4
+eps_rel  = 1e-4
+max_iter = 500                  # ALADIN needs far fewer iters than ADMM
+
+rho    = [1e0, 1e1, 1e2, 1e3, 1e4]   # augmented-Lagrangian penalty
+mu     = [1e2, 1e3, 1e4, 1e5]        # coordinator-QP slack penalty
+growth = [1.0, 1.5, 2.0]             # geometric r_p / r_mu (1.0 = off)
+
+[proximal]
+# :pflow proximal coupling — supported with coupling=:power or :hybrid
+# (per aladin() validation). Enable where the plain state-coupling QP
+# ill-conditions (AC). Keep the proximal term small.
+use_pflow_for = ["ac"]
+weight_tied_to_rho = true
+
+[formulation.dc]
+convex = true
+growth = 1.0
+note   = "rho=0 reduces ALADIN to dual decomposition; converges fast"
+
+[formulation.socwr]
+convex = true
+growth = 1.0
+note   = "similar to DC"
+
+[formulation.ac]
+convex = false
+growth = 1.5
+note   = "SQP Hessian + moderate rho + growth; where ALADIN beats ADMM"

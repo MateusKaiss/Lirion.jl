@@ -1,0 +1,99 @@
+# ============================================================
+# selected_cases.toml
+# ============================================================
+# Declarative case list for the Lirion distributed-OPF paper.
+# Scope of the prepare stage: case selection + copy + partitioning.
+# No solver / tuning / distributed runs are driven from here.
+#
+# Variants (std/api/sad) are auto-discovered by 01_select_cases.jl
+# from the PGLib tree. Per-case partition counts `k` live in
+# configs/partitioning.toml.
+# ============================================================
+
+[meta]
+description = "PGLib-OPF cases selected for the Lirion distributed-OPF paper"
+pglib_env_var = "PGLIB_OPF_ROOT"
+pglib_default_root = "/home/mateus-kaiss/Downloads/papers/pglib-opf-master"
+# std -> <root>/pglib_opf_<name>.m
+# api -> <root>/api/pglib_opf_<name>__api.m
+# sad -> <root>/sad/pglib_opf_<name>__sad.m
+
+# ---- Main cases (backbone of the paper) --------------------
+[[case]]
+name = "case14_ieee"
+family = "IEEE"
+role = "debug"
+group = "main"
+
+[[case]]
+name = "case30_ieee"
+family = "IEEE"
+role = "debug"
+group = "main"
+
+[[case]]
+name = "case57_ieee"
+family = "IEEE"
+role = "debug"
+group = "main"
+
+[[case]]
+name = "case73_ieee_rts"
+family = "RTS"
+role = "main"
+group = "main"
+
+[[case]]
+name = "case118_ieee"
+family = "IEEE"
+role = "main"
+group = "main"
+
+[[case]]
+name = "case179_goc"
+family = "GOC"
+role = "main"
+group = "main"
+
+[[case]]
+name = "case300_ieee"
+family = "IEEE"
+role = "main"
+group = "main"
+
+[[case]]
+name = "case500_goc"
+family = "GOC"
+role = "scale"
+group = "main"
+
+[[case]]
+name = "case588_sdet"
+family = "SDET"
+role = "scale"
+group = "main"
+
+[[case]]
+name = "case1354_pegase"
+family = "PEGASE"
+role = "scale"
+group = "main"
+
+# ---- Optional / PowerModelsADA-comparison cases ------------
+[[case]]
+name = "case24_ieee_rts"
+family = "RTS"
+role = "comparison"
+group = "optional"
+
+[[case]]
+name = "case39_epri"
+family = "EPRI"
+role = "comparison"
+group = "optional"
+
+[[case]]
+name = "case2000_goc"
+family = "GOC"
+role = "scale-stretch"
+group = "optional"

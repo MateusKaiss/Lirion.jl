@@ -1,0 +1,147 @@
+boundary_buses = [101, 103, 107, 109, 112, 113, 114, 116, 121, 123, 203, 212, 213, 215, 217, 220, 223, 325]
+case = "case73_ieee_rts"
+clean_for_main = true
+k_actual = 4
+k_requested = 4
+method = "metis"
+n_boundary_buses = 18
+n_branch = 120
+n_bus = 73
+n_gen = 99
+n_tie_lines = 13
+optional_or_sensitivity = false
+path_copied = "cases/raw/pglib/std/pglib_opf_case73_ieee_rts.m"
+path_original = "/home/mateus-kaiss/Downloads/papers/pglib-opf-master/pglib_opf_case73_ieee_rts.m"
+path_partitioned = "cases/partitioned/case73_ieee_rts/std/k4/case.m"
+refine = false
+sectionings_planned = ["tie_line", "dummy_bus", "split_bus"]
+seed = 1
+shared_partition = true
+shared_with_reference = "std"
+status = "clean"
+tie_lines = [[101, 103, 1, 3], [103, 109, 3, 1], [107, 203, 1, 2], [112, 123, 1, 3], [113, 123, 1, 3], [113, 215, 1, 2], [114, 116, 1, 3], [123, 217, 3, 2], [212, 223, 2, 4], [213, 223, 2, 4], [220, 223, 2, 4], [220, 223, 2, 4], [325, 121, 4, 3]]
+variant = "std"
+warnings = []
+
+[balance]
+cv = 0.4035868455522256
+imbalance_max_over_mean = 1.4246575342465753
+max = 26
+mean = 18.25
+min = 11
+n_zones = 4
+std = 7.365459931328117
+
+    [balance.sizes_by_zone]
+    1 = 13
+    2 = 23
+    3 = 11
+    4 = 26
+
+[bus_to_zone]
+101 = 1
+102 = 1
+103 = 3
+104 = 1
+105 = 1
+106 = 1
+107 = 1
+108 = 1
+109 = 1
+110 = 1
+111 = 1
+112 = 1
+113 = 1
+114 = 1
+115 = 3
+116 = 3
+117 = 3
+118 = 3
+119 = 3
+120 = 3
+121 = 3
+122 = 3
+123 = 3
+124 = 3
+201 = 2
+202 = 2
+203 = 2
+204 = 2
+205 = 2
+206 = 2
+207 = 2
+208 = 2
+209 = 2
+210 = 2
+211 = 2
+212 = 2
+213 = 2
+214 = 2
+215 = 2
+216 = 2
+217 = 2
+218 = 2
+219 = 2
+220 = 2
+221 = 2
+222 = 2
+223 = 4
+224 = 2
+301 = 4
+302 = 4
+303 = 4
+304 = 4
+305 = 4
+306 = 4
+307 = 4
+308 = 4
+309 = 4
+310 = 4
+311 = 4
+312 = 4
+313 = 4
+314 = 4
+315 = 4
+316 = 4
+317 = 4
+318 = 4
+319 = 4
+320 = 4
+321 = 4
+322 = 4
+323 = 4
+324 = 4
+325 = 4
+
+[connectivity]
+all_connected = true
+
+    [connectivity.per_zone]
+    1 = true
+    2 = true
+    3 = true
+    4 = true
+
+[generation]
+all_zones_have_gen = true
+
+    [generation.per_zone]
+    1 = true
+    2 = true
+    3 = true
+    4 = true
+
+[sectioning_coupling_counts.dummy_bus]
+coupling_edges = 13
+
+[sectioning_coupling_counts.split_bus]
+split_buses = 18
+
+[sectioning_coupling_counts.tie_line]
+coupling_edges = 13
+
+[zones]
+1 = [101, 102, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114]
+2 = [201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 224]
+3 = [103, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124]
+4 = [223, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325]

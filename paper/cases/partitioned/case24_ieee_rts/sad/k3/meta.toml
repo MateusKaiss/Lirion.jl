@@ -1,0 +1,94 @@
+boundary_buses = [2, 3, 4, 5, 6, 9, 10, 11, 14, 15, 19, 20, 24]
+case = "case24_ieee_rts"
+clean_for_main = true
+k_actual = 3
+k_requested = 3
+method = "metis"
+n_boundary_buses = 13
+n_branch = 38
+n_bus = 24
+n_gen = 33
+n_tie_lines = 8
+optional_or_sensitivity = false
+path_copied = "cases/raw/pglib/sad/pglib_opf_case24_ieee_rts__sad.m"
+path_original = "/home/mateus-kaiss/Downloads/papers/pglib-opf-master/sad/pglib_opf_case24_ieee_rts__sad.m"
+path_partitioned = "cases/partitioned/case24_ieee_rts/sad/k3/case.m"
+refine = false
+sectionings_planned = ["tie_line", "dummy_bus", "split_bus"]
+seed = 1
+shared_partition = true
+shared_with_reference = "std"
+status = "clean"
+tie_lines = [[2, 6, 1, 3], [3, 9, 1, 3], [4, 9, 1, 3], [5, 10, 1, 3], [11, 14, 3, 2], [15, 24, 2, 1], [19, 20, 2, 3], [19, 20, 2, 3]]
+variant = "sad"
+warnings = []
+
+[balance]
+cv = 0.25
+imbalance_max_over_mean = 1.25
+max = 10
+mean = 8.0
+min = 6
+n_zones = 3
+std = 2.0
+
+    [balance.sizes_by_zone]
+    1 = 6
+    2 = 8
+    3 = 10
+
+[bus_to_zone]
+1 = 1
+10 = 3
+11 = 3
+12 = 3
+13 = 3
+14 = 2
+15 = 2
+16 = 2
+17 = 2
+18 = 2
+19 = 2
+2 = 1
+20 = 3
+21 = 2
+22 = 2
+23 = 3
+24 = 1
+3 = 1
+4 = 1
+5 = 1
+6 = 3
+7 = 3
+8 = 3
+9 = 3
+
+[connectivity]
+all_connected = true
+
+    [connectivity.per_zone]
+    1 = true
+    2 = true
+    3 = true
+
+[generation]
+all_zones_have_gen = true
+
+    [generation.per_zone]
+    1 = true
+    2 = true
+    3 = true
+
+[sectioning_coupling_counts.dummy_bus]
+coupling_edges = 8
+
+[sectioning_coupling_counts.split_bus]
+split_buses = 13
+
+[sectioning_coupling_counts.tie_line]
+coupling_edges = 8
+
+[zones]
+1 = [1, 2, 3, 4, 5, 24]
+2 = [14, 15, 16, 17, 18, 19, 21, 22]
+3 = [6, 7, 8, 9, 10, 11, 12, 13, 20, 23]

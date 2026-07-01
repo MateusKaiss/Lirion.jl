@@ -1,56 +1,106 @@
-# Paper reproduction
+# Lirion distributed-OPF paper — experiments
 
-This folder is **not** part of the Lirion package — `Pkg.add("Lirion")`
-does not pull it in. It is bundled with the repository only so that
-reviewers and researchers can reproduce the paper's centralized vs.
-distributed OPF benchmarks locally.
+This folder is **not** part of the Lirion package (`Pkg.add("Lirion")`
+does not pull it in). It bundles the reproducible experiment pipeline so
+reviewers can rebuild the cases, partitions, tuning and tables locally.
 
-## Contents
+## Design: partition vs. sectioning
 
-- `paper_results.jl` — main reproduction script
-- `cases/<case>/std/*.m` — PGLib-OPF std-variant cases, with pre-computed
-  Metis partitions (`*_tie.m` for TieLine / DummyBus, `*_splitbus.m`
-  for SplitBus with the bilateral-zone repair)
+In current Lirion, **sectioning is a runtime choice**, not a file. The
+solver applies `TieLine` / `DummyBus` / `SplitBus` in memory from the
+`bus.zone` column of the case:
 
-## Cases and partitions
+```julia
+solve(case; model = ac, algorithm = admm(sectioning = :dummy_bus, coupling = :hybrid))
+# -> build_distributed_system(case, algorithm.sectioning)
+#    -> prepare_distributed_partitions(case, sectioning)  # reads case.bus.zone
+```
 
-| Case | Buses | Zones | Tie-lines | Tie-lines (SplitBus) |
-|---|---:|---:|---:|---:|
-| case14_ieee | 14 | 2 | 3 | 3 |
-| case30_ieee | 30 | 2 | 6 | 6 |
-| case57_ieee | 57 | 2 | 8 | 8 |
+Therefore a partition is **one `case.m` carrying only the `zone`
+column**, one per `(case, variant, k)`. There are **no** `_tie.m` /
+`_dummybus.m` / `_splitbus.m` files — the sectionings to test are
+recorded as metadata (`sectionings_planned`) in each `meta.toml`.
 
-## Usage
+## PGLib-OPF data
+
+Cases come from [PGLib-OPF](https://github.com/power-grid-lib/pglib-opf).
+Root resolution order:
+
+1. environment variable `PGLIB_OPF_ROOT`;
+2. fallback `/home/mateus-kaiss/Downloads/papers/pglib-opf-master`.
+
+Variants: `std` at `<root>/pglib_opf_<name>.m`, `api` at
+`<root>/api/pglib_opf_<name>__api.m`, `sad` at
+`<root>/sad/pglib_opf_<name>__sad.m`. The scripts **copy** (never
+move/alter) the selected cases into `cases/raw/pglib/{std,api,sad}/`.
+
+## Partitioning deps
+
+`02_build_partitions.jl` needs the Lirion partition extension:
+
+```julia
+using Pkg; Pkg.add(["Metis", "Graphs", "SimpleWeightedGraphs"])
+```
+
+## Layout
+
+```
+cases/selected_cases.toml          # declarative case list
+cases/raw/pglib/{std,api,sad}/     # copied PGLib .m + PGLIB_LICENSE + PGLIB_README
+cases/partitioned/<case>/<variant>/k<k>/{case.m, meta.toml}
+cases/partitioned/{_summary,_diagnostic}.toml
+configs/partitioning.toml          # per-case k, seeds, refine
+configs/selection_criteria.toml    # partition + tuning selection rules
+configs/tuning_grid_{admm,aladin}.toml  # placeholders (not run yet)
+scripts/lib/common.jl              # shared helpers
+scripts/prepare/{01_select_cases,02_build_partitions}.jl
+scripts/experiments/               # (future) solver / tuning drivers
+scripts/tables/                    # (future) table + figure generation
+results/logs/                      # per-script logs (git-ignored)
+```
+
+## Reproduce / audit (no solver)
 
 ```julia
 using Lirion
-# Optional but recommended: also have one of Gurobi / Ipopt / Clarabel / OSQP loaded.
-include(joinpath(pkgdir(Lirion), "paper", "paper_results.jl"))
+using Metis, Graphs, SimpleWeightedGraphs
+include(joinpath(pkgdir(Lirion), "paper", "scripts", "prepare", "01_select_cases.jl"))
+include(joinpath(pkgdir(Lirion), "paper", "scripts", "prepare", "02_build_partitions.jl"))
 ```
 
-The script:
+Normal use reads the ready-made cases in `cases/partitioned/`; the
+`prepare/` scripts are only the reconstruction/audit recipe.
 
-1. Solves the centralized DC / AC / SOCWR OPF on each case as reference.
-2. Runs the distributed ADMM across every combination of
-   `{state, power, hybrid}` coupling × `{tie_line, dummy_bus, split_bus}`
-   sectioning (18 combinations per case).
-3. Prints the per-run gap, iteration count, and wall time, plus a
-   summary table at the end.
+## Partition status & main matrix
 
-## ρ and `max_iter` table
+Each `meta.toml` carries `status`, `clean_for_main`, and
+`optional_or_sensitivity`:
 
-The reproduction uses the per-`(case, base_model, coupling)` ρ values
-established by the paper's tuning study (see `paper_results.jl`:
-`CASE_OVERRIDES`). In particular:
+- `clean` (`clean_for_main = true`) — every zone connected **and** has a
+  dispatchable generator. **The main matrix of the paper uses ONLY these.**
+- `connected_no_gen` (`clean_for_main = false`,
+  `optional_or_sensitivity = true`) — the partition is connected, but some
+  zone has no dispatchable generator of its own and imports power through
+  the tie-lines. This is a data property of the case (few dispatchable
+  generators, e.g. case14/case30), not a partitioning defect. Kept as
+  **optional / sensitivity** cases, out of the headline matrix.
+- `not_clean` — some zone is not connected on the electrical graph.
+  After the component-based connectivity repair
+  (`Lirion.enforce_zone_connectivity!`) this count is **0**; a partition
+  can only be `not_clean` if the underlying graph itself has more
+  electrical islands than zones can absorb.
 
-- `state` coupling on any base needs ρ = 1e5 on `case14_ieee` and
-  ρ = 1e6 on `case30_ieee` / `case57_ieee` (smaller ρ leaves the
-  primal consensus unclosed for tens of thousands of iterations).
-- DC `power`-only on `case30_ieee` needs ρ = 1e8 with `max_iter = 10000`
-  to escape the known ~1.2 % angle-drift plateau. AC/SOCWR `power`
-  cannot absorb that ρ (solver ill-conditioning) and stay at the
-  default ρ = 1e3.
-- `hybrid` converges at the default ρ = 1e3 across all cases.
+Aggregate `status_counts_by_case_k` are recorded in
+`cases/partitioned/_summary.toml` (`_meta`).
 
-Every other combination uses `ρ = {state: 1e5, power: 1e3, hybrid: 1e3}`
-with `max_iter = 5000` and `eps_abs = eps_rel = 1e-4`.
+## Data license & attribution
+
+The cases in `cases/raw/` and `cases/partitioned/` derive from the
+**IEEE PES Power Grid Library — Optimal Power Flow (PGLib-OPF)**,
+<https://github.com/power-grid-lib/pglib-opf>. PGLib-OPF **data** is
+licensed **CC-BY 4.0** (<http://creativecommons.org/licenses/by/4.0/>);
+the PGLib software is MIT. The upstream `LICENSE` ships verbatim as
+`cases/raw/pglib/PGLIB_LICENSE`, and each `.m` retains its per-case
+copyright header. Partitioned cases are modifications (a Metis-assigned
+`zone` column) of these CC-BY sources and remain CC-BY 4.0 with
+attribution preserved.
