@@ -1,0 +1,18 @@
+[_meta]
+generated_at = "2026-07-02T11:48:07.911"
+policy = "Solver config is decided per ROLE. Centralized = objective oracle; distributed = the study object (algorithm × sectioning × coupling × k). The two roles may use different solvers when that reflects their role; both are fixed rules per category (no case-by-case cherry-picking). Within the distributed results, ADMM and ALADIN share the SAME solver per formulation (guaranteed: resolve_optimizer dispatches on base_model, not on the algorithm)."
+stage = "C0"
+
+[centralized_solver_config]
+ac = "Ipopt + MA57 via LIRION_HSLLIB"
+dc = "Gurobi"
+socwr = "Clarabel (hardened)"
+
+[distributed_solver_config]
+ac = "Ipopt + MA57 via LIRION_HSLLIB (falls back to MUMPS if unset)"
+dc = "OSQP (Lirion default; fast warm-started inner QP)"
+socwr = "Clarabel (hardened, Lirion default)"
+
+[runtime_config]
+BLAS_threads = 1
+JULIA_NUM_THREADS = 1

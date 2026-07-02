@@ -1,0 +1,40 @@
+# C0 — runtime/solver alignment
+
+| mode | case | formulation | algorithm | sectioning | coupling | solver_variant | blas_threads | julia_threads | status | objective | obj_match_ref | iterations | runtime_s | warnings | notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| centralized | case1354_pegase | dc | centralized |  |  | Gurobi | 1 | 1 | optimal | 1218182.036 |  | 0 | 0.1081879139 |  |  |
+| centralized | case1354_pegase | dc | centralized |  |  | Gurobi | 2 | 1 | optimal | 1218182.036 | true | 0 | 0.06715416908 |  |  |
+| centralized | case1354_pegase | dc | centralized |  |  | Gurobi | 4 | 1 | optimal | 1218182.036 | true | 0 | 0.06923794746 |  |  |
+| centralized | case1354_pegase | dc | centralized |  |  | Gurobi | 8 | 1 | optimal | 1218182.036 | true | 0 | 0.07092094421 |  |  |
+| centralized | case1354_pegase | dc | centralized |  |  | Gurobi | 14 | 1 | optimal | 1218182.036 | true | 0 | 0.07022094727 |  |  |
+| centralized | case1354_pegase | socwr | centralized |  |  | Clarabel(hardened) | 1 | 1 | optimal | 1235968.263 |  | 0 | 1.274272919 |  |  |
+| centralized | case1354_pegase | socwr | centralized |  |  | Clarabel(hardened) | 2 | 1 | optimal | 1235968.261 | true | 0 | 1.292486906 |  |  |
+| centralized | case1354_pegase | socwr | centralized |  |  | Clarabel(hardened) | 4 | 1 | optimal | 1235968.26 | true | 0 | 1.525266171 |  |  |
+| centralized | case1354_pegase | socwr | centralized |  |  | Clarabel(hardened) | 8 | 1 | optimal | 1235968.259 | true | 0 | 1.430297136 |  |  |
+| centralized | case1354_pegase | socwr | centralized |  |  | Clarabel(hardened) | 14 | 1 | optimal | 1235968.259 | true | 0 | 1.693322897 |  |  |
+| centralized | case1354_pegase | ac | centralized |  |  | Ipopt+MA57 | 1 | 1 | local_optimal | 1258843.987 |  | 0 | 1.780272007 |  |  |
+| centralized | case1354_pegase | ac | centralized |  |  | Ipopt+MA57 | 2 | 1 | local_optimal | 1258843.987 | true | 0 | 1.920505047 |  |  |
+| centralized | case1354_pegase | ac | centralized |  |  | Ipopt+MA57 | 4 | 1 | local_optimal | 1258843.987 | true | 0 | 1.749761105 |  |  |
+| centralized | case1354_pegase | ac | centralized |  |  | Ipopt+MA57 | 8 | 1 | local_optimal | 1258843.987 | true | 0 | 1.9151299 |  |  |
+| centralized | case1354_pegase | ac | centralized |  |  | Ipopt+MA57 | 14 | 1 | local_optimal | 1258843.987 | true | 0 | 1.737627029 |  |  |
+| distributed | case118_ieee | dc | admm | tie_line | hybrid | OSQP (Lirion distributed default) | 1 | 1 | error |  |  | 0 | 2.155614138 |  | TaskFailedException |
+| distributed | case118_ieee | dc | admm | tie_line | hybrid | OSQP (Lirion distributed default) | 2 | 1 | error |  |  | 0 | 1.79798913 |  | TaskFailedException |
+| distributed | case118_ieee | dc | admm | tie_line | hybrid | OSQP (Lirion distributed default) | 4 | 1 | error |  |  | 0 | 1.701662064 |  | TaskFailedException |
+| distributed | case118_ieee | dc | admm | tie_line | hybrid | OSQP (Lirion distributed default) | 8 | 1 | error |  |  | 0 | 1.821763039 |  | TaskFailedException |
+| distributed | case118_ieee | dc | admm | tie_line | hybrid | OSQP (Lirion distributed default) | 14 | 1 | error |  |  | 0 | 1.840190172 |  | TaskFailedException |
+| distributed | case118_ieee | socwr | admm | tie_line | hybrid | Clarabel (hardened, Lirion default) | 1 | 1 | iteration_limit | 96334.98169 |  | 300 | 8.597529888 |  |  |
+| distributed | case118_ieee | socwr | admm | tie_line | hybrid | Clarabel (hardened, Lirion default) | 2 | 1 | iteration_limit | 96334.98169 | true | 300 | 8.359164 |  |  |
+| distributed | case118_ieee | socwr | admm | tie_line | hybrid | Clarabel (hardened, Lirion default) | 4 | 1 | iteration_limit | 96334.98169 | true | 300 | 8.349139214 |  |  |
+| distributed | case118_ieee | socwr | admm | tie_line | hybrid | Clarabel (hardened, Lirion default) | 8 | 1 | iteration_limit | 96334.98169 | true | 300 | 8.367485046 |  |  |
+| distributed | case118_ieee | socwr | admm | tie_line | hybrid | Clarabel (hardened, Lirion default) | 14 | 1 | iteration_limit | 96334.98169 | true | 300 | 8.386965036 |  |  |
+| distributed | case118_ieee | ac | admm | tie_line | hybrid | Ipopt/MUMPS (Lirion distributed default) | 1 | 1 | iteration_limit | 97213.56016 |  | 300 | 18.470752 |  |  |
+| distributed | case118_ieee | ac | admm | tie_line | hybrid | Ipopt/MUMPS (Lirion distributed default) | 2 | 1 | iteration_limit | 97213.56016 | true | 300 | 18.42535996 |  |  |
+| distributed | case118_ieee | ac | admm | tie_line | hybrid | Ipopt/MUMPS (Lirion distributed default) | 4 | 1 | iteration_limit | 97213.56016 | true | 300 | 18.40884113 |  |  |
+| distributed | case118_ieee | ac | admm | tie_line | hybrid | Ipopt/MUMPS (Lirion distributed default) | 8 | 1 | iteration_limit | 97213.56016 | true | 300 | 19.12859988 |  |  |
+| distributed | case118_ieee | ac | admm | tie_line | hybrid | Ipopt/MUMPS (Lirion distributed default) | 14 | 1 | iteration_limit | 97213.56016 | true | 300 | 19.17018414 |  |  |
+| distributed | case57_ieee | ac | admm | tie_line | hybrid | Ipopt+MUMPS(dist) | 1 | 1 | converged | 37589.33114 |  | 186 | 5.086854935 |  |  |
+| distributed | case57_ieee | ac | admm | tie_line | hybrid | Ipopt+MA57(dist) | 1 | 1 | converged | 37589.33114 | true | 186 | 3.74686718 |  |  |
+| distributed | case118_ieee | ac | admm | tie_line | hybrid | Ipopt+MUMPS(dist) | 1 | 1 | iteration_limit | 97213.56016 |  | 300 | 18.64654613 |  |  |
+| distributed | case118_ieee | ac | admm | tie_line | hybrid | Ipopt+MA57(dist) | 1 | 1 | iteration_limit | 97213.56016 | true | 300 | 14.8974309 |  |  |
+| distributed | case57_ieee | dc | admm | tie_line | hybrid | OSQP(default) | 1 | 1 | converged | 34772.98865 |  | 253 | 0.3008310795 |  |  |
+| distributed | case57_ieee | dc | admm | tie_line | hybrid | Gurobi(probe) | 1 | 1 | converged | 34772.9479 | false | 236 | 0.5050308704 |  |  |
