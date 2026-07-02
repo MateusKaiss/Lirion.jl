@@ -1,0 +1,25 @@
+# D1a - package model inventory
+
+| category | item | centralized | distributed | admm | aladin | notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| model | DC | yes | yes | yes | yes | linear approx |
+| model | AC | yes | yes | yes | yes | polar |
+| model | SOCWR | yes | yes | yes | yes | SOC relaxation (Jabr) |
+| model | ACR | yes | no | no | no | centralized-only (rectangular) |
+| model | IVR | yes | no | no | no | centralized-only |
+| model | LPAC | yes | no | no | no | centralized-only |
+| model | QC | yes | no | no | no | centralized-only |
+| model | SDPWRM | yes | no | no | no | centralized-only |
+| model | SOCBF | yes | no | no | no | centralized-only (branch-flow) |
+| model | BFA | yes | no | no | no | centralized-only (LinDistFlow) |
+| model | NFA | yes | no | no | no | centralized-only |
+| algorithm | centralized | yes |  |  |  | oracle/baseline |
+| algorithm | admm |  | yes | yes |  | consensus |
+| algorithm | aladin |  | yes |  | yes | SQP + augmented Lagrangian |
+| sectioning | tie_line |  | yes | yes | yes | supported all couplings |
+| sectioning | dummy_bus |  | yes | yes | partial | ALADIN+SOCWR+dummy_bus not_implemented |
+| sectioning | split_bus |  | yes | partial | partial | only hybrid coupling supported |
+| coupling | state |  | yes | yes | yes |  |
+| coupling | hybrid |  | yes | yes | yes |  |
+| coupling | power |  | yes | yes | yes |  |
+| coupling | pflow |  | yes | no | yes | ALADIN proximal_mode; needs coupling power/hybrid |

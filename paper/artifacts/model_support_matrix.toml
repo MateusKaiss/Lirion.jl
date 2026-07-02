@@ -1,0 +1,1226 @@
+[_meta]
+algorithms = ["centralized", "admm", "aladin"]
+case = "case14_ieee"
+centralized_models = ["DC", "AC", "ACR", "IVR", "LPAC", "SOCWR", "QC", "SDPWRM", "SOCBF", "BFA", "NFA"]
+centralized_only_models = ["ACR", "IVR", "LPAC", "QC", "SDPWRM", "SOCBF", "BFA", "NFA"]
+couplings = ["state", "hybrid", "power", "pflow(aladin proximal_mode)"]
+distributed_models = ["DC", "AC", "SOCWR"]
+generated_at = "2026-07-02T17:15:49.886"
+sectionings = ["tie_line", "dummy_bus", "split_bus"]
+stage = "D1a"
+
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "converged"
+classification = "aladin_converged_admm_failed"
+coupling = "state"
+formulation = "dc"
+k = 2
+paper_status = "needs_admm_tuning"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "converged"
+classification = "both_converged"
+coupling = "hybrid"
+formulation = "dc"
+k = 2
+paper_status = "paper_ready"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "converged"
+classification = "both_converged"
+coupling = "power"
+formulation = "dc"
+k = 2
+paper_status = "paper_ready"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "not_implemented"
+classification = "both_failed"
+coupling = "state"
+formulation = "dc"
+k = 2
+paper_status = "exclude_from_main"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "converged"
+classification = "both_converged"
+coupling = "hybrid"
+formulation = "dc"
+k = 2
+paper_status = "paper_ready"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "converged"
+classification = "both_converged"
+coupling = "power"
+formulation = "dc"
+k = 2
+paper_status = "paper_ready"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "not_implemented"
+ALADIN_status = "not_implemented"
+classification = "not_implemented"
+coupling = "state"
+formulation = "dc"
+k = 2
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "converged"
+classification = "both_converged"
+coupling = "hybrid"
+formulation = "dc"
+k = 2
+paper_status = "paper_ready"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "not_implemented"
+ALADIN_status = "not_implemented"
+classification = "not_implemented"
+coupling = "power"
+formulation = "dc"
+k = 2
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "state"
+formulation = "socwr"
+k = 2
+paper_status = "needs_aladin_tuning"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "hybrid"
+formulation = "socwr"
+k = 2
+paper_status = "needs_aladin_tuning"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "power"
+formulation = "socwr"
+k = 2
+paper_status = "needs_aladin_tuning"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "not_implemented"
+classification = "both_failed"
+coupling = "state"
+formulation = "socwr"
+k = 2
+paper_status = "exclude_from_main"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "not_implemented"
+classification = "admm_converged_aladin_failed"
+coupling = "hybrid"
+formulation = "socwr"
+k = 2
+paper_status = "needs_aladin_tuning"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "not_implemented"
+classification = "admm_converged_aladin_failed"
+coupling = "power"
+formulation = "socwr"
+k = 2
+paper_status = "needs_aladin_tuning"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "not_implemented"
+ALADIN_status = "not_implemented"
+classification = "not_implemented"
+coupling = "state"
+formulation = "socwr"
+k = 2
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "hybrid"
+formulation = "socwr"
+k = 2
+paper_status = "needs_aladin_tuning"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "not_implemented"
+ALADIN_status = "not_implemented"
+classification = "not_implemented"
+coupling = "power"
+formulation = "socwr"
+k = 2
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "state"
+formulation = "ac"
+k = 2
+paper_status = "needs_aladin_tuning"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "hybrid"
+formulation = "ac"
+k = 2
+paper_status = "needs_aladin_tuning"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "converged"
+classification = "both_converged"
+coupling = "power"
+formulation = "ac"
+k = 2
+paper_status = "paper_ready"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "failed"
+classification = "both_failed"
+coupling = "state"
+formulation = "ac"
+k = 2
+paper_status = "exclude_from_main"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "hybrid"
+formulation = "ac"
+k = 2
+paper_status = "needs_aladin_tuning"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "power"
+formulation = "ac"
+k = 2
+paper_status = "needs_aladin_tuning"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "not_implemented"
+ALADIN_status = "not_implemented"
+classification = "not_implemented"
+coupling = "state"
+formulation = "ac"
+k = 2
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "converged"
+classification = "both_converged"
+coupling = "hybrid"
+formulation = "ac"
+k = 2
+paper_status = "paper_ready"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "not_implemented"
+ALADIN_status = "not_implemented"
+classification = "not_implemented"
+coupling = "power"
+formulation = "ac"
+k = 2
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "converged"
+classification = "aladin_converged_admm_failed"
+coupling = "state"
+formulation = "dc"
+k = 3
+paper_status = "needs_admm_tuning"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "converged"
+classification = "both_converged"
+coupling = "hybrid"
+formulation = "dc"
+k = 3
+paper_status = "paper_ready"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "converged"
+classification = "both_converged"
+coupling = "power"
+formulation = "dc"
+k = 3
+paper_status = "paper_ready"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "not_implemented"
+classification = "both_failed"
+coupling = "state"
+formulation = "dc"
+k = 3
+paper_status = "exclude_from_main"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "converged"
+classification = "both_converged"
+coupling = "hybrid"
+formulation = "dc"
+k = 3
+paper_status = "paper_ready"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "converged"
+classification = "both_converged"
+coupling = "power"
+formulation = "dc"
+k = 3
+paper_status = "paper_ready"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "not_implemented"
+ALADIN_status = "not_implemented"
+classification = "not_implemented"
+coupling = "state"
+formulation = "dc"
+k = 3
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "converged"
+classification = "both_converged"
+coupling = "hybrid"
+formulation = "dc"
+k = 3
+paper_status = "paper_ready"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "not_implemented"
+ALADIN_status = "not_implemented"
+classification = "not_implemented"
+coupling = "power"
+formulation = "dc"
+k = 3
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "failed"
+classification = "both_failed"
+coupling = "state"
+formulation = "socwr"
+k = 3
+paper_status = "exclude_from_main"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "hybrid"
+formulation = "socwr"
+k = 3
+paper_status = "needs_aladin_tuning"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "power"
+formulation = "socwr"
+k = 3
+paper_status = "needs_aladin_tuning"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "not_implemented"
+classification = "both_failed"
+coupling = "state"
+formulation = "socwr"
+k = 3
+paper_status = "exclude_from_main"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "not_implemented"
+classification = "both_failed"
+coupling = "hybrid"
+formulation = "socwr"
+k = 3
+paper_status = "exclude_from_main"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "not_implemented"
+classification = "both_failed"
+coupling = "power"
+formulation = "socwr"
+k = 3
+paper_status = "exclude_from_main"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "not_implemented"
+ALADIN_status = "not_implemented"
+classification = "not_implemented"
+coupling = "state"
+formulation = "socwr"
+k = 3
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "hybrid"
+formulation = "socwr"
+k = 3
+paper_status = "needs_aladin_tuning"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "not_implemented"
+ALADIN_status = "not_implemented"
+classification = "not_implemented"
+coupling = "power"
+formulation = "socwr"
+k = 3
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "failed"
+classification = "both_failed"
+coupling = "state"
+formulation = "ac"
+k = 3
+paper_status = "exclude_from_main"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "hybrid"
+formulation = "ac"
+k = 3
+paper_status = "needs_aladin_tuning"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "power"
+formulation = "ac"
+k = 3
+paper_status = "needs_aladin_tuning"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "failed"
+classification = "both_failed"
+coupling = "state"
+formulation = "ac"
+k = 3
+paper_status = "exclude_from_main"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "failed"
+classification = "both_failed"
+coupling = "hybrid"
+formulation = "ac"
+k = 3
+paper_status = "exclude_from_main"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "failed"
+classification = "both_failed"
+coupling = "power"
+formulation = "ac"
+k = 3
+paper_status = "exclude_from_main"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "not_implemented"
+ALADIN_status = "not_implemented"
+classification = "not_implemented"
+coupling = "state"
+formulation = "ac"
+k = 3
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "hybrid"
+formulation = "ac"
+k = 3
+paper_status = "needs_aladin_tuning"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "not_implemented"
+ALADIN_status = "not_implemented"
+classification = "not_implemented"
+coupling = "power"
+formulation = "ac"
+k = 3
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "converged"
+classification = "aladin_converged_admm_failed"
+coupling = "state"
+formulation = "dc"
+k = 4
+paper_status = "needs_admm_tuning"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "converged"
+classification = "both_converged"
+coupling = "hybrid"
+formulation = "dc"
+k = 4
+paper_status = "paper_ready"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "converged"
+classification = "both_converged"
+coupling = "power"
+formulation = "dc"
+k = 4
+paper_status = "paper_ready"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "not_implemented"
+classification = "both_failed"
+coupling = "state"
+formulation = "dc"
+k = 4
+paper_status = "exclude_from_main"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "converged"
+classification = "aladin_converged_admm_failed"
+coupling = "hybrid"
+formulation = "dc"
+k = 4
+paper_status = "needs_admm_tuning"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "converged"
+classification = "both_converged"
+coupling = "power"
+formulation = "dc"
+k = 4
+paper_status = "paper_ready"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "not_implemented"
+ALADIN_status = "not_implemented"
+classification = "not_implemented"
+coupling = "state"
+formulation = "dc"
+k = 4
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "converged"
+classification = "both_converged"
+coupling = "hybrid"
+formulation = "dc"
+k = 4
+paper_status = "paper_ready"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "not_implemented"
+ALADIN_status = "not_implemented"
+classification = "not_implemented"
+coupling = "power"
+formulation = "dc"
+k = 4
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "failed"
+classification = "both_failed"
+coupling = "state"
+formulation = "socwr"
+k = 4
+paper_status = "exclude_from_main"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "hybrid"
+formulation = "socwr"
+k = 4
+paper_status = "needs_aladin_tuning"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "power"
+formulation = "socwr"
+k = 4
+paper_status = "needs_aladin_tuning"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "not_implemented"
+classification = "both_failed"
+coupling = "state"
+formulation = "socwr"
+k = 4
+paper_status = "exclude_from_main"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "not_implemented"
+classification = "both_failed"
+coupling = "hybrid"
+formulation = "socwr"
+k = 4
+paper_status = "exclude_from_main"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "not_implemented"
+classification = "both_failed"
+coupling = "power"
+formulation = "socwr"
+k = 4
+paper_status = "exclude_from_main"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "not_implemented"
+ALADIN_status = "not_implemented"
+classification = "not_implemented"
+coupling = "state"
+formulation = "socwr"
+k = 4
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "hybrid"
+formulation = "socwr"
+k = 4
+paper_status = "needs_aladin_tuning"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "not_implemented"
+ALADIN_status = "not_implemented"
+classification = "not_implemented"
+coupling = "power"
+formulation = "socwr"
+k = 4
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "failed"
+classification = "both_failed"
+coupling = "state"
+formulation = "ac"
+k = 4
+paper_status = "exclude_from_main"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "hybrid"
+formulation = "ac"
+k = 4
+paper_status = "needs_aladin_tuning"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "power"
+formulation = "ac"
+k = 4
+paper_status = "needs_aladin_tuning"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "failed"
+classification = "both_failed"
+coupling = "state"
+formulation = "ac"
+k = 4
+paper_status = "exclude_from_main"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "failed"
+classification = "both_failed"
+coupling = "hybrid"
+formulation = "ac"
+k = 4
+paper_status = "exclude_from_main"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "failed"
+ALADIN_status = "failed"
+classification = "both_failed"
+coupling = "power"
+formulation = "ac"
+k = 4
+paper_status = "exclude_from_main"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "not_implemented"
+ALADIN_status = "not_implemented"
+classification = "not_implemented"
+coupling = "state"
+formulation = "ac"
+k = 4
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "converged"
+ALADIN_status = "failed"
+classification = "admm_converged_aladin_failed"
+coupling = "hybrid"
+formulation = "ac"
+k = 4
+paper_status = "needs_aladin_tuning"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "not_implemented"
+ALADIN_status = "not_implemented"
+classification = "not_implemented"
+coupling = "power"
+formulation = "ac"
+k = 4
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "converged"
+classification = "aladin_only_pflow"
+coupling = "hybrid+pflow"
+formulation = "dc"
+k = 2
+paper_status = "paper_ready"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "converged"
+classification = "aladin_only_pflow"
+coupling = "power+pflow"
+formulation = "dc"
+k = 2
+paper_status = "paper_ready"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "converged"
+classification = "aladin_only_pflow"
+coupling = "hybrid+pflow"
+formulation = "dc"
+k = 2
+paper_status = "paper_ready"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "converged"
+classification = "aladin_only_pflow"
+coupling = "power+pflow"
+formulation = "dc"
+k = 2
+paper_status = "paper_ready"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "converged"
+classification = "aladin_only_pflow"
+coupling = "hybrid+pflow"
+formulation = "dc"
+k = 2
+paper_status = "paper_ready"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "not_implemented"
+classification = "pflow_not_implemented"
+coupling = "power+pflow"
+formulation = "dc"
+k = 2
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "hybrid+pflow"
+formulation = "socwr"
+k = 2
+paper_status = "support_only"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "power+pflow"
+formulation = "socwr"
+k = 2
+paper_status = "support_only"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "not_implemented"
+classification = "pflow_not_implemented"
+coupling = "hybrid+pflow"
+formulation = "socwr"
+k = 2
+paper_status = "support_only"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "not_implemented"
+classification = "pflow_not_implemented"
+coupling = "power+pflow"
+formulation = "socwr"
+k = 2
+paper_status = "support_only"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "hybrid+pflow"
+formulation = "socwr"
+k = 2
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "not_implemented"
+classification = "pflow_not_implemented"
+coupling = "power+pflow"
+formulation = "socwr"
+k = 2
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "converged"
+classification = "aladin_only_pflow"
+coupling = "hybrid+pflow"
+formulation = "ac"
+k = 2
+paper_status = "paper_ready"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "power+pflow"
+formulation = "ac"
+k = 2
+paper_status = "support_only"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "hybrid+pflow"
+formulation = "ac"
+k = 2
+paper_status = "support_only"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "power+pflow"
+formulation = "ac"
+k = 2
+paper_status = "support_only"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "converged"
+classification = "aladin_only_pflow"
+coupling = "hybrid+pflow"
+formulation = "ac"
+k = 2
+paper_status = "paper_ready"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "not_implemented"
+classification = "pflow_not_implemented"
+coupling = "power+pflow"
+formulation = "ac"
+k = 2
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "converged"
+classification = "aladin_only_pflow"
+coupling = "hybrid+pflow"
+formulation = "dc"
+k = 3
+paper_status = "paper_ready"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "converged"
+classification = "aladin_only_pflow"
+coupling = "power+pflow"
+formulation = "dc"
+k = 3
+paper_status = "paper_ready"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "converged"
+classification = "aladin_only_pflow"
+coupling = "hybrid+pflow"
+formulation = "dc"
+k = 3
+paper_status = "paper_ready"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "converged"
+classification = "aladin_only_pflow"
+coupling = "power+pflow"
+formulation = "dc"
+k = 3
+paper_status = "paper_ready"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "converged"
+classification = "aladin_only_pflow"
+coupling = "hybrid+pflow"
+formulation = "dc"
+k = 3
+paper_status = "paper_ready"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "not_implemented"
+classification = "pflow_not_implemented"
+coupling = "power+pflow"
+formulation = "dc"
+k = 3
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "hybrid+pflow"
+formulation = "socwr"
+k = 3
+paper_status = "support_only"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "power+pflow"
+formulation = "socwr"
+k = 3
+paper_status = "support_only"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "not_implemented"
+classification = "pflow_not_implemented"
+coupling = "hybrid+pflow"
+formulation = "socwr"
+k = 3
+paper_status = "support_only"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "not_implemented"
+classification = "pflow_not_implemented"
+coupling = "power+pflow"
+formulation = "socwr"
+k = 3
+paper_status = "support_only"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "hybrid+pflow"
+formulation = "socwr"
+k = 3
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "not_implemented"
+classification = "pflow_not_implemented"
+coupling = "power+pflow"
+formulation = "socwr"
+k = 3
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "hybrid+pflow"
+formulation = "ac"
+k = 3
+paper_status = "support_only"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "power+pflow"
+formulation = "ac"
+k = 3
+paper_status = "support_only"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "hybrid+pflow"
+formulation = "ac"
+k = 3
+paper_status = "support_only"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "power+pflow"
+formulation = "ac"
+k = 3
+paper_status = "support_only"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "hybrid+pflow"
+formulation = "ac"
+k = 3
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "not_implemented"
+classification = "pflow_not_implemented"
+coupling = "power+pflow"
+formulation = "ac"
+k = 3
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "converged"
+classification = "aladin_only_pflow"
+coupling = "hybrid+pflow"
+formulation = "dc"
+k = 4
+paper_status = "paper_ready"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "converged"
+classification = "aladin_only_pflow"
+coupling = "power+pflow"
+formulation = "dc"
+k = 4
+paper_status = "paper_ready"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "converged"
+classification = "aladin_only_pflow"
+coupling = "hybrid+pflow"
+formulation = "dc"
+k = 4
+paper_status = "paper_ready"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "converged"
+classification = "aladin_only_pflow"
+coupling = "power+pflow"
+formulation = "dc"
+k = 4
+paper_status = "paper_ready"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "converged"
+classification = "aladin_only_pflow"
+coupling = "hybrid+pflow"
+formulation = "dc"
+k = 4
+paper_status = "paper_ready"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "not_implemented"
+classification = "pflow_not_implemented"
+coupling = "power+pflow"
+formulation = "dc"
+k = 4
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "hybrid+pflow"
+formulation = "socwr"
+k = 4
+paper_status = "support_only"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "power+pflow"
+formulation = "socwr"
+k = 4
+paper_status = "support_only"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "not_implemented"
+classification = "pflow_not_implemented"
+coupling = "hybrid+pflow"
+formulation = "socwr"
+k = 4
+paper_status = "support_only"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "not_implemented"
+classification = "pflow_not_implemented"
+coupling = "power+pflow"
+formulation = "socwr"
+k = 4
+paper_status = "support_only"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "hybrid+pflow"
+formulation = "socwr"
+k = 4
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "not_implemented"
+classification = "pflow_not_implemented"
+coupling = "power+pflow"
+formulation = "socwr"
+k = 4
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "hybrid+pflow"
+formulation = "ac"
+k = 4
+paper_status = "support_only"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "power+pflow"
+formulation = "ac"
+k = 4
+paper_status = "support_only"
+sectioning = "tie_line"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "hybrid+pflow"
+formulation = "ac"
+k = 4
+paper_status = "support_only"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "power+pflow"
+formulation = "ac"
+k = 4
+paper_status = "support_only"
+sectioning = "dummy_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "failed"
+classification = "pflow_failed"
+coupling = "hybrid+pflow"
+formulation = "ac"
+k = 4
+paper_status = "support_only"
+sectioning = "split_bus"
+[[cell]]
+ADMM_status = "n/a"
+ALADIN_status = "not_implemented"
+classification = "pflow_not_implemented"
+coupling = "power+pflow"
+formulation = "ac"
+k = 4
+paper_status = "support_only"
+sectioning = "split_bus"
