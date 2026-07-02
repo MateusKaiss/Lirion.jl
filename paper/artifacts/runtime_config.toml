@@ -1,7 +1,8 @@
 [_meta]
 generated_at = "2026-07-02T11:48:07.911"
 policy = "Solver config is decided per ROLE. Centralized = objective oracle; distributed = the study object (algorithm × sectioning × coupling × k). The two roles may use different solvers when that reflects their role; both are fixed rules per category (no case-by-case cherry-picking). Within the distributed results, ADMM and ALADIN share the SAME solver per formulation (guaranteed: resolve_optimizer dispatches on base_model, not on the algorithm)."
-stage = "C0"
+stage = "C0+C0b"
+runtime_note = "C0b (Julia threading alignment): distributed ADMM/ALADIN solve zone subproblems via Threads.@threads, so parallelism scales with the number of zones (k). Objective is identical across thread counts (deterministic); no numerical change, no instability. BLAS stays at 1 (per-subproblem), Julia threads parallelize zones. k2 cases saturate at ~2 threads; case118 k8 scaled to ~8 threads (0.94s -> 0.34s). Official JULIA_NUM_THREADS=8 covers k<=8 fully and does not oversubscribe (BLAS=1, 28 cores); centralized solves are not Julia-threaded so this only affects distributed runs."
 
 [centralized_solver_config]
 ac = "Ipopt + MA57 via LIRION_HSLLIB"
@@ -15,4 +16,4 @@ socwr = "Clarabel (hardened, Lirion default)"
 
 [runtime_config]
 BLAS_threads = 1
-JULIA_NUM_THREADS = 1
+JULIA_NUM_THREADS = 8

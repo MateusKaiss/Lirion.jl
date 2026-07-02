@@ -1,0 +1,49 @@
+# C0b — Julia threading alignment (BLAS threads = 1)
+
+| julia_threads | blas_threads | case | k | formulation | algorithm | sectioning | coupling | status | iterations | primal_residual | gap_pct | runtime_s | objective | warnings |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 1 | case57_ieee | 2 | dc | admm | tie_line | hybrid | converged | 127 | 0.0006169110761 | -0.0007413144831 | 0.1389091015 | 34772.69011 |  |
+| 1 | 1 | case57_ieee | 2 | socwr | admm | tie_line | hybrid | converged | 44 | 0.001579402907 | -0.00292682252 | 0.4794280529 | 37525.27482 |  |
+| 1 | 1 | case57_ieee | 2 | ac | admm | tie_line | hybrid | converged | 65 | 0.001519027817 | 0.005246664841 | 1.483680964 | 37591.31039 |  |
+| 1 | 1 | case73_ieee_rts | 2 | dc | admm | tie_line | hybrid | iteration_limit | 200 | 0.007158835783 | 0.00518631847 | 0.529145956 | 183013.2121 |  |
+| 1 | 1 | case73_ieee_rts | 2 | ac | admm | tie_line | hybrid | converged | 109 | 0.0009860179056 | -0.0003692576554 | 3.561488152 | 189763.3765 |  |
+| 1 | 1 | case118_ieee | 2 | dc | admm | tie_line | hybrid | iteration_limit | 200 | 0.003239267522 | 0.002601230973 | 2.43983984 | 93103.1517 |  |
+| 1 | 1 | case118_ieee | 2 | ac | admm | tie_line | hybrid | converged | 119 | 0.001202952811 | 0.0005579180246 | 5.298324823 | 97214.14931 |  |
+| 1 | 1 | case118_ieee | 8 | dc | admm | tie_line | hybrid | iteration_limit | 200 | 0.01215965363 | 0.003286259124 | 0.9356429577 | 93103.78946 |  |
+| 1 | 1 | case57_ieee | 2 | dc | aladin | tie_line | hybrid | iteration_limit | 60 | 0.6025194427 | -2.370056594 | 0.2640280724 | 33948.80935 |  |
+| 2 | 1 | case57_ieee | 2 | dc | admm | tie_line | hybrid | converged | 127 | 0.0006169110761 | -0.0007413144831 | 0.1041460037 | 34772.69011 |  |
+| 2 | 1 | case57_ieee | 2 | socwr | admm | tie_line | hybrid | converged | 44 | 0.001579402907 | -0.00292682252 | 0.304243803 | 37525.27482 |  |
+| 2 | 1 | case57_ieee | 2 | ac | admm | tie_line | hybrid | converged | 65 | 0.001519027817 | 0.005246664841 | 0.9085891247 | 37591.31039 |  |
+| 2 | 1 | case73_ieee_rts | 2 | dc | admm | tie_line | hybrid | iteration_limit | 200 | 0.007158720884 | 0.005184917436 | 0.3357388973 | 183013.2095 |  |
+| 2 | 1 | case73_ieee_rts | 2 | ac | admm | tie_line | hybrid | converged | 109 | 0.0009860179056 | -0.0003692576554 | 1.983978987 | 189763.3765 |  |
+| 2 | 1 | case118_ieee | 2 | dc | admm | tie_line | hybrid | iteration_limit | 200 | 0.003239288904 | 0.002601248224 | 2.326719999 | 93103.15171 |  |
+| 2 | 1 | case118_ieee | 2 | ac | admm | tie_line | hybrid | converged | 119 | 0.001202952811 | 0.0005579180246 | 3.575911045 | 97214.14931 |  |
+| 2 | 1 | case118_ieee | 8 | dc | admm | tie_line | hybrid | iteration_limit | 200 | 0.01215963317 | 0.003284598522 | 0.5188448429 | 93103.78792 |  |
+| 2 | 1 | case57_ieee | 2 | dc | aladin | tie_line | hybrid | iteration_limit | 60 | 0.6025194541 | -2.370088761 | 0.2919871807 | 33948.79816 |  |
+| 4 | 1 | case57_ieee | 2 | dc | admm | tie_line | hybrid | converged | 127 | 0.0006169110761 | -0.0007413144831 | 0.1289761066 | 34772.69011 |  |
+| 4 | 1 | case57_ieee | 2 | socwr | admm | tie_line | hybrid | converged | 44 | 0.001579402907 | -0.00292682252 | 0.3146381378 | 37525.27482 |  |
+| 4 | 1 | case57_ieee | 2 | ac | admm | tie_line | hybrid | converged | 65 | 0.001519027817 | 0.005246664841 | 0.8635640144 | 37591.31039 |  |
+| 4 | 1 | case73_ieee_rts | 2 | dc | admm | tie_line | hybrid | iteration_limit | 200 | 0.007158808947 | 0.005186271164 | 0.3585209846 | 183013.212 |  |
+| 4 | 1 | case73_ieee_rts | 2 | ac | admm | tie_line | hybrid | converged | 109 | 0.0009860179056 | -0.0003692576554 | 2.03579998 | 189763.3765 |  |
+| 4 | 1 | case118_ieee | 2 | dc | admm | tie_line | hybrid | iteration_limit | 200 | 0.003239226733 | 0.002601195001 | 2.356936932 | 93103.15166 |  |
+| 4 | 1 | case118_ieee | 2 | ac | admm | tie_line | hybrid | converged | 119 | 0.001202952811 | 0.0005579180246 | 3.409085035 | 97214.14931 |  |
+| 4 | 1 | case118_ieee | 8 | dc | admm | tie_line | hybrid | iteration_limit | 200 | 0.01215965363 | 0.003286259124 | 0.3555078506 | 93103.78946 |  |
+| 4 | 1 | case57_ieee | 2 | dc | aladin | tie_line | hybrid | iteration_limit | 60 | 0.6025194779 | -2.370045533 | 0.2564339638 | 33948.81319 |  |
+| 8 | 1 | case57_ieee | 2 | dc | admm | tie_line | hybrid | converged | 127 | 0.0006169110761 | -0.0007413144831 | 0.1310338974 | 34772.69011 |  |
+| 8 | 1 | case57_ieee | 2 | socwr | admm | tie_line | hybrid | converged | 44 | 0.001579402907 | -0.00292682252 | 0.3354179859 | 37525.27482 |  |
+| 8 | 1 | case57_ieee | 2 | ac | admm | tie_line | hybrid | converged | 65 | 0.001519027817 | 0.005246664841 | 0.7901921272 | 37591.31039 |  |
+| 8 | 1 | case73_ieee_rts | 2 | dc | admm | tie_line | hybrid | iteration_limit | 200 | 0.007158835783 | 0.00518631847 | 0.3552129269 | 183013.2121 |  |
+| 8 | 1 | case73_ieee_rts | 2 | ac | admm | tie_line | hybrid | converged | 109 | 0.0009860179056 | -0.0003692576554 | 2.143033028 | 189763.3765 |  |
+| 8 | 1 | case118_ieee | 2 | dc | admm | tie_line | hybrid | iteration_limit | 200 | 0.003239287826 | 0.002601245157 | 2.420452118 | 93103.15171 |  |
+| 8 | 1 | case118_ieee | 2 | ac | admm | tie_line | hybrid | converged | 119 | 0.001202952811 | 0.0005579180246 | 3.397194862 | 97214.14931 |  |
+| 8 | 1 | case118_ieee | 8 | dc | admm | tie_line | hybrid | iteration_limit | 200 | 0.01215972886 | 0.003287215494 | 0.3382577896 | 93103.79035 |  |
+| 8 | 1 | case57_ieee | 2 | dc | aladin | tie_line | hybrid | iteration_limit | 60 | 0.6025194779 | -2.37006959 | 0.2566180229 | 33948.80483 |  |
+| 14 | 1 | case57_ieee | 2 | dc | admm | tie_line | hybrid | converged | 127 | 0.0006169110761 | -0.0007413144831 | 0.1276459694 | 34772.69011 |  |
+| 14 | 1 | case57_ieee | 2 | socwr | admm | tie_line | hybrid | converged | 44 | 0.001579402907 | -0.00292682252 | 0.3212070465 | 37525.27482 |  |
+| 14 | 1 | case57_ieee | 2 | ac | admm | tie_line | hybrid | converged | 65 | 0.001519027817 | 0.005246664841 | 0.8152859211 | 37591.31039 |  |
+| 14 | 1 | case73_ieee_rts | 2 | dc | admm | tie_line | hybrid | iteration_limit | 200 | 0.007158777113 | 0.005186403628 | 0.4709439278 | 183013.2122 |  |
+| 14 | 1 | case73_ieee_rts | 2 | ac | admm | tie_line | hybrid | converged | 109 | 0.0009860179056 | -0.0003692576554 | 2.046662092 | 189763.3765 |  |
+| 14 | 1 | case118_ieee | 2 | dc | admm | tie_line | hybrid | iteration_limit | 200 | 0.003239272629 | 0.002601235172 | 2.427419186 | 93103.1517 |  |
+| 14 | 1 | case118_ieee | 2 | ac | admm | tie_line | hybrid | converged | 119 | 0.001202952811 | 0.0005579180246 | 3.480638027 | 97214.14931 |  |
+| 14 | 1 | case118_ieee | 8 | dc | admm | tie_line | hybrid | iteration_limit | 200 | 0.01215965363 | 0.003286259124 | 0.3646469116 | 93103.78946 |  |
+| 14 | 1 | case57_ieee | 2 | dc | aladin | tie_line | hybrid | iteration_limit | 60 | 0.6025194779 | -2.370069585 | 0.2759921551 | 33948.80483 |  |
