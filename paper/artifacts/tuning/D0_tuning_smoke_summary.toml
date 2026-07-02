@@ -1,0 +1,55 @@
+[_meta]
+generated_at = "2026-07-02T13:44:11.972"
+n_attempts = 20
+note = "tuning-infrastructure smoke; validates declared grid + robust failure capture + lexicographic selection. Not final results."
+stage = "D0"
+
+    [_meta.runtime]
+    BLAS_threads = 1
+    JULIA_NUM_THREADS = 1
+
+[[selected]]
+cell = "case118_ieee/k2/dc/admm/tie_line/hybrid"
+convergence_flag = true
+failure_reason = ""
+gap_pct = -0.0003845577816352531
+n_attempts = 4
+n_failed = 2
+selected_parameter_set = "rho=1e+05"
+support_status = "supported"
+[[selected]]
+cell = "case57_ieee/k2/dc/admm/tie_line/hybrid"
+convergence_flag = true
+failure_reason = ""
+gap_pct = -7.701791513026551e-5
+n_attempts = 4
+n_failed = 0
+selected_parameter_set = "rho=1e+05"
+support_status = "supported"
+[[selected]]
+cell = "case57_ieee/k2/ac/admm/tie_line/hybrid"
+convergence_flag = true
+failure_reason = ""
+gap_pct = 7.52198026726442e-5
+n_attempts = 4
+n_failed = 0
+selected_parameter_set = "rho=1e+04"
+support_status = "supported"
+[[selected]]
+cell = "case57_ieee/k2/dc/aladin/tie_line/hybrid"
+convergence_flag = false
+failure_reason = ""
+gap_pct = -2.3700646992701158
+n_attempts = 4
+n_failed = 2
+selected_parameter_set = "rho=1e+03,mu=1e+03,growth=1.05"
+support_status = "supported"
+[[selected]]
+cell = "case57_ieee/k2/ac/aladin/tie_line/hybrid"
+convergence_flag = false
+failure_reason = ""
+gap_pct = -0.5293450122267923
+n_attempts = 4
+n_failed = 1
+selected_parameter_set = "rho=1e+04,mu=1e+04,growth=1.05"
+support_status = "supported"

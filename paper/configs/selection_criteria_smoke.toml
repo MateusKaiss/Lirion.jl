@@ -1,0 +1,25 @@
+# ============================================================
+# selection_criteria_smoke.toml  (D0)
+# ============================================================
+# Lexicographic rule to pick the best attempt per cell, declared before
+# running. If no attempt converges, the "least bad" is still selected
+# (is_selected=true) but flagged convergence_flag=false with its reason.
+# ============================================================
+
+[convergence]
+eps_abs = 1e-4
+eps_rel = 1e-4
+
+[accuracy]
+gap_target_pct = 1.0
+
+[selection]
+# lower rank = higher priority
+order = [
+    "converged",           # 1. status == converged
+    "gap_below_target",    # 2. |gap_pct| < gap_target_pct
+    "smallest_residual",   # 3. smallest final primal residual
+    "fewest_iterations",   # 4. fewest iterations
+    "lowest_runtime",      # 5. last tie-break
+]
+report_all_attempts = true

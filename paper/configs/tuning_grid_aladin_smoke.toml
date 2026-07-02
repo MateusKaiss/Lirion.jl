@@ -1,0 +1,16 @@
+# ============================================================
+# tuning_grid_aladin_smoke.toml  (D0 — tuning infrastructure smoke)
+# ============================================================
+# Small grid centered on the values Lirion's own ALADIN tests use
+# (rho = mu = 1000, rho_growth = 1.05). We vary rho and mu one order of
+# magnitude around that validated point and keep rho_growth fixed — no
+# large/blind extrapolation. Goal: validate the mechanism, not tune.
+# ============================================================
+
+[global]
+max_iter = 60
+rho_growth = 1.05
+
+[grid]
+rho = [1e3, 1e4]
+mu = [1e3, 1e4]

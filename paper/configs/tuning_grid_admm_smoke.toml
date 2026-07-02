@@ -1,0 +1,20 @@
+# ============================================================
+# tuning_grid_admm_smoke.toml  (D0 — tuning infrastructure smoke)
+# ============================================================
+# Small declared grid to validate the tuning mechanism, NOT to produce
+# final paper results. rho=1e3 is included on purpose so case118 DC k2
+# exercises the failure-capture path (OSQP subproblem hits its internal
+# iteration limit at that rho); 1e4/1e5 should run.
+# ============================================================
+
+[global]
+max_iter = 500
+eps_abs = 1e-4
+eps_rel = 1e-4
+# adaptive_rho = false for the smoke so the rho grid shows a clean
+# pass/fail contrast (matches the case118 DC diagnosis: 1e3 fails,
+# 1e4/1e5 run, 1e6 fails). Adaptive rho is a tuning axis for later.
+adaptive_rho = false
+
+[grid]
+rho = [1e3, 1e4, 1e5, 1e6]
