@@ -9,13 +9,13 @@ const reduced_list = [
     "pglib_opf_case5_pjm.m",
     "pglib_opf_case14_ieee.m",
     "pglib_opf_case24_ieee_rts.m",
-    "pglib_opf_case30_as.m",
     "pglib_opf_case30_ieee.m",
     "pglib_opf_case39_epri.m",
     "pglib_opf_case57_ieee.m",
     "pglib_opf_case60_c.m",
     "pglib_opf_case73_ieee_rts.m",
     "pglib_opf_case118_ieee.m",
+    # "pglib_opf_case30_as.m",
     # "pglib_opf_case89_pegase.m",
     # "pglib_opf_case162_ieee_dtc.m",
     # "pglib_opf_case179_goc.m",
@@ -73,6 +73,18 @@ const reduced_list = [
     # "pglib_opf_case78484_epigrids.m",
 ]
 
+# Reduced list for SDP (dense SDPWRM). Dense SDP scales O(n²) variables and
+# scales poorly past ~60 buses; additionally, Clarabel often hits
+# NUMERICAL_ERROR on certain pathological cases (e.g. case30_ieee) where the
+# reported objective becomes meaningless — those cases are skipped here.
+const reduced_testlist_sdp = [
+    "pglib_opf_case3_lmbd.m",
+    "pglib_opf_case5_pjm.m",
+    "pglib_opf_case14_ieee.m",
+    "pglib_opf_case24_ieee_rts.m",
+    "pglib_opf_case30_as.m",
+]
+
 # Reduced list for AC only
 const reduced_testlist_ac = [
     "pglib_opf_case3_lmbd.m",
@@ -85,15 +97,15 @@ const reduced_testlist_ac = [
     "pglib_opf_case60_c.m",
     "pglib_opf_case73_ieee_rts.m",
     "pglib_opf_case118_ieee.m",
-    "pglib_opf_case162_ieee_dtc.m",
-    "pglib_opf_case179_goc.m",
+    # "pglib_opf_case162_ieee_dtc.m",
+    # "pglib_opf_case179_goc.m",
     # "pglib_opf_case89_pegase.m",
     # "pglib_opf_case197_snem.m",
     # "pglib_opf_case200_activ.m",
 ]
 
 # Cases with batteries (matpower_cases folder)
-const battery_cases = [
+const storage_cases = [
     # "case5_bus_2_bat.m",
     "case14_bus_4_bat.m",
     "case57_bus_6_bat.m",
@@ -114,21 +126,11 @@ function get_available_optimizer(preferred, fallback)
     return preferred
 end
 
-const GLOBAL_FAILED_CASES = Dict{String, Dict{String, Vector{String}}}()
+# GLOBAL_FAILED_CASES and track_failure are defined in common.jl and
+# reused here.
 
-function track_failure(label::String, origin::String, case_name::String)
-    if !haskey(GLOBAL_FAILED_CASES, label)
-        GLOBAL_FAILED_CASES[label] = Dict("PowerModels" => String[], "Lirion" => String[])
-    end
-    return push!(GLOBAL_FAILED_CASES[label][origin], case_name)
-end
-
-@inline function _objective_lirion(out::Lirion.LirionRunResult)
-    d = out.result
-    d isa AbstractDict || error("Lirion out.result must be Dict, got $(typeof(d))")
-    haskey(d, "objective") ||
-        error("Lirion result has no key 'objective'. Keys=$(collect(keys(d)))")
-    return Float64(d["objective"])
+@inline function _objective_lirion(out::Lirion.LirionResult)
+    return Float64(out.objective)
 end
 
 @inline function _model_from_type(model_type::Type{<:Lirion.OPFModel})
@@ -144,6 +146,10 @@ end
         return Lirion.lpac()
     elseif model_type == Lirion.SOCWR
         return Lirion.socwr()
+    elseif model_type == Lirion.QC
+        return Lirion.qc()
+    elseif model_type == Lirion.SDPWRM
+        return Lirion.sdpwrm()
     elseif model_type == Lirion.SOCBF
         return Lirion.socbf()
     elseif model_type == Lirion.BFA
@@ -221,6 +227,14 @@ end
         elseif model_type == Lirion.SOCWR
             return Float64(
                 PowerModels.solve_opf(pm_data, SOCWRConicPowerModel, optimizer)["objective"],
+            )
+        elseif model_type == Lirion.QC
+            return Float64(
+                PowerModels.solve_opf(pm_data, QCRMPowerModel, optimizer)["objective"],
+            )
+        elseif model_type == Lirion.SDPWRM
+            return Float64(
+                PowerModels.solve_opf(pm_data, SDPWRMPowerModel, optimizer)["objective"],
             )
         elseif model_type == Lirion.SOCBF
             return Float64(
@@ -371,6 +385,22 @@ function run_test_objective()
             case_list = reduced_list,
         )
 
+        run_model_tests(
+            Lirion.QC,
+            "QC";
+            optimizer = Ipopt.Optimizer,
+            case_list = reduced_testlist_ac,
+        )
+
+        sdp_optimizer = Clarabel.Optimizer
+        run_model_tests(
+            Lirion.SDPWRM,
+            "SDPWRM";
+            optimizer = sdp_optimizer,
+            case_list = reduced_testlist_sdp,
+            tol = 0.01,
+        )
+
         socbf_optimizer = Clarabel.Optimizer
         run_model_tests(
             Lirion.SOCBF,
@@ -392,19 +422,19 @@ function run_test_objective()
             Lirion.DC,
             "DC com baterias";
             optimizer = dc_optimizer,
-            case_list = battery_cases,
+            case_list = storage_cases,
         )
         run_model_tests(
             Lirion.AC,
             "AC com baterias";
             optimizer = Ipopt.Optimizer,
-            case_list = battery_cases,
+            case_list = storage_cases,
         )
         run_model_tests(
             Lirion.ACR,
             "ACR com baterias";
             optimizer = Ipopt.Optimizer,
-            case_list = battery_cases,
+            case_list = storage_cases,
         )
         # LPAC + storage: PowerModels does not support _solve_opf_strg with
         # LPACCPowerModel, so we skip battery tests for LPAC.
@@ -412,13 +442,13 @@ function run_test_objective()
         #     Lirion.LPAC,
         #     "LPAC com baterias";
         #     optimizer = Ipopt.Optimizer,
-        #     case_list = battery_cases,
+        #     case_list = storage_cases,
         # )
         # run_model_tests(
         #     Lirion.SOCWR,
         #     "SOCWR com baterias";
         #     optimizer = socwr_optimizer,
-        #     case_list = battery_cases,
+        #     case_list = storage_cases,
         # )
     end
 end

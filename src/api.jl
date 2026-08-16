@@ -1,6 +1,6 @@
-# -----------------------------
+# ============================================================
 # Model builders
-# -----------------------------
+# ============================================================
 
 dc() = DC
 ac() = AC
@@ -8,13 +8,15 @@ acr() = ACR
 ivr() = IVR
 lpac() = LPAC
 socwr() = SOCWR
+qc() = QC
+sdpwrm() = SDPWRM
 socbf() = SOCBF
 bfa() = BFA
 nfa() = NFA
 
-# -----------------------------
+# ============================================================
 # Algorithm builders
-# -----------------------------
+# ============================================================
 
 centralized() = CentralizedAlgorithm()
 
@@ -24,8 +26,13 @@ centralized() = CentralizedAlgorithm()
     x isa Sectioning && return x
     x === :tie_line && return TieLine()
     x === :dummy_bus && return DummyBus()
+    x === :split_bus && return SplitBus()
     x === :metis && return Metis()
-    throw(ArgumentError("Invalid sectioning=$x. Allowed: :tie_line, :dummy_bus, :metis"))
+    throw(
+        ArgumentError(
+            "Invalid sectioning=$x. Allowed: :tie_line, :dummy_bus, :split_bus, :metis",
+        ),
+    )
 end
 
 @inline function admm(;
@@ -51,12 +58,43 @@ end
         throw(ArgumentError("Invalid coupling=$coupling. Allowed: :state, :power, :hybrid"))
     max_iter > 0 || throw(ArgumentError("max_iter must be > 0"))
 
+    if haskey(kwargs, :proximal_mode)
+        pm = kwargs[:proximal_mode]
+        pm in (:primal, :pflow) ||
+            throw(ArgumentError(
+                "Invalid proximal_mode=$pm. Allowed: :primal, :pflow",
+            ))
+        pm === :pflow && !(coupling in (:power, :hybrid)) &&
+            throw(
+                ArgumentError(
+                    "proximal_mode=:pflow is supported with coupling=:power or " *
+                    ":hybrid (got coupling=$(coupling)). Use one of those, or " *
+                    "proximal_mode=:primal.",
+                ),
+            )
+    end
+    if haskey(kwargs, :sigma_pflow)
+        kwargs[:sigma_pflow] > 0 ||
+            throw(ArgumentError("sigma_pflow must be > 0"))
+    end
+    if haskey(kwargs, :sigma_qflow)
+        kwargs[:sigma_qflow] > 0 ||
+            throw(ArgumentError("sigma_qflow must be > 0"))
+    end
+    if haskey(kwargs, :stopping_criterion)
+        sc = kwargs[:stopping_criterion]
+        sc in (:boyd, :hfd) ||
+            throw(ArgumentError(
+                "Invalid stopping_criterion=$sc. Allowed: :boyd, :hfd",
+            ))
+    end
+
     return ALADINAlgorithm(coupling, _sectioning(sectioning), max_iter, (; kwargs...))
 end
 
-# -----------------------------
+# ============================================================
 # Plot helpers
-# -----------------------------
+# ============================================================
 
 @inline function _input_basedir(path::AbstractString)::String
     p = abspath(String(path))
@@ -68,7 +106,7 @@ end
 end
 
 @inline function _plots_stem(model_type)::String
-    if model_type isa DistributedOPFModel
+    if model_type isa ADMMConfig
         return "admm_" *
                lowercase(string(nameof(model_type.base_model))) * "_" *
                string(model_type.coupling) * "_" *

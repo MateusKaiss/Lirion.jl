@@ -1,0 +1,37 @@
+[metadata]
+case = "pglib_opf_case60_c.m"
+has_storage = false
+regenerated_at = "2026-04-19"
+
+[objectives]
+ac = 92693.66960101381
+acr = 92693.66962268713
+bfa = 90699.99997538957
+dc = 90699.99987067649
+ivr = 92693.66962268707
+lpac = 92702.43537863214
+qc = 92639.14932860393
+socbf = 92639.04682336691
+socwr = 92637.03710833624
+
+[pm_reference]
+ac = 92693.66959791655
+acr = 92693.66961960336
+bfa = 90699.99751146231
+dc = 90699.9998706765
+ivr = 92693.66962268707
+lpac = 92702.43537758145
+qc = 92639.14932013131
+socbf = 92639.04682185309
+socwr = 92637.03705135213
+
+[status]
+ac = "local_optimal"
+acr = "local_optimal"
+bfa = "optimal"
+dc = "local_optimal"
+ivr = "local_optimal"
+lpac = "local_optimal"
+qc = "local_optimal"
+socbf = "optimal"
+socwr = "optimal"

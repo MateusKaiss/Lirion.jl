@@ -1,18 +1,10 @@
-const _mp_data_names = [
-    "mpc.version", "mpc.baseMVA", "mpc.bus", "mpc.gen",
-    "mpc.branch", "mpc.dcline", "mpc.gencost", "mpc.dclinecost",
-    "mpc.bus_name", "mpc.storage", "mpc.switch", "mpc.prosumer", "mpc.consumer",
-    "mpc.bus_timeseries", "mpc.prosumer_timeseries", "mpc.consumer_timeseries",
-    "mpc.gencost_timeseries",
-]
+# ============================================================
+# Matpower table parsers (tokenized rows -> typed *Raw structs)
+# ============================================================
 
-# ==============================================================================
+# ------------------------------------------------------------
 # Token helpers
-# ------------------------------------------------------------------------------
-# All helpers are `@inline`, type-stable, and allocation-free on the hot path.
-# `tryparse` handles every numeric case natively (incl. Inf/NaN), so no manual
-# fast paths are needed.
-# ==============================================================================
+# ------------------------------------------------------------
 
 @inline _nrows(data::Vector{Vector{String}}) = length(data)
 
@@ -50,6 +42,10 @@ end
     v = tryparse(Float64, s)
     return v === nothing ? default : v
 end
+
+# ------------------------------------------------------------
+# Static tables (bus / gen / branch / dcline / storage / switch)
+# ------------------------------------------------------------
 
 function _bus_from_mat(data::Vector{Vector{String}})
     n = _nrows(data)
@@ -391,49 +387,9 @@ function _switch_from_mat(data::Vector{Vector{String}})
     return SwitchRaw{Float64}(f_bus, t_bus, psw, qsw, state, thermal_rating, status)
 end
 
-function _consumer_from_mat(data::Vector{Vector{String}})
-    n = _nrows(data)
-
-    bus = Vector{Int}(undef, n)
-    demand = Vector{Float64}(undef, n)
-    q_demand = Vector{Float64}(undef, n)
-
-    @inbounds for i in 1:n
-        row = data[i]
-        bus[i] = _as_int(_tok(row, 1, "0"), 0)
-        demand[i] = _as_f64(_tok(row, 2, ""), 0.0)
-        q_demand[i] = _as_f64(_tok(row, 3, ""), 0.0)
-    end
-
-    return ConsumerRaw{Float64}(bus, demand, q_demand)
-end
-
-function _prosumer_from_mat(data::Vector{Vector{String}})
-    n = _nrows(data)
-
-    bus = Vector{Int}(undef, n)
-    generation = Vector{Float64}(undef, n)
-    demand = Vector{Float64}(undef, n)
-    q_generation = Vector{Float64}(undef, n)
-    q_demand = Vector{Float64}(undef, n)
-    cost_injection = Vector{Float64}(undef, n)
-    inverter_capacity = Vector{Float64}(undef, n)
-
-    @inbounds for i in 1:n
-        row = data[i]
-        bus[i] = _as_int(_tok(row, 1, "0"), 0)
-        generation[i] = _as_f64(_tok(row, 2, ""), 0.0)
-        demand[i] = _as_f64(_tok(row, 3, ""), 0.0)
-        q_generation[i] = _as_f64(_tok(row, 4, ""), 0.0)
-        q_demand[i] = _as_f64(_tok(row, 5, ""), 0.0)
-        cost_injection[i] = _as_f64(_tok(row, 6, ""), 0.0)
-        inverter_capacity[i] = _as_f64(_tok(row, 7, ""), 0.0)
-    end
-
-    return ProsumerRaw{Float64}(
-        bus, generation, demand, q_generation, q_demand, cost_injection, inverter_capacity,
-    )
-end
+# ------------------------------------------------------------
+# Time-series tables
+# ------------------------------------------------------------
 
 function _bus_ts_from_mat(data::Vector{Vector{String}})
     n = _nrows(data)
@@ -454,45 +410,31 @@ function _bus_ts_from_mat(data::Vector{Vector{String}})
     return BusTimeseriesRaw{Float64}(time, bus, pd, qd, fill(0.0, n), fill(0.0, n))
 end
 
-function _consumer_ts_from_mat(data::Vector{Vector{String}})
+function _gen_ts_from_mat(data::Vector{Vector{String}})
     n = _nrows(data)
-
     time = Vector{Int}(undef, n)
-    bus = Vector{Int}(undef, n)
-    demand = Vector{Float64}(undef, n)
-    q_demand = Vector{Float64}(undef, n)
+    gen_id = Vector{Int}(undef, n)
+    pmax = Vector{Float64}(undef, n)
+    pmin = Vector{Float64}(undef, n)
+    qmax = Vector{Float64}(undef, n)
+    qmin = Vector{Float64}(undef, n)
 
     @inbounds for i in 1:n
         row = data[i]
         time[i] = _as_int(_tok(row, 1, "0"), 0)
-        bus[i] = _as_int(_tok(row, 2, "0"), 0)
-        demand[i] = _as_f64(_tok(row, 3, ""), 0.0)
-        q_demand[i] = _as_f64(_tok(row, 4, ""), 0.0)
+        gen_id[i] = _as_int(_tok(row, 2, "0"), 0)
+        pmax[i] = _as_f64(_tok(row, 3, "NaN"), NaN)
+        pmin[i] = _as_f64(_tok(row, 4, "NaN"), NaN)
+        qmax[i] = _as_f64(_tok(row, 5, "NaN"), NaN)
+        qmin[i] = _as_f64(_tok(row, 6, "NaN"), NaN)
     end
 
-    return ConsumerTimeseriesRaw{Float64}(time, bus, demand, q_demand)
+    return GenTimeseriesRaw{Float64}(time, gen_id, pmax, pmin, qmax, qmin)
 end
 
-function _prosumer_ts_from_mat(data::Vector{Vector{String}})
-    n = _nrows(data)
-
-    time = Vector{Int}(undef, n)
-    bus = Vector{Int}(undef, n)
-    p_pv = Vector{Float64}(undef, n)
-    p_load = Vector{Float64}(undef, n)
-    p_curtail = Vector{Float64}(undef, n)
-
-    @inbounds for i in 1:n
-        row = data[i]
-        time[i] = _as_int(_tok(row, 1, "0"), 0)
-        bus[i] = _as_int(_tok(row, 2, "0"), 0)
-        p_pv[i] = _as_f64(_tok(row, 3, ""), 0.0)
-        p_load[i] = _as_f64(_tok(row, 4, ""), 0.0)
-        p_curtail[i] = _as_f64(_tok(row, 5, ""), 0.0)
-    end
-
-    return ProsumerTimeseriesRaw{Float64}(time, bus, p_pv, p_load, p_curtail)
-end
+# ------------------------------------------------------------
+# Generator cost tables
+# ------------------------------------------------------------
 
 function _parse_gencost_table_raw(data::Vector{Vector{String}})
     n = _nrows(data)

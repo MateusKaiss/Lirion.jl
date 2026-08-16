@@ -1,3 +1,7 @@
+# ============================================================
+# IVR current balance
+# ============================================================
+
 function add_ivr_current_balance_constraints!(
     model::JuMP.Model,
     sys::SystemData,
@@ -24,17 +28,6 @@ function add_ivr_current_balance_constraints!(
     @inbounds for b in valid_bus_ids
         bus_idx = bus_idx_map[b]
 
-        # Demand at this bus (static or timeseries snapshot)
-        pd_val = pf.has_bus_ts ? pf.pd_ts[bus_idx, 1] : bus.pd[bus_idx]
-        qd_val = pf.has_bus_ts ? pf.qd_ts[bus_idx, 1] : bus.qd[bus_idx]
-
-        # Consumer demand
-        pd_cons = pf.has_consumer_ts ? pf.consumer_pd_ts[bus_idx, 1] : 0.0
-        qd_cons = pf.has_consumer_ts ? pf.consumer_qd_ts[bus_idx, 1] : 0.0
-
-        pd_total = pd_val + pd_cons
-        qd_total = qd_val + qd_cons
-
         gs_val = gs[bus_idx]
         bs_val = bs[bus_idx]
 
@@ -43,14 +36,15 @@ function add_ivr_current_balance_constraints!(
         br_to = pf.bus_to_branches_to[bus_idx]
 
         for t in 1:T
+            pd_total = pf.has_bus_ts ? pf.pd_ts[bus_idx, t] : bus.pd[bus_idx]
+            qd_total = pf.has_bus_ts ? pf.qd_ts[bus_idx, t] : bus.qd[bus_idx]
+
             vr_b = vr[b, t]
             vi_b = vi[b, t]
 
-            # Sum generator currents at this bus
             sum_crg = sum(crg[g, t] for g in gen_at_bus if gen.existing[g]; init = 0.0)
             sum_cig = sum(cig[g, t] for g in gen_at_bus if gen.existing[g]; init = 0.0)
 
-            # Sum branch currents leaving this bus
             sum_cr_out =
                 sum(cr_fr[l, t] for l in br_from if pf.branch_status[l] == 1; init = 0.0) +
                 sum(cr_to[l, t] for l in br_to if pf.branch_status[l] == 1; init = 0.0)
@@ -58,7 +52,6 @@ function add_ivr_current_balance_constraints!(
                 sum(ci_fr[l, t] for l in br_from if pf.branch_status[l] == 1; init = 0.0) +
                 sum(ci_to[l, t] for l in br_to if pf.branch_status[l] == 1; init = 0.0)
 
-            # KCL real: Σ crg = Σ cr_branch + (pd·vr + qd·vi)/(vr²+vi²) + gs·vr - bs·vi
             @constraint(model,
                 sum_crg ==
                 sum_cr_out +
@@ -66,7 +59,6 @@ function add_ivr_current_balance_constraints!(
                 gs_val * vr_b - bs_val * vi_b
             )
 
-            # KCL imag: Σ cig = Σ ci_branch + (pd·vi - qd·vr)/(vr²+vi²) + gs·vi + bs·vr
             @constraint(model,
                 sum_cig ==
                 sum_ci_out +

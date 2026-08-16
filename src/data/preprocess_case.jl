@@ -1,3 +1,7 @@
+# ============================================================
+# Index maps
+# ============================================================
+
 function _build_bus_idx_map(bus_ids::AbstractVector{<:Integer})::Vector{Int}
     n = length(bus_ids)
     n == 0 && return Int[]
@@ -61,16 +65,16 @@ function add_case_index_maps!(raw_case::CaseRaw)
         m.bus_to_branches_to = [Int[] for _ in 1:nbus]
     end
 
-    m.bus_to_prosumers =
-        raw_case.prosumer === nothing ? [Int[] for _ in 1:nbus] :
-        _group_items_by_bus(raw_case.prosumer.bus, m.bus_idx_map, nbus)
-
-    m.bus_to_batteries =
+    m.bus_to_storages =
         raw_case.storage === nothing ? [Int[] for _ in 1:nbus] :
         _group_items_by_bus(raw_case.storage.storage_bus, m.bus_idx_map, nbus)
 
     return raw_case
 end
+
+# ============================================================
+# Angle conversion
+# ============================================================
 
 function convert_angles_to_rad!(raw_case::CaseRaw)
     deg2rad = π / 180
@@ -102,8 +106,45 @@ function convert_angles_to_rad!(raw_case::CaseRaw)
     return raw_case
 end
 
+# ============================================================
+# Angle-difference clamping
+# ============================================================
+
+function clamp_voltage_angle_differences!(
+    raw_case::CaseRaw,
+    default_pad::Float64 = 1.0472,
+)
+    raw_case.branch === nothing && return raw_case
+    amin = raw_case.branch.angmin
+    amax = raw_case.branch.angmax
+    half_pi = π / 2
+
+    @inbounds for i in eachindex(amin)
+        if amin[i] <= -half_pi
+            amin[i] = -default_pad
+        end
+        if amax[i] >= half_pi
+            amax[i] = default_pad
+        end
+        if amin[i] == 0.0 && amax[i] == 0.0
+            amin[i] = -default_pad
+            amax[i] = default_pad
+        end
+    end
+    return raw_case
+end
+
+# ============================================================
+# Per-unit conversion
+# ============================================================
+
 function convert_to_pu!(raw_case::CaseRaw)
     Sbase = raw_case.baseMVA
+    Sbase > 0 || throw(
+        ArgumentError(
+            "baseMVA must be positive (got $(Sbase)); cannot convert case to per-unit.",
+        ),
+    )
 
     if raw_case.bus !== nothing
         b = raw_case.bus
@@ -150,6 +191,11 @@ end
 
 function convert_timeseries_to_pu!(raw_case::CaseRaw)
     Sbase = raw_case.baseMVA
+    Sbase > 0 || throw(
+        ArgumentError(
+            "baseMVA must be positive (got $(Sbase)); cannot convert time series to per-unit.",
+        ),
+    )
 
     if raw_case.bus_timeseries !== nothing
         ts = raw_case.bus_timeseries
@@ -159,27 +205,28 @@ function convert_timeseries_to_pu!(raw_case::CaseRaw)
         ts.bs ./= Sbase
     end
 
-    if raw_case.prosumer_timeseries !== nothing
-        ts = raw_case.prosumer_timeseries
-        ts.p_load ./= Sbase
-        ts.p_pv ./= Sbase
-        ts.p_curtail ./= Sbase
-    end
-
-    if raw_case.consumer_timeseries !== nothing
-        ts = raw_case.consumer_timeseries
-        ts.demand ./= Sbase
-        ts.q_demand ./= Sbase
+    if raw_case.gen_timeseries !== nothing
+        ts = raw_case.gen_timeseries
+        _rescale_finite!(ts.pmax, Sbase)
+        _rescale_finite!(ts.pmin, Sbase)
+        _rescale_finite!(ts.qmax, Sbase)
+        _rescale_finite!(ts.qmin, Sbase)
     end
 
     return raw_case
 end
 
-# ---------------------------------------------------------------------
-# NOTE / TODO (Timeseries review needed)
-#
-# This whole timeseries preprocessing pipeline still needs a full review.
-# ---------------------------------------------------------------------
+@inline function _rescale_finite!(v::Vector{Float64}, s::Float64)
+    @inbounds for i in eachindex(v)
+        isnan(v[i]) || (v[i] /= s)
+    end
+    return v
+end
+
+# ============================================================
+# Main entry point
+# ============================================================
+# TODO: timeseries preprocessing pipeline still needs full review.
 
 function preprocess_case_data!(
     raw_case::CaseRaw,
@@ -197,17 +244,15 @@ function preprocess_case_data!(
 
     ensure_bus_timeseries!(raw_case, time_horizon)
     ensure_gencost_timeseries!(raw_case, time_horizon)
-    ensure_prosumer_timeseries!(raw_case, time_horizon)
-    ensure_consumer_timeseries!(raw_case, time_horizon)
 
     extend_bus_timeseries!(raw_case, time_horizon)
     extend_gencost_timeseries!(raw_case, time_horizon)
-    extend_prosumer_timeseries!(raw_case, time_horizon)
-    extend_consumer_timeseries!(raw_case, time_horizon)
+    extend_gen_timeseries!(raw_case, time_horizon)
 
     sort_timeseries_by_time_and_id!(raw_case)
 
     convert_angles_to_rad!(raw_case)
+    clamp_voltage_angle_differences!(raw_case)
     add_case_index_maps!(raw_case)
 
     convert_to_pu!(raw_case)

@@ -1,9 +1,13 @@
+# ============================================================
+# DC (linear DC power flow)
+# ============================================================
+
 function add_dc_branch_expressions!(model::JuMP.Model, br::BranchData)
     T = get(model.ext, :time_periods, 1)
     active = br.active
 
     @expression(model, p_flow_branches[i in active, t in 1:T],
-        br.b[i] * (
+        -br.b[i] * (
             model[:theta][br.from[i], t] -
             model[:theta][br.to[i], t]
         )

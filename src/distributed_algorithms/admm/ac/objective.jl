@@ -1,9 +1,9 @@
 # ============================================================
-# AC OBJECTIVE
+# Quadratic terms
 # ============================================================
 
 # ------------------------------------------------------------
-# QUADRATIC TERMS
+# State
 # ------------------------------------------------------------
 
 function build_quad_bus_expr!(
@@ -20,15 +20,20 @@ function build_quad_bus_expr!(
                 0.5 * rho_v_mag * v_mag[b, 1]^2
     end
 
-    part.quad_bus_expr_ac = quad
+    part.quad_bus_expr = quad
     return quad
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function build_quad_branch_expr!(
     part::PartitionAC,
     rho_p::Float64,
     rho_q::Float64,
     zone_edges::Vector{Int},
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )
     quad = zero(JuMP.QuadExpr)
 
@@ -40,12 +45,71 @@ function build_quad_branch_expr!(
         quad += 0.5 * rho_p * p^2 + 0.5 * rho_q * q^2
     end
 
-    part.quad_branch_expr_ac = quad
+    pos = part.position
+    @inbounds for (ga, za, gb, zb) in branch_pairs
+        if za == pos
+            l = part.branch_idx_full_to_zone[ga]
+            if l != 0
+                # half-A: the dummy bus is its TO end -> TO-side flow (see
+                # _pq_flow_to_exprs; the from-side form leaks half-A's series loss).
+                p, q = _pq_flow_to_exprs(part, l)
+                quad += 0.5 * rho_p * p^2 + 0.5 * rho_q * q^2
+            end
+        end
+        if zb == pos
+            l = part.branch_idx_full_to_zone[gb]
+            if l != 0
+                # half-B: the dummy bus is its FROM end -> from-side is correct.
+                p, q = _pq_flow_from_exprs(part, l)
+                quad += 0.5 * rho_p * p^2 + 0.5 * rho_q * q^2
+            end
+        end
+    end
+
+    part.quad_branch_expr = quad
     return quad
 end
 
 # ------------------------------------------------------------
-# LINEAR TERMS
+# Hybrid
+# ------------------------------------------------------------
+
+function build_quad_p_inj_expr_ac!(
+    part::PartitionAC,
+    rho::Float64,
+    p_inj_store::Union{Nothing, Dict{Int, JuMP.VariableRef}},
+)
+    quad = zero(JuMP.QuadExpr)
+    if p_inj_store !== nothing
+        for (_, v) in p_inj_store
+            quad += 0.5 * rho * v^2
+        end
+    end
+    part.quad_p_inj_expr = quad
+    return quad
+end
+
+function build_quad_q_inj_expr_ac!(
+    part::PartitionAC,
+    rho::Float64,
+    q_inj_store::Union{Nothing, Dict{Int, JuMP.VariableRef}},
+)
+    quad = zero(JuMP.QuadExpr)
+    if q_inj_store !== nothing
+        for (_, v) in q_inj_store
+            quad += 0.5 * rho * v^2
+        end
+    end
+    part.quad_q_inj_expr = quad
+    return quad
+end
+
+# ============================================================
+# Linear terms
+# ============================================================
+
+# ------------------------------------------------------------
+# State
 # ------------------------------------------------------------
 
 function build_linear_bus_term(
@@ -71,11 +135,14 @@ function build_linear_bus_term(
     return lin
 end
 
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
 function build_linear_branch_term(
     part::PartitionAC,
-    zone_edges::Vector{Int},
-    p_consensus::Vector{Float64},
-    q_consensus::Vector{Float64},
+    p_consensus::AbstractVector{Float64},
+    q_consensus::AbstractVector{Float64},
     duals_p::AbstractVector{Float64},
     duals_q::AbstractVector{Float64},
     interzonal::Vector{Int},
@@ -101,78 +168,188 @@ function build_linear_branch_term(
     return lin
 end
 
+function build_linear_dummy_term(
+    part::PartitionAC,
+    p_consensus::AbstractVector{Float64},
+    q_consensus::AbstractVector{Float64},
+    duals_p::AbstractVector{Float64},
+    duals_q::AbstractVector{Float64},
+    branch_pairs::Vector{NTuple{4, Int}},
+    rho_p::Float64,
+    rho_q::Float64,
+)
+    lin = zero(JuMP.AffExpr)
+    isempty(branch_pairs) && return lin
+
+    pos = part.position
+    @inbounds for (k, (ga, za, gb, zb)) in enumerate(branch_pairs)
+        p_cons = p_consensus[k]
+        q_cons = q_consensus[k]
+        p_dual = duals_p[k]
+        q_dual = duals_q[k]
+        if za == pos
+            l = part.branch_idx_full_to_zone[ga]
+            if l != 0
+                # half-A: dummy bus is its TO end -> TO-side flow (see _pq_flow_to_exprs).
+                p, q = _pq_flow_to_exprs(part, l)
+                lin += (p_dual - rho_p * p_cons) * p +
+                       (q_dual - rho_q * q_cons) * q
+            end
+        end
+        if zb == pos
+            l = part.branch_idx_full_to_zone[gb]
+            if l != 0
+                # half-B: dummy bus is its FROM end -> from-side is correct.
+                p, q = _pq_flow_from_exprs(part, l)
+                lin += (p_dual - rho_p * p_cons) * p +
+                       (q_dual - rho_q * q_cons) * q
+            end
+        end
+    end
+
+    return lin
+end
+
+# ============================================================
+# Update objective
+# ============================================================
+
 # ------------------------------------------------------------
-# UPDATE OBJECTIVE
+# State
 # ------------------------------------------------------------
 
 function update_objective!(part::PartitionAC, ws::ACStateWorkspace)
     lin = build_linear_bus_term(
         part,
-        ws.theta_consensus,
-        ws.v_mag_consensus,
-        view(ws.duals_theta, :, part.position),
-        view(ws.duals_v_mag, :, part.position),
-        ws.rho_theta[],
-        ws.rho_v[],
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        view(ws.vars.theta.duals, :, part.position),
+        view(ws.vars.v_mag.duals, :, part.position),
+        ws.vars.theta.rho[],
+        ws.vars.v_mag.rho[],
     )
 
-    @objective(
-        part.model,
-        Min,
-        part.obj_base + part.quad_bus_expr_ac + lin,
-    )
+    @objective(part.local_model, Min, part.obj_base + part.quad_bus_expr + lin)
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function update_objective!(part::PartitionAC, ws::ACPowerWorkspace)
-    lin = build_linear_branch_term(
+    lin_branch = build_linear_branch_term(
         part,
-        part.zone_edges,
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
-        view(ws.duals_p_flow, :, part.position),
-        view(ws.duals_q_flow, :, part.position),
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        view(ws.vars.p_flow.duals, :, part.position),
+        view(ws.vars.q_flow.duals, :, part.position),
         ws.interzonal,
-        ws.rho_p[],
-        ws.rho_q[],
+        ws.vars.p_flow.rho[],
+        ws.vars.q_flow.rho[],
+    )
+    lin_dummy = build_linear_dummy_term(
+        part,
+        ws.vars.p_dummy.consensus,
+        ws.vars.q_dummy.consensus,
+        view(ws.vars.p_dummy.duals, :, part.position),
+        view(ws.vars.q_dummy.duals, :, part.position),
+        ws.branch_pairs,
+        ws.vars.p_dummy.rho[],
+        ws.vars.q_dummy.rho[],
     )
 
     @objective(
-        part.model,
+        part.local_model,
         Min,
-        part.obj_base + part.quad_branch_expr_ac + lin,
+        part.obj_base + part.quad_branch_expr + lin_branch + lin_dummy,
     )
 end
 
-function update_objective!(part::PartitionAC, ws::ACHybridWorkspace)
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
+
+function update_objective!(
+    part::PartitionAC,
+    ws::ACHybridWorkspace{<:Union{TieLine, DummyBus}},
+)
     lin_bus = build_linear_bus_term(
         part,
-        ws.theta_consensus,
-        ws.v_mag_consensus,
-        view(ws.duals_theta, :, part.position),
-        view(ws.duals_v_mag, :, part.position),
-        ws.rho_theta[],
-        ws.rho_v[],
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        view(ws.vars.theta.duals, :, part.position),
+        view(ws.vars.v_mag.duals, :, part.position),
+        ws.vars.theta.rho[],
+        ws.vars.v_mag.rho[],
     )
 
     lin_branch = build_linear_branch_term(
         part,
-        part.zone_edges,
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
-        view(ws.duals_p_flow, :, part.position),
-        view(ws.duals_q_flow, :, part.position),
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        view(ws.vars.p_flow.duals, :, part.position),
+        view(ws.vars.q_flow.duals, :, part.position),
         ws.interzonal,
-        ws.rho_p[],
-        ws.rho_q[],
+        ws.vars.p_flow.rho[],
+        ws.vars.q_flow.rho[],
+    )
+    lin_dummy = build_linear_dummy_term(
+        part,
+        ws.vars.p_dummy.consensus,
+        ws.vars.q_dummy.consensus,
+        view(ws.vars.p_dummy.duals, :, part.position),
+        view(ws.vars.q_dummy.duals, :, part.position),
+        ws.branch_pairs,
+        ws.vars.p_dummy.rho[],
+        ws.vars.q_dummy.rho[],
     )
 
     @objective(
-        part.model,
-        Min,
-        part.obj_base +
-        part.quad_bus_expr_ac +
-        part.quad_branch_expr_ac +
-        lin_bus +
-        lin_branch,
+        part.local_model, Min,
+        part.obj_base + part.quad_bus_expr + part.quad_branch_expr +
+        lin_bus + lin_branch + lin_dummy,
     )
+    return nothing
+end
+
+function update_objective!(
+    part::PartitionAC,
+    ws::ACHybridWorkspace{SplitBus},
+)
+    lin_bus = build_linear_bus_term(
+        part,
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        view(ws.vars.theta.duals, :, part.position),
+        view(ws.vars.v_mag.duals, :, part.position),
+        ws.vars.theta.rho[],
+        ws.vars.v_mag.rho[],
+    )
+
+    lin_p_inj = build_linear_inj_term_groups(
+        part.position,
+        ws.inj_groups,
+        ws.inj_copy_zone,
+        ws.p_inj_vars,
+        ws.vars.p_inj.consensus,
+        view(ws.vars.p_inj.duals, :, part.position),
+        ws.vars.p_inj.rho[],
+    )
+    lin_q_inj = build_linear_inj_term_groups(
+        part.position,
+        ws.inj_groups,
+        ws.inj_copy_zone,
+        ws.q_inj_vars,
+        ws.vars.q_inj.consensus,
+        view(ws.vars.q_inj.duals, :, part.position),
+        ws.vars.q_inj.rho[],
+    )
+
+    @objective(
+        part.local_model, Min,
+        part.obj_base + part.quad_bus_expr +
+        part.quad_p_inj_expr + part.quad_q_inj_expr +
+        lin_bus + lin_p_inj + lin_q_inj,
+    )
+    return nothing
 end

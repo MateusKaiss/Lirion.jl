@@ -1,3 +1,7 @@
+# ============================================================
+# Result dictionary builder
+# ============================================================
+
 function build_result_dict(model::JuMP.Model, sys::SystemData)
     T = get(model.ext, :time_periods, sys.T)
     result = Dict{String, Any}()
@@ -108,8 +112,8 @@ function build_result_dict(model::JuMP.Model, sys::SystemData)
     # -------------------------
     # Storage
     # -------------------------
-    if haskey(model, :storage) && sys.battery.n > 0
-        nb = sys.battery.n
+    if haskey(model, :storage) && sys.storage.n > 0
+        nb = sys.storage.n
         result["storage"] = Dict(
             "storage" => [value(model[:storage][b, t]) for b in 1:nb, t in 1:T],
             "charge" => [value(model[:charge][b, t]) for b in 1:nb, t in 1:T],
@@ -119,26 +123,9 @@ function build_result_dict(model::JuMP.Model, sys::SystemData)
                 haskey(model, :ccms) ?
                 [value(model[:ccms][b, t]) for b in 1:nb, t in 1:T] : nothing,
             "p_injected" =>
-                [value(model[:p_battery_injected][b, t]) for b in 1:nb, t in 1:T],
+                [value(model[:p_storage_injected][b, t]) for b in 1:nb, t in 1:T],
             "q_injected" =>
-                [value(model[:q_battery_injected][b, t]) for b in 1:nb, t in 1:T],
-        )
-    end
-
-    # -------------------------
-    # Prosumer
-    # -------------------------
-    if haskey(model, :p_prosumer_injected) && sys.prosumer.number_of_prosumers > 0
-        np = sys.prosumer.number_of_prosumers
-        result["prosumer"] = Dict(
-            "p_injected" =>
-                [value(model[:p_prosumer_injected][p, t]) for p in 1:np, t in 1:T],
-            "q_injected" =>
-                [value(model[:q_prosumer_injected][p, t]) for p in 1:np, t in 1:T],
-            "pv_used" =>
-                [value(model[:pv_generation_used][p, t]) for p in 1:np, t in 1:T],
-            "curtailment" =>
-                [value(model[:pv_curtailment][p, t]) for p in 1:np, t in 1:T],
+                [value(model[:q_storage_injected][b, t]) for b in 1:nb, t in 1:T],
         )
     end
 

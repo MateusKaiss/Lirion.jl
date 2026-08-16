@@ -1,17 +1,18 @@
+# ============================================================
+# Time-grid discovery and alignment
+# ============================================================
+
 function get_model_times(case::CaseRaw)
     time_vecs = Vector{Vector{Int}}()
 
     if case.bus_timeseries !== nothing && !isempty(case.bus_timeseries.time)
         push!(time_vecs, case.bus_timeseries.time)
     end
-    if case.prosumer_timeseries !== nothing && !isempty(case.prosumer_timeseries.time)
-        push!(time_vecs, case.prosumer_timeseries.time)
-    end
     if case.gencost_timeseries !== nothing && !isempty(case.gencost_timeseries.time)
         push!(time_vecs, case.gencost_timeseries.time)
     end
-    if case.consumer_timeseries !== nothing && !isempty(case.consumer_timeseries.time)
-        push!(time_vecs, case.consumer_timeseries.time)
+    if case.gen_timeseries !== nothing && !isempty(case.gen_timeseries.time)
+        push!(time_vecs, case.gen_timeseries.time)
     end
 
     isempty(time_vecs) && return Int[]
@@ -26,14 +27,11 @@ function check_time_alignment(case::CaseRaw)
     if case.bus_timeseries !== nothing && !isempty(case.bus_timeseries.time)
         time_sets["bus_timeseries"] = Set(case.bus_timeseries.time)
     end
-    if case.prosumer_timeseries !== nothing && !isempty(case.prosumer_timeseries.time)
-        time_sets["prosumer_timeseries"] = Set(case.prosumer_timeseries.time)
-    end
     if case.gencost_timeseries !== nothing && !isempty(case.gencost_timeseries.time)
         time_sets["gencost_timeseries"] = Set(case.gencost_timeseries.time)
     end
-    if case.consumer_timeseries !== nothing && !isempty(case.consumer_timeseries.time)
-        time_sets["consumer_timeseries"] = Set(case.consumer_timeseries.time)
+    if case.gen_timeseries !== nothing && !isempty(case.gen_timeseries.time)
+        time_sets["gen_timeseries"] = Set(case.gen_timeseries.time)
     end
 
     if length(time_sets) > 1
@@ -45,6 +43,10 @@ function check_time_alignment(case::CaseRaw)
         end
     end
 end
+
+# ============================================================
+# Seed timeseries from static tables
+# ============================================================
 
 function ensure_bus_timeseries!(case::CaseRaw, T::Int)
     if case.bus_timeseries !== nothing && !isempty(case.bus_timeseries.time)
@@ -112,50 +114,9 @@ function ensure_gencost_timeseries!(case::CaseRaw, T::Int)
     return
 end
 
-function ensure_prosumer_timeseries!(case::CaseRaw, T::Int)
-    if case.prosumer_timeseries !== nothing && !isempty(case.prosumer_timeseries.time)
-        return
-    end
-    if T == 1 || case.prosumer === nothing
-        return
-    end
-
-    @info "Creating prosumer_timeseries based on static table prosumer."
-
-    s = case.prosumer
-    nb = length(s.bus)
-
-    case.prosumer_timeseries = ProsumerTimeseriesRaw{Float64}(
-        ones(Int, nb),
-        copy(s.bus),
-        copy(Float64.(s.generation)),
-        copy(Float64.(s.demand)),
-        fill(0.0, nb),
-    )
-    return
-end
-
-function ensure_consumer_timeseries!(case::CaseRaw, T::Int)
-    if case.consumer_timeseries !== nothing && !isempty(case.consumer_timeseries.time)
-        return
-    end
-    if T == 1 || case.consumer === nothing
-        return
-    end
-
-    @info "Creating consumer_timeseries based on static table consumer."
-
-    c = case.consumer
-    nb = length(c.bus)
-
-    case.consumer_timeseries = ConsumerTimeseriesRaw{Float64}(
-        ones(Int, nb),
-        copy(c.bus),
-        copy(Float64.(c.demand)),
-        copy(Float64.(c.q_demand)),
-    )
-    return
-end
+# ============================================================
+# Extend timeseries to full horizon
+# ============================================================
 
 function _extend_generic_timeseries!(
     times::Vector{Int},
@@ -213,19 +174,16 @@ function extend_gencost_timeseries!(case::CaseRaw, T::Int)
     return _extend_generic_timeseries!(ts.time, ts.gen_id, cols, T, "gencost_timeseries")
 end
 
-function extend_prosumer_timeseries!(case::CaseRaw, T::Int)
-    case.prosumer_timeseries === nothing && return
-    ts = case.prosumer_timeseries
-    cols = AbstractVector[ts.p_pv, ts.p_load, ts.p_curtail]
-    return _extend_generic_timeseries!(ts.time, ts.bus, cols, T, "prosumer_timeseries")
+function extend_gen_timeseries!(case::CaseRaw, T::Int)
+    case.gen_timeseries === nothing && return
+    ts = case.gen_timeseries
+    cols = AbstractVector[ts.pmax, ts.pmin, ts.qmax, ts.qmin]
+    return _extend_generic_timeseries!(ts.time, ts.gen_id, cols, T, "gen_timeseries")
 end
 
-function extend_consumer_timeseries!(case::CaseRaw, T::Int)
-    case.consumer_timeseries === nothing && return
-    ts = case.consumer_timeseries
-    cols = AbstractVector[ts.demand, ts.q_demand]
-    return _extend_generic_timeseries!(ts.time, ts.bus, cols, T, "consumer_timeseries")
-end
+# ============================================================
+# Sorting
+# ============================================================
 
 function sort_timeseries_by_time_and_id!(case::CaseRaw)
     if case.bus_timeseries !== nothing
@@ -238,15 +196,10 @@ function sort_timeseries_by_time_and_id!(case::CaseRaw)
         order = sortperm([(ts.time[i], ts.gen_id[i]) for i in eachindex(ts.time)])
         case.gencost_timeseries = slice_gencost_ts(ts, order)
     end
-    if case.prosumer_timeseries !== nothing
-        ts = case.prosumer_timeseries
-        order = sortperm([(ts.time[i], ts.bus[i]) for i in eachindex(ts.time)])
-        case.prosumer_timeseries = slice_prosumer_ts(ts, order)
-    end
-    if case.consumer_timeseries !== nothing
-        ts = case.consumer_timeseries
-        order = sortperm([(ts.time[i], ts.bus[i]) for i in eachindex(ts.time)])
-        case.consumer_timeseries = slice_consumer_ts(ts, order)
+    if case.gen_timeseries !== nothing
+        ts = case.gen_timeseries
+        order = sortperm([(ts.time[i], ts.gen_id[i]) for i in eachindex(ts.time)])
+        case.gen_timeseries = slice_gen_ts(ts, order)
     end
     return
 end

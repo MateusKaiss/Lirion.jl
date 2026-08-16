@@ -1,3 +1,6 @@
+# ============================================================
+# Variables
+# ============================================================
 
 function add_lpac_branch_variables!(model::JuMP.Model, br::BranchData)
     T = get(model.ext, :time_periods, 1)
@@ -48,6 +51,10 @@ function add_lpac_branch_variables!(model::JuMP.Model, br::BranchData)
     return nothing
 end
 
+# ============================================================
+# Expressions
+# ============================================================
+
 function add_lpac_branch_expressions!(model::JuMP.Model, br::BranchData)
     T = get(model.ext, :time_periods, 1)
     active = br.active
@@ -95,6 +102,10 @@ function add_lpac_branch_expressions!(model::JuMP.Model, br::BranchData)
 
     return nothing
 end
+
+# ============================================================
+# Constraints
+# ============================================================
 
 function add_lpac_branch_constraints!(model::JuMP.Model, br::BranchData)
     T = get(model.ext, :time_periods, 1)

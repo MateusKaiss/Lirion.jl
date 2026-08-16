@@ -1,11 +1,20 @@
 using Test
 using Lirion
-using PowerModels
 using Glob
 using Ipopt
 using OSQP
 using Clarabel
 using JuMP: optimizer_with_attributes
+
+# PowerModels is a test-only dependency (declared in [extras] / [targets], so
+# `Pkg.test()` provides it). It is used by the multi-period tests (which
+# cross-validate against PM's multi-network OPF), by the opt-in gold test
+# (env var LIRION_TEST_VS_PM=1), and by the fixture regeneration script. The
+# centralized fixture suite itself is frozen and PM-free.
+const LIRION_TEST_VS_PM = get(ENV, "LIRION_TEST_VS_PM", "0") == "1"
+if LIRION_TEST_VS_PM
+    using PowerModels
+end
 
 include("common.jl")
 
@@ -39,24 +48,51 @@ const DEFAULT_SOCWR_SOLVER = optimizer_with_attributes(
     "reduced_tol_ktratio" => 1e-4,
 )
 
-include(joinpath(@__DIR__, "test_objective.jl"))
-include(joinpath(@__DIR__, "test_timeseries.jl"))
+# Fast suite (default): frozen fixtures, no PM dependency.
+include(joinpath(@__DIR__, "test_centralized_fixtures.jl"))
 
-include(joinpath(@__DIR__, "test_admm_dc.jl"))
-include(joinpath(@__DIR__, "test_admm_ac.jl"))
-include(joinpath(@__DIR__, "test_admm_socwr.jl"))
+# Gold suite (opt-in): live PM roundtrip.
+LIRION_TEST_VS_PM && include(joinpath(@__DIR__, "test_objective.jl"))
+
+include(joinpath(@__DIR__, "test_multiperiod.jl"))
+include(joinpath(@__DIR__, "test_renewables.jl"))
+
+include(joinpath(@__DIR__, "distributed", "test_admm_dc.jl"))
+include(joinpath(@__DIR__, "distributed", "test_admm_ac.jl"))
+include(joinpath(@__DIR__, "distributed", "test_admm_socwr.jl"))
+include(joinpath(@__DIR__, "distributed", "test_aladin_dc.jl"))
+include(joinpath(@__DIR__, "distributed", "test_aladin_ac.jl"))
+include(joinpath(@__DIR__, "distributed", "test_aladin_socwr.jl"))
+include(joinpath(@__DIR__, "distributed", "test_aladin_qp_dual_sign.jl"))
+include(joinpath(@__DIR__, "distributed", "test_dummybus_ybus_equiv.jl"))
+include(joinpath(@__DIR__, "distributed", "test_paper_regressions.jl"))
+include(joinpath(@__DIR__, "partitioning", "test_connectivity.jl"))
 
 @testset "Lirion - All Tests" begin
-    # Centralizados
-    run_test_objective()
-    # run_test_timeseries()
+    # Centralized: fast fixtures (default) + optional PM roundtrip.
+    run_centralized_fixture_tests(; rtol = 1e-3)
+    LIRION_TEST_VS_PM && run_test_objective()
 
-    # # Distributed DC
+    # Multi-period invariants (internal consistency)
+    run_multiperiod_invariants(; optimizer = Ipopt.Optimizer)
+
+    # Renewables
+    run_renewables_tests(; optimizer = Ipopt.Optimizer)
+
+    # Distributed DC
     run_admm_dc_state_tests(; rtol = 0.01)
     run_admm_dc_power_tests(; rtol = 0.01)
     run_admm_dc_hybrid_tests(; rtol = 0.01)
+    run_admm_dc_dummybus_hybrid_tests(; rtol = 0.05)
+    run_admm_dc_dummybus_power_tests(; rtol = 0.05)
+    run_admm_dc_splitbus_hybrid_tests(; rtol = 0.01)
+    run_admm_dc_splitbus_3zone_tests(;
+        rtol = 0.02,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
 
-    # # # Distributed AC
+    # Distributed AC
     run_admm_ac_state_tests(;
         rtol = 0.01,
         central_optimizer = Ipopt.Optimizer,
@@ -69,6 +105,26 @@ include(joinpath(@__DIR__, "test_admm_socwr.jl"))
     )
     run_admm_ac_hybrid_tests(;
         rtol = 0.01,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
+    run_admm_ac_splitbus_hybrid_tests(;
+        rtol = 0.05,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
+    run_admm_ac_splitbus_3zone_tests(;
+        rtol = 0.02,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
+    run_admm_ac_dummybus_hybrid_tests(;
+        rtol = 0.05,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
+    run_admm_ac_dummybus_power_tests(;
+        rtol = 0.05,
         central_optimizer = Ipopt.Optimizer,
         distributed_optimizer = Ipopt.Optimizer,
     )
@@ -89,6 +145,127 @@ include(joinpath(@__DIR__, "test_admm_socwr.jl"))
         central_optimizer = DEFAULT_SOCWR_SOLVER,
         distributed_optimizer = DEFAULT_SOCWR_SOLVER,
     )
+    run_admm_socwr_splitbus_hybrid_tests(;
+        rtol = 0.05,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
+    )
+    run_admm_socwr_splitbus_3zone_tests(;
+        rtol = 0.05,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
+    )
+    run_admm_socwr_dummybus_hybrid_tests(;
+        rtol = 0.05,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
+    )
+    run_admm_socwr_dummybus_power_tests(;
+        rtol = 0.05,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
+    )
+
+    # Distributed ALADIN — DC
+    run_aladin_dc_state_tests(; rtol = 0.01)
+    run_aladin_dc_power_tests(; rtol = 0.01)
+    run_aladin_dc_hybrid_tests(; rtol = 0.01)
+    run_aladin_dc_hybrid_pflow_tests(; rtol = 0.01)
+    run_aladin_dc_splitbus_hybrid_tests(; rtol = 0.05)
+    run_aladin_dc_splitbus_3zone_tests(;
+        rtol = 0.02,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
+    run_aladin_dc_dummybus_hybrid_tests(; rtol = 0.05)
+    run_aladin_dc_dummybus_power_tests(; rtol = 0.05)
+
+    # Distributed ALADIN — AC
+    run_aladin_ac_state_tests(;
+        rtol = 0.01,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
+    run_aladin_ac_power_tests(;
+        rtol = 0.01,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
+    run_aladin_ac_hybrid_tests(;
+        rtol = 0.01,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
+    run_aladin_ac_hybrid_pflow_tests(;
+        rtol = 0.01,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
+    run_aladin_ac_splitbus_hybrid_tests(;
+        rtol = 0.05,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
+    run_aladin_ac_splitbus_3zone_tests(;
+        rtol = 0.02,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
+    run_aladin_ac_dummybus_hybrid_tests(;
+        rtol = 0.05,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
+    run_aladin_ac_dummybus_power_tests(;
+        rtol = 0.05,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
+    run_aladin_ac_dummybus_pflow_hybrid_tests(;
+        rtol = 0.05,
+        central_optimizer = Ipopt.Optimizer,
+        distributed_optimizer = Ipopt.Optimizer,
+    )
+
+    # Distributed ALADIN — SOCWR
+    run_aladin_socwr_state_tests(;
+        rtol = 0.01,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
+    )
+    run_aladin_socwr_power_tests(;
+        rtol = 0.01,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
+    )
+    run_aladin_socwr_hybrid_tests(;
+        rtol = 0.01,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
+    )
+    run_aladin_socwr_hybrid_pflow_tests(;
+        rtol = 0.01,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
+    )
+    run_aladin_socwr_splitbus_hybrid_tests(;
+        rtol = 0.05,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
+    )
+    run_aladin_socwr_splitbus_3zone_tests(;
+        rtol = 0.05,
+        central_optimizer = DEFAULT_SOCWR_SOLVER,
+        distributed_optimizer = DEFAULT_SOCWR_SOLVER,
+    )
+
+    run_aladin_qp_dual_sign_tests()
+    run_dummybus_ybus_equiv_tests()
+    run_paper_regression_tests()
+
+    # Partitioner: zone connectivity repair (pure unit tests + guarded e2e)
+    run_partition_connectivity_tests()
+    run_partition_connectivity_e2e_tests()
 end
 
 print_failures()

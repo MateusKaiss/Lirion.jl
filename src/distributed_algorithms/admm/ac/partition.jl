@@ -1,167 +1,196 @@
 # ============================================================
-# AC PARTITION INITIALIZATION
+# Per-partition initializers
 # ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 function init_state_partition!(
     part::PartitionAC,
     sys_zone::SystemData,
     optimizer_factory,
-    rho_theta::Float64,
-    rho_v_mag::Float64,
 )
-    model = _setup_partition_model!(part, sys_zone, AC, optimizer_factory)
-
-    part.theta_var = model[:theta]
-    part.v_mag_var = model[:v_magnitude]
-
-    for I in keys(part.theta_var)
-        set_start_value(part.theta_var[I], 0.0)
-    end
-    for I in keys(part.v_mag_var)
-        set_start_value(part.v_mag_var[I], 1.0)
-    end
-
-    build_quad_bus_expr!(part, rho_theta, rho_v_mag)
-    @objective(model, Min, part.obj_base + part.quad_bus_expr_ac)
-
+    build_local_model!(part, sys_zone, State, optimizer_factory)
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function init_power_partition!(
     part::PartitionAC,
     sys_zone::SystemData,
     optimizer_factory,
-    rho_p::Float64,
-    rho_q::Float64,
     interzonal_branches,
 )
-    part.zone_edges = _zone_cut_edges(part, interzonal_branches)
-    model = _setup_partition_model!(part, sys_zone, AC, optimizer_factory)
-
-    part.theta_var = model[:theta]
-    part.v_mag_var = model[:v_magnitude]
-
-    for I in keys(part.theta_var)
-        set_start_value(part.theta_var[I], 0.0)
-    end
-    for I in keys(part.v_mag_var)
-        set_start_value(part.v_mag_var[I], 1.0)
-    end
-
-    build_quad_branch_expr!(part, rho_p, rho_q, part.zone_edges)
-    @objective(model, Min, part.obj_base + part.quad_branch_expr_ac)
-
+    build_local_model!(part, sys_zone, Power, optimizer_factory, interzonal_branches)
     return nothing
 end
+
+# ------------------------------------------------------------
+# Hybrid — TieLine
+# ------------------------------------------------------------
 
 function init_hybrid_partition!(
     part::PartitionAC,
     sys_zone::SystemData,
     optimizer_factory,
-    rho_theta::Float64,
-    rho_v_mag::Float64,
-    rho_p::Float64,
-    rho_q::Float64,
+    ::TieLine,
     interzonal_branches,
 )
-    part.zone_edges = _zone_cut_edges(part, interzonal_branches)
-    model = _setup_partition_model!(part, sys_zone, AC, optimizer_factory)
+    build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
+    return nothing
+end
 
-    part.theta_var = model[:theta]
-    part.v_mag_var = model[:v_magnitude]
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
 
-    for I in keys(part.theta_var)
-        set_start_value(part.theta_var[I], 0.0)
-    end
-    for I in keys(part.v_mag_var)
-        set_start_value(part.v_mag_var[I], 1.0)
-    end
+function init_hybrid_partition!(
+    part::PartitionAC,
+    sys_zone::SystemData,
+    optimizer_factory,
+    ::DummyBus,
+    interzonal_branches,
+)
+    build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
+    return nothing
+end
 
-    build_quad_bus_expr!(part, rho_theta, rho_v_mag)
-    build_quad_branch_expr!(part, rho_p, rho_q, part.zone_edges)
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
 
-    @objective(
-        model,
-        Min,
-        part.obj_base + part.quad_bus_expr_ac + part.quad_branch_expr_ac,
+function init_hybrid_partition!(
+    part::PartitionAC,
+    sys_zone::SystemData,
+    optimizer_factory,
+    ::SplitBus,
+    interzonal_branches,
+    bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_store::Dict{Int, JuMP.VariableRef},
+    q_inj_store::Dict{Int, JuMP.VariableRef},
+)
+    build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
+    _attach_pq_inj_variables_ac!(
+        part, sys_zone, bus_pairs, p_inj_store, q_inj_store,
     )
-
     return nothing
 end
 
 # ============================================================
-# BATCH
+# Batch entry points
 # ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 function init_state_partition!(
     partitions::Partitions{PartitionAC},
     sys::DistributedSystem,
     optimizer_factory,
-    rho_theta::Float64,
-    rho_v_mag::Float64,
 )
     n = length(partitions.parts)
-    @assert length(sys.parts) == n "DistributedSystem.parts must be aligned with partitions.parts"
-
+    @assert length(sys.parts) == n
     @inbounds for i in 1:n
         init_state_partition!(
-            partitions.parts[i],
-            sys.parts[i],
-            optimizer_factory,
-            rho_theta,
-            rho_v_mag,
+            partitions.parts[i], sys.parts[i], optimizer_factory,
         )
     end
     return nothing
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function init_power_partition!(
     partitions::Partitions{PartitionAC},
     sys::DistributedSystem,
     optimizer_factory,
-    rho_p::Float64,
-    rho_q::Float64,
     interzonal_branches,
 )
     n = length(partitions.parts)
-    @assert length(sys.parts) == n "DistributedSystem.parts must be aligned with partitions.parts"
-
+    @assert length(sys.parts) == n
     @inbounds for i in 1:n
         init_power_partition!(
-            partitions.parts[i],
-            sys.parts[i],
-            optimizer_factory,
-            rho_p,
-            rho_q,
+            partitions.parts[i], sys.parts[i], optimizer_factory,
             interzonal_branches,
         )
     end
     return nothing
 end
 
+# ------------------------------------------------------------
+# Hybrid — TieLine
+# ------------------------------------------------------------
+
 function init_hybrid_partition!(
     partitions::Partitions{PartitionAC},
     sys::DistributedSystem,
     optimizer_factory,
-    rho_theta::Float64,
-    rho_v_mag::Float64,
-    rho_p::Float64,
-    rho_q::Float64,
+    sectioning::TieLine,
     interzonal_branches,
 )
     n = length(partitions.parts)
-    @assert length(sys.parts) == n "DistributedSystem.parts must be aligned with partitions.parts"
-
+    @assert length(sys.parts) == n
     @inbounds for i in 1:n
         init_hybrid_partition!(
-            partitions.parts[i],
-            sys.parts[i],
-            optimizer_factory,
-            rho_theta,
-            rho_v_mag,
-            rho_p,
-            rho_q,
-            interzonal_branches,
+            partitions.parts[i], sys.parts[i], optimizer_factory,
+            sectioning, interzonal_branches,
+        )
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    partitions::Partitions{PartitionAC},
+    sys::DistributedSystem,
+    optimizer_factory,
+    sectioning::DummyBus,
+    interzonal_branches,
+)
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n
+    @inbounds for i in 1:n
+        init_hybrid_partition!(
+            partitions.parts[i], sys.parts[i], optimizer_factory,
+            sectioning, interzonal_branches,
+        )
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    partitions::Partitions{PartitionAC},
+    sys::DistributedSystem,
+    optimizer_factory,
+    sectioning::SplitBus,
+    interzonal_branches,
+    bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+    q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+)
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n
+    @assert length(p_inj_vars) == n
+    @assert length(q_inj_vars) == n
+    @inbounds for i in 1:n
+        init_hybrid_partition!(
+            partitions.parts[i], sys.parts[i], optimizer_factory,
+            sectioning, interzonal_branches,
+            bus_pairs, p_inj_vars[i], q_inj_vars[i],
         )
     end
     return nothing

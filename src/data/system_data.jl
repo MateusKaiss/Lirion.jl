@@ -9,12 +9,9 @@ struct SystemData
     bus::BusData
     branch::BranchData
     gen::GenData
-    battery::BatteryData
-    prosumer::ProsumerData
+    storage::StorageData
 
     bus_ts::BusTimeseriesData
-    prosumer_ts::ProsumerTimeseriesData
-    consumer_ts::ConsumerTimeseriesData
     gencost_ts::GencostTimeseriesData
 
     powerflow::PowerFlowData
@@ -23,9 +20,9 @@ struct SystemData
     case_raw::Dict{String, Any}
 end
 
-# ==============================================================================
+# ============================================================
 # Distributed system
-# ==============================================================================
+# ============================================================
 
 struct DistributedSystem
     zones::Vector{Int}
@@ -37,11 +34,14 @@ struct DistributedSystem
 
     full_shared_bus_ids::Vector{Int}
     interzonal_branches::Vector{Int}
+    branch_pairs::Vector{NTuple{4, Int}}
+    bus_pairs::Vector{NTuple{3, Int}}
+    bus_groups::Vector{Tuple{Int, Vector{Int}}}
 end
 
-# ==============================================================================
+# ============================================================
 # Utils
-# ==============================================================================
+# ============================================================
 
 function _raw_snapshot(case_raw::CaseRaw)
     d = Dict{String, Any}()
@@ -60,12 +60,9 @@ function build_system_data(case_raw::CaseRaw)::SystemData
     bus_data = build_bus_data(case_raw)
     branch_data = build_branch_data(case_raw)
     gen_data = build_gen_data(case_raw)
-    battery_data = build_battery_data(case_raw)
-    prosumer_data = build_prosumer_data(case_raw)
+    storage_data = build_storage_data(case_raw)
 
     bus_ts_data = build_bus_timeseries_data(case_raw)
-    prosumer_ts_data = build_prosumer_timeseries_data(case_raw)
-    consumer_ts_data = build_consumer_timeseries_data(case_raw)
     gencost_ts_data = build_gencost_timeseries_data(case_raw)
 
     powerflow_data = build_power_flow_data(case_raw)
@@ -77,11 +74,8 @@ function build_system_data(case_raw::CaseRaw)::SystemData
         bus_data,
         branch_data,
         gen_data,
-        battery_data,
-        prosumer_data,
+        storage_data,
         bus_ts_data,
-        prosumer_ts_data,
-        consumer_ts_data,
         gencost_ts_data,
         powerflow_data,
         objective_data,
@@ -116,6 +110,9 @@ function build_distributed_system(
     end
 
     full_shared_bus_ids = case_raw.dist.full_shared_bus_ids
+    branch_pairs = case_raw.dist.branch_pairs
+    bus_pairs = case_raw.dist.bus_pairs
+    bus_groups = case_raw.dist.bus_groups
 
     return DistributedSystem(
         zones,
@@ -125,5 +122,8 @@ function build_distributed_system(
         zone_shared_bus_ids,
         full_shared_bus_ids,
         interzonal_branches,
+        branch_pairs,
+        bus_pairs,
+        bus_groups,
     )
 end

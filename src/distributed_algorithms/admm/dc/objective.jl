@@ -1,9 +1,9 @@
 # ============================================================
-# DC OBJECTIVE
+# Quadratic terms
 # ============================================================
 
 # ------------------------------------------------------------
-# QUADRATIC TERMS
+# State
 # ------------------------------------------------------------
 
 function build_quad_bus_expr!(
@@ -21,12 +21,17 @@ function build_quad_bus_expr!(
     return quad
 end
 
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
 function build_quad_branch_expr!(
     part::PartitionDC,
     rho_p::Float64,
     zone_edges::Vector{Int},
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )
-    m = part.model::JuMP.Model
+    m = part.local_model::JuMP.Model
     quad = zero(JuMP.QuadExpr)
 
     @inbounds for e in zone_edges
@@ -37,18 +42,59 @@ function build_quad_branch_expr!(
         quad += 0.5 * rho_p * p^2
     end
 
+    pos = part.position
+    @inbounds for (ga, za, gb, zb) in branch_pairs
+        if za == pos
+            l = part.branch_idx_full_to_zone[ga]
+            if l != 0
+                p = m[:p_flow_branches][l, 1]
+                quad += 0.5 * rho_p * p^2
+            end
+        end
+        if zb == pos
+            l = part.branch_idx_full_to_zone[gb]
+            if l != 0
+                p = m[:p_flow_branches][l, 1]
+                quad += 0.5 * rho_p * p^2
+            end
+        end
+    end
+
     part.quad_branch_expr = quad
     return quad
 end
 
 # ------------------------------------------------------------
-# LINEAR TERMS
+# Hybrid
+# ------------------------------------------------------------
+
+function build_quad_p_inj_expr!(
+    part::PartitionDC,
+    rho::Float64,
+    p_inj_store::Union{Nothing, Dict{Int, JuMP.VariableRef}},
+)
+    quad = zero(JuMP.QuadExpr)
+    if p_inj_store !== nothing
+        for (_, v) in p_inj_store
+            quad += 0.5 * rho * v^2
+        end
+    end
+    part.quad_p_inj_expr = quad
+    return quad
+end
+
+# ============================================================
+# Linear terms
+# ============================================================
+
+# ------------------------------------------------------------
+# State
 # ------------------------------------------------------------
 
 function build_linear_bus_term(
     part::PartitionDC,
     theta_consensus::Vector{Float64},
-    theta_duals::AbstractVector{Float64},   # column view over n_shared
+    theta_duals::AbstractVector{Float64},
     rho_theta::Float64,
 )::JuMP.AffExpr
     theta = part.theta_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}
@@ -62,19 +108,19 @@ function build_linear_bus_term(
     return lin
 end
 
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
 function build_linear_branch_term(
     part::PartitionDC,
-    zone_edges::Vector{Int},
     p_flow_consensus::Vector{Float64},
-    duals_p_flow::AbstractVector{Float64},   # column view over n_inter
+    duals_p_flow::AbstractVector{Float64},
     interzonal::Vector{Int},
     rho_p::Float64,
 )::JuMP.AffExpr
-    m = part.model::JuMP.Model
+    m = part.local_model::JuMP.Model
     lin = zero(JuMP.AffExpr)
-
-    # Build a lookup from full-branch index to position in `interzonal`.
-    # We iterate enumerate(interzonal) and check if this zone cuts it.
     @inbounds for (k, e) in enumerate(interzonal)
         l = part.branch_idx_full_to_zone[e]
         l == 0 && continue
@@ -86,66 +132,144 @@ function build_linear_branch_term(
     return lin
 end
 
+function build_linear_dummy_term(
+    part::PartitionDC,
+    p_dummy_consensus::Vector{Float64},
+    duals_p_dummy::AbstractVector{Float64},
+    branch_pairs::Vector{NTuple{4, Int}},
+    rho_p::Float64,
+)::JuMP.AffExpr
+    m = part.local_model::JuMP.Model
+    lin = zero(JuMP.AffExpr)
+    isempty(branch_pairs) && return lin
+
+    pos = part.position
+    @inbounds for (k, (ga, za, gb, zb)) in enumerate(branch_pairs)
+        p_cons = p_dummy_consensus[k]
+        p_dual = duals_p_dummy[k]
+        if za == pos
+            l = part.branch_idx_full_to_zone[ga]
+            if l != 0
+                p = m[:p_flow_branches][l, 1]
+                lin += (p_dual - rho_p * p_cons) * p
+            end
+        end
+        if zb == pos
+            l = part.branch_idx_full_to_zone[gb]
+            if l != 0
+                p = m[:p_flow_branches][l, 1]
+                lin += (p_dual - rho_p * p_cons) * p
+            end
+        end
+    end
+    return lin
+end
+
+# ============================================================
+# Update objective
+# ============================================================
+
 # ------------------------------------------------------------
-# UPDATE OBJECTIVE
+# State
 # ------------------------------------------------------------
 
 function update_objective!(part::PartitionDC, ws::DCStateWorkspace)
     lin = build_linear_bus_term(
         part,
-        ws.theta_consensus,
-        view(ws.duals_theta, :, part.position),
-        ws.rho_theta[],
+        ws.vars.theta.consensus,
+        view(ws.vars.theta.duals, :, part.position),
+        ws.vars.theta.rho[],
     )
 
-    @objective(
-        part.model,
-        Min,
-        part.obj_base + part.quad_bus_expr + lin,
-    )
+    @objective(part.local_model, Min, part.obj_static + lin)
 end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
 function update_objective!(part::PartitionDC, ws::DCPowerWorkspace)
-    lin = build_linear_branch_term(
+    lin_branch = build_linear_branch_term(
         part,
-        part.zone_edges,
-        ws.p_flow_consensus,
-        view(ws.duals_p_flow, :, part.position),
+        ws.vars.p_flow.consensus,
+        view(ws.vars.p_flow.duals, :, part.position),
         ws.interzonal,
-        ws.rho_p[],
+        ws.vars.p_flow.rho[],
+    )
+    lin_dummy = build_linear_dummy_term(
+        part,
+        ws.vars.p_dummy.consensus,
+        view(ws.vars.p_dummy.duals, :, part.position),
+        ws.branch_pairs,
+        ws.vars.p_dummy.rho[],
     )
 
-    @objective(
-        part.model,
-        Min,
-        part.obj_base + part.quad_branch_expr + lin,
-    )
+    @objective(part.local_model, Min, part.obj_static + lin_branch + lin_dummy)
 end
 
-function update_objective!(part::PartitionDC, ws::DCHybridWorkspace)
+# ------------------------------------------------------------
+# Hybrid - TieLine/DummyBus
+# ------------------------------------------------------------
+
+function update_objective!(
+    part::PartitionDC,
+    ws::DCHybridWorkspace{<:Union{TieLine, DummyBus}},
+)
     lin_bus = build_linear_bus_term(
         part,
-        ws.theta_consensus,
-        view(ws.duals_theta, :, part.position),
-        ws.rho_theta[],
+        ws.vars.theta.consensus,
+        view(ws.vars.theta.duals, :, part.position),
+        ws.vars.theta.rho[],
     )
 
     lin_branch = build_linear_branch_term(
         part,
-        part.zone_edges,
-        ws.p_flow_consensus,
-        view(ws.duals_p_flow, :, part.position),
+        ws.vars.p_flow.consensus,
+        view(ws.vars.p_flow.duals, :, part.position),
         ws.interzonal,
-        ws.rho_p[],
+        ws.vars.p_flow.rho[],
+    )
+    lin_dummy = build_linear_dummy_term(
+        part,
+        ws.vars.p_dummy.consensus,
+        view(ws.vars.p_dummy.duals, :, part.position),
+        ws.branch_pairs,
+        ws.vars.p_dummy.rho[],
     )
 
     @objective(
-        part.model,
+        part.local_model,
         Min,
-        part.obj_base +
-        part.quad_bus_expr +
-        part.quad_branch_expr +
-        lin_bus +
-        lin_branch,
+        part.obj_static + lin_bus + lin_branch + lin_dummy,
     )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
+function update_objective!(
+    part::PartitionDC,
+    ws::DCHybridWorkspace{SplitBus},
+)
+    lin_bus = build_linear_bus_term(
+        part,
+        ws.vars.theta.consensus,
+        view(ws.vars.theta.duals, :, part.position),
+        ws.vars.theta.rho[],
+    )
+
+    lin_p_inj = build_linear_inj_term_groups(
+        part.position,
+        ws.inj_groups,
+        ws.inj_copy_zone,
+        ws.p_inj_vars,
+        ws.vars.p_inj.consensus,
+        view(ws.vars.p_inj.duals, :, part.position),
+        ws.vars.p_inj.rho[],
+    )
+
+    @objective(part.local_model, Min, part.obj_static + lin_bus + lin_p_inj)
+    return nothing
 end

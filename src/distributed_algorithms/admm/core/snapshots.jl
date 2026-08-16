@@ -1,15 +1,12 @@
 # ============================================================
-# Hotpath snapshots
-# ------------------------------------------------------------
-# Allocate per-partition buffers for variable values and provide fast
-# snapshot functions that write current (or start) values from the JuMP
-# model into those buffers.
-#
-# Shared-bus local indices are read from the precomputed
-# `part.shared_bus_local_idx` (built in `build_partitions`).
+# Buffer preparation
 # ============================================================
 
 @inline _bus_dims(part) = (length(part.bus.id), length(part.zone_shared_bus_ids))
+
+# ------------------------------------------------------------
+# DC
+# ------------------------------------------------------------
 
 function prepare_hotpaths!(part::PartitionDC)
     n_bus, n_shared = _bus_dims(part)
@@ -17,6 +14,10 @@ function prepare_hotpaths!(part::PartitionDC)
     part.theta_shared_buf = zeros(n_shared)
     return nothing
 end
+
+# ------------------------------------------------------------
+# AC
+# ------------------------------------------------------------
 
 function prepare_hotpaths!(part::PartitionAC)
     n_bus, n_shared = _bus_dims(part)
@@ -27,6 +28,10 @@ function prepare_hotpaths!(part::PartitionAC)
     return nothing
 end
 
+# ------------------------------------------------------------
+# SOCWR
+# ------------------------------------------------------------
+
 function prepare_hotpaths!(part::PartitionSOCWR)
     n_bus, n_shared = _bus_dims(part)
     part.v2_buf = zeros(n_bus)
@@ -34,9 +39,9 @@ function prepare_hotpaths!(part::PartitionSOCWR)
     return nothing
 end
 
-# ------------------------------------------------------------
+# ============================================================
 # JuMP value helpers
-# ------------------------------------------------------------
+# ============================================================
 
 @inline function _val_or_start(
     model::JuMP.Model,
@@ -60,9 +65,9 @@ end
     has_vals::Bool,
 ) = _val_or_start(model, bus_var[b, t], default, has_vals)
 
-# ------------------------------------------------------------
+# ============================================================
 # Snapshot kernels
-# ------------------------------------------------------------
+# ============================================================
 
 @inline function _snapshot_bus_var!(
     buf::Vector{Float64},
@@ -82,17 +87,15 @@ end
     buf::Vector{Float64},
     model::JuMP.Model,
     bus_var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2},
-    zone_bus_ids::Vector{Int},
-    shared_bus_local_idx::Vector{Int},
+    shared_bus_ids::Vector{Int},
     default::Float64,
 )
     has_vals = JuMP.has_values(model)
-    @inbounds for i in eachindex(shared_bus_local_idx)
-        local_idx = shared_bus_local_idx[i]
+    @inbounds for i in eachindex(shared_bus_ids)
         buf[i] = _val_at(
             model,
             bus_var,
-            zone_bus_ids[local_idx],
+            shared_bus_ids[i],
             1,
             default,
             has_vals,
@@ -101,46 +104,70 @@ end
     return buf
 end
 
+# ============================================================
+# Full-bus snapshots
+# ============================================================
+
 # ------------------------------------------------------------
-# Snapshot API — full bus
+# DC
 # ------------------------------------------------------------
 
 @inline snapshot_theta!(part::PartitionDC) =
-    _snapshot_bus_var!(part.theta_buf, part.model, part.theta_var, part.bus.id, 0.0)
-
-@inline snapshot_theta!(part::PartitionAC) =
-    _snapshot_bus_var!(part.theta_buf, part.model, part.theta_var, part.bus.id, 0.0)
-
-@inline snapshot_v_mag!(part::PartitionAC) =
-    _snapshot_bus_var!(part.v_mag_buf, part.model, part.v_mag_var, part.bus.id, 1.0)
-
-@inline snapshot_v2!(part::PartitionSOCWR) =
-    _snapshot_bus_var!(part.v2_buf, part.model, part.v2_var, part.bus.id, 1.0)
+    _snapshot_bus_var!(part.theta_buf, part.local_model, part.theta_var, part.bus.id, 0.0)
 
 # ------------------------------------------------------------
-# Snapshot API — shared bus
+# AC
+# ------------------------------------------------------------
+
+@inline snapshot_theta!(part::PartitionAC) =
+    _snapshot_bus_var!(part.theta_buf, part.local_model, part.theta_var, part.bus.id, 0.0)
+
+@inline snapshot_v_mag!(part::PartitionAC) =
+    _snapshot_bus_var!(part.v_mag_buf, part.local_model, part.v_mag_var, part.bus.id, 1.0)
+
+# ------------------------------------------------------------
+# SOCWR
+# ------------------------------------------------------------
+
+@inline snapshot_v2!(part::PartitionSOCWR) =
+    _snapshot_bus_var!(part.v2_buf, part.local_model, part.v2_var, part.bus.id, 1.0)
+
+# ============================================================
+# Shared-bus snapshots
+# ============================================================
+
+# ------------------------------------------------------------
+# DC
 # ------------------------------------------------------------
 
 @inline snapshot_theta_shared!(part::PartitionDC) =
     _snapshot_shared_var!(
-        part.theta_shared_buf, part.model, part.theta_var,
-        part.bus.id, part.shared_bus_local_idx, 0.0,
+        part.theta_shared_buf, part.local_model, part.theta_var,
+        part.zone_shared_bus_ids, 0.0,
     )
+
+# ------------------------------------------------------------
+# AC
+# ------------------------------------------------------------
 
 @inline snapshot_theta_shared!(part::PartitionAC) =
     _snapshot_shared_var!(
-        part.theta_shared_buf, part.model, part.theta_var,
-        part.bus.id, part.shared_bus_local_idx, 0.0,
+        part.theta_shared_buf, part.local_model, part.theta_var,
+        part.zone_shared_bus_ids, 0.0,
     )
 
 @inline snapshot_v_mag_shared!(part::PartitionAC) =
     _snapshot_shared_var!(
-        part.v_mag_shared_buf, part.model, part.v_mag_var,
-        part.bus.id, part.shared_bus_local_idx, 1.0,
+        part.v_mag_shared_buf, part.local_model, part.v_mag_var,
+        part.zone_shared_bus_ids, 1.0,
     )
+
+# ------------------------------------------------------------
+# SOCWR
+# ------------------------------------------------------------
 
 @inline snapshot_v2_shared!(part::PartitionSOCWR) =
     _snapshot_shared_var!(
-        part.v2_shared_buf, part.model, part.v2_var,
-        part.bus.id, part.shared_bus_local_idx, 1.0,
+        part.v2_shared_buf, part.local_model, part.v2_var,
+        part.zone_shared_bus_ids, 1.0,
     )

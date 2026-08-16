@@ -1,139 +1,110 @@
 # ============================================================
-# AC WORKSPACES
+# Workspace structs
 # ============================================================
 
-# ---------------- STATE ----------------
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 Base.@kwdef mutable struct ACStateWorkspace <: AbstractADMMWorkspace
     partitions::Partitions{PartitionAC}
     id::Vector{Int}
 
-    theta_consensus::Vector{Float64}
-    v_mag_consensus::Vector{Float64}
+    vars::NamedTuple{(:theta, :v_mag), Tuple{VarState, VarState}}
 
-    theta_consensus_prev::Vector{Float64}
-    v_mag_consensus_prev::Vector{Float64}
-
-    duals_theta::Matrix{Float64}
-    duals_v_mag::Matrix{Float64}
-
-    rho_theta::Base.RefValue{Float64}
-    rho_v::Base.RefValue{Float64}
-
-    prev_rho_theta::Base.RefValue{Float64}
-    prev_rho_v::Base.RefValue{Float64}
-
-    # Scratch vectors for circular mean (reused per iter)
     sin_sum::Vector{Float64}
     cos_sum::Vector{Float64}
     bus_counts::Vector{Int}
 
-    r_primal::Float64 = 0.0
-    r_dual::Float64 = 0.0
-    eps_primal::Float64 = 0.0
-    eps_dual::Float64 = 0.0
-
-    # Per-component residuals (cached for rho_update! without recomputation)
     r_primal_theta::Float64 = 0.0
     r_primal_v_mag::Float64 = 0.0
     r_dual_theta::Float64 = 0.0
     r_dual_v_mag::Float64 = 0.0
 
-    hist::ADMMHistory = ADMMHistory()
-    iter::Int = 0
-end
-
-# ---------------- POWER ----------------
-
-Base.@kwdef mutable struct ACPowerWorkspace <: AbstractADMMWorkspace
-    partitions::Partitions{PartitionAC}
-    id::Vector{Int}
-
-    interzonal::Vector{Int}
-
-    p_flow_consensus::Vector{Float64}
-    q_flow_consensus::Vector{Float64}
-
-    p_flow_consensus_prev::Vector{Float64}
-    q_flow_consensus_prev::Vector{Float64}
-
-    duals_p_flow::Matrix{Float64}
-    duals_q_flow::Matrix{Float64}
-
-    rho_p::Base.RefValue{Float64}
-    rho_q::Base.RefValue{Float64}
-
-    prev_rho_p::Base.RefValue{Float64}
-    prev_rho_q::Base.RefValue{Float64}
-
-    # Scratch counters for NaN-safe AC branch consensus (per-iter).
-    p_branch_counts::Vector{Int}
-    q_branch_counts::Vector{Int}
-
     r_primal::Float64 = 0.0
     r_dual::Float64 = 0.0
     eps_primal::Float64 = 0.0
     eps_dual::Float64 = 0.0
+    iter::Int = 0
+    hist::ADMMHistory = ADMMHistory()
+end
 
-    # Per-component residuals (cached for rho_update! without recomputation)
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
+Base.@kwdef mutable struct ACPowerWorkspace{S <: Sectioning} <: AbstractADMMWorkspace
+    partitions::Partitions{PartitionAC}
+    id::Vector{Int}
+
+    sectioning::S
+
+    interzonal::Vector{Int}
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[]
+    pair_counts::Vector{Int} = Int[]
+
+    # `p_flow`/`q_flow` carry tie-line consensus; `p_dummy`/`q_dummy`
+    # carry dummy-line consensus (Method 2). Exactly one pair is non-empty
+    # depending on `S`.
+    vars::NamedTuple{
+        (:p_flow, :q_flow, :p_dummy, :q_dummy),
+        Tuple{VarState, VarState, VarState, VarState},
+    }
+
+    p_branch_counts::Vector{Int}
+    q_branch_counts::Vector{Int}
+
     r_primal_p::Float64 = 0.0
     r_primal_q::Float64 = 0.0
     r_dual_p::Float64 = 0.0
     r_dual_q::Float64 = 0.0
 
-    hist::ADMMHistory = ADMMHistory()
+    r_primal::Float64 = 0.0
+    r_dual::Float64 = 0.0
+    eps_primal::Float64 = 0.0
+    eps_dual::Float64 = 0.0
     iter::Int = 0
+    hist::ADMMHistory = ADMMHistory()
 end
 
-# ---------------- HYBRID ----------------
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
 
-Base.@kwdef mutable struct ACHybridWorkspace <: AbstractADMMWorkspace
+Base.@kwdef mutable struct ACHybridWorkspace{S <: Sectioning} <: AbstractADMMWorkspace
     partitions::Partitions{PartitionAC}
     id::Vector{Int}
 
+    sectioning::S
+
     interzonal::Vector{Int}
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[]
+    pair_counts::Vector{Int} = Int[]
 
-    theta_consensus::Vector{Float64}
-    v_mag_consensus::Vector{Float64}
+    bus_pairs::Vector{NTuple{3, Int}} = NTuple{3, Int}[]
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
+        Vector{Dict{Int, JuMP.VariableRef}}()
+    q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
+        Vector{Dict{Int, JuMP.VariableRef}}()
 
-    theta_consensus_prev::Vector{Float64}
-    v_mag_consensus_prev::Vector{Float64}
+    # SplitBus N-way injection copies (shared by p_inj and q_inj).
+    inj_groups::Vector{Tuple{Int, Vector{Int}}} = Tuple{Int, Vector{Int}}[]
+    inj_copy_zone::Vector{Int} = Int[]
 
-    p_flow_consensus::Vector{Float64}
-    q_flow_consensus::Vector{Float64}
+    vars::NamedTuple{
+        (:theta, :v_mag, :p_flow, :q_flow, :p_dummy, :q_dummy, :p_inj, :q_inj),
+        Tuple{
+            VarState, VarState, VarState, VarState,
+            VarState, VarState, VarState, VarState,
+        },
+    }
 
-    p_flow_consensus_prev::Vector{Float64}
-    q_flow_consensus_prev::Vector{Float64}
-
-    duals_theta::Matrix{Float64}
-    duals_v_mag::Matrix{Float64}
-
-    duals_p_flow::Matrix{Float64}
-    duals_q_flow::Matrix{Float64}
-
-    rho_theta::Base.RefValue{Float64}
-    rho_v::Base.RefValue{Float64}
-    rho_p::Base.RefValue{Float64}
-    rho_q::Base.RefValue{Float64}
-
-    prev_rho_theta::Base.RefValue{Float64}
-    prev_rho_v::Base.RefValue{Float64}
-    prev_rho_p::Base.RefValue{Float64}
-    prev_rho_q::Base.RefValue{Float64}
-
-    # Scratch buffers
     sin_sum::Vector{Float64}
     cos_sum::Vector{Float64}
     bus_counts::Vector{Int}
     p_branch_counts::Vector{Int}
     q_branch_counts::Vector{Int}
 
-    r_primal::Float64 = 0.0
-    r_dual::Float64 = 0.0
-    eps_primal::Float64 = 0.0
-    eps_dual::Float64 = 0.0
-
-    # Per-component residuals (cached for rho_update! without recomputation)
     r_primal_theta::Float64 = 0.0
     r_primal_v_mag::Float64 = 0.0
     r_dual_theta::Float64 = 0.0
@@ -142,168 +113,214 @@ Base.@kwdef mutable struct ACHybridWorkspace <: AbstractADMMWorkspace
     r_primal_q::Float64 = 0.0
     r_dual_p::Float64 = 0.0
     r_dual_q::Float64 = 0.0
+    r_primal_p_inj::Float64 = 0.0
+    r_dual_p_inj::Float64 = 0.0
+    r_primal_q_inj::Float64 = 0.0
+    r_dual_q_inj::Float64 = 0.0
 
-    hist::ADMMHistory = ADMMHistory()
+    r_primal::Float64 = 0.0
+    r_dual::Float64 = 0.0
+    eps_primal::Float64 = 0.0
+    eps_dual::Float64 = 0.0
     iter::Int = 0
+    hist::ADMMHistory = ADMMHistory()
 end
 
 # ============================================================
-# RHO HELPERS
+# Rho accessors
 # ============================================================
 
 _get_rhos(ws::ACStateWorkspace) = (
-    rho_theta = ws.rho_theta[],
-    rho_v = ws.rho_v[],
+    rho_theta = ws.vars.theta.rho[],
+    rho_v = ws.vars.v_mag.rho[],
 )
 
 _get_rhos(ws::ACPowerWorkspace) = (
-    rho_p = ws.rho_p[],
-    rho_q = ws.rho_q[],
+    rho_p = ws.vars.p_flow.rho[],
+    rho_q = ws.vars.q_flow.rho[],
 )
 
 _get_rhos(ws::ACHybridWorkspace) = (
-    rho_theta = ws.rho_theta[],
-    rho_v = ws.rho_v[],
-    rho_p = ws.rho_p[],
-    rho_q = ws.rho_q[],
+    rho_theta = ws.vars.theta.rho[],
+    rho_v = ws.vars.v_mag.rho[],
+    rho_p = ws.vars.p_flow.rho[],
+    rho_q = ws.vars.q_flow.rho[],
+    rho_p_inj = ws.vars.p_inj.rho[],
+    rho_q_inj = ws.vars.q_inj.rho[],
 )
 
 # ============================================================
-# BUILDERS
+# Builders
 # ============================================================
 
-# ---------------- STATE ----------------
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
-function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{State, AC})
+function build_workspace(sys, config, optimizer_factory, ::ADMM{State, AC})
     partitions = build_partitions(PartitionAC, sys)
     id = partitions.zones
     n_zones = length(partitions)
     n_shared = length(sys.full_shared_bus_ids)
 
-    init_state_partition!(
-        partitions,
-        sys,
-        optimizer_factory,
-        config.rho_theta,
-        config.rho_v,
+    init_state_partition!(partitions, sys, optimizer_factory)
+
+    vars = (
+        theta = VarState(n_shared, n_zones, config.rho_theta),
+        v_mag = VarState(n_shared, n_zones, config.rho_v; init_value = 1.0),
     )
 
-    rho_theta = Ref(config.rho_theta)
-    rho_v = Ref(config.rho_v)
-
-    return ACStateWorkspace(;
+    ws = ACStateWorkspace(;
         partitions = partitions,
         id = id,
-        theta_consensus = zeros(n_shared),
-        v_mag_consensus = ones(n_shared),
-        theta_consensus_prev = zeros(n_shared),
-        v_mag_consensus_prev = ones(n_shared),
-        duals_theta = zeros(n_shared, n_zones),
-        duals_v_mag = zeros(n_shared, n_zones),
-        rho_theta = rho_theta,
-        rho_v = rho_v,
-        prev_rho_theta = Ref(rho_theta[]),
-        prev_rho_v = Ref(rho_v[]),
+        vars = vars,
         sin_sum = zeros(n_shared),
         cos_sum = zeros(n_shared),
         bus_counts = zeros(Int, n_shared),
     )
+    refresh_rho!(ws)
+    return ws
 end
 
-# ---------------- POWER ----------------
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
-function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Power, AC})
+function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, AC})
     partitions = build_partitions(PartitionAC, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
+    brpairs = sys.branch_pairs
     n_zones = length(partitions)
     n_inter = length(inter)
+    n_pairs = length(brpairs)
 
-    init_power_partition!(
-        partitions,
-        sys,
-        optimizer_factory,
-        config.rho_p,
-        config.rho_q,
-        inter,
+    sectioning = config.sectioning
+    if sectioning isa TieLine
+        n_flow = n_inter
+        n_dummy = 0
+    elseif sectioning isa DummyBus
+        n_flow = 0
+        n_dummy = n_pairs
+    else
+        error("ADMM{Power, AC}: unsupported sectioning $(sectioning)")
+    end
+
+    init_power_partition!(partitions, sys, optimizer_factory, inter)
+
+    p_flow = VarState(n_flow, n_zones, config.rho_p)
+    q_flow = VarState(n_flow, n_zones, config.rho_q)
+    vars = (
+        p_flow = p_flow,
+        q_flow = q_flow,
+        # dummy twins share rho refs with their tie-line counterparts.
+        p_dummy = VarState(n_dummy, n_zones, p_flow.rho, p_flow.prev_rho),
+        q_dummy = VarState(n_dummy, n_zones, q_flow.rho, q_flow.prev_rho),
     )
 
-    rho_p = Ref(config.rho_p)
-    rho_q = Ref(config.rho_q)
-
-    return ACPowerWorkspace(;
+    ws = ACPowerWorkspace(;
         partitions = partitions,
         id = id,
+        sectioning = sectioning,
         interzonal = inter,
-        p_flow_consensus = zeros(n_inter),
-        q_flow_consensus = zeros(n_inter),
-        p_flow_consensus_prev = zeros(n_inter),
-        q_flow_consensus_prev = zeros(n_inter),
-        duals_p_flow = zeros(n_inter, n_zones),
-        duals_q_flow = zeros(n_inter, n_zones),
-        rho_p = rho_p,
-        rho_q = rho_q,
-        prev_rho_p = Ref(rho_p[]),
-        prev_rho_q = Ref(rho_q[]),
+        branch_pairs = brpairs,
+        pair_counts = fill(2, n_pairs),
+        vars = vars,
         p_branch_counts = zeros(Int, n_inter),
         q_branch_counts = zeros(Int, n_inter),
     )
+    refresh_rho!(ws)
+    return ws
 end
 
-# ---------------- HYBRID ----------------
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
 
-function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC})
+function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, AC})
     partitions = build_partitions(PartitionAC, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
+    brpairs = sys.branch_pairs
+    bpairs = sys.bus_pairs
     n_zones = length(partitions)
     n_shared = length(sys.full_shared_bus_ids)
     n_inter = length(inter)
+    n_pairs = length(brpairs)
+    n_bus_pairs = length(bpairs)
 
-    init_hybrid_partition!(
-        partitions,
-        sys,
-        optimizer_factory,
-        config.rho_theta,
-        config.rho_v,
-        config.rho_p,
-        config.rho_q,
-        inter,
+    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+
+    inj_groups = Tuple{Int, Vector{Int}}[]
+    inj_copy_zone = Int[]
+    n_inj = 0
+
+    sectioning = config.sectioning
+    if sectioning isa TieLine
+        n_flow = n_inter
+        n_dummy = 0
+        init_hybrid_partition!(
+            partitions, sys, optimizer_factory, sectioning, inter,
+        )
+    elseif sectioning isa DummyBus
+        n_flow = 0
+        n_dummy = n_pairs
+        init_hybrid_partition!(
+            partitions, sys, optimizer_factory, sectioning, inter,
+        )
+    elseif sectioning isa SplitBus
+        n_flow = 0
+        n_dummy = 0
+        for (b_id, zones) in sys.bus_groups
+            cidxs = Int[]
+            for z in zones
+                n_inj += 1
+                push!(cidxs, n_inj)
+                push!(inj_copy_zone, z)
+            end
+            push!(inj_groups, (b_id, cidxs))
+        end
+        init_hybrid_partition!(
+            partitions, sys, optimizer_factory, sectioning, inter,
+            bpairs, p_inj_vars, q_inj_vars,
+        )
+    else
+        error("ADMM{Hybrid, AC}: unsupported sectioning $(sectioning)")
+    end
+
+    p_flow = VarState(n_flow, n_zones, config.rho_p)
+    q_flow = VarState(n_flow, n_zones, config.rho_q)
+    vars = (
+        theta = VarState(n_shared, n_zones, config.rho_theta),
+        v_mag = VarState(n_shared, n_zones, config.rho_v; init_value = 1.0),
+        p_flow = p_flow,
+        q_flow = q_flow,
+        p_dummy = VarState(n_dummy, n_zones, p_flow.rho, p_flow.prev_rho),
+        q_dummy = VarState(n_dummy, n_zones, q_flow.rho, q_flow.prev_rho),
+        p_inj = VarState(n_inj, n_zones, config.rho_p),
+        q_inj = VarState(n_inj, n_zones, config.rho_q),
     )
 
-    rho_theta = Ref(config.rho_theta)
-    rho_v = Ref(config.rho_v)
-    rho_p = Ref(config.rho_p)
-    rho_q = Ref(config.rho_q)
-
-    return ACHybridWorkspace(;
+    ws = ACHybridWorkspace(;
         partitions = partitions,
         id = id,
+        sectioning = sectioning,
         interzonal = inter,
-        theta_consensus = zeros(n_shared),
-        v_mag_consensus = ones(n_shared),
-        theta_consensus_prev = zeros(n_shared),
-        v_mag_consensus_prev = ones(n_shared),
-        p_flow_consensus = zeros(n_inter),
-        q_flow_consensus = zeros(n_inter),
-        p_flow_consensus_prev = zeros(n_inter),
-        q_flow_consensus_prev = zeros(n_inter),
-        duals_theta = zeros(n_shared, n_zones),
-        duals_v_mag = zeros(n_shared, n_zones),
-        duals_p_flow = zeros(n_inter, n_zones),
-        duals_q_flow = zeros(n_inter, n_zones),
-        rho_theta = rho_theta,
-        rho_v = rho_v,
-        rho_p = rho_p,
-        rho_q = rho_q,
-        prev_rho_theta = Ref(rho_theta[]),
-        prev_rho_v = Ref(rho_v[]),
-        prev_rho_p = Ref(rho_p[]),
-        prev_rho_q = Ref(rho_q[]),
+        branch_pairs = brpairs,
+        pair_counts = fill(2, n_pairs),
+        bus_pairs = bpairs,
+        p_inj_vars = p_inj_vars,
+        q_inj_vars = q_inj_vars,
+        inj_groups = inj_groups,
+        inj_copy_zone = inj_copy_zone,
+        vars = vars,
         sin_sum = zeros(n_shared),
         cos_sum = zeros(n_shared),
         bus_counts = zeros(Int, n_shared),
         p_branch_counts = zeros(Int, n_inter),
         q_branch_counts = zeros(Int, n_inter),
     )
+    refresh_rho!(ws)
+    return ws
 end

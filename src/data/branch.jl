@@ -30,7 +30,6 @@ struct BranchData
     g::Vector{Float64}
     b::Vector{Float64}
 
-    # Pi-model shunts per side (standard matpower: g_fr = g_to = 0, b_fr = b_to = b_sh/2)
     g_fr::Vector{Float64}
     b_fr::Vector{Float64}
     g_to::Vector{Float64}
@@ -70,11 +69,27 @@ function get_branch_parameters(case_raw::CaseRaw)
 
     r = branch_raw.br_r
     x = branch_raw.br_x
-    z_mag_sq = r .^ 2 .+ x .^ 2
-    g = r ./ z_mag_sq
-    b = -x ./ z_mag_sq
-
     n = length(from)
+
+    g = Vector{Float64}(undef, n)
+    b = Vector{Float64}(undef, n)
+    @inbounds for i in 1:n
+        z2 = r[i]^2 + x[i]^2
+        if z2 == 0.0
+            if status[i] == 1
+                error(
+                    "Branch $i (from=$(from[i]), to=$(to[i])) has zero series impedance " *
+                    "(r=0 and x=0). Admittance y=1/(r+jx) is undefined. " *
+                    "Either remove the branch, disable it (br_status=0), or fix the input data.",
+                )
+            end
+            g[i] = 0.0
+            b[i] = 0.0
+        else
+            g[i] = r[i] / z2
+            b[i] = -x[i] / z2
+        end
+    end
 
     tap_position = Vector{Float64}(undef, n)
     tap_angle = Vector{Float64}(undef, n)
@@ -93,7 +108,6 @@ function get_branch_parameters(case_raw::CaseRaw)
         status[i] == 1 && push!(active, i)
     end
 
-    # Pi-model shunts: standard matpower has g_fr = g_to = 0, b_fr = b_to = b_sh/2.
     b_sh = branch_raw.br_b
     g_fr = zeros(Float64, n)
     b_fr = b_sh ./ 2

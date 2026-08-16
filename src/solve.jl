@@ -1,10 +1,6 @@
 # ============================================================
-# Run + Solve
+# Input validation
 # ============================================================
-
-# -----------------------------
-# Helpers
-# -----------------------------
 
 @inline function _assert_valid_path(path::AbstractString)::String
     p = abspath(String(path))
@@ -13,36 +9,38 @@
     return p
 end
 
-function run_lirion(inputs::CentralizedInputs)::LirionRunResult
+# ============================================================
+# Internal runners (centralized / distributed)
+# ============================================================
+
+function run_lirion(inputs::CentralizedInputs)::LirionResult
     @info "Case: $(inputs.database_path)"
     @info "Model: $(inputs.model_type)"
     @info "Optimizer (raw): $(inputs.optimizer)"
 
+    t0 = time_ns()
     result_model = solve_model(inputs)
-
     sys = inputs.system
-    data = sys.case_raw
-    result_dict = build_result_dict(result_model, sys)
-
-    if inputs.write_outputs
-        save_result_to_csv(result_dict, data, inputs.database_path)
-    end
-
-    return LirionRunResult(;
-        result = result_dict,
-        model = result_model,
-        system = sys,
-        diagnostics = NoDiagnostics(),
+    return build_lirion_result_centralized(
+        result_model, sys, inputs.model_type, t0,
     )
 end
 
-function run_lirion(inputs::DistributedInputs)::LirionRunResult
+function run_lirion(inputs::DistributedInputs)::LirionResult
     @info "Case: $(inputs.database_path)"
     @info "Model: $(inputs.model_type)"
     @info "Optimizer (raw): $(inputs.optimizer)"
 
-    return run_distributed(inputs)
+    t0 = time_ns()
+    partitions, ws, iter_done = solve_distributed(inputs)
+    return build_lirion_result_distributed(
+        partitions, ws, inputs.model_type, iter_done, t0, inputs.system,
+    )
 end
+
+# ============================================================
+# Public API — solve
+# ============================================================
 
 function solve(
     path::AbstractString;
@@ -51,7 +49,7 @@ function solve(
     optimizer = nothing,
     outputs::Bool = false,
     plots::Bool = false,
-)::LirionRunResult
+)::LirionResult
     path_str = _assert_valid_path(path)
 
     inputs = _build_inputs(
@@ -64,5 +62,25 @@ function solve(
 
     out = run_lirion(inputs)
     _maybe_build_plots!(plots, path_str, inputs.model_type, out)
+    return out
+end
+
+function solve(
+    case::CaseRaw;
+    model::Type{<:OPFModel},
+    algorithm::AbstractAlgorithm = centralized(),
+    optimizer = nothing,
+    outputs::Bool = false,
+    plots::Bool = false,
+)::LirionResult
+    inputs = _build_inputs(
+        case,
+        algorithm;
+        model = model,
+        optimizer = optimizer,
+        outputs = outputs,
+    )
+    out = run_lirion(inputs)
+    _maybe_build_plots!(plots, inputs.database_path, inputs.model_type, out)
     return out
 end

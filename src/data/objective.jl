@@ -10,8 +10,6 @@ struct ObjectiveData
     curtailment_cost::Vector{Float64}
     plant_type::Vector{String}
     generator_status::Vector{Int}
-    number_of_prosumers::Int
-    prosumer_costs::Vector{Float64}
     has_timeseries::Bool
     sbase::Float64
 end
@@ -27,9 +25,23 @@ function get_objective_parameters(
     T = case_raw.T
     has_timeseries = T > 1
 
+    # N1 (2026-08-02): Lirion builds POLYNOMIAL objectives only. A gencost row
+    # with MODEL = 1 (piecewise-linear) would have its breakpoint table silently
+    # read as polynomial coefficients — a wrong objective with no warning
+    # (latent defect D3, full math audit 2026-07-03). Fail loudly instead.
+    if case_raw.gencost !== nothing
+        for (g, m) in enumerate(case_raw.gencost.model)
+            m == 2 || error(
+                "Generator $g has gencost MODEL = $m (piecewise-linear cost). " *
+                "Lirion supports polynomial costs only (MODEL = 2); parsing " *
+                "PWL breakpoints as polynomial coefficients would silently " *
+                "build a wrong objective. Convert the case or drop the PWL rows.",
+            )
+        end
+    end
+
     ng = case_raw.gen === nothing ? 0 : length(case_raw.gen.gen_bus)
     nbatt = case_raw.storage === nothing ? 0 : length(case_raw.storage.storage_bus)
-    npros = case_raw.prosumer === nothing ? 0 : length(case_raw.prosumer.bus)
 
     T_eff = max(T, 1)
     generator_costs = _empty_generator_costs(T_eff, ng)
@@ -38,7 +50,7 @@ function get_objective_parameters(
         ts = gencost_timeseries
         @inbounds for i in eachindex(ts.time)
             t = ts.time[i]
-            g = ts.gen_id[i]                 # 1-based global gen index
+            g = ts.gen_id[i]
             (t < 1 || t > T_eff) && continue
             (g < 1 || g > ng) && continue
             generator_costs[t][g] = ts.cost_coefficients[i]
@@ -56,7 +68,6 @@ function get_objective_parameters(
     curt = case_raw.gen === nothing ? Float64[] : case_raw.gen.curtailment_cost
     ptype = case_raw.gen === nothing ? String[] : case_raw.gen.plant_type
     gstat = case_raw.gen === nothing ? Int[] : case_raw.gen.gen_status
-    pcost = case_raw.prosumer === nothing ? Float64[] : case_raw.prosumer.cost_injection
 
     return (
         number_of_generators = ng,
@@ -66,8 +77,6 @@ function get_objective_parameters(
         curtailment_cost = curt,
         plant_type = ptype,
         generator_status = gstat,
-        number_of_prosumers = npros,
-        prosumer_costs = pcost,
         has_timeseries = has_timeseries,
     )
 end
@@ -82,8 +91,6 @@ function build_objective_data(case_raw::CaseRaw)::ObjectiveData
         params.curtailment_cost,
         params.plant_type,
         params.generator_status,
-        params.number_of_prosumers,
-        params.prosumer_costs,
         params.has_timeseries,
         case_raw.baseMVA,
     )

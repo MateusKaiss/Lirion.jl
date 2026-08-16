@@ -1,6 +1,10 @@
-# ==============================================================================
-# Interzonal branches (tie lines) finder
-# ==============================================================================
+# ============================================================
+# TieLine — interzonal branch finder
+# ============================================================
+
+_find_interzonal_branches(::CaseRaw, ::DummyBus) = Int[]
+
+_find_interzonal_branches(::CaseRaw, ::SplitBus) = Int[]
 
 function _find_interzonal_branches(full::CaseRaw, ::TieLine)
     full_bus_ids = full.bus.bus_i
@@ -11,8 +15,6 @@ function _find_interzonal_branches(full::CaseRaw, ::TieLine)
 
     n_bus = length(full_bus_ids)
     max_bus_id = n_bus == 0 ? 0 : maximum(full_bus_ids)
-
-    # Dense map: bus_id -> zone id (0 if absent).
     bus_to_zone = zeros(Int, max_bus_id)
     @inbounds for i in 1:n_bus
         bus_to_zone[full_bus_ids[i]] = full_bus_zones[i]
@@ -23,7 +25,16 @@ function _find_interzonal_branches(full::CaseRaw, ::TieLine)
 
     @inbounds for i in eachindex(f_bus)
         br_status[i] == 1 || continue
-        if bus_to_zone[f_bus[i]] != bus_to_zone[t_bus[i]]
+        fi = f_bus[i]
+        ti = t_bus[i]
+        if fi < 1 || fi > max_bus_id || ti < 1 || ti > max_bus_id ||
+           bus_to_zone[fi] == 0 || bus_to_zone[ti] == 0
+            error(
+                "Partitioning: branch $i references bus id outside bus table " *
+                "(f=$fi, t=$ti, max_bus_id=$max_bus_id). Data inconsistent.",
+            )
+        end
+        if bus_to_zone[fi] != bus_to_zone[ti]
             push!(interzonal_branches, i)
         end
     end
@@ -31,16 +42,24 @@ function _find_interzonal_branches(full::CaseRaw, ::TieLine)
     return interzonal_branches
 end
 
-# ------------------------------------------------------------------------------
-# Generic helpers
-# ------------------------------------------------------------------------------
+@inline function _require_interzonal_branches(full::CaseRaw, who::AbstractString)
+    isempty(_find_interzonal_branches(full, TieLine())) && error(
+        "$who: the system is electrically decoupled — no interzonal branches " *
+        "found. The zones form independent islands with nothing to couple. " *
+        "Use `centralized()` on each zone separately, or check the `bus.zone` " *
+        "assignments.",
+    )
+    return nothing
+end
+
+# ============================================================
+# Generic helpers (shared across sectionings)
+# ============================================================
 
 @inline function branch_in_service_mask(branch::BranchRaw{Float64})
     return branch.br_status .== 1
 end
 
-# Mark `zone_internal_membership[bus_id] = true` for all internal buses of
-# `zone_id`. Assumes the caller `fill!(membership, false)` before calling.
 @inline function _mark_internal_membership!(
     zone_internal_membership::Vector{Bool},
     full_bus_ids::AbstractVector{<:Integer},
@@ -54,8 +73,6 @@ end
     return nothing
 end
 
-# Extend `zone_subprob_membership` (which starts as a copy of the internal
-# membership) with external neighbors connected via any in-service branch.
 @inline function _collect_external_neighbor_buses!(
     zone_subprob_membership::Vector{Bool},
     zone_internal_membership::Vector{Bool},
@@ -81,8 +98,32 @@ end
     return nothing
 end
 
-# Collect global bus indices (positions in `full_bus_ids`) whose id is marked
-# in `membership`. Output is naturally in ascending position order.
+@inline function _collect_external_dummy_neighbors!(
+    zone_subprob_membership::Vector{Bool},
+    zone_internal_membership::Vector{Bool},
+    full_f_bus_ids::AbstractVector{Int},
+    full_t_bus_ids::AbstractVector{Int},
+    full_branch_in_service_mask::AbstractVector{Bool},
+    dummy_bus_ids::Set{Int},
+)
+    @inbounds for i in eachindex(full_f_bus_ids)
+        full_branch_in_service_mask[i] || continue
+
+        f_bus_id = full_f_bus_ids[i]
+        t_bus_id = full_t_bus_ids[i]
+
+        f_in_zone = zone_internal_membership[f_bus_id]
+        t_in_zone = zone_internal_membership[t_bus_id]
+
+        if f_in_zone && !t_in_zone && (t_bus_id in dummy_bus_ids)
+            zone_subprob_membership[t_bus_id] = true
+        elseif t_in_zone && !f_in_zone && (f_bus_id in dummy_bus_ids)
+            zone_subprob_membership[f_bus_id] = true
+        end
+    end
+    return nothing
+end
+
 @inline function _collect_member_positions(
     full_bus_ids::AbstractVector{<:Integer},
     membership::Vector{Bool},
@@ -91,6 +132,15 @@ end
     sizehint!(out, count(membership))
     @inbounds for i in eachindex(full_bus_ids)
         membership[full_bus_ids[i]] && push!(out, i)
+    end
+    return out
+end
+
+@inline function _compute_zone_id_to_pos(zone_ids::AbstractVector{<:Integer})
+    out = Dict{Int, Int}()
+    sizehint!(out, length(zone_ids))
+    @inbounds for (pos, zone_id) in enumerate(zone_ids)
+        out[zone_id] = pos
     end
     return out
 end
@@ -150,6 +200,22 @@ end
     return nothing
 end
 
+@inline function _zero_clone_loads!(
+    bus::BusRaw{Float64},
+    zone_internal_membership::Vector{Bool},
+)
+    @inbounds for i in eachindex(bus.bus_i)
+        bus_id = bus.bus_i[i]
+        zone_internal_membership[bus_id] && continue
+        bus.is_virtual[i] = false
+        bus.pd[i] = 0.0
+        bus.qd[i] = 0.0
+        bus.gs[i] = 0.0
+        bus.bs[i] = 0.0
+    end
+    return nothing
+end
+
 @inline function _filter_by_zone_bus(
     component_bus_ids::AbstractVector{<:Integer},
     zone_internal_membership::Vector{Bool},
@@ -200,14 +266,14 @@ end
     full::CaseRaw,
     zone_gen_idx::Vector{Int},
 )
-    gc = full.gencost
+    gen_cost = full.gencost
 
     zone_case.gencost = GencostRaw{Float64}(
-        gc.model[zone_gen_idx],
-        gc.startup[zone_gen_idx],
-        gc.shutdown[zone_gen_idx],
-        gc.ncost[zone_gen_idx],
-        gc.cost_coefficients[zone_gen_idx],
+        gen_cost.model[zone_gen_idx],
+        gen_cost.startup[zone_gen_idx],
+        gen_cost.shutdown[zone_gen_idx],
+        gen_cost.ncost[zone_gen_idx],
+        gen_cost.cost_coefficients[zone_gen_idx],
     )
 
     return nothing
@@ -230,6 +296,65 @@ end
         end
     end
     return out
+end
+
+@inline function _filter_branches_inside_subprob(
+    full_f_bus_ids::AbstractVector{<:Integer},
+    full_t_bus_ids::AbstractVector{<:Integer},
+    full_branch_in_service_mask::AbstractVector{Bool},
+    zone_subprob_membership::Vector{Bool},
+)
+    out = Int[]
+    sizehint!(out, length(full_f_bus_ids))
+    @inbounds for i in eachindex(full_f_bus_ids)
+        full_branch_in_service_mask[i] || continue
+        f = Int(full_f_bus_ids[i])
+        t = Int(full_t_bus_ids[i])
+        if zone_subprob_membership[f] && zone_subprob_membership[t]
+            push!(out, i)
+        end
+    end
+    return out
+end
+
+@inline function _filter_branches_owned_by_zone(
+    full_branch_in_service_mask::AbstractVector{Bool},
+    branch_owner::Vector{Int},
+    zone_id::Int,
+)
+    out = Int[]
+    sizehint!(out, length(branch_owner))
+    @inbounds for b in eachindex(branch_owner)
+        full_branch_in_service_mask[b] || continue
+        branch_owner[b] == zone_id || continue
+        push!(out, b)
+    end
+    return out
+end
+
+@inline function _compute_branch_owner_and_split_set(
+    full_f_bus_ids::AbstractVector{<:Integer},
+    full_t_bus_ids::AbstractVector{<:Integer},
+    full_branch_in_service_mask::AbstractVector{Bool},
+    bus_to_zone::Vector{Int},
+    n_full_branches::Int,
+)
+    branch_owner = zeros(Int, n_full_branches)
+    split_set = Set{Tuple{Int, Int}}()
+    @inbounds for b in eachindex(full_f_bus_ids)
+        full_branch_in_service_mask[b] || continue
+        f = full_f_bus_ids[b]
+        t = full_t_bus_ids[b]
+        zf = bus_to_zone[f]
+        zt = bus_to_zone[t]
+        if zf == zt
+            branch_owner[b] = zf
+        else
+            branch_owner[b] = zt
+            push!(split_set, (f, zt))
+        end
+    end
+    return branch_owner, split_set
 end
 
 @inline function _slice_branch(full_branch::BranchRaw{Float64}, keep::Vector{Int})
@@ -280,32 +405,6 @@ end
     )
 end
 
-@inline function _slice_prosumer(
-    full_prosumer::ProsumerRaw{Float64},
-    keep::Vector{Int},
-)
-    return ProsumerRaw{Float64}(
-        full_prosumer.bus[keep],
-        full_prosumer.generation[keep],
-        full_prosumer.demand[keep],
-        full_prosumer.q_generation[keep],
-        full_prosumer.q_demand[keep],
-        full_prosumer.cost_injection[keep],
-        full_prosumer.inverter_capacity[keep],
-    )
-end
-
-@inline function _slice_consumer(
-    full_consumer::ConsumerRaw{Float64},
-    keep::Vector{Int},
-)
-    return ConsumerRaw{Float64}(
-        full_consumer.bus[keep],
-        full_consumer.demand[keep],
-        full_consumer.q_demand[keep],
-    )
-end
-
 @inline function _filter_timeseries!(
     zone_case::CaseRaw,
     full::CaseRaw,
@@ -326,36 +425,8 @@ end
         )
     end
 
-    if full.prosumer_timeseries !== nothing
-        ts = full.prosumer_timeseries
-        zone_ts_idx = _filter_by_zone_bus(ts.bus, zone_internal_membership)
-
-        zone_case.prosumer_timeseries = ProsumerTimeseriesRaw{Float64}(
-            ts.time[zone_ts_idx],
-            ts.bus[zone_ts_idx],
-            ts.p_pv[zone_ts_idx],
-            ts.p_load[zone_ts_idx],
-            ts.p_curtail[zone_ts_idx],
-        )
-    end
-
-    if full.consumer_timeseries !== nothing
-        ts = full.consumer_timeseries
-        zone_ts_idx = _filter_by_zone_bus(ts.bus, zone_internal_membership)
-
-        zone_case.consumer_timeseries = ConsumerTimeseriesRaw{Float64}(
-            ts.time[zone_ts_idx],
-            ts.bus[zone_ts_idx],
-            ts.demand[zone_ts_idx],
-            ts.q_demand[zone_ts_idx],
-        )
-    end
-
     if full.gencost_timeseries !== nothing
         ts = full.gencost_timeseries
-
-        # Remap global gen ids to zone-local gen ids (1..length(zone_gen_idx)).
-        # `zone_gen_idx[k]` is the GLOBAL gen id of local gen `k`.
         n_global_gen = length(full.gen.gen_bus)
         global_to_local_gen = zeros(Int, n_global_gen)
         @inbounds for (local_k, global_k) in enumerate(zone_gen_idx)
@@ -388,5 +459,131 @@ end
         )
     end
 
+    if full.gen_timeseries !== nothing
+        ts = full.gen_timeseries
+
+        n_global_gen = length(full.gen.gen_bus)
+        global_to_local_gen = zeros(Int, n_global_gen)
+        @inbounds for (local_k, global_k) in enumerate(zone_gen_idx)
+            global_to_local_gen[global_k] = local_k
+        end
+
+        zone_g_ts_idx = Int[]
+        sizehint!(zone_g_ts_idx, length(ts.gen_id))
+        @inbounds for i in eachindex(ts.gen_id)
+            g = ts.gen_id[i]
+            (g >= 1 && g <= n_global_gen && global_to_local_gen[g] != 0) || continue
+            push!(zone_g_ts_idx, i)
+        end
+
+        remapped_gen_id_ts = Vector{Int}(undef, length(zone_g_ts_idx))
+        @inbounds for (k, idx) in enumerate(zone_g_ts_idx)
+            remapped_gen_id_ts[k] = global_to_local_gen[ts.gen_id[idx]]
+        end
+
+        zone_case.gen_timeseries = GenTimeseriesRaw{Float64}(
+            ts.time[zone_g_ts_idx],
+            remapped_gen_id_ts,
+            ts.pmax[zone_g_ts_idx],
+            ts.pmin[zone_g_ts_idx],
+            ts.qmax[zone_g_ts_idx],
+            ts.qmin[zone_g_ts_idx],
+        )
+    end
+
+    return nothing
+end
+
+# ============================================================
+# DummyBus — dummy bus / branch / dummy generator push helpers
+# ============================================================
+
+function _push_dummy_bus!(
+    bus::BusRaw{Float64},
+    bus_id::Int,
+    area::Int,
+    base_kv::Float64,
+    zone::Int,
+)
+    push!(bus.bus_i, bus_id)
+    push!(bus.bus_type, 1)
+    push!(bus.pd, 0.0)
+    push!(bus.qd, 0.0)
+    push!(bus.gs, 0.0)
+    push!(bus.bs, 0.0)
+    push!(bus.area, area)
+    push!(bus.vm, 1.0)
+    push!(bus.va, 0.0)
+    push!(bus.base_kv, base_kv)
+    push!(bus.zone, zone)
+    push!(bus.vmax, 1.1)
+    push!(bus.vmin, 0.9)
+    push!(bus.lam_p, 0.0)
+    push!(bus.lam_q, 0.0)
+    push!(bus.mu_vmax, 0.0)
+    push!(bus.mu_vmin, 0.0)
+    push!(bus.is_virtual, false)
+    return nothing
+end
+
+function _push_branch!(br, f, t, r, x, b_sh, ra, rb, rc, tap, shift, amin, amax)
+    push!(br.f_bus, f)
+    push!(br.t_bus, t)
+    push!(br.br_r, r)
+    push!(br.br_x, x)
+    push!(br.br_b, b_sh)
+    push!(br.rate_a, ra)
+    push!(br.rate_b, rb)
+    push!(br.rate_c, rc)
+    push!(br.tap, tap)
+    push!(br.shift, shift)
+    push!(br.br_status, 1)
+    push!(br.angmin, amin)
+    push!(br.angmax, amax)
+    push!(br.pf, 0.0)
+    push!(br.qf, 0.0)
+    push!(br.pt, 0.0)
+    push!(br.qt, 0.0)
+    push!(br.mu_sf, 0.0)
+    push!(br.mu_st, 0.0)
+    push!(br.mu_angmin, 0.0)
+    push!(br.mu_angmax, 0.0)
+    return nothing
+end
+
+function _push_dummy_gen!(gen, gen_cost, bus_id::Int, baseMVA::Float64)
+    push!(gen.gen_bus, bus_id)
+    push!(gen.pg, 0.0)
+    push!(gen.qg, 0.0)
+    push!(gen.qmax, 1e4)
+    push!(gen.qmin, -1e4)
+    push!(gen.vg, 1.0)
+    push!(gen.mbase, baseMVA)
+    push!(gen.gen_status, 1)
+    push!(gen.pmax, 1e4)
+    push!(gen.pmin, -1e4)
+    push!(gen.pc1, 0.0)
+    push!(gen.pc2, 0.0)
+    push!(gen.qc1min, 0.0)
+    push!(gen.qc1max, 0.0)
+    push!(gen.qc2min, 0.0)
+    push!(gen.qc2max, 0.0)
+    push!(gen.ramp_agc, 0.0)
+    push!(gen.ramp_10, 0.0)
+    push!(gen.ramp_30, 0.0)
+    push!(gen.ramp_q, 0.0)
+    push!(gen.apf, 0.0)
+    push!(gen.mu_pmax, 0.0)
+    push!(gen.mu_pmin, 0.0)
+    push!(gen.mu_qmax, 0.0)
+    push!(gen.mu_qmin, 0.0)
+    push!(gen.plant_type, "artificial")
+    push!(gen.curtailment_cost, 0.0)
+
+    push!(gen_cost.model, 2)
+    push!(gen_cost.startup, 0.0)
+    push!(gen_cost.shutdown, 0.0)
+    push!(gen_cost.ncost, 2)
+    push!(gen_cost.cost_coefficients, [0.0, 0.0])
     return nothing
 end

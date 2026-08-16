@@ -1,4 +1,4 @@
-# ==============================================================================
+# ============================================================
 # Lirion.jl — Matlab/Matpower minimal parser (adapted from InfrastructureModels)
 #
 # LICENSE NOTE:
@@ -6,11 +6,11 @@
 # Keep a copy of the original license text in:
 #   licenses/InfrastructureModels_LICENSE.txt
 # and clearly mark modifications (this file is modified/adapted).
-# ==============================================================================
+# ============================================================
 
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------
 # Result type
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------
 
 struct MatlabParseResult
     data::Dict{String, Any}
@@ -18,9 +18,9 @@ struct MatlabParseResult
     column_names::Dict{String, Any}
 end
 
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------
 # Base conversions
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------
 
 function check_type(typ, value)
     if isa(value, typ)
@@ -42,19 +42,14 @@ function check_type(typ, value)
     end
 end
 
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------
 # Assignment parsing + scalar typing
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------
 
-# Extract `(name, value)` from a MATLAB assignment like `foo.bar = 123;`.
-# Uses substring views + findfirst instead of `split`, avoiding per-line Vector
-# allocations.
 function _extract_matlab_assignment(s::AbstractString)
-    # Trim at first ';' (if present).
     semi = findfirst(==(';'), s)
     statement = semi === nothing ? s : SubString(s, firstindex(s), prevind(s, semi))
 
-    # Split at first '='.
     eq = findfirst(==('='), statement)
     @assert eq !== nothing "expected '=' in assignment: $(s)"
 
@@ -101,9 +96,9 @@ function _type_value(value_string::AbstractString)
     end
 end
 
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------
 # Line normalization helpers
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------
 
 function _strip_comment_matlab(s::AbstractString)
     in_quote = false
@@ -166,9 +161,9 @@ function _add_line_delimiter(mp_line::AbstractString, start_char, end_char)
     return line
 end
 
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------
 # Tokenization helpers (matrix rows)
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------
 
 function _split_line(mp_line::AbstractString)
     tokens = String[]
@@ -234,9 +229,9 @@ function _split_line(mp_line::AbstractString)
     return tokens
 end
 
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------
 # Matrix/cell block parsing engine
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------
 
 function _parse_matlab_data(lines, index, start_char, end_char)
     last_index = length(lines)
@@ -305,7 +300,10 @@ function _parse_matlab_data(lines, index, start_char, end_char)
         if columns < 0
             columns = length(row_items)
         elseif columns != length(row_items)
-            @error "Matrix parsing error: inconsistent number of items in each row\n$(row_s)"
+            error(
+                "Matlab parser: inconsistent row width in matrix (expected $(columns), " *
+                "got $(length(row_items))): $(row_s)",
+            )
         end
     end
 
@@ -325,7 +323,10 @@ function _parse_matlab_data(lines, index, start_char, end_char)
         colnames = split(col_line)
 
         if !isempty(matrix) && length(matrix[1]) != length(colnames)
-            @error "Column name parsing error: data cols $(length(matrix[1])) vs column names $(length(colnames))"
+            error(
+                "Matlab parser: column name count mismatch — data has " *
+                "$(length(matrix[1])) columns, header has $(length(colnames)).",
+            )
         end
 
         matrix_dict["column_names"] = colnames
@@ -337,9 +338,9 @@ end
 _parse_matlab_cells(lines, index) = _parse_matlab_data(lines, index, '{', '}')
 _parse_matlab_matrix(lines, index) = _parse_matlab_data(lines, index, '[', ']')
 
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------
 # Dispatch helpers for main loop
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------
 
 @inline _is_function_decl(line::AbstractString) = startswith(line, "function")
 @inline _is_assignment(line::AbstractString) = occursin('=', line)
@@ -367,9 +368,9 @@ end
     return !startswith(line, string(struct_name, '.'))
 end
 
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------
 # Handlers
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------
 
 function _handle_function_line!(
     line::AbstractString,

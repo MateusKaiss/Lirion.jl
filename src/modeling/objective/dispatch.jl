@@ -11,9 +11,9 @@ function objective!(
     return nothing
 end
 
-# =======================================================================
+# ============================================================
 # EXPRESSIONS
-# =======================================================================
+# ============================================================
 
 function add_objective_expressions!(model::JuMP.Model, obj::ObjectiveData, ::Type{DC})
     return add_generation_cost!(model, obj)
@@ -39,6 +39,14 @@ function add_objective_expressions!(model::JuMP.Model, obj::ObjectiveData, ::Typ
     return add_generation_cost!(model, obj)
 end
 
+function add_objective_expressions!(model::JuMP.Model, obj::ObjectiveData, ::Type{SDPWRM})
+    return add_generation_cost!(model, obj)
+end
+
+function add_objective_expressions!(model::JuMP.Model, obj::ObjectiveData, ::Type{QC})
+    return add_generation_cost!(model, obj)
+end
+
 function add_objective_expressions!(model::JuMP.Model, obj::ObjectiveData, ::Type{SOCBF})
     return add_generation_cost!(model, obj)
 end
@@ -51,9 +59,9 @@ function add_objective_expressions!(model::JuMP.Model, obj::ObjectiveData, ::Typ
     return add_generation_cost!(model, obj)
 end
 
-# =======================================================================
+# ============================================================
 # OBJECTIVE FUNCTION
-# =======================================================================
+# ============================================================
 
 function add_objective_function!(model::JuMP.Model)
     @objective(model, Min,

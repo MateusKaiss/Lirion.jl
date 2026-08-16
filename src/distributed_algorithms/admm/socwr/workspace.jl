@@ -1,10 +1,10 @@
 # ============================================================
-# SOCWR WORKSPACES
+# Workspace structs
 # ============================================================
 
-# ============================================================
-# STATE (V² + R/T)
-# ============================================================
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 Base.@kwdef mutable struct SOCWRStateWorkspace <: AbstractADMMWorkspace
     partitions::Partitions{PartitionSOCWR}
@@ -12,41 +12,11 @@ Base.@kwdef mutable struct SOCWRStateWorkspace <: AbstractADMMWorkspace
 
     interzonal::Vector{Int}
 
-    # BUS
-    v2_consensus::Vector{Float64}
-    v2_consensus_prev::Vector{Float64}
-
-    # RT
-    r_consensus::Vector{Float64}
-    t_consensus::Vector{Float64}
-
-    r_consensus_prev::Vector{Float64}
-    t_consensus_prev::Vector{Float64}
-
-    # DUALS
-    duals_v2::Matrix{Float64}
-
-    duals_r::Matrix{Float64}
-    duals_t::Matrix{Float64}
-
-    # RHOS
-    rho_v2::Base.RefValue{Float64}
-    rho_r::Base.RefValue{Float64}
-    rho_t::Base.RefValue{Float64}
-
-    prev_rho_v2::Base.RefValue{Float64}
-    prev_rho_r::Base.RefValue{Float64}
-    prev_rho_t::Base.RefValue{Float64}
+    vars::NamedTuple{(:v2, :r, :t), Tuple{VarState, VarState, VarState}}
 
     bus_counts::Vector{Int}
     branch_counts::Vector{Int}
 
-    r_primal::Float64 = 0.0
-    r_dual::Float64 = 0.0
-    eps_primal::Float64 = 0.0
-    eps_dual::Float64 = 0.0
-
-    # Per-component residuals (cached for rho_update! without recomputation)
     r_primal_bus::Float64 = 0.0
     r_dual_bus::Float64 = 0.0
     r_primal_r::Float64 = 0.0
@@ -54,111 +24,86 @@ Base.@kwdef mutable struct SOCWRStateWorkspace <: AbstractADMMWorkspace
     r_dual_r::Float64 = 0.0
     r_dual_t::Float64 = 0.0
 
-    hist::ADMMHistory = ADMMHistory()
-    iter::Int = 0
-end
-
-# ============================================================
-# POWER (P/Q)
-# ============================================================
-
-Base.@kwdef mutable struct SOCWRPowerWorkspace <: AbstractADMMWorkspace
-    partitions::Partitions{PartitionSOCWR}
-    id::Vector{Int}
-
-    interzonal::Vector{Int}
-
-    p_flow_consensus::Vector{Float64}
-    q_flow_consensus::Vector{Float64}
-
-    p_flow_consensus_prev::Vector{Float64}
-    q_flow_consensus_prev::Vector{Float64}
-
-    duals_p::Matrix{Float64}
-    duals_q::Matrix{Float64}
-
-    rho_p::Base.RefValue{Float64}
-    rho_q::Base.RefValue{Float64}
-
-    prev_rho_p::Base.RefValue{Float64}
-    prev_rho_q::Base.RefValue{Float64}
-
-    branch_counts::Vector{Int}
-
     r_primal::Float64 = 0.0
     r_dual::Float64 = 0.0
     eps_primal::Float64 = 0.0
     eps_dual::Float64 = 0.0
+    iter::Int = 0
+    hist::ADMMHistory = ADMMHistory()
+end
 
-    # Per-component residuals (cached for rho_update! without recomputation)
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
+Base.@kwdef mutable struct SOCWRPowerWorkspace{S <: Sectioning} <: AbstractADMMWorkspace
+    partitions::Partitions{PartitionSOCWR}
+    id::Vector{Int}
+
+    sectioning::S
+
+    interzonal::Vector{Int}
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[]
+    pair_counts::Vector{Int} = Int[]
+
+    # `p_flow`/`q_flow` carry tie-line consensus; `p_dummy`/`q_dummy`
+    # carry dummy-line consensus (Method 2). Exactly one pair is non-empty
+    # depending on `S`.
+    vars::NamedTuple{
+        (:p_flow, :q_flow, :p_dummy, :q_dummy),
+        Tuple{VarState, VarState, VarState, VarState},
+    }
+
+    branch_counts::Vector{Int}
+
     r_primal_p::Float64 = 0.0
     r_primal_q::Float64 = 0.0
     r_dual_p::Float64 = 0.0
     r_dual_q::Float64 = 0.0
 
-    hist::ADMMHistory = ADMMHistory()
-    iter::Int = 0
-end
-
-# ============================================================
-# HYBRID (V² + P/Q + R/T)
-# ============================================================
-
-Base.@kwdef mutable struct SOCWRHybridWorkspace <: AbstractADMMWorkspace
-    partitions::Partitions{PartitionSOCWR}
-    id::Vector{Int}
-
-    interzonal::Vector{Int}
-
-    # BUS
-    v2_consensus::Vector{Float64}
-    v2_consensus_prev::Vector{Float64}
-
-    # PQ
-    p_flow_consensus::Vector{Float64}
-    q_flow_consensus::Vector{Float64}
-
-    p_flow_consensus_prev::Vector{Float64}
-    q_flow_consensus_prev::Vector{Float64}
-
-    # RT
-    r_consensus::Vector{Float64}
-    t_consensus::Vector{Float64}
-
-    r_consensus_prev::Vector{Float64}
-    t_consensus_prev::Vector{Float64}
-
-    # DUALS
-    duals_v2::Matrix{Float64}
-
-    duals_p::Matrix{Float64}
-    duals_q::Matrix{Float64}
-
-    duals_r::Matrix{Float64}
-    duals_t::Matrix{Float64}
-
-    # RHOS
-    rho_v2::Base.RefValue{Float64}
-    rho_p::Base.RefValue{Float64}
-    rho_q::Base.RefValue{Float64}
-    rho_r::Base.RefValue{Float64}
-    rho_t::Base.RefValue{Float64}
-
-    prev_rho_v2::Base.RefValue{Float64}
-    prev_rho_p::Base.RefValue{Float64}
-    prev_rho_q::Base.RefValue{Float64}
-    prev_rho_r::Base.RefValue{Float64}
-    prev_rho_t::Base.RefValue{Float64}
-
-    bus_counts::Vector{Int}
-    branch_counts::Vector{Int}
-
     r_primal::Float64 = 0.0
     r_dual::Float64 = 0.0
     eps_primal::Float64 = 0.0
     eps_dual::Float64 = 0.0
+    iter::Int = 0
+    hist::ADMMHistory = ADMMHistory()
+end
 
-    # Per-component residuals (cached for rho_update! without recomputation)
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
+
+Base.@kwdef mutable struct SOCWRHybridWorkspace{S <: Sectioning} <: AbstractADMMWorkspace
+    partitions::Partitions{PartitionSOCWR}
+    id::Vector{Int}
+
+    sectioning::S
+
+    interzonal::Vector{Int}
+    branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[]
+    pair_counts::Vector{Int} = Int[]
+
+    bus_pairs::Vector{NTuple{3, Int}} = NTuple{3, Int}[]
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
+        Vector{Dict{Int, JuMP.VariableRef}}()
+    q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
+        Vector{Dict{Int, JuMP.VariableRef}}()
+
+    # SplitBus N-way injection copies (shared by p_inj and q_inj).
+    inj_groups::Vector{Tuple{Int, Vector{Int}}} = Tuple{Int, Vector{Int}}[]
+    inj_copy_zone::Vector{Int} = Int[]
+
+    vars::NamedTuple{
+        (:v2, :p_flow, :q_flow, :p_dummy, :q_dummy, :r, :t, :p_inj, :q_inj),
+        Tuple{
+            VarState, VarState, VarState, VarState, VarState,
+            VarState, VarState, VarState, VarState,
+        },
+    }
+
+    bus_counts::Vector{Int}
+    branch_counts::Vector{Int}
+
     r_primal_bus::Float64 = 0.0
     r_dual_bus::Float64 = 0.0
     r_primal_p::Float64 = 0.0
@@ -169,39 +114,53 @@ Base.@kwdef mutable struct SOCWRHybridWorkspace <: AbstractADMMWorkspace
     r_primal_t::Float64 = 0.0
     r_dual_r::Float64 = 0.0
     r_dual_t::Float64 = 0.0
+    r_primal_p_inj::Float64 = 0.0
+    r_dual_p_inj::Float64 = 0.0
+    r_primal_q_inj::Float64 = 0.0
+    r_dual_q_inj::Float64 = 0.0
 
-    hist::ADMMHistory = ADMMHistory()
+    r_primal::Float64 = 0.0
+    r_dual::Float64 = 0.0
+    eps_primal::Float64 = 0.0
+    eps_dual::Float64 = 0.0
     iter::Int = 0
+    hist::ADMMHistory = ADMMHistory()
 end
 
 # ============================================================
-# RHO HELPERS
+# Rho accessors
 # ============================================================
 
 _get_rhos(ws::SOCWRStateWorkspace) = (
-    rho_v2 = ws.rho_v2[],
-    rho_r = ws.rho_r[],
-    rho_t = ws.rho_t[],
+    rho_v2 = ws.vars.v2.rho[],
+    rho_r = ws.vars.r.rho[],
+    rho_t = ws.vars.t.rho[],
 )
 
 _get_rhos(ws::SOCWRPowerWorkspace) = (
-    rho_p = ws.rho_p[],
-    rho_q = ws.rho_q[],
+    rho_p = ws.vars.p_flow.rho[],
+    rho_q = ws.vars.q_flow.rho[],
 )
 
 _get_rhos(ws::SOCWRHybridWorkspace) = (
-    rho_v2 = ws.rho_v2[],
-    rho_p = ws.rho_p[],
-    rho_q = ws.rho_q[],
-    rho_r = ws.rho_r[],
-    rho_t = ws.rho_t[],
+    rho_v2 = ws.vars.v2.rho[],
+    rho_p = ws.vars.p_flow.rho[],
+    rho_q = ws.vars.q_flow.rho[],
+    rho_r = ws.vars.r.rho[],
+    rho_t = ws.vars.t.rho[],
+    rho_p_inj = ws.vars.p_inj.rho[],
+    rho_q_inj = ws.vars.q_inj.rho[],
 )
 
 # ============================================================
-# BUILDERS — STATE
+# Builders
 # ============================================================
 
-function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCWR})
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
+
+function build_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCWR})
     partitions = build_partitions(PartitionSOCWR, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
@@ -209,145 +168,164 @@ function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCW
     n_shared = length(sys.full_shared_bus_ids)
     n_inter = length(inter)
 
-    init_state_partition!(
-        partitions,
-        sys,
-        optimizer_factory,
-        config.rho_v2,
-        config.rho_r,
-        config.rho_t,
-        inter,
+    init_state_partition!(partitions, sys, optimizer_factory, inter)
+
+    vars = (
+        v2 = VarState(n_shared, n_zones, config.rho_v2; init_value = 1.0),
+        r = VarState(n_inter, n_zones, config.rho_r),
+        t = VarState(n_inter, n_zones, config.rho_t),
     )
 
-    rho_v2 = Ref(config.rho_v2)
-    rho_r = Ref(config.rho_r)
-    rho_t = Ref(config.rho_t)
-
-    return SOCWRStateWorkspace(;
+    ws = SOCWRStateWorkspace(;
         partitions = partitions,
         id = id,
         interzonal = inter,
-        v2_consensus = ones(n_shared),
-        v2_consensus_prev = ones(n_shared),
-        r_consensus = zeros(n_inter),
-        t_consensus = zeros(n_inter),
-        r_consensus_prev = zeros(n_inter),
-        t_consensus_prev = zeros(n_inter),
-        duals_v2 = zeros(n_shared, n_zones),
-        duals_r = zeros(n_inter, n_zones),
-        duals_t = zeros(n_inter, n_zones),
-        rho_v2 = rho_v2,
-        rho_r = rho_r,
-        rho_t = rho_t,
-        prev_rho_v2 = Ref(rho_v2[]),
-        prev_rho_r = Ref(rho_r[]),
-        prev_rho_t = Ref(rho_t[]),
+        vars = vars,
         bus_counts = zeros(Int, n_shared),
         branch_counts = zeros(Int, n_inter),
     )
+    refresh_rho!(ws)
+    return ws
 end
 
-# ============================================================
-# BUILDERS — POWER
-# ============================================================
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
-function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWR})
+function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWR})
     partitions = build_partitions(PartitionSOCWR, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
+    brpairs = sys.branch_pairs
     n_zones = length(partitions)
     n_inter = length(inter)
+    n_pairs = length(brpairs)
 
-    init_power_partition!(
-        partitions,
-        sys,
-        optimizer_factory,
-        config.rho_p,
-        config.rho_q,
-        inter,
+    sectioning = config.sectioning
+    if sectioning isa TieLine
+        n_flow = n_inter
+        n_dummy = 0
+    elseif sectioning isa DummyBus
+        n_flow = 0
+        n_dummy = n_pairs
+    else
+        error("ADMM{Power, SOCWR}: unsupported sectioning $(sectioning)")
+    end
+
+    init_power_partition!(partitions, sys, optimizer_factory, inter)
+
+    p_flow = VarState(n_flow, n_zones, config.rho_p)
+    q_flow = VarState(n_flow, n_zones, config.rho_q)
+    vars = (
+        p_flow = p_flow,
+        q_flow = q_flow,
+        p_dummy = VarState(n_dummy, n_zones, p_flow.rho, p_flow.prev_rho),
+        q_dummy = VarState(n_dummy, n_zones, q_flow.rho, q_flow.prev_rho),
     )
 
-    rho_p = Ref(config.rho_p)
-    rho_q = Ref(config.rho_q)
-
-    return SOCWRPowerWorkspace(;
+    ws = SOCWRPowerWorkspace(;
         partitions = partitions,
         id = id,
+        sectioning = sectioning,
         interzonal = inter,
-        p_flow_consensus = zeros(n_inter),
-        q_flow_consensus = zeros(n_inter),
-        p_flow_consensus_prev = zeros(n_inter),
-        q_flow_consensus_prev = zeros(n_inter),
-        duals_p = zeros(n_inter, n_zones),
-        duals_q = zeros(n_inter, n_zones),
-        rho_p = rho_p,
-        rho_q = rho_q,
-        prev_rho_p = Ref(rho_p[]),
-        prev_rho_q = Ref(rho_q[]),
+        branch_pairs = brpairs,
+        pair_counts = fill(2, n_pairs),
+        vars = vars,
         branch_counts = zeros(Int, n_inter),
     )
+    refresh_rho!(ws)
+    return ws
 end
 
-# ============================================================
-# BUILDERS — HYBRID
-# ============================================================
+# ------------------------------------------------------------
+# Hybrid
+# ------------------------------------------------------------
 
-function build_admm_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
+function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
     partitions = build_partitions(PartitionSOCWR, sys)
     id = partitions.zones
     inter = sys.interzonal_branches
+    brpairs = sys.branch_pairs
+    bpairs = sys.bus_pairs
     n_zones = length(partitions)
     n_shared = length(sys.full_shared_bus_ids)
     n_inter = length(inter)
+    n_pairs = length(brpairs)
+    n_bus_pairs = length(bpairs)
 
-    init_hybrid_partition!(
-        partitions,
-        sys,
-        optimizer_factory,
-        config.rho_v2,
-        config.rho_p,
-        config.rho_q,
-        config.rho_r,
-        config.rho_t,
-        inter,
+    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    q_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+
+    inj_groups = Tuple{Int, Vector{Int}}[]
+    inj_copy_zone = Int[]
+    n_inj = 0
+
+    sectioning = config.sectioning
+    if sectioning isa TieLine
+        n_flow = n_inter
+        n_dummy = 0
+        n_rt = n_inter
+        init_hybrid_partition!(
+            partitions, sys, optimizer_factory, sectioning, inter,
+        )
+    elseif sectioning isa DummyBus
+        n_flow = 0
+        n_dummy = n_pairs
+        n_rt = 0
+        init_hybrid_partition!(
+            partitions, sys, optimizer_factory, sectioning, inter,
+        )
+    elseif sectioning isa SplitBus
+        n_flow = 0
+        n_dummy = 0
+        n_rt = 0
+        for (b_id, zones) in sys.bus_groups
+            cidxs = Int[]
+            for z in zones
+                n_inj += 1
+                push!(cidxs, n_inj)
+                push!(inj_copy_zone, z)
+            end
+            push!(inj_groups, (b_id, cidxs))
+        end
+        init_hybrid_partition!(
+            partitions, sys, optimizer_factory, sectioning, inter,
+            bpairs, p_inj_vars, q_inj_vars,
+        )
+    else
+        error("ADMM{Hybrid, SOCWR}: unsupported sectioning $(sectioning)")
+    end
+
+    p_flow = VarState(n_flow, n_zones, config.rho_p)
+    q_flow = VarState(n_flow, n_zones, config.rho_q)
+    vars = (
+        v2 = VarState(n_shared, n_zones, config.rho_v2; init_value = 1.0),
+        p_flow = p_flow,
+        q_flow = q_flow,
+        p_dummy = VarState(n_dummy, n_zones, p_flow.rho, p_flow.prev_rho),
+        q_dummy = VarState(n_dummy, n_zones, q_flow.rho, q_flow.prev_rho),
+        r = VarState(n_rt, n_zones, config.rho_r),
+        t = VarState(n_rt, n_zones, config.rho_t),
+        p_inj = VarState(n_inj, n_zones, config.rho_p),
+        q_inj = VarState(n_inj, n_zones, config.rho_q),
     )
 
-    rho_v2 = Ref(config.rho_v2)
-    rho_p = Ref(config.rho_p)
-    rho_q = Ref(config.rho_q)
-    rho_r = Ref(config.rho_r)
-    rho_t = Ref(config.rho_t)
-
-    return SOCWRHybridWorkspace(;
+    ws = SOCWRHybridWorkspace(;
         partitions = partitions,
         id = id,
+        sectioning = sectioning,
         interzonal = inter,
-        v2_consensus = ones(n_shared),
-        v2_consensus_prev = ones(n_shared),
-        p_flow_consensus = zeros(n_inter),
-        q_flow_consensus = zeros(n_inter),
-        p_flow_consensus_prev = zeros(n_inter),
-        q_flow_consensus_prev = zeros(n_inter),
-        r_consensus = zeros(n_inter),
-        t_consensus = zeros(n_inter),
-        r_consensus_prev = zeros(n_inter),
-        t_consensus_prev = zeros(n_inter),
-        duals_v2 = zeros(n_shared, n_zones),
-        duals_p = zeros(n_inter, n_zones),
-        duals_q = zeros(n_inter, n_zones),
-        duals_r = zeros(n_inter, n_zones),
-        duals_t = zeros(n_inter, n_zones),
-        rho_v2 = rho_v2,
-        rho_p = rho_p,
-        rho_q = rho_q,
-        rho_r = rho_r,
-        rho_t = rho_t,
-        prev_rho_v2 = Ref(rho_v2[]),
-        prev_rho_p = Ref(rho_p[]),
-        prev_rho_q = Ref(rho_q[]),
-        prev_rho_r = Ref(rho_r[]),
-        prev_rho_t = Ref(rho_t[]),
+        branch_pairs = brpairs,
+        pair_counts = fill(2, n_pairs),
+        bus_pairs = bpairs,
+        p_inj_vars = p_inj_vars,
+        q_inj_vars = q_inj_vars,
+        inj_groups = inj_groups,
+        inj_copy_zone = inj_copy_zone,
+        vars = vars,
         bus_counts = zeros(Int, n_shared),
         branch_counts = zeros(Int, n_inter),
     )
+    refresh_rho!(ws)
+    return ws
 end

@@ -1,6 +1,6 @@
-# ==============================================================================
+# ============================================================
 # Inputs
-# ==============================================================================
+# ============================================================
 
 abstract type AbstractLirionInputs end
 
@@ -41,7 +41,7 @@ end
 @inline _load(path::AbstractString, csv::CsvFolder)::CaseRaw =
     _parse_case(String(path), csv)
 
-function load_input_data(path::AbstractString)::CaseRaw
+function load_inputs(path::AbstractString)::CaseRaw
     params = abspath(String(path))
     return _load(params, detect_input(params))
 end
@@ -50,75 +50,70 @@ end
 # Inputs builder
 # ============================================================
 
+# ------------------------------------------------------------
+# Path entry (shared)
+# ------------------------------------------------------------
+
 function _build_inputs(
     path::String,
-    algorithm::CentralizedAlgorithm;
+    algorithm::AbstractAlgorithm;
     model::Type{<:OPFModel},
     optimizer::Any,
     outputs::Bool,
+)::AbstractLirionInputs
+    return _build_inputs(
+        load_inputs(path), algorithm;
+        model, optimizer, outputs, label = path,
+    )
+end
+
+# ------------------------------------------------------------
+# Centralized
+# ------------------------------------------------------------
+
+function _build_inputs(
+    raw_case::CaseRaw,
+    ::CentralizedAlgorithm;
+    model::Type{<:OPFModel},
+    optimizer::Any,
+    outputs::Bool,
+    label::String = raw_case.name,
 )::CentralizedInputs
-    raw_case = load_input_data(path)
-    preprocess_case_data!(raw_case, OPFModel)
+    preprocess_case_data!(raw_case, model)
+    return CentralizedInputs(label, model, optimizer, outputs, build_system_data(raw_case))
+end
 
-    full_sys = build_system_data(raw_case)
+# ------------------------------------------------------------
+# Distributed
+# ------------------------------------------------------------
 
-    return CentralizedInputs(
-        path,
+_make_config(algorithm::ADMMAlgorithm, model::Type{<:OPFModel}) =
+    ADMMConfig(
         model,
-        optimizer,
-        outputs,
-        full_sys,
+        algorithm.coupling,
+        algorithm.sectioning,
+        algorithm.max_iter;
+        algorithm.kwargs...,
     )
-end
-
-function _build_inputs(
-    path::String,
-    algorithm::ADMMAlgorithm;
-    model::Type{<:OPFModel},
-    optimizer::Any,
-    outputs::Bool,
-)::DistributedInputs
-    raw_case = load_input_data(path)
-    preprocess_case_data!(raw_case, OPFModel)
-
-    cfg = DistributedOPFModel(
-        model, algorithm.coupling, algorithm.sectioning, algorithm.max_iter;
+_make_config(algorithm::ALADINAlgorithm, model::Type{<:OPFModel}) =
+    ALADINConfig(
+        model,
+        algorithm.coupling,
+        algorithm.sectioning,
+        algorithm.max_iter;
         algorithm.kwargs...,
     )
 
-    dist_sys = build_distributed_system(raw_case, algorithm.sectioning)
-
-    return DistributedInputs(
-        path,
-        cfg,
-        optimizer,
-        outputs,
-        dist_sys,
-    )
-end
-
 function _build_inputs(
-    path::String,
-    algorithm::ALADINAlgorithm;
+    raw_case::CaseRaw,
+    algorithm::AbstractDistributedAlgorithm;
     model::Type{<:OPFModel},
     optimizer::Any,
     outputs::Bool,
+    label::String = raw_case.name,
 )::DistributedInputs
-    raw_case = load_input_data(path)
-    preprocess_case_data!(raw_case, OPFModel)
-
-    cfg = ALADINConfig(
-        model, algorithm.coupling, algorithm.sectioning, algorithm.max_iter;
-        algorithm.kwargs...,
-    )
-
+    preprocess_case_data!(raw_case, model)
+    cfg = _make_config(algorithm, model)
     dist_sys = build_distributed_system(raw_case, algorithm.sectioning)
-
-    return DistributedInputs(
-        path,
-        cfg,
-        optimizer,
-        outputs,
-        dist_sys,
-    )
+    return DistributedInputs(label, cfg, optimizer, outputs, dist_sys)
 end

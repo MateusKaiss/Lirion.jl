@@ -1,3 +1,7 @@
+# ============================================================
+# Bus time-series data
+# ============================================================
+
 struct BusTimeseriesData
     has_timeseries::Bool
     time::Vector{Int}

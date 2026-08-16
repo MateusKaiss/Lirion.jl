@@ -9,9 +9,9 @@ function branches!(
     return nothing
 end
 
-# =======================================================================
+# ============================================================
 # VARIABLES
-# =======================================================================
+# ============================================================
 
 function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{DC})
     return nothing
@@ -37,6 +37,16 @@ function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{SOCWR}
     return add_rt_variables_with_bounds!(model, sys.bus, sys.branch)
 end
 
+function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{QC})
+    return add_qc_branch_variables!(model, sys.bus, sys.branch)
+end
+
+function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{SDPWRM})
+    # SDP needs the bus matrix variables first (they own v_magnitude_sq).
+    add_sdpwrm_bus_variables!(model, sys.bus, sys.branch)
+    return add_sdpwrm_branch_variables!(model, sys.bus, sys.branch)
+end
+
 function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{SOCBF})
     return add_socbf_branch_variables!(model, sys.bus, sys.branch)
 end
@@ -49,9 +59,9 @@ function add_branch_variables!(model::JuMP.Model, sys::SystemData, ::Type{NFA})
     return add_nfa_branch_variables!(model, sys.branch)
 end
 
-# =======================================================================
+# ============================================================
 # EXPRESSIONS
-# =======================================================================
+# ============================================================
 
 function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{DC})
     return add_dc_branch_expressions!(model, sys.branch)
@@ -77,6 +87,14 @@ function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{SOCW
     return add_socwr_branch_expressions!(model, sys.branch)
 end
 
+function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{QC})
+    return add_socwr_branch_expressions!(model, sys.branch)
+end
+
+function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{SDPWRM})
+    return add_socwr_branch_expressions!(model, sys.branch)
+end
+
 function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{SOCBF})
     return nothing  # SOCBF: power flows are variables, not expressions
 end
@@ -89,9 +107,9 @@ function add_branch_expressions!(model::JuMP.Model, sys::SystemData, ::Type{NFA}
     return add_nfa_branch_expressions!(model, sys.branch)
 end
 
-# =======================================================================
+# ============================================================
 # CONSTRAINTS
-# =======================================================================
+# ============================================================
 
 function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{DC})
     return add_dc_branch_constraints!(model, sys.branch)
@@ -114,7 +132,15 @@ function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{LPAC
 end
 
 function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{SOCWR})
-    return add_socwr_branch_constraints!(model, sys.branch)
+    return add_socwr_branch_constraints!(model, sys.bus, sys.branch)
+end
+
+function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{QC})
+    return add_qc_branch_constraints!(model, sys.bus, sys.branch)
+end
+
+function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{SDPWRM})
+    return add_sdpwrm_branch_constraints!(model, sys.bus, sys.branch)
 end
 
 function add_branch_constraints!(model::JuMP.Model, sys::SystemData, ::Type{SOCBF})

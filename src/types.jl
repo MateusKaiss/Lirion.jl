@@ -8,8 +8,10 @@ struct DC <: OPFModel end
 struct AC <: OPFModel end     # AC polar (V, θ)
 struct ACR <: OPFModel end    # AC rectangular (vr, vi)
 struct IVR <: OPFModel end    # Current-Voltage rectangular (vr, vi, cr, ci)
-struct LPAC <: OPFModel end   # Linear Power AC (Coffrin & Van Hentenryck 2014)
-struct SOCWR <: OPFModel end  # Jabr SOCP (W-rectangular)
+struct LPAC <: OPFModel end   # Linear Power AC
+struct SOCWR <: OPFModel end  # SOCP (W-rectangular)
+struct QC <: OPFModel end     # Quadratic-Convex relaxation
+struct SDPWRM <: OPFModel end # SDP (W-rectangular matrix)
 struct SOCBF <: OPFModel end  # Branch Flow SOCP
 struct BFA <: OPFModel end    # Linear Branch Flow Approx (LinDistFlow)
 struct NFA <: OPFModel end    # Network Flow Approximation (LP, active-only)
@@ -25,11 +27,13 @@ struct Power <: ADMMVariant end
 struct Hybrid <: ADMMVariant end
 
 # ============================================================
-# ADMM TYPE COMBINATOR
+# DISTRIBUTED ALGORITHM HIERARCHY
 # ============================================================
 
-struct ADMM{V <: ADMMVariant, M <: OPFModel} end
-struct ALADIN{V <: ADMMVariant, M <: OPFModel} end
+abstract type DistributedAlgorithm end
+
+struct ADMM{V <: ADMMVariant, M <: OPFModel} <: DistributedAlgorithm end
+struct ALADIN{V <: ADMMVariant, M <: OPFModel} <: DistributedAlgorithm end
 
 # ============================================================
 # SECTIONING / DECOMPOSITION STRATEGIES
@@ -38,6 +42,7 @@ struct ALADIN{V <: ADMMVariant, M <: OPFModel} end
 abstract type Sectioning end
 struct TieLine <: Sectioning end
 struct DummyBus <: Sectioning end
+struct SplitBus <: Sectioning end
 struct Metis <: Sectioning end
 
 # ============================================================
@@ -45,9 +50,9 @@ struct Metis <: Sectioning end
 # ============================================================
 
 abstract type AbstractAlgorithm end
-abstract type AbstractDistributedAlgorithm <: AbstractAlgorithm end
 
 struct CentralizedAlgorithm <: AbstractAlgorithm end
+abstract type AbstractDistributedAlgorithm <: AbstractAlgorithm end
 
 struct ADMMAlgorithm <: AbstractDistributedAlgorithm
     coupling::Symbol
@@ -238,7 +243,7 @@ end
 
 abstract type AbstractDistributedConfig end
 
-mutable struct DistributedOPFModel <: AbstractDistributedConfig
+mutable struct ADMMConfig <: AbstractDistributedConfig
     base_model::Type{<:OPFModel}
     coupling::Symbol
     sectioning::Sectioning
@@ -259,8 +264,11 @@ mutable struct DistributedOPFModel <: AbstractDistributedConfig
     mu_decr::Float64
     tau_incr::Float64
     tau_decr::Float64
+    adapt_warmup::Int
+    rho_floor::Float64
+    adapt_freeze::Float64
 
-    function DistributedOPFModel(
+    function ADMMConfig(
         base_model::Type{<:OPFModel},
         coupling::Symbol,
         sectioning::Sectioning,
@@ -273,11 +281,14 @@ mutable struct DistributedOPFModel <: AbstractDistributedConfig
         rho_t::Real,
         eps_abs::Real,
         eps_rel::Real;
-        adaptive_rho::Bool = true,
-        mu_incr::Real = 3.0,
-        mu_decr::Real = 3.0,
-        tau_incr::Real = 1.05,
-        tau_decr::Real = 0.98,
+        adaptive_rho::Bool = false,
+        mu_incr::Real = 30.0,
+        mu_decr::Real = 10.0,
+        tau_incr::Real = 1.2,
+        tau_decr::Real = 0.5,
+        adapt_warmup::Integer = 5,
+        rho_floor::Real = 0.0,
+        adapt_freeze::Real = 100.0,
     )
         base_model in (DC, AC, SOCWR) ||
             throw(ArgumentError("Invalid base_model=$base_model. Allowed: DC, AC, SOCWR"))
@@ -305,6 +316,9 @@ mutable struct DistributedOPFModel <: AbstractDistributedConfig
         mu_decr > 0 || throw(ArgumentError("mu_decr must be > 0"))
         tau_incr > 0 || throw(ArgumentError("tau_incr must be > 0"))
         tau_decr > 0 || throw(ArgumentError("tau_decr must be > 0"))
+        adapt_warmup >= 0 || throw(ArgumentError("adapt_warmup must be ≥ 0"))
+        rho_floor >= 0 || throw(ArgumentError("rho_floor must be ≥ 0"))
+        adapt_freeze >= 0 || throw(ArgumentError("adapt_freeze must be ≥ 0"))
 
         return new(
             base_model,
@@ -324,6 +338,9 @@ mutable struct DistributedOPFModel <: AbstractDistributedConfig
             Float64(mu_decr),
             Float64(tau_incr),
             Float64(tau_decr),
+            Int(adapt_warmup),
+            Float64(rho_floor),
+            Float64(adapt_freeze),
         )
     end
 end
@@ -332,7 +349,7 @@ end
 # DISTRIBUTED OPF MODEL CONVENIENCE CONSTRUCTORS
 # ============================================================
 
-DistributedOPFModel(
+ADMMConfig(
     base_model::Type{<:OPFModel},
     coupling::Symbol,
     sectioning::Union{Sectioning, Symbol},
@@ -340,16 +357,19 @@ DistributedOPFModel(
     rho::Real,
     eps_abs::Real,
     eps_rel::Real;
-    adaptive_rho::Bool = true,
-    mu_incr::Real = 3.0,
-    mu_decr::Real = 3.0,
-    tau_incr::Real = 1.05,
-    tau_decr::Real = 0.98,
+    adaptive_rho::Bool = false,
+    mu_incr::Real = 30.0,
+    mu_decr::Real = 10.0,
+    tau_incr::Real = 1.2,
+    tau_decr::Real = 0.5,
+    adapt_warmup::Integer = 5,
+    rho_floor::Real = 0.0,
+    adapt_freeze::Real = 100.0,
 ) = begin
     sec = _sectioning(sectioning)
     rhos = _normalize_rhos_strict(base_model, coupling; rho = rho)
 
-    DistributedOPFModel(
+    ADMMConfig(
         base_model,
         coupling,
         sec,
@@ -367,10 +387,13 @@ DistributedOPFModel(
         mu_decr = mu_decr,
         tau_incr = tau_incr,
         tau_decr = tau_decr,
+        adapt_warmup = adapt_warmup,
+        rho_floor = rho_floor,
+        adapt_freeze = adapt_freeze,
     )
 end
 
-DistributedOPFModel(
+ADMMConfig(
     base_model::Type{<:OPFModel},
     coupling::Symbol,
     sectioning::Union{Sectioning, Symbol},
@@ -385,11 +408,14 @@ DistributedOPFModel(
     rho_t::Union{Nothing, Real} = nothing,
     eps_abs::Real = 1e-7,
     eps_rel::Real = 1e-7,
-    adaptive_rho::Bool = true,
-    mu_incr::Real = 3.0,
-    mu_decr::Real = 3.0,
-    tau_incr::Real = 1.05,
-    tau_decr::Real = 0.98,
+    adaptive_rho::Bool = false,
+    mu_incr::Real = 30.0,
+    mu_decr::Real = 10.0,
+    tau_incr::Real = 1.2,
+    tau_decr::Real = 0.5,
+    adapt_warmup::Integer = 5,
+    rho_floor::Real = 0.0,
+    adapt_freeze::Real = 100.0,
 ) = begin
     sec = _sectioning(sectioning)
 
@@ -406,7 +432,7 @@ DistributedOPFModel(
         rho_t = rho_t,
     )
 
-    DistributedOPFModel(
+    ADMMConfig(
         base_model,
         coupling,
         sec,
@@ -424,6 +450,9 @@ DistributedOPFModel(
         mu_decr = mu_decr,
         tau_incr = tau_incr,
         tau_decr = tau_decr,
+        adapt_warmup = adapt_warmup,
+        rho_floor = rho_floor,
+        adapt_freeze = adapt_freeze,
     )
 end
 
@@ -437,16 +466,31 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
     sectioning::Sectioning
     max_iter::Int
 
-    # Penalty parameters (see Houska-Frasch-Diehl 2016)
-    rho::Float64             # proximal penalty in local subproblems
-    mu::Float64              # consensus slack penalty in coordination QP
+    rho::Float64
+    mu::Float64
 
-    # Convergence tolerances (KKT-style)
+    alpha1::Float64
+    alpha2::Float64
+    alpha3::Float64
+
+    sigma_theta_shared::Float64
+    sigma_pg::Float64
+    sigma_other::Float64
+    sigma_pflow::Float64
+    sigma_qflow::Float64
     eps_abs::Float64
     eps_rel::Float64
-
-    # Active-set identification tolerance
     active_set_tol::Float64
+    adaptive::Bool
+    rho_growth::Float64
+    mu_growth::Float64
+    rho_upper::Float64
+    mu_upper::Float64
+    proximal_mode::Symbol
+    qp_optimizer::Any
+    stopping_criterion::Symbol
+    check_primal_step::Bool
+    globalization::Symbol
 
     function ALADINConfig(
         base_model::Type{<:OPFModel},
@@ -455,14 +499,32 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
         max_iter::Integer;
         rho::Real = 1e3,
         mu::Real = 1e4,
+        alpha1::Real = 1.0,
+        alpha2::Real = 1.0,
+        alpha3::Real = 1.0,
+        sigma_theta_shared::Real = 10.0,
+        sigma_pg::Real = 1.0,
+        sigma_other::Real = 1.0,
+        sigma_pflow::Real = 10.0,
+        sigma_qflow::Real = 10.0,
         eps_abs::Real = 1e-4,
         eps_rel::Real = 1e-4,
         active_set_tol::Real = 1e-6,
+        adaptive::Bool = false,
+        rho_growth::Real = 1.3,
+        mu_growth::Real = 2.0,
+        rho_upper::Real = 1e6,
+        mu_upper::Real = 1e6,
+        proximal_mode::Symbol = :primal,
+        qp_optimizer = nothing,
+        stopping_criterion::Symbol = :boyd,
+        check_primal_step::Bool = false,
+        globalization::Symbol = :armijo_l2,
     )
-        base_model === DC ||
+        base_model in (DC, AC, SOCWR) ||
             throw(
                 ArgumentError(
-                    "ALADIN is currently implemented only for DC. Got: $(base_model)",
+                    "ALADIN is currently implemented for DC, AC, and SOCWR. Got: $(base_model)",
                 ),
             )
         coupling in (:state, :power, :hybrid) ||
@@ -471,13 +533,91 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
                     "Invalid coupling=$(coupling). Allowed: :state, :power, :hybrid",
                 ),
             )
+
+        base_model === SOCWR && sectioning isa DummyBus &&
+            throw(
+                ArgumentError(
+                    "ALADIN is not supported for SOCWR + DummyBus sectioning " *
+                    "(coordinator QP converges to a relaxed solution). " *
+                    "Use ADMM for this combination, or switch sectioning to " *
+                    ":tie_line / :split_bus for ALADIN on SOCWR.",
+                ),
+            )
         max_iter > 0 || throw(ArgumentError("max_iter must be > 0"))
         rho > 0 || throw(ArgumentError("rho must be > 0"))
         mu > 0 || throw(ArgumentError("mu must be > 0"))
+        alpha1 > 0 || throw(ArgumentError("alpha1 must be > 0"))
+        alpha2 > 0 || throw(ArgumentError("alpha2 must be > 0"))
+        alpha3 > 0 || throw(ArgumentError("alpha3 must be > 0"))
         eps_abs >= 0 || throw(ArgumentError("eps_abs must be ≥ 0"))
         eps_rel >= 0 || throw(ArgumentError("eps_rel must be ≥ 0"))
         active_set_tol > 0 || throw(ArgumentError("active_set_tol must be > 0"))
-
+        rho_growth >= 1.0 ||
+            throw(ArgumentError("rho_growth must be ≥ 1 (monotonic growth)"))
+        mu_growth >= 1.0 ||
+            throw(ArgumentError("mu_growth must be ≥ 1 (monotonic growth)"))
+        rho_upper >= rho ||
+            throw(ArgumentError("rho_upper must be ≥ rho"))
+        mu_upper >= mu ||
+            throw(ArgumentError("mu_upper must be ≥ mu"))
+        sigma_theta_shared > 0 ||
+            throw(
+                ArgumentError(
+                    "sigma_theta_shared must be > 0 (Σ_i ≻ 0 hypothesis of HFD Theorem 4)",
+                ),
+            )
+        sigma_pg > 0 ||
+            throw(
+                ArgumentError("sigma_pg must be > 0 (Σ_i ≻ 0 hypothesis of HFD Theorem 4)"),
+            )
+        sigma_other > 0 ||
+            throw(
+                ArgumentError(
+                    "sigma_other must be > 0 (Σ_i ≻ 0 hypothesis of HFD Theorem 4)",
+                ),
+            )
+        sigma_pflow > 0 || throw(ArgumentError("sigma_pflow must be > 0"))
+        sigma_qflow > 0 || throw(ArgumentError("sigma_qflow must be > 0"))
+        proximal_mode in (:primal, :pflow) ||
+            throw(
+                ArgumentError(
+                    "Invalid proximal_mode=$proximal_mode. Allowed: :primal, :pflow",
+                ),
+            )
+        stopping_criterion in (:boyd, :hfd) ||
+            throw(
+                ArgumentError(
+                    "Invalid stopping_criterion=$stopping_criterion. Allowed: :boyd, :hfd",
+                ),
+            )
+        globalization in (:armijo_l2, :alg3) ||
+            throw(
+                ArgumentError(
+                    "Invalid globalization=$globalization. Allowed: :armijo_l2 " *
+                    "(ℓ2 Armijo backtracking) or :alg3 (HFD Algorithm 3, steps a/b/c).",
+                ),
+            )
+        # B1 (2026-08-03): :alg3 dispatch (_alg3_step!, L1 merit machinery) is
+        # implemented for AC only — DC/SOCWR would silently run :armijo_l2,
+        # violating the declared configuration. Fail loudly; porting the merit
+        # machinery to DC/SOCWR is scoped follow-up work (case39 spec).
+        globalization === :alg3 && base_model in (DC, SOCWR) &&
+            throw(
+                ArgumentError(
+                    "globalization=:alg3 is implemented for AC only (the L1 " *
+                    "merit machinery lives in aladin/ac/line_search.jl); " *
+                    "base_model=$base_model would silently fall back to " *
+                    ":armijo_l2. Use :armijo_l2, or port _alg3_step! first.",
+                ),
+            )
+        proximal_mode === :pflow && !(coupling in (:power, :hybrid)) &&
+            throw(
+                ArgumentError(
+                    "proximal_mode=:pflow is supported with coupling=:power or " *
+                    ":hybrid (got coupling=$(coupling)). Use one of those, or " *
+                    "proximal_mode=:primal.",
+                ),
+            )
         return new(
             base_model,
             coupling,
@@ -485,9 +625,27 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
             Int(max_iter),
             Float64(rho),
             Float64(mu),
+            Float64(alpha1),
+            Float64(alpha2),
+            Float64(alpha3),
+            Float64(sigma_theta_shared),
+            Float64(sigma_pg),
+            Float64(sigma_other),
+            Float64(sigma_pflow),
+            Float64(sigma_qflow),
             Float64(eps_abs),
             Float64(eps_rel),
             Float64(active_set_tol),
+            adaptive,
+            Float64(rho_growth),
+            Float64(mu_growth),
+            Float64(rho_upper),
+            Float64(mu_upper),
+            proximal_mode,
+            qp_optimizer,
+            stopping_criterion,
+            check_primal_step,
+            globalization,
         )
     end
 end
@@ -504,14 +662,14 @@ end
 # Shims
 # ============================================================
 
-rho(c::DistributedOPFModel) = c.rho_theta
+rho(c::ADMMConfig) = c.rho_theta
 
-Base.getproperty(c::DistributedOPFModel, s::Symbol) =
+Base.getproperty(c::ADMMConfig, s::Symbol) =
     s === :rho ? c.rho_theta :
     s === :rho_v2 ? c.rho_v :
     getfield(c, s)
 
-function Base.setproperty!(c::DistributedOPFModel, s::Symbol, v)
+function Base.setproperty!(c::ADMMConfig, s::Symbol, v)
     if s === :rho
         v isa Real || throw(ArgumentError("rho must be Real, got $(typeof(v))"))
         vf = Float64(v)
@@ -541,17 +699,16 @@ function Base.setproperty!(c::DistributedOPFModel, s::Symbol, v)
     end
 end
 
-Base.propertynames(c::DistributedOPFModel, private::Bool = false) =
-    (propertynames(typeof(c), private)..., :rho, :rho_v2)
+Base.propertynames(c::ADMMConfig, private::Bool = false) =
+    (fieldnames(typeof(c))..., :rho, :rho_v2)
 
 # ============================================================
 # Diagnostics
 # ============================================================
 
 abstract type AbstractRunDiagnostics end
-struct NoDiagnostics <: AbstractRunDiagnostics end
 
-abstract type AbstractADMMWorkspace end
+struct NoDiagnostics <: AbstractRunDiagnostics end
 
 Base.@kwdef struct ADMMHistory <: AbstractRunDiagnostics
     r_primal::Vector{Float64} = Float64[]
@@ -563,17 +720,16 @@ Base.@kwdef struct ADMMHistory <: AbstractRunDiagnostics
     meta::Dict{Symbol, Any} = Dict{Symbol, Any}()
 end
 
-Base.@kwdef struct LirionRunResult
-    result::Any = nothing
-    model::Any = nothing
-    system::Any = nothing
-    diagnostics::AbstractRunDiagnostics = NoDiagnostics()
-end
+
+abstract type AbstractDistributedWorkspace end
+
+abstract type AbstractADMMWorkspace <: AbstractDistributedWorkspace end
 
 # ============================================================
 # Inputs Format
 # ============================================================
 
 abstract type InputFormat end
+
 struct MatpowerM <: InputFormat end
 struct CsvFolder <: InputFormat end

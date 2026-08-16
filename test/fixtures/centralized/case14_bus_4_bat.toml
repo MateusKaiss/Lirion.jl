@@ -1,0 +1,19 @@
+[metadata]
+case = "case14_bus_4_bat.m"
+has_storage = true
+regenerated_at = "2026-04-19"
+
+[objectives]
+ac = 1542.7074124709118
+acr = 1542.707413317105
+dc = 1469.4947792730911
+
+[pm_reference]
+ac = 1542.7074124709143
+acr = 1542.7074133165
+dc = 1469.4947792730918
+
+[status]
+ac = "local_optimal"
+acr = "local_optimal"
+dc = "local_optimal"

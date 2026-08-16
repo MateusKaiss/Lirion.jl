@@ -1,6 +1,6 @@
-# =========================
+# ============================================================
 # Utils
-# =========================
+# ============================================================
 
 @inline _select_default_optimizer(::Type{DC}) = OSQP.Optimizer
 @inline _select_default_optimizer(::Type{<:OPFModel}) = Ipopt.Optimizer
@@ -9,6 +9,8 @@
 @inline _select_default_optimizer(::Type{LPAC}) = Ipopt.Optimizer
 
 @inline _select_default_optimizer(::Type{SOCWR}) = Clarabel.Optimizer
+@inline _select_default_optimizer(::Type{QC}) = Ipopt.Optimizer
+@inline _select_default_optimizer(::Type{SDPWRM}) = Clarabel.Optimizer
 @inline _select_default_optimizer(::Type{SOCBF}) = Clarabel.Optimizer
 @inline _select_default_optimizer(::Type{BFA}) = Clarabel.Optimizer
 @inline _select_default_optimizer(::Type{NFA}) = OSQP.Optimizer
@@ -21,16 +23,14 @@
     return something(user_opt, input_opt, _select_default_optimizer(model_type))
 end
 
-# =========================
+# ============================================================
 # TIMES (CENTRALIZED)
-# =========================
+# ============================================================
 
 function get_model_times(sys::SystemData)
     time_vecs = Vector{Vector{Int}}()
 
     !isempty(sys.bus_ts.time) && push!(time_vecs, sys.bus_ts.time)
-    !isempty(sys.prosumer_ts.time) && push!(time_vecs, sys.prosumer_ts.time)
-    !isempty(sys.consumer_ts.time) && push!(time_vecs, sys.consumer_ts.time)
     !isempty(sys.gencost_ts.time) && push!(time_vecs, sys.gencost_ts.time)
 
     if isempty(time_vecs)
@@ -42,9 +42,9 @@ function get_model_times(sys::SystemData)
     return times
 end
 
-# =========================
+# ============================================================
 # SUBPROBLEM PIPELINE
-# =========================
+# ============================================================
 
 @inline function assemble_opf!(
     model::JuMP.Model,
@@ -54,17 +54,16 @@ end
     buses!(model, sys, model_type)
     branches!(model, sys, model_type)
     generators!(model, sys, model_type)
-    batteries!(model, sys, model_type)
-    prosumers!(model, sys, model_type)
+    storages!(model, sys, model_type)
     active_power_balance!(model, sys, model_type)
     reactive_power_balance!(model, sys, model_type)
     objective!(model, sys, model_type)
     return nothing
 end
 
-# =========================
+# ============================================================
 # BUILDER (single / multi)
-# =========================
+# ============================================================
 
 function _build_singleperiod_model(sys::SystemData, model_type::Type{<:OPFModel}, optimizer)
     model = JuMP.Model(optimizer)
@@ -102,9 +101,9 @@ function build_model(
     return _build_multiperiod_model(sys, model_type, opt, times)
 end
 
-# =========================
+# ============================================================
 # BUILDER
-# =========================
+# ============================================================
 
 function build_model(inputs::CentralizedInputs; optimizer = nothing)
     sys = inputs.system

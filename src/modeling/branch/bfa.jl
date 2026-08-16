@@ -1,6 +1,6 @@
-# =======================================================================
+# ============================================================
 # BFA (Branch Flow Approximation — LinDistFlow)
-# =======================================================================
+# ============================================================
 
 function add_bfa_branch_variables!(model::JuMP.Model, bus::BusData, br::BranchData)
     T = get(model.ext, :time_periods, 1)
@@ -62,24 +62,6 @@ function add_bfa_branch_constraints!(model::JuMP.Model, bus::BusData, br::Branch
     @constraint(model, bfa_voltage_drop[l in active, t in 1:T],
         inv_t[l]^2 * w[br.from[l], t] - w[br.to[l], t] ==
         2 * (r[l] * p_fr[l, t] + x[l] * q_fr[l, t])
-    )
-
-    # --- Thermal limits (from end) ---
-    @constraint(model, bfa_thermal_fr[l in active, t in 1:T],
-        [
-            br.rate_a[l],
-            p_fr[l, t],
-            q_fr[l, t],
-        ] in JuMP.SecondOrderCone()
-    )
-
-    # --- Thermal limits (to end) ---
-    @constraint(model, bfa_thermal_to[l in active, t in 1:T],
-        [
-            br.rate_a[l],
-            p_to[l, t],
-            q_to[l, t],
-        ] in JuMP.SecondOrderCone()
     )
 
     # --- Angle difference cuts (BF form, reused from SOCBF) ---

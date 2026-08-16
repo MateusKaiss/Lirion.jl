@@ -1,27 +1,225 @@
-# =======================================================================
-# ALADIN-DC — Partition initialization (stub for Milestone 1b)
-# =======================================================================
+# ============================================================
+# ALADIN-DC — Per-partition setup
+# ============================================================
 
-function init_state_partition_aladin!(
-    part::PartitionDCAladin,
-    sys_zone,
+# ============================================================
+# Per-partition initialisers
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
+
+function init_state_partition!(
+    part::PartitionDC,
+    sys_zone::SystemData,
     optimizer_factory,
+    cfg::ALADINConfig,
 )
-    return error("init_state_partition_aladin! not yet implemented (Milestone 1c)")
+    build_local_model!(part, sys_zone, State, optimizer_factory)
+    return build_aladin_zone_data(part; include_edges = false)
 end
 
-function init_power_partition_aladin!(
-    part::PartitionDCAladin,
-    sys_zone,
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
+function init_power_partition!(
+    part::PartitionDC,
+    sys_zone::SystemData,
     optimizer_factory,
+    cfg::ALADINConfig,
+    interzonal_branches::Vector{Int},
 )
-    return error("init_power_partition_aladin! not yet implemented (Milestone 1d)")
+    build_local_model!(part, sys_zone, Power, optimizer_factory, interzonal_branches)
+    return build_aladin_zone_data(part; include_edges = true)
 end
 
-function init_hybrid_partition_aladin!(
-    part::PartitionDCAladin,
-    sys_zone,
+# ------------------------------------------------------------
+# Hybrid — TieLine
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    part::PartitionDC,
+    sys_zone::SystemData,
     optimizer_factory,
+    cfg::ALADINConfig,
+    ::TieLine,
+    interzonal_branches::Vector{Int},
 )
-    return error("init_hybrid_partition_aladin! not yet implemented (Milestone 1d)")
+    build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
+    return build_aladin_zone_data(part; include_edges = true)
+end
+
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    part::PartitionDC,
+    sys_zone::SystemData,
+    optimizer_factory,
+    cfg::ALADINConfig,
+    ::DummyBus,
+    interzonal_branches::Vector{Int},
+)
+    build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
+    return build_aladin_zone_data(part; include_edges = true)
+end
+
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    part::PartitionDC,
+    sys_zone::SystemData,
+    optimizer_factory,
+    cfg::ALADINConfig,
+    ::SplitBus,
+    interzonal_branches::Vector{Int},
+    sys_bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_store::Dict{Int, JuMP.VariableRef},
+)
+    build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
+    _attach_p_inj_variables!(part, sys_bus_pairs, p_inj_store)
+    return build_aladin_zone_data(part; include_edges = true)
+end
+
+# ============================================================
+# Batch entry points
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
+
+function init_state_partition!(
+    partitions::Partitions{PartitionDC},
+    sys::DistributedSystem,
+    optimizer_factory,
+    cfg::ALADINConfig,
+)
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n
+    zones = Vector{AladinZoneData}(undef, n)
+    @inbounds for i in 1:n
+        zones[i] = init_state_partition!(
+            partitions.parts[i], sys.parts[i], optimizer_factory, cfg,
+        )
+    end
+    bus_pairs = _build_shared_bus_pairs(partitions, zones)
+    return zones, bus_pairs
+end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
+function init_power_partition!(
+    partitions::Partitions{PartitionDC},
+    sys::DistributedSystem,
+    optimizer_factory,
+    cfg::ALADINConfig,
+)
+    inter = sys.interzonal_branches
+    sys_branch_pairs = sys.branch_pairs
+
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n
+    zones = Vector{AladinZoneData}(undef, n)
+    @inbounds for i in 1:n
+        zones[i] = init_power_partition!(
+            partitions.parts[i], sys.parts[i], optimizer_factory, cfg, inter,
+        )
+    end
+    interzonal_line_pairs = _build_interzonal_line_pairs(partitions, inter)
+    dummy_pairs = _build_dummy_line_pairs(partitions, zones, sys_branch_pairs)
+    return zones, interzonal_line_pairs, dummy_pairs
+end
+
+# ------------------------------------------------------------
+# Hybrid — TieLine
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    partitions::Partitions{PartitionDC},
+    sys::DistributedSystem,
+    optimizer_factory,
+    cfg::ALADINConfig,
+    sectioning::TieLine,
+)
+    inter = sys.interzonal_branches
+
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n
+    zones = Vector{AladinZoneData}(undef, n)
+    @inbounds for i in 1:n
+        zones[i] = init_hybrid_partition!(
+            partitions.parts[i], sys.parts[i], optimizer_factory, cfg,
+            sectioning, inter,
+        )
+    end
+    bus_pairs = _build_shared_bus_pairs(partitions, zones)
+    interzonal_line_pairs = _build_interzonal_line_pairs(partitions, inter)
+    return zones, bus_pairs, interzonal_line_pairs
+end
+
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    partitions::Partitions{PartitionDC},
+    sys::DistributedSystem,
+    optimizer_factory,
+    cfg::ALADINConfig,
+    sectioning::DummyBus,
+)
+    inter = sys.interzonal_branches
+    sys_branch_pairs = sys.branch_pairs
+
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n
+    zones = Vector{AladinZoneData}(undef, n)
+    @inbounds for i in 1:n
+        zones[i] = init_hybrid_partition!(
+            partitions.parts[i], sys.parts[i], optimizer_factory, cfg,
+            sectioning, inter,
+        )
+    end
+    bus_pairs = _build_shared_bus_pairs(partitions, zones)
+    interzonal_line_pairs = _build_interzonal_line_pairs(partitions, inter)
+    dummy_pairs = _build_dummy_line_pairs(partitions, zones, sys_branch_pairs)
+    return zones, bus_pairs, interzonal_line_pairs, dummy_pairs
+end
+
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    partitions::Partitions{PartitionDC},
+    sys::DistributedSystem,
+    optimizer_factory,
+    cfg::ALADINConfig,
+    sectioning::SplitBus,
+)
+    inter = sys.interzonal_branches
+    sys_bus_pairs = sys.bus_pairs
+
+    n_zones = length(partitions.parts)
+    @assert length(sys.parts) == n_zones
+    p_inj_vars = [Dict{Int, JuMP.VariableRef}() for _ in 1:n_zones]
+    zones = Vector{AladinZoneData}(undef, n_zones)
+    @inbounds for i in 1:n_zones
+        zones[i] = init_hybrid_partition!(
+            partitions.parts[i], sys.parts[i], optimizer_factory, cfg,
+            sectioning, inter, sys_bus_pairs, p_inj_vars[i],
+        )
+    end
+    bus_pairs = _build_shared_bus_pairs(partitions, zones)
+    interzonal_line_pairs = _build_interzonal_line_pairs(partitions, inter)
+    split_pairs = _build_split_bus_pairs(partitions, zones, sys.bus_groups, p_inj_vars)
+    return zones, bus_pairs, interzonal_line_pairs, split_pairs, p_inj_vars
 end

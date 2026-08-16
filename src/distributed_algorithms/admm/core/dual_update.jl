@@ -1,16 +1,17 @@
 # ============================================================
-# ADMM Dual Update — unified for DC · AC · SOCWR
+# Helpers
 # ============================================================
 
 # ------------------------------------------------------------
-# Bus duals: single variable, linear (DC theta, SOCWR V²)
+# Bus
 # ------------------------------------------------------------
+
 function _update_bus_duals_single!(
     duals::Matrix{Float64},
     partitions::Partitions,
     consensus::Vector{Float64},
     rho::Float64,
-    snapshot_fn,    # (part) -> Vector{Float64}: shared-bus values
+    snapshot_fn,
 )
     for part in partitions
         x_local = snapshot_fn(part)
@@ -23,9 +24,6 @@ function _update_bus_duals_single!(
     return nothing
 end
 
-# ------------------------------------------------------------
-# Bus duals: AC (angle-wrapped theta + linear |V|)
-# ------------------------------------------------------------
 function _update_bus_duals_ac!(
     duals_theta::Matrix{Float64},
     duals_v_mag::Matrix{Float64},
@@ -50,15 +48,16 @@ function _update_bus_duals_ac!(
 end
 
 # ------------------------------------------------------------
-# Branch duals: single variable (DC P)
+# Branch
 # ------------------------------------------------------------
+
 function _update_branch_duals_single!(
-    duals::Matrix{Float64},
+    duals::AbstractMatrix{Float64},
     partitions::Partitions,
-    consensus::Vector{Float64},
+    consensus::AbstractVector{Float64},
     rho::Float64,
     interzonal::Vector{Int},
-    extract_fn,    # (part, l) -> Float64
+    extract_fn,
 )
     for part in partitions
         p = part.position
@@ -72,19 +71,16 @@ function _update_branch_duals_single!(
     return nothing
 end
 
-# ------------------------------------------------------------
-# Branch duals: paired variables (SOCWR PQ, SOCWR RT)
-# ------------------------------------------------------------
 function _update_branch_duals_paired!(
-    duals_a::Matrix{Float64},
-    duals_b::Matrix{Float64},
+    duals_a::AbstractMatrix{Float64},
+    duals_b::AbstractMatrix{Float64},
     partitions::Partitions,
-    consensus_a::Vector{Float64},
-    consensus_b::Vector{Float64},
+    consensus_a::AbstractVector{Float64},
+    consensus_b::AbstractVector{Float64},
     rho_a::Float64,
     rho_b::Float64,
     interzonal::Vector{Int},
-    extract_fn,    # (part, l) -> (Float64, Float64)
+    extract_fn,
 )
     for part in partitions
         p = part.position
@@ -99,17 +95,12 @@ function _update_branch_duals_paired!(
     return nothing
 end
 
-# ------------------------------------------------------------
-# Branch duals: AC P/Q (with isfinite checks for NLP)
-# ------------------------------------------------------------
-# Specialized variant because AC flow expressions can return NaN; a bad
-# P must NOT skip a good Q update (and vice versa).
 function _update_branch_duals_ac!(
-    duals_p::Matrix{Float64},
-    duals_q::Matrix{Float64},
+    duals_p::AbstractMatrix{Float64},
+    duals_q::AbstractMatrix{Float64},
     partitions::Partitions{PartitionAC},
-    p_consensus::Vector{Float64},
-    q_consensus::Vector{Float64},
+    p_consensus::AbstractVector{Float64},
+    q_consensus::AbstractVector{Float64},
     rho_p::Float64,
     rho_q::Float64,
     interzonal::Vector{Int},
@@ -131,174 +122,528 @@ function _update_branch_duals_ac!(
     return nothing
 end
 
+# ------------------------------------------------------------
+# Branch pairs
+# ------------------------------------------------------------
+
+# `extract_fn` is the FROM-side extractor, correct for half-B (whose from bus IS the
+# dummy bus). Half-A's dummy end is its TO bus, so it needs `extract_fn_a` — the dual has
+# to be driven by the SAME residual the objective/consensus minimise, otherwise the
+# multipliers chase a quantity nobody optimises and the run diverges. Defaults to
+# extract_fn for the DC path, where p_rev == -p_fr makes the two identical.
+function _update_branch_pairs_duals_single!(
+    duals::AbstractMatrix{Float64},
+    partitions::Partitions,
+    consensus::AbstractVector{Float64},
+    rho::Float64,
+    pairs::Vector{NTuple{4, Int}},
+    extract_fn;
+    extract_fn_a = extract_fn,
+)
+    isempty(pairs) && return nothing
+    @inbounds for (k, (ga, za, gb, zb)) in enumerate(pairs)
+        pa = partitions.parts[za]
+        la = pa.branch_idx_full_to_zone[ga]
+        if la != 0
+            vala = extract_fn_a(pa, la)
+            duals[k, za] += rho * (vala - consensus[k])
+        end
+        pb = partitions.parts[zb]
+        lb = pb.branch_idx_full_to_zone[gb]
+        if lb != 0
+            valb = extract_fn(pb, lb)
+            duals[k, zb] += rho * (valb - consensus[k])
+        end
+    end
+    return nothing
+end
+
+function _update_branch_pairs_duals_ac!(
+    duals_p::AbstractMatrix{Float64},
+    duals_q::AbstractMatrix{Float64},
+    partitions::Partitions{PartitionAC},
+    p_consensus::AbstractVector{Float64},
+    q_consensus::AbstractVector{Float64},
+    rho_p::Float64,
+    rho_q::Float64,
+    pairs::Vector{NTuple{4, Int}},
+)
+    isempty(pairs) && return nothing
+    @inbounds for (k, (ga, za, gb, zb)) in enumerate(pairs)
+        pa = partitions.parts[za]
+        pb = partitions.parts[zb]
+        la = pa.branch_idx_full_to_zone[ga]
+        lb = pb.branch_idx_full_to_zone[gb]
+        if la != 0
+            # half-A: dummy bus is its TO end. The dual must be driven by the SAME
+            # residual the objective/consensus use, i.e. the TO-side flow — mixing sides
+            # here makes the multipliers chase a quantity nobody minimises and the run
+            # diverges. See _pq_flow_to_exprs.
+            p_expr, q_expr = _pq_flow_to_exprs(pa, la)
+            p_val = JuMP.value(p_expr)
+            q_val = JuMP.value(q_expr)
+            isfinite(p_val) &&
+                (duals_p[k, za] += rho_p * (p_val - p_consensus[k]))
+            isfinite(q_val) &&
+                (duals_q[k, za] += rho_q * (q_val - q_consensus[k]))
+        end
+        if lb != 0
+            # half-B: dummy bus is its FROM end -> from-side is correct.
+            p_expr, q_expr = _pq_flow_from_exprs(pb, lb)
+            p_val = JuMP.value(p_expr)
+            q_val = JuMP.value(q_expr)
+            isfinite(p_val) &&
+                (duals_p[k, zb] += rho_p * (p_val - p_consensus[k]))
+            isfinite(q_val) &&
+                (duals_q[k, zb] += rho_q * (q_val - q_consensus[k]))
+        end
+    end
+    return nothing
+end
+
 # ============================================================
-# Dispatch: dual_update!(ws)
+# DC
 # ============================================================
 
-# ---- DC ----
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 function dual_update!(ws::DCStateWorkspace)
     _update_bus_duals_single!(
-        ws.duals_theta,
+        ws.vars.theta.duals,
         ws.partitions,
-        ws.theta_consensus,
-        ws.rho_theta[],
+        ws.vars.theta.consensus,
+        ws.vars.theta.rho[],
         snapshot_theta_shared!,
     )
     return nothing
 end
 
-function dual_update!(ws::DCPowerWorkspace)
+# ------------------------------------------------------------
+# Power — TieLine
+# ------------------------------------------------------------
+
+function dual_update!(ws::DCPowerWorkspace{TieLine})
     _update_branch_duals_single!(
-        ws.duals_p_flow,
+        ws.vars.p_flow.duals,
         ws.partitions,
-        ws.p_flow_consensus,
-        ws.rho_p[],
+        ws.vars.p_flow.consensus,
+        ws.vars.p_flow.rho[],
         ws.interzonal,
         _dc_flow_value,
     )
     return nothing
 end
 
-function dual_update!(ws::DCHybridWorkspace)
+# ------------------------------------------------------------
+# Power — DummyBus
+# ------------------------------------------------------------
+
+function dual_update!(ws::DCPowerWorkspace{DummyBus})
+    _update_branch_pairs_duals_single!(
+        ws.vars.p_dummy.duals,
+        ws.partitions,
+        ws.vars.p_dummy.consensus,
+        ws.vars.p_dummy.rho[],
+        ws.branch_pairs,
+        _dc_flow_value,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — TieLine
+# ------------------------------------------------------------
+
+function dual_update!(ws::DCHybridWorkspace{TieLine})
     _update_bus_duals_single!(
-        ws.duals_theta,
+        ws.vars.theta.duals,
         ws.partitions,
-        ws.theta_consensus,
-        ws.rho_theta[],
+        ws.vars.theta.consensus,
+        ws.vars.theta.rho[],
         snapshot_theta_shared!,
     )
     _update_branch_duals_single!(
-        ws.duals_p_flow,
+        ws.vars.p_flow.duals,
         ws.partitions,
-        ws.p_flow_consensus,
-        ws.rho_p[],
+        ws.vars.p_flow.consensus,
+        ws.vars.p_flow.rho[],
         ws.interzonal,
         _dc_flow_value,
     )
     return nothing
 end
 
-# ---- AC ----
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
+function dual_update!(ws::DCHybridWorkspace{DummyBus})
+    _update_bus_duals_single!(
+        ws.vars.theta.duals,
+        ws.partitions,
+        ws.vars.theta.consensus,
+        ws.vars.theta.rho[],
+        snapshot_theta_shared!,
+    )
+    _update_branch_pairs_duals_single!(
+        ws.vars.p_dummy.duals,
+        ws.partitions,
+        ws.vars.p_dummy.consensus,
+        ws.vars.p_dummy.rho[],
+        ws.branch_pairs,
+        _dc_flow_value,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
+function dual_update!(ws::DCHybridWorkspace{SplitBus})
+    _update_bus_duals_single!(
+        ws.vars.theta.duals,
+        ws.partitions,
+        ws.vars.theta.consensus,
+        ws.vars.theta.rho[],
+        snapshot_theta_shared!,
+    )
+    _update_inj_groups_duals!(
+        ws.vars.p_inj.duals,
+        ws.partitions,
+        ws.vars.p_inj.consensus,
+        ws.vars.p_inj.rho[],
+        ws.inj_groups,
+        ws.inj_copy_zone,
+        ws.p_inj_vars,
+    )
+    return nothing
+end
+
+# ============================================================
+# AC
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 function dual_update!(ws::ACStateWorkspace)
     _update_bus_duals_ac!(
-        ws.duals_theta,
-        ws.duals_v_mag,
+        ws.vars.theta.duals,
+        ws.vars.v_mag.duals,
         ws.partitions,
-        ws.theta_consensus,
-        ws.v_mag_consensus,
-        ws.rho_theta[],
-        ws.rho_v[],
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        ws.vars.theta.rho[],
+        ws.vars.v_mag.rho[],
     )
     return nothing
 end
 
-function dual_update!(ws::ACPowerWorkspace)
+# ------------------------------------------------------------
+# Power — TieLine
+# ------------------------------------------------------------
+
+function dual_update!(ws::ACPowerWorkspace{TieLine})
+    rho_p = ws.vars.p_flow.rho[]
+    rho_q = ws.vars.q_flow.rho[]
+
     _update_branch_duals_ac!(
-        ws.duals_p_flow,
-        ws.duals_q_flow,
+        ws.vars.p_flow.duals,
+        ws.vars.q_flow.duals,
         ws.partitions,
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
-        ws.rho_p[],
-        ws.rho_q[],
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        rho_p, rho_q,
         ws.interzonal,
     )
     return nothing
 end
 
-function dual_update!(ws::ACHybridWorkspace)
+# ------------------------------------------------------------
+# Power — DummyBus
+# ------------------------------------------------------------
+
+function dual_update!(ws::ACPowerWorkspace{DummyBus})
+    rho_p = ws.vars.p_dummy.rho[]
+    rho_q = ws.vars.q_dummy.rho[]
+
+    _update_branch_pairs_duals_ac!(
+        ws.vars.p_dummy.duals,
+        ws.vars.q_dummy.duals,
+        ws.partitions,
+        ws.vars.p_dummy.consensus,
+        ws.vars.q_dummy.consensus,
+        rho_p, rho_q,
+        ws.branch_pairs,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — TieLine
+# ------------------------------------------------------------
+
+function dual_update!(ws::ACHybridWorkspace{TieLine})
+    rho_p = ws.vars.p_flow.rho[]
+    rho_q = ws.vars.q_flow.rho[]
+
     _update_bus_duals_ac!(
-        ws.duals_theta,
-        ws.duals_v_mag,
+        ws.vars.theta.duals,
+        ws.vars.v_mag.duals,
         ws.partitions,
-        ws.theta_consensus,
-        ws.v_mag_consensus,
-        ws.rho_theta[],
-        ws.rho_v[],
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        ws.vars.theta.rho[],
+        ws.vars.v_mag.rho[],
     )
     _update_branch_duals_ac!(
-        ws.duals_p_flow,
-        ws.duals_q_flow,
+        ws.vars.p_flow.duals,
+        ws.vars.q_flow.duals,
         ws.partitions,
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
-        ws.rho_p[],
-        ws.rho_q[],
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        rho_p, rho_q,
         ws.interzonal,
     )
     return nothing
 end
 
-# ---- SOCWR ----
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
+function dual_update!(ws::ACHybridWorkspace{DummyBus})
+    rho_p = ws.vars.p_dummy.rho[]
+    rho_q = ws.vars.q_dummy.rho[]
+
+    _update_bus_duals_ac!(
+        ws.vars.theta.duals,
+        ws.vars.v_mag.duals,
+        ws.partitions,
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        ws.vars.theta.rho[],
+        ws.vars.v_mag.rho[],
+    )
+    _update_branch_pairs_duals_ac!(
+        ws.vars.p_dummy.duals,
+        ws.vars.q_dummy.duals,
+        ws.partitions,
+        ws.vars.p_dummy.consensus,
+        ws.vars.q_dummy.consensus,
+        rho_p, rho_q,
+        ws.branch_pairs,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
+function dual_update!(ws::ACHybridWorkspace{SplitBus})
+    _update_bus_duals_ac!(
+        ws.vars.theta.duals,
+        ws.vars.v_mag.duals,
+        ws.partitions,
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        ws.vars.theta.rho[],
+        ws.vars.v_mag.rho[],
+    )
+    _update_inj_groups_duals!(
+        ws.vars.p_inj.duals, ws.partitions,
+        ws.vars.p_inj.consensus, ws.vars.p_inj.rho[],
+        ws.inj_groups, ws.inj_copy_zone, ws.p_inj_vars,
+    )
+    _update_inj_groups_duals!(
+        ws.vars.q_inj.duals, ws.partitions,
+        ws.vars.q_inj.consensus, ws.vars.q_inj.rho[],
+        ws.inj_groups, ws.inj_copy_zone, ws.q_inj_vars,
+    )
+    return nothing
+end
+
+# ============================================================
+# SOCWR
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 function dual_update!(ws::SOCWRStateWorkspace)
     _update_bus_duals_single!(
-        ws.duals_v2,
+        ws.vars.v2.duals,
         ws.partitions,
-        ws.v2_consensus,
-        ws.rho_v2[],
+        ws.vars.v2.consensus,
+        ws.vars.v2.rho[],
         snapshot_v2_shared!,
     )
     _update_branch_duals_paired!(
-        ws.duals_r,
-        ws.duals_t,
+        ws.vars.r.duals,
+        ws.vars.t.duals,
         ws.partitions,
-        ws.r_consensus,
-        ws.t_consensus,
-        ws.rho_r[],
-        ws.rho_t[],
+        ws.vars.r.consensus,
+        ws.vars.t.consensus,
+        ws.vars.r.rho[],
+        ws.vars.t.rho[],
         ws.interzonal,
         _socwr_rt_values,
     )
     return nothing
 end
 
-function dual_update!(ws::SOCWRPowerWorkspace)
+# ------------------------------------------------------------
+# Power — TieLine
+# ------------------------------------------------------------
+
+function dual_update!(ws::SOCWRPowerWorkspace{TieLine})
+    rho_p = ws.vars.p_flow.rho[]
+    rho_q = ws.vars.q_flow.rho[]
+
     _update_branch_duals_paired!(
-        ws.duals_p,
-        ws.duals_q,
+        ws.vars.p_flow.duals,
+        ws.vars.q_flow.duals,
         ws.partitions,
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
-        ws.rho_p[],
-        ws.rho_q[],
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        rho_p, rho_q,
         ws.interzonal,
         _socwr_pq_values,
     )
     return nothing
 end
 
-function dual_update!(ws::SOCWRHybridWorkspace)
+# ------------------------------------------------------------
+# Power — DummyBus
+# ------------------------------------------------------------
+
+function dual_update!(ws::SOCWRPowerWorkspace{DummyBus})
+    rho_p = ws.vars.p_dummy.rho[]
+    rho_q = ws.vars.q_dummy.rho[]
+
+    _update_branch_pairs_duals_single!(
+        ws.vars.p_dummy.duals,
+        ws.partitions,
+        ws.vars.p_dummy.consensus,
+        rho_p,
+        ws.branch_pairs,
+        _socwr_p_value;
+        extract_fn_a = _socwr_p_value_to,
+    )
+    _update_branch_pairs_duals_single!(
+        ws.vars.q_dummy.duals,
+        ws.partitions,
+        ws.vars.q_dummy.consensus,
+        rho_q,
+        ws.branch_pairs,
+        _socwr_q_value;
+        extract_fn_a = _socwr_q_value_to,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — TieLine
+# ------------------------------------------------------------
+
+function dual_update!(ws::SOCWRHybridWorkspace{TieLine})
+    rho_p = ws.vars.p_flow.rho[]
+    rho_q = ws.vars.q_flow.rho[]
+
     _update_bus_duals_single!(
-        ws.duals_v2,
+        ws.vars.v2.duals,
         ws.partitions,
-        ws.v2_consensus,
-        ws.rho_v2[],
+        ws.vars.v2.consensus,
+        ws.vars.v2.rho[],
         snapshot_v2_shared!,
     )
     _update_branch_duals_paired!(
-        ws.duals_p,
-        ws.duals_q,
+        ws.vars.p_flow.duals,
+        ws.vars.q_flow.duals,
         ws.partitions,
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
-        ws.rho_p[],
-        ws.rho_q[],
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        rho_p, rho_q,
         ws.interzonal,
         _socwr_pq_values,
     )
     _update_branch_duals_paired!(
-        ws.duals_r,
-        ws.duals_t,
+        ws.vars.r.duals,
+        ws.vars.t.duals,
         ws.partitions,
-        ws.r_consensus,
-        ws.t_consensus,
-        ws.rho_r[],
-        ws.rho_t[],
+        ws.vars.r.consensus,
+        ws.vars.t.consensus,
+        ws.vars.r.rho[],
+        ws.vars.t.rho[],
         ws.interzonal,
         _socwr_rt_values,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
+function dual_update!(ws::SOCWRHybridWorkspace{DummyBus})
+    rho_p = ws.vars.p_dummy.rho[]
+    rho_q = ws.vars.q_dummy.rho[]
+
+    _update_bus_duals_single!(
+        ws.vars.v2.duals,
+        ws.partitions,
+        ws.vars.v2.consensus,
+        ws.vars.v2.rho[],
+        snapshot_v2_shared!,
+    )
+    _update_branch_pairs_duals_single!(
+        ws.vars.p_dummy.duals,
+        ws.partitions,
+        ws.vars.p_dummy.consensus,
+        rho_p,
+        ws.branch_pairs,
+        _socwr_p_value;
+        extract_fn_a = _socwr_p_value_to,
+    )
+    _update_branch_pairs_duals_single!(
+        ws.vars.q_dummy.duals,
+        ws.partitions,
+        ws.vars.q_dummy.consensus,
+        rho_q,
+        ws.branch_pairs,
+        _socwr_q_value;
+        extract_fn_a = _socwr_q_value_to,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
+function dual_update!(ws::SOCWRHybridWorkspace{SplitBus})
+    _update_bus_duals_single!(
+        ws.vars.v2.duals,
+        ws.partitions,
+        ws.vars.v2.consensus,
+        ws.vars.v2.rho[],
+        snapshot_v2_shared!,
+    )
+    _update_inj_groups_duals!(
+        ws.vars.p_inj.duals, ws.partitions,
+        ws.vars.p_inj.consensus, ws.vars.p_inj.rho[],
+        ws.inj_groups, ws.inj_copy_zone, ws.p_inj_vars,
+    )
+    _update_inj_groups_duals!(
+        ws.vars.q_inj.duals, ws.partitions,
+        ws.vars.q_inj.consensus, ws.vars.q_inj.rho[],
+        ws.inj_groups, ws.inj_copy_zone, ws.q_inj_vars,
     )
     return nothing
 end

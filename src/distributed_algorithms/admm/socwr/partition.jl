@@ -1,192 +1,15 @@
 # ============================================================
-# SOCWR PARTITION INITIALIZATION
+# Tikhonov regularization
 # ============================================================
 
-function init_state_partition!(
-    part::PartitionSOCWR,
-    sys_zone::SystemData,
-    optimizer_factory,
-    rho_v2::Float64,
-    rho_r::Float64,
-    rho_t::Float64,
-    interzonal_branches,
-)
-    part.zone_edges = _zone_cut_edges(part, interzonal_branches)
-    model = _setup_partition_model!(part, sys_zone, SOCWR, optimizer_factory)
-
-    part.v2_var = model[:v_magnitude_sq]
-    for I in keys(part.v2_var)
-        set_start_value(part.v2_var[I], 1.0)
-    end
-
-    build_quad_bus_expr!(part, rho_v2)
-    build_quad_branch_rt_expr!(part, rho_r, rho_t, part.zone_edges)
-
-    part.obj_static = part.obj_base + part.quad_bus_expr_socwr + part.quad_rt_expr_socwr
-    @objective(model, Min, part.obj_static)
-
-    return nothing
-end
-
-function init_power_partition!(
-    part::PartitionSOCWR,
-    sys_zone::SystemData,
-    optimizer_factory,
-    rho_p::Float64,
-    rho_q::Float64,
-    interzonal_branches,
-)
-    part.zone_edges = _zone_cut_edges(part, interzonal_branches)
-    model = _setup_partition_model!(part, sys_zone, SOCWR, optimizer_factory)
-
-    if is_gurobi(model)
-        soft_anchor_branch_expr!(
-            part;
-            kappa_v2 = 1e-6,
-            kappa_pq = 1e-8,
-            use_bus = true,
-            use_pq = true,
-        )
-    else
-        part.soft_anchor_expr = zero(JuMP.QuadExpr)
-    end
-
-    build_quad_branch_pq_expr!(part, rho_p, rho_q, part.zone_edges)
-
-    part.obj_static = part.obj_base + part.quad_pq_expr_socwr + part.soft_anchor_expr
-    @objective(model, Min, part.obj_static)
-
-    return nothing
-end
-
-function init_hybrid_partition!(
-    part::PartitionSOCWR,
-    sys_zone::SystemData,
-    optimizer_factory,
-    rho_v2::Float64,
-    rho_p::Float64,
-    rho_q::Float64,
-    rho_r::Float64,
-    rho_t::Float64,
-    interzonal_branches,
-)
-    part.zone_edges = _zone_cut_edges(part, interzonal_branches)
-    model = _setup_partition_model!(part, sys_zone, SOCWR, optimizer_factory)
-
-    part.v2_var = model[:v_magnitude_sq]
-    for I in keys(part.v2_var)
-        set_start_value(part.v2_var[I], 1.0)
-    end
-
-    build_quad_bus_expr!(part, rho_v2)
-    build_quad_branch_pq_expr!(part, rho_p, rho_q, part.zone_edges)
-    build_quad_branch_rt_expr!(part, rho_r, rho_t, part.zone_edges)
-
-    part.obj_static =
-        part.obj_base + part.quad_bus_expr_socwr + part.quad_pq_expr_socwr +
-        part.quad_rt_expr_socwr
-
-    @objective(model, Min, part.obj_static)
-
-    return nothing
-end
-
-# ============================================================
-# BATCH
-# ============================================================
-
-function init_state_partition!(
-    partitions::Partitions{PartitionSOCWR},
-    sys::DistributedSystem,
-    optimizer_factory,
-    rho_v2::Float64,
-    rho_r::Float64,
-    rho_t::Float64,
-    interzonal_branches,
-)
-    n = length(partitions.parts)
-    @assert length(sys.parts) == n "DistributedSystem.parts must be aligned with partitions.parts"
-
-    @inbounds for i in 1:n
-        init_state_partition!(
-            partitions.parts[i],
-            sys.parts[i],
-            optimizer_factory,
-            rho_v2,
-            rho_r,
-            rho_t,
-            interzonal_branches,
-        )
-    end
-    return nothing
-end
-
-function init_power_partition!(
-    partitions::Partitions{PartitionSOCWR},
-    sys::DistributedSystem,
-    optimizer_factory,
-    rho_p::Float64,
-    rho_q::Float64,
-    interzonal_branches,
-)
-    n = length(partitions.parts)
-    @assert length(sys.parts) == n "DistributedSystem.parts must be aligned with partitions.parts"
-
-    @inbounds for i in 1:n
-        init_power_partition!(
-            partitions.parts[i],
-            sys.parts[i],
-            optimizer_factory,
-            rho_p,
-            rho_q,
-            interzonal_branches,
-        )
-    end
-    return nothing
-end
-
-function init_hybrid_partition!(
-    partitions::Partitions{PartitionSOCWR},
-    sys::DistributedSystem,
-    optimizer_factory,
-    rho_v2::Float64,
-    rho_p::Float64,
-    rho_q::Float64,
-    rho_r::Float64,
-    rho_t::Float64,
-    interzonal_branches,
-)
-    n = length(partitions.parts)
-    @assert length(sys.parts) == n "DistributedSystem.parts must be aligned with partitions.parts"
-
-    @inbounds for i in 1:n
-        init_hybrid_partition!(
-            partitions.parts[i],
-            sys.parts[i],
-            optimizer_factory,
-            rho_v2,
-            rho_p,
-            rho_q,
-            rho_r,
-            rho_t,
-            interzonal_branches,
-        )
-    end
-    return nothing
-end
-
-# ============================================================
-# SOCWR EXTRAS — soft anchoring (Gurobi stabilization)
-# ============================================================
-
-function soft_anchor_branch_expr!(
+function tikhonov_regularization_expr!(
     part::PartitionSOCWR;
     kappa_v2::Float64 = 1e-6,
     kappa_pq::Float64 = 1e-8,
     use_bus::Bool = true,
     use_pq::Bool = true,
 )
-    m = part.model::JuMP.Model
+    m = part.local_model::JuMP.Model
     quad = zero(JuMP.QuadExpr)
 
     if use_bus && haskey(m, :v_magnitude_sq)
@@ -210,6 +33,218 @@ function soft_anchor_branch_expr!(
         end
     end
 
-    part.soft_anchor_expr = quad
+    part.tikhonov_reg_expr = quad
     return quad
+end
+
+# ============================================================
+# Per-partition initializers
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
+
+function init_state_partition!(
+    part::PartitionSOCWR,
+    sys_zone::SystemData,
+    optimizer_factory,
+    interzonal_branches,
+)
+    build_local_model!(part, sys_zone, State, optimizer_factory, interzonal_branches)
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
+function init_power_partition!(
+    part::PartitionSOCWR,
+    sys_zone::SystemData,
+    optimizer_factory,
+    interzonal_branches,
+)
+    build_local_model!(part, sys_zone, Power, optimizer_factory, interzonal_branches)
+    if is_gurobi(part.local_model)
+        tikhonov_regularization_expr!(
+            part;
+            kappa_v2 = 1e-6,
+            kappa_pq = 1e-8,
+            use_bus = true,
+            use_pq = true,
+        )
+    else
+        part.tikhonov_reg_expr = zero(JuMP.QuadExpr)
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — TieLine
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    part::PartitionSOCWR,
+    sys_zone::SystemData,
+    optimizer_factory,
+    ::TieLine,
+    interzonal_branches,
+)
+    build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    part::PartitionSOCWR,
+    sys_zone::SystemData,
+    optimizer_factory,
+    ::DummyBus,
+    interzonal_branches,
+)
+    build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    part::PartitionSOCWR,
+    sys_zone::SystemData,
+    optimizer_factory,
+    ::SplitBus,
+    interzonal_branches,
+    bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_store::Dict{Int, JuMP.VariableRef},
+    q_inj_store::Dict{Int, JuMP.VariableRef},
+)
+    build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
+    _attach_pq_inj_variables_socwr!(
+        part, bus_pairs, p_inj_store, q_inj_store,
+    )
+    return nothing
+end
+
+# ============================================================
+# Batch entry points
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
+
+function init_state_partition!(
+    partitions::Partitions{PartitionSOCWR},
+    sys::DistributedSystem,
+    optimizer_factory,
+    interzonal_branches,
+)
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n
+    @inbounds for i in 1:n
+        init_state_partition!(
+            partitions.parts[i], sys.parts[i], optimizer_factory,
+            interzonal_branches,
+        )
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
+function init_power_partition!(
+    partitions::Partitions{PartitionSOCWR},
+    sys::DistributedSystem,
+    optimizer_factory,
+    interzonal_branches,
+)
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n
+    @inbounds for i in 1:n
+        init_power_partition!(
+            partitions.parts[i], sys.parts[i], optimizer_factory,
+            interzonal_branches,
+        )
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — TieLine
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    partitions::Partitions{PartitionSOCWR},
+    sys::DistributedSystem,
+    optimizer_factory,
+    sectioning::TieLine,
+    interzonal_branches,
+)
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n
+    @inbounds for i in 1:n
+        init_hybrid_partition!(
+            partitions.parts[i], sys.parts[i], optimizer_factory,
+            sectioning, interzonal_branches,
+        )
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    partitions::Partitions{PartitionSOCWR},
+    sys::DistributedSystem,
+    optimizer_factory,
+    sectioning::DummyBus,
+    interzonal_branches,
+)
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n
+    @inbounds for i in 1:n
+        init_hybrid_partition!(
+            partitions.parts[i], sys.parts[i], optimizer_factory,
+            sectioning, interzonal_branches,
+        )
+    end
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    partitions::Partitions{PartitionSOCWR},
+    sys::DistributedSystem,
+    optimizer_factory,
+    sectioning::SplitBus,
+    interzonal_branches,
+    bus_pairs::Vector{NTuple{3, Int}},
+    p_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+    q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}},
+)
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n
+    @assert length(p_inj_vars) == n
+    @assert length(q_inj_vars) == n
+    @inbounds for i in 1:n
+        init_hybrid_partition!(
+            partitions.parts[i], sys.parts[i], optimizer_factory,
+            sectioning, interzonal_branches,
+            bus_pairs, p_inj_vars[i], q_inj_vars[i],
+        )
+    end
+    return nothing
 end

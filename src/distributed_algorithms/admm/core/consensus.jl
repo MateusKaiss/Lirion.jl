@@ -1,15 +1,16 @@
 # ============================================================
-# ADMM Consensus — unified for DC · AC · SOCWR
+# Helpers
 # ============================================================
 
 # ------------------------------------------------------------
-# Bus consensus: single variable, linear averaging (DC theta, SOCWR V²)
+# Bus
 # ------------------------------------------------------------
+
 function _consensus_bus_single!(
     consensus::Vector{Float64},
     counts::Vector{Int},
     partitions::Partitions,
-    snapshot_fn,    # (part) -> Vector{Float64}: shared-bus values
+    snapshot_fn,
 )
     fill!(consensus, 0.0)
     fill!(counts, 0)
@@ -30,9 +31,6 @@ function _consensus_bus_single!(
     return nothing
 end
 
-# ------------------------------------------------------------
-# Bus consensus: AC (circular theta + linear |V|)
-# ------------------------------------------------------------
 function _consensus_bus_ac!(
     theta_consensus::Vector{Float64},
     v_mag_consensus::Vector{Float64},
@@ -69,14 +67,15 @@ function _consensus_bus_ac!(
 end
 
 # ------------------------------------------------------------
-# Branch consensus: single variable (DC P)
+# Branch
 # ------------------------------------------------------------
+
 function _consensus_branch_single!(
-    consensus::Vector{Float64},
-    counts::Vector{Int},
+    consensus::AbstractVector{Float64},
+    counts::AbstractVector{Int},
     partitions::Partitions,
     interzonal::Vector{Int},
-    extract_fn,    # (part, l) -> Float64
+    extract_fn,
 )
     fill!(consensus, 0.0)
     fill!(counts, 0)
@@ -97,16 +96,13 @@ function _consensus_branch_single!(
     return nothing
 end
 
-# ------------------------------------------------------------
-# Branch consensus: paired variables (SOCWR PQ, SOCWR RT)
-# ------------------------------------------------------------
 function _consensus_branch_paired!(
-    consensus_a::Vector{Float64},
-    consensus_b::Vector{Float64},
-    counts::Vector{Int},
+    consensus_a::AbstractVector{Float64},
+    consensus_b::AbstractVector{Float64},
+    counts::AbstractVector{Int},
     partitions::Partitions,
     interzonal::Vector{Int},
-    extract_fn,    # (part, l) -> (Float64, Float64)
+    extract_fn,
 )
     fill!(consensus_a, 0.0)
     fill!(consensus_b, 0.0)
@@ -133,16 +129,11 @@ function _consensus_branch_paired!(
     return nothing
 end
 
-# ------------------------------------------------------------
-# Branch consensus: AC P/Q (with isfinite checks for NLP)
-# ------------------------------------------------------------
-# Uses independent P/Q counters: NLP flows can be NaN, and we don't want
-# a bad P to poison Q (or vice versa).
 function _consensus_branch_ac!(
-    p_consensus::Vector{Float64},
-    q_consensus::Vector{Float64},
-    p_counts::Vector{Int},
-    q_counts::Vector{Int},
+    p_consensus::AbstractVector{Float64},
+    q_consensus::AbstractVector{Float64},
+    p_counts::AbstractVector{Int},
+    q_counts::AbstractVector{Int},
     partitions::Partitions{PartitionAC},
     interzonal::Vector{Int},
 )
@@ -178,38 +169,118 @@ function _consensus_branch_ac!(
     return nothing
 end
 
+# ------------------------------------------------------------
+# Branch pairs
+# ------------------------------------------------------------
+
+# `extract_fn` is the FROM-side extractor, correct for half-B (whose from bus IS the
+# dummy bus). Half-A's dummy end is its TO bus and needs `extract_fn_a`; averaging a
+# from-side value with a to-side one would make the consensus target a quantity that is
+# neither. Defaults to extract_fn for DC, where p_rev == -p_fr makes them identical.
+function _consensus_branch_pairs!(
+    consensus::AbstractVector{Float64},
+    counts::AbstractVector{Int},
+    partitions::Partitions,
+    pairs::Vector{NTuple{4, Int}},
+    extract_fn;
+    extract_fn_a = extract_fn,
+)
+    isempty(pairs) && return nothing
+    fill!(consensus, 0.0)
+    fill!(counts, 0)
+    @inbounds for (k, (ga, za, gb, zb)) in enumerate(pairs)
+        pa = partitions.parts[za]
+        la = pa.branch_idx_full_to_zone[ga]
+        pb = partitions.parts[zb]
+        lb = pb.branch_idx_full_to_zone[gb]
+        if la != 0
+            consensus[k] += extract_fn_a(pa, la)
+            counts[k] += 1
+        end
+        if lb != 0
+            consensus[k] += extract_fn(pb, lb)
+            counts[k] += 1
+        end
+        counts[k] > 0 && (consensus[k] /= counts[k])
+    end
+    return nothing
+end
+
+function _consensus_branch_pairs_ac!(
+    p_consensus::AbstractVector{Float64},
+    q_consensus::AbstractVector{Float64},
+    counts::AbstractVector{Int},
+    partitions::Partitions{PartitionAC},
+    pairs::Vector{NTuple{4, Int}},
+)
+    isempty(pairs) && return nothing
+    @inbounds for (k, (ga, za, gb, zb)) in enumerate(pairs)
+        pa = partitions.parts[za]
+        pb = partitions.parts[zb]
+        la = pa.branch_idx_full_to_zone[ga]
+        lb = pb.branch_idx_full_to_zone[gb]
+
+        p_sum = 0.0
+        q_sum = 0.0
+        p_n = 0
+        q_n = 0
+        if la != 0
+            p_expr, q_expr = _pq_flow_to_exprs(pa, la)
+            p_val = JuMP.value(p_expr)
+            q_val = JuMP.value(q_expr)
+            if isfinite(p_val)
+                p_sum += p_val
+                p_n += 1
+            end
+            if isfinite(q_val)
+                q_sum += q_val
+                q_n += 1
+            end
+        end
+        if lb != 0
+            # side B: D is this half's FROM bus -> from-side accessor is already correct.
+            p_expr, q_expr = _pq_flow_from_exprs(pb, lb)
+            p_val = JuMP.value(p_expr)
+            q_val = JuMP.value(q_expr)
+            if isfinite(p_val)
+                p_sum += p_val
+                p_n += 1
+            end
+            if isfinite(q_val)
+                q_sum += q_val
+                q_n += 1
+            end
+        end
+        p_consensus[k] = p_n > 0 ? p_sum / p_n : 0.0
+        q_consensus[k] = q_n > 0 ? q_sum / q_n : 0.0
+        counts[k] = 2
+    end
+    return nothing
+end
+
 # ============================================================
-# Dispatch: consensus!(ws)
+# DC
 # ============================================================
 
-# ---- DC ----
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 consensus!(ws::DCStateWorkspace) =
     _consensus_bus_single!(
-        ws.theta_consensus,
+        ws.vars.theta.consensus,
         ws.bus_counts,
         ws.partitions,
         snapshot_theta_shared!,
     )
 
-consensus!(ws::DCPowerWorkspace) =
-    _consensus_branch_single!(
-        ws.p_flow_consensus,
-        ws.branch_counts,
-        ws.partitions,
-        ws.interzonal,
-        _dc_flow_value,
-    )
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
-function consensus!(ws::DCHybridWorkspace)
-    _consensus_bus_single!(
-        ws.theta_consensus,
-        ws.bus_counts,
-        ws.partitions,
-        snapshot_theta_shared!,
-    )
+function consensus!(ws::DCPowerWorkspace{TieLine})
     _consensus_branch_single!(
-        ws.p_flow_consensus,
+        ws.vars.p_flow.consensus,
         ws.branch_counts,
         ws.partitions,
         ws.interzonal,
@@ -218,40 +289,106 @@ function consensus!(ws::DCHybridWorkspace)
     return nothing
 end
 
-# ---- AC ----
+function consensus!(ws::DCPowerWorkspace{DummyBus})
+    _consensus_branch_pairs!(
+        ws.vars.p_dummy.consensus,
+        ws.pair_counts,
+        ws.partitions,
+        ws.branch_pairs,
+        _dc_flow_value,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — TieLine
+# ------------------------------------------------------------
+
+function consensus!(ws::DCHybridWorkspace{TieLine})
+    _consensus_bus_single!(
+        ws.vars.theta.consensus,
+        ws.bus_counts,
+        ws.partitions,
+        snapshot_theta_shared!,
+    )
+    _consensus_branch_single!(
+        ws.vars.p_flow.consensus,
+        ws.branch_counts,
+        ws.partitions,
+        ws.interzonal,
+        _dc_flow_value,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
+function consensus!(ws::DCHybridWorkspace{DummyBus})
+    _consensus_bus_single!(
+        ws.vars.theta.consensus,
+        ws.bus_counts,
+        ws.partitions,
+        snapshot_theta_shared!,
+    )
+    _consensus_branch_pairs!(
+        ws.vars.p_dummy.consensus,
+        ws.pair_counts,
+        ws.partitions,
+        ws.branch_pairs,
+        _dc_flow_value,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
+function consensus!(ws::DCHybridWorkspace{SplitBus})
+    _consensus_bus_single!(
+        ws.vars.theta.consensus,
+        ws.bus_counts,
+        ws.partitions,
+        snapshot_theta_shared!,
+    )
+    _consensus_inj_groups!(
+        ws.vars.p_inj.consensus,
+        ws.partitions,
+        ws.inj_groups,
+        ws.inj_copy_zone,
+        ws.p_inj_vars,
+    )
+    return nothing
+end
+
+# ============================================================
+# AC
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 consensus!(ws::ACStateWorkspace) =
     _consensus_bus_ac!(
-        ws.theta_consensus,
-        ws.v_mag_consensus,
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
         ws.sin_sum,
         ws.cos_sum,
         ws.bus_counts,
         ws.partitions,
     )
 
-consensus!(ws::ACPowerWorkspace) =
-    _consensus_branch_ac!(
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
-        ws.p_branch_counts,
-        ws.q_branch_counts,
-        ws.partitions,
-        ws.interzonal,
-    )
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
 
-function consensus!(ws::ACHybridWorkspace)
-    _consensus_bus_ac!(
-        ws.theta_consensus,
-        ws.v_mag_consensus,
-        ws.sin_sum,
-        ws.cos_sum,
-        ws.bus_counts,
-        ws.partitions,
-    )
+function consensus!(ws::ACPowerWorkspace{TieLine})
     _consensus_branch_ac!(
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
         ws.p_branch_counts,
         ws.q_branch_counts,
         ws.partitions,
@@ -260,18 +397,106 @@ function consensus!(ws::ACHybridWorkspace)
     return nothing
 end
 
-# ---- SOCWR ----
+function consensus!(ws::ACPowerWorkspace{DummyBus})
+    _consensus_branch_pairs_ac!(
+        ws.vars.p_dummy.consensus,
+        ws.vars.q_dummy.consensus,
+        ws.pair_counts,
+        ws.partitions,
+        ws.branch_pairs,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — TieLine
+# ------------------------------------------------------------
+
+function consensus!(ws::ACHybridWorkspace{TieLine})
+    _consensus_bus_ac!(
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        ws.sin_sum,
+        ws.cos_sum,
+        ws.bus_counts,
+        ws.partitions,
+    )
+    _consensus_branch_ac!(
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
+        ws.p_branch_counts,
+        ws.q_branch_counts,
+        ws.partitions,
+        ws.interzonal,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
+function consensus!(ws::ACHybridWorkspace{DummyBus})
+    _consensus_bus_ac!(
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        ws.sin_sum,
+        ws.cos_sum,
+        ws.bus_counts,
+        ws.partitions,
+    )
+    _consensus_branch_pairs_ac!(
+        ws.vars.p_dummy.consensus,
+        ws.vars.q_dummy.consensus,
+        ws.pair_counts,
+        ws.partitions,
+        ws.branch_pairs,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
+function consensus!(ws::ACHybridWorkspace{SplitBus})
+    _consensus_bus_ac!(
+        ws.vars.theta.consensus,
+        ws.vars.v_mag.consensus,
+        ws.sin_sum,
+        ws.cos_sum,
+        ws.bus_counts,
+        ws.partitions,
+    )
+    _consensus_inj_groups!(
+        ws.vars.p_inj.consensus, ws.partitions,
+        ws.inj_groups, ws.inj_copy_zone, ws.p_inj_vars,
+    )
+    _consensus_inj_groups!(
+        ws.vars.q_inj.consensus, ws.partitions,
+        ws.inj_groups, ws.inj_copy_zone, ws.q_inj_vars,
+    )
+    return nothing
+end
+
+# ============================================================
+# SOCWR
+# ============================================================
+
+# ------------------------------------------------------------
+# State
+# ------------------------------------------------------------
 
 function consensus!(ws::SOCWRStateWorkspace)
     _consensus_bus_single!(
-        ws.v2_consensus,
+        ws.vars.v2.consensus,
         ws.bus_counts,
         ws.partitions,
         snapshot_v2_shared!,
     )
     _consensus_branch_paired!(
-        ws.r_consensus,
-        ws.t_consensus,
+        ws.vars.r.consensus,
+        ws.vars.t.consensus,
         ws.branch_counts,
         ws.partitions,
         ws.interzonal,
@@ -280,38 +505,120 @@ function consensus!(ws::SOCWRStateWorkspace)
     return nothing
 end
 
-consensus!(ws::SOCWRPowerWorkspace) =
+# ------------------------------------------------------------
+# Power
+# ------------------------------------------------------------
+
+function consensus!(ws::SOCWRPowerWorkspace{TieLine})
     _consensus_branch_paired!(
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
         ws.branch_counts,
         ws.partitions,
         ws.interzonal,
         _socwr_pq_values,
     )
+    return nothing
+end
 
-function consensus!(ws::SOCWRHybridWorkspace)
+function consensus!(ws::SOCWRPowerWorkspace{DummyBus})
+    _consensus_branch_pairs!(
+        ws.vars.p_dummy.consensus,
+        ws.pair_counts,
+        ws.partitions,
+        ws.branch_pairs,
+        _socwr_p_value;
+        extract_fn_a = _socwr_p_value_to,
+    )
+    _consensus_branch_pairs!(
+        ws.vars.q_dummy.consensus,
+        ws.pair_counts,
+        ws.partitions,
+        ws.branch_pairs,
+        _socwr_q_value;
+        extract_fn_a = _socwr_q_value_to,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — TieLine
+# ------------------------------------------------------------
+
+function consensus!(ws::SOCWRHybridWorkspace{TieLine})
     _consensus_bus_single!(
-        ws.v2_consensus,
+        ws.vars.v2.consensus,
         ws.bus_counts,
         ws.partitions,
         snapshot_v2_shared!,
     )
     _consensus_branch_paired!(
-        ws.p_flow_consensus,
-        ws.q_flow_consensus,
+        ws.vars.p_flow.consensus,
+        ws.vars.q_flow.consensus,
         ws.branch_counts,
         ws.partitions,
         ws.interzonal,
         _socwr_pq_values,
     )
     _consensus_branch_paired!(
-        ws.r_consensus,
-        ws.t_consensus,
+        ws.vars.r.consensus,
+        ws.vars.t.consensus,
         ws.branch_counts,
         ws.partitions,
         ws.interzonal,
         _socwr_rt_values,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
+function consensus!(ws::SOCWRHybridWorkspace{DummyBus})
+    _consensus_bus_single!(
+        ws.vars.v2.consensus,
+        ws.bus_counts,
+        ws.partitions,
+        snapshot_v2_shared!,
+    )
+    _consensus_branch_pairs!(
+        ws.vars.p_dummy.consensus,
+        ws.pair_counts,
+        ws.partitions,
+        ws.branch_pairs,
+        _socwr_p_value;
+        extract_fn_a = _socwr_p_value_to,
+    )
+    _consensus_branch_pairs!(
+        ws.vars.q_dummy.consensus,
+        ws.pair_counts,
+        ws.partitions,
+        ws.branch_pairs,
+        _socwr_q_value;
+        extract_fn_a = _socwr_q_value_to,
+    )
+    return nothing
+end
+
+# ------------------------------------------------------------
+# Hybrid — SplitBus
+# ------------------------------------------------------------
+
+function consensus!(ws::SOCWRHybridWorkspace{SplitBus})
+    _consensus_bus_single!(
+        ws.vars.v2.consensus,
+        ws.bus_counts,
+        ws.partitions,
+        snapshot_v2_shared!,
+    )
+    _consensus_inj_groups!(
+        ws.vars.p_inj.consensus, ws.partitions,
+        ws.inj_groups, ws.inj_copy_zone, ws.p_inj_vars,
+    )
+    _consensus_inj_groups!(
+        ws.vars.q_inj.consensus, ws.partitions,
+        ws.inj_groups, ws.inj_copy_zone, ws.q_inj_vars,
     )
     return nothing
 end
