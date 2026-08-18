@@ -1,14 +1,6 @@
 # ============================================================
 # Zone connectivity repair (pure graph, no Metis dependency)
 # ============================================================
-# Operates on an integer zone label per node (`zone[i]`) and an
-# adjacency list of node indices (`adj[i]`). Used by the Metis
-# partitioner (ext/MetisExt.jl) to guarantee that every zone is a
-# single connected component of the electrical graph whenever that is
-# topologically possible.
-#
-# These functions are intentionally in Lirion core (not the extension)
-# so they can be unit-tested without Metis/Graphs/SimpleWeightedGraphs.
 
 """
     _zone_connected_components(zone, adj) -> Dict{Int,Vector{Vector{Int}}}
