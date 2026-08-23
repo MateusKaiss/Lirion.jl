@@ -7,6 +7,9 @@ using PlotlyLight
 # Primitives
 # ============================================================
 
+@inline _log_safe(v::Real) = (isfinite(v) && v > 0.0) ? Float64(v) : 1e-16
+@inline _log_safe(xs::AbstractVector) = Float64[_log_safe(x) for x in xs]
+
 function _plot_convergence(
     res_primal::Vector{Float64},
     res_dual::Vector{Float64},
@@ -16,10 +19,10 @@ function _plot_convergence(
 )
     x = 1:length(res_primal)
     p = Plot()
-    p(; x, y = res_primal, type = :scatter, mode = "lines",       name = "‖rᵏ‖")
-    p(; x, y = res_dual,   type = :scatter, mode = "lines",       name = "‖sᵏ‖")
-    p(; x, y = eps_primal, type = :scatter, mode = "lines",       name = "epsᵖʳⁱ",  line = (; dash = "dash"))
-    p(; x, y = eps_dual,   type = :scatter, mode = "lines",       name = "epsᵈᵘᵃˡ", line = (; dash = "dash"))
+    p(; x, y = _log_safe(res_primal), type = :scatter, mode = "lines",       name = "‖rᵏ‖")
+    p(; x, y = _log_safe(res_dual),   type = :scatter, mode = "lines",       name = "‖sᵏ‖")
+    p(; x, y = _log_safe(eps_primal), type = :scatter, mode = "lines",       name = "epsᵖʳⁱ",  line = (; dash = "dash"))
+    p(; x, y = _log_safe(eps_dual),   type = :scatter, mode = "lines",       name = "epsᵈᵘᵃˡ", line = (; dash = "dash"))
     p.layout.title         = "Convergência do ADMM"
     p.layout.xaxis.title   = "Iterações k"
     p.layout.yaxis.title   = "Resíduo"
@@ -31,7 +34,7 @@ end
 function _plot_rho(rho_vec::Vector{Float64}, path::String; label::String = "rho")
     x = 1:length(rho_vec)
     p = Plot()
-    p(; x, y = rho_vec, type = :scatter, mode = "lines+markers", name = label)
+    p(; x, y = _log_safe(rho_vec), type = :scatter, mode = "lines+markers", name = label)
     p.layout.title       = "Evolução de $(label) no ADMM"
     p.layout.xaxis.title = "Iterações k"
     p.layout.yaxis.title = label
@@ -154,4 +157,4 @@ function Lirion.build_plots(
     return nothing
 end
 
-end # module
+end
