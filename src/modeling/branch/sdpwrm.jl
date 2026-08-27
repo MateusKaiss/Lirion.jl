@@ -184,9 +184,7 @@ function add_sdpwrm_branch_constraints!(model::JuMP.Model, bus::BusData, br::Bra
     # tan(angmin)*wr ≤ wi ≤ tan(angmax)*wr
     add_rt_tangent_angle_cuts!(model, br)
 
-    # Lifted Nonlinear Cuts (LNCs) — Coffrin, Hijazi, Van Hentenryck 2015
-    # (arXiv:1512.04644). Strengthen the SDP relaxation; PM adds these for all
-    # W-models via constraint_voltage_angle_difference(pm::AbstractWModels,...).
+    # Lifted Nonlinear Cuts (Coffrin-Hijazi-Van Hentenryck 2015, arXiv:1512.04644)
     add_sdpwrm_lnc_cuts!(model, bus, br)
 
     return nothing

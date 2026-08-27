@@ -64,6 +64,22 @@ function add_bfa_branch_constraints!(model::JuMP.Model, bus::BusData, br::Branch
         2 * (r[l] * p_fr[l, t] + x[l] * q_fr[l, t])
     )
 
+    # --- Thermal limits: apparent-power disk p²+q²≤rate² ---
+    @constraint(model, bfa_thermal_fr[l in active, t in 1:T],
+        [
+            br.rate_a[l],
+            p_fr[l, t],
+            q_fr[l, t],
+        ] in JuMP.SecondOrderCone()
+    )
+    @constraint(model, bfa_thermal_to[l in active, t in 1:T],
+        [
+            br.rate_a[l],
+            p_to[l, t],
+            q_to[l, t],
+        ] in JuMP.SecondOrderCone()
+    )
+
     # --- Angle difference cuts (BF form, reused from SOCBF) ---
     _add_socbf_angle_constraints!(model, br)
 

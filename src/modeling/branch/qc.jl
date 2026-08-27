@@ -8,10 +8,9 @@
 #   theta[b]           — voltage angle (from AC bus vars)
 #   v_magnitude_sq[b]  — w[b] = vm[b]² (SOCWR bus var)
 #
-# Buspair variables (one per active branch in Lirion — assumes no parallel
-# branches at the (from,to) level):
-#   R[l]    — wr[bp] = vm_i · vm_j · cos(θ_i − θ_j)
-#   T_var[l]— wi[bp] = vm_i · vm_j · sin(θ_i − θ_j)
+# Buspair variables:
+#   R[l]    — wr[bp] = vm_i · vm_j · cos(θ_i − θ_j)  (shared per (from,to) pair)
+#   T_var[l]— wi[bp] = vm_i · vm_j · sin(θ_i − θ_j)  (shared per (from,to) pair)
 #   td[l]   — θ_i − θ_j (angle difference)
 #   vv[l]   — vm_i · vm_j
 #   cs[l]   — cosine envelope, bounded by cos(angmin..angmax)

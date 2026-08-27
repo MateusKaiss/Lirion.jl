@@ -62,7 +62,9 @@ function add_socwr_branch_constraints!(
         br.ang_max[i]
     )
 
-    @constraint(model, [l in active, t in 1:T],
+    # one Jabr cone per bus pair (PowerModels `constraint_model_voltage`)
+    pair_reps = get(model.ext, :socwr_pair_reps, active)
+    @constraint(model, [l in pair_reps, t in 1:T],
         [
             model[:v_magnitude_sq][br.from[l], t] / sqrt(2),
             model[:v_magnitude_sq][br.to[l], t] / sqrt(2),
@@ -89,10 +91,7 @@ function add_socwr_branch_constraints!(
 
     add_rt_tangent_angle_cuts!(model, br)
 
-    # Lifted Nonlinear Cuts (Coffrin-Hijazi-Van Hentenryck 2015,
-    # arXiv:1512.04644). Strengthen the W-space relaxation so Lirion
-    # matches the PowerModels SOCWR tightness. Same cut derivation used
-    # in QC and SDPWRM.
+    # Lifted Nonlinear Cuts (Coffrin-Hijazi-Van Hentenryck 2015, arXiv:1512.04644)
     add_socwr_lnc_cuts!(model, bus, br)
 
     return nothing
