@@ -52,6 +52,9 @@ function run_algorithm(
     ws = build_workspace(sys, config, optimizer_factory, tag)
     initial_rhos = _get_rhos(ws)
 
+    # opt-in zone warm-start (admm/core/warmstart.jl)
+    zone_warmstart_enabled(config) && zone_warmstart!(ws)
+
     run_algorithm!(ws, params)
 
     tag_str = _print_tag(ws)

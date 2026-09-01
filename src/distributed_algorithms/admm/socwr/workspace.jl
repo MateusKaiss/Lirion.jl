@@ -156,12 +156,31 @@ _get_rhos(ws::SOCWRHybridWorkspace) = (
 # Builders
 # ============================================================
 
+# Stamp the W-space model (SOCWR | SOCWRNL) onto every zone partition.
+@inline function _set_zone_model!(
+    partitions::Partitions{PartitionSOCWR}, zone_model::Type{<:OPFModel},
+)
+    @inbounds for p in partitions.parts
+        p.zone_model = zone_model
+    end
+    return partitions
+end
+
 # ------------------------------------------------------------
 # State
 # ------------------------------------------------------------
 
-function build_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCWR})
+# SOCWR and SOCWRNL share the workspace; zone_model selects the encoding.
+build_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCWR}) =
+    _build_socwr_state_workspace(sys, config, optimizer_factory, SOCWR)
+build_workspace(sys, config, optimizer_factory, ::ADMM{State, SOCWRNL}) =
+    _build_socwr_state_workspace(sys, config, optimizer_factory, SOCWRNL)
+
+function _build_socwr_state_workspace(
+    sys, config, optimizer_factory, zone_model::Type{<:OPFModel},
+)
     partitions = build_partitions(PartitionSOCWR, sys)
+    _set_zone_model!(partitions, zone_model)
     id = partitions.zones
     inter = sys.interzonal_branches
     n_zones = length(partitions)
@@ -192,8 +211,16 @@ end
 # Power
 # ------------------------------------------------------------
 
-function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWR})
+build_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWR}) =
+    _build_socwr_power_workspace(sys, config, optimizer_factory, SOCWR)
+build_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWRNL}) =
+    _build_socwr_power_workspace(sys, config, optimizer_factory, SOCWRNL)
+
+function _build_socwr_power_workspace(
+    sys, config, optimizer_factory, zone_model::Type{<:OPFModel},
+)
     partitions = build_partitions(PartitionSOCWR, sys)
+    _set_zone_model!(partitions, zone_model)
     id = partitions.zones
     inter = sys.interzonal_branches
     brpairs = sys.branch_pairs
@@ -209,7 +236,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWR})
         n_flow = 0
         n_dummy = n_pairs
     else
-        error("ADMM{Power, SOCWR}: unsupported sectioning $(sectioning)")
+        error("ADMM{Power, $(zone_model)}: unsupported sectioning $(sectioning)")
     end
 
     init_power_partition!(partitions, sys, optimizer_factory, inter)
@@ -234,6 +261,9 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Power, SOCWR})
         branch_counts = zeros(Int, n_inter),
     )
     refresh_rho!(ws)
+    # Provenance only (socwr/objective.jl lifted flow penalty).
+    _socwrnl_lifted_flow_active(partitions) &&
+        (ws.hist.meta[:socwrnl_lifted_flow] = true)
     return ws
 end
 
@@ -241,8 +271,16 @@ end
 # Hybrid
 # ------------------------------------------------------------
 
-function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
+build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR}) =
+    _build_socwr_hybrid_workspace(sys, config, optimizer_factory, SOCWR)
+build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWRNL}) =
+    _build_socwr_hybrid_workspace(sys, config, optimizer_factory, SOCWRNL)
+
+function _build_socwr_hybrid_workspace(
+    sys, config, optimizer_factory, zone_model::Type{<:OPFModel},
+)
     partitions = build_partitions(PartitionSOCWR, sys)
+    _set_zone_model!(partitions, zone_model)
     id = partitions.zones
     inter = sys.interzonal_branches
     brpairs = sys.branch_pairs
@@ -293,7 +331,7 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
             bpairs, p_inj_vars, q_inj_vars,
         )
     else
-        error("ADMM{Hybrid, SOCWR}: unsupported sectioning $(sectioning)")
+        error("ADMM{Hybrid, $(zone_model)}: unsupported sectioning $(sectioning)")
     end
 
     p_flow = VarState(n_flow, n_zones, config.rho_p)
@@ -327,5 +365,8 @@ function build_workspace(sys, config, optimizer_factory, ::ADMM{Hybrid, SOCWR})
         branch_counts = zeros(Int, n_inter),
     )
     refresh_rho!(ws)
+    # Provenance only (see the Power builder above).
+    _socwrnl_lifted_flow_active(partitions) &&
+        (ws.hist.meta[:socwrnl_lifted_flow] = true)
     return ws
 end

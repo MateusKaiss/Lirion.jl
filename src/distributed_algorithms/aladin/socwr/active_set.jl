@@ -51,12 +51,21 @@ end
 # Active-constraint Jacobian
 # ============================================================
 
+# Activity tolerances; recorded in `aladin_runtime_manifest()`.
+const _SOCWR_ACTIVE_DUAL_TOL = Ref{Float64}(1e-6)
+const _SOCWR_ACTIVE_CONE_TOL = Ref{Float64}(1e-6)
+# conic LICQ rank threshold
+const _SOCWR_ACTIVE_DEP_TOL = 1e-10
+
 function build_active_jacobian(
     zone::AladinZoneDataSOCWR;
-    dual_tol::Float64 = 1e-6,
-    cone_tol::Float64 = 1e-6,
-    dep_tol::Float64 = 1e-10,
+    dual_tol::Float64 = _SOCWR_ACTIVE_DUAL_TOL[],
+    cone_tol::Float64 = _SOCWR_ACTIVE_CONE_TOL[],
+    dep_tol::Float64 = _SOCWR_ACTIVE_DEP_TOL,
 )::SparseArrays.SparseMatrixCSC{Float64, Int}
+    # SOCWRNL: the active NLP Jacobian was assembled in `_refresh_exact_hessian_socwrnl!`
+    zone.exact_hessian && return zone.active_jac
+
     model = zone.local_model
     var_to_col = zone.var_to_col
     n_vars = zone.n_vars

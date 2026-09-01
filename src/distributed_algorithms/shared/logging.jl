@@ -38,9 +38,13 @@ _print_tag(::DCHybridWorkspace) = "[ADMM-hybrid/DC]"
 _print_tag(::ACStateWorkspace) = "[ADMM-state/AC]"
 _print_tag(::ACPowerWorkspace) = "[ADMM-power/AC]"
 _print_tag(::ACHybridWorkspace) = "[ADMM-hybrid/AC]"
-_print_tag(::SOCWRStateWorkspace) = "[ADMM-state/SOCWR]"
-_print_tag(::SOCWRPowerWorkspace) = "[ADMM-power/SOCWR]"
-_print_tag(::SOCWRHybridWorkspace) = "[ADMM-hybrid/SOCWR]"
+@inline function _socwr_zone_label(ws)
+    ps = ws.partitions.parts
+    return isempty(ps) ? "SOCWR" : string(nameof(ps[1].zone_model))
+end
+_print_tag(ws::SOCWRStateWorkspace) = "[ADMM-state/$(_socwr_zone_label(ws))]"
+_print_tag(ws::SOCWRPowerWorkspace) = "[ADMM-power/$(_socwr_zone_label(ws))]"
+_print_tag(ws::SOCWRHybridWorkspace) = "[ADMM-hybrid/$(_socwr_zone_label(ws))]"
 _print_tag(::AbstractADMMWorkspace) = "[ADMM]"
 
 @inline function _print_admm_residuals!(ws::AbstractADMMWorkspace)
@@ -61,9 +65,9 @@ _print_tag(::ACStateWorkspaceALADIN) = "[ALADIN-state/AC]"
 _print_tag(::ACPowerWorkspaceALADIN) = "[ALADIN-power/AC]"
 _print_tag(::ACHybridWorkspaceALADIN) = "[ALADIN-hybrid/AC]"
 
-_print_tag(::SOCWRStateWorkspaceALADIN) = "[ALADIN-state/SOCWR]"
-_print_tag(::SOCWRPowerWorkspaceALADIN) = "[ALADIN-power/SOCWR]"
-_print_tag(::SOCWRHybridWorkspaceALADIN) = "[ALADIN-hybrid/SOCWR]"
+_print_tag(ws::SOCWRStateWorkspaceALADIN) = "[ALADIN-state/$(_socwr_zone_label(ws))]"
+_print_tag(ws::SOCWRPowerWorkspaceALADIN) = "[ALADIN-power/$(_socwr_zone_label(ws))]"
+_print_tag(ws::SOCWRHybridWorkspaceALADIN) = "[ALADIN-hybrid/$(_socwr_zone_label(ws))]"
 
 _print_tag(::AbstractALADINWorkspace) = "[ALADIN]"
 

@@ -52,7 +52,7 @@ end
 
 const _QP_HESS_REG = Ref(0.0)
 
-@inline function _add_zone_cost!(
+@inline function _add_diagonal_zone_cost!(
     qp_obj::JuMP.QuadExpr,
     zone::AbstractAladinZoneData,
     dy::Vector{JuMP.VariableRef},
@@ -70,6 +70,43 @@ const _QP_HESS_REG = Ref(0.0)
     end
     return nothing
 end
+
+@inline function _add_full_hessian_zone_cost!(
+    qp_obj::JuMP.QuadExpr,
+    zone::AbstractAladinZoneData,
+    dy::Vector{JuMP.VariableRef},
+)
+    @inbounds for k in 1:zone.n_vars
+        gk = zone.g[k]
+        if gk != 0.0
+            JuMP.add_to_expression!(qp_obj, gk, dy[k])
+        end
+    end
+
+    H = zone.hess
+    row_idx = SparseArrays.rowvals(H)
+    nz_vals = SparseArrays.nonzeros(H)
+    @inbounds for col in 1:size(H, 2)
+        for k in SparseArrays.nzrange(H, col)
+            r = row_idx[k]
+            r > col && continue
+            v = nz_vals[k]
+            v == 0.0 && continue
+            if r == col
+                JuMP.add_to_expression!(qp_obj, 0.5 * v, dy[r], dy[col])
+            else
+                JuMP.add_to_expression!(qp_obj, v, dy[r], dy[col])
+            end
+        end
+    end
+    return nothing
+end
+
+@inline _add_zone_cost!(
+    qp_obj::JuMP.QuadExpr,
+    zone::AbstractAladinZoneData,
+    dy::Vector{JuMP.VariableRef},
+) = _add_diagonal_zone_cost!(qp_obj, zone, dy)
 
 # ============================================================
 # Active set — equality rows + box bounds
@@ -135,6 +172,12 @@ function _check_qp_status!(model::JuMP.Model, tag::AbstractString)
         ts == MOI.LOCALLY_SOLVED ||
         ts == MOI.ALMOST_OPTIMAL ||
         ts == MOI.ALMOST_LOCALLY_SOLVED
+    if ts == MOI.ALMOST_OPTIMAL || ts == MOI.ALMOST_LOCALLY_SOLVED
+        Threads.atomic_add!(_REDUCED_ACCURACY_EVENTS, 1)
+        @warn "$tag accepted with a REDUCED-accuracy status (termination_status=$ts, " *
+              "raw=$(try; JuMP.raw_status(model); catch; "n/a"; end)); Δy/λ_QP of this " *
+              "iteration only meet the solver's reduced tolerances." maxlog = 5
+    end
     if !acceptable
         raw = try
             JuMP.raw_status(model)
@@ -147,5 +190,6 @@ function _check_qp_status!(model::JuMP.Model, tag::AbstractString)
           raw_status         = $raw
         """)
     end
+    _note_almost_qp_solve!(model)   # count only; accept logic unchanged
     return nothing
 end

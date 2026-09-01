@@ -8,6 +8,7 @@ acr() = ACR
 ivr() = IVR
 lpac() = LPAC
 socwr() = SOCWR
+socwrnl() = SOCWRNL
 qc() = QC
 sdpwrm() = SDPWRM
 socbf() = SOCBF
