@@ -27,6 +27,12 @@ Base.@kwdef mutable struct SOCWRStateWorkspaceALADIN <: AbstractALADINWorkspace
     alpha3::Float64 = 1.0
     alpha2_init::Float64 = 1.0
     line_search::Bool = true
+    globalization::Symbol = :armijo_l2
+    lam_bar::Float64 = 0.0        # frozen L1 exact-penalty weight for :alg3 (0 = unset)
+    kap_bar::Float64 = 0.0        # :alg3_original — local-constraint weight κ̄ (0 = unset)
+    alg3_lam_bar::Float64 = 0.0   # :alg3_original — user-fixed λ̄ = κ̄ (0 = auto-majorising)
+    alg3_branch::Symbol = :none   # :alg3_original — last branch taken (:a / :b / :c)
+    alg3_c::Symbol = :none        # :alg3_original — status of the last branch (c) (core/branch_c.jl)
 
     sigma_v2::Float64 = 10.0
     sigma_r::Float64 = 5.0
@@ -59,8 +65,12 @@ Base.@kwdef mutable struct SOCWRPowerWorkspaceALADIN <: AbstractALADINWorkspace
 
     zones::Vector{AladinZoneDataSOCWR}
     interzonal_line_pairs::Vector{InterzonalLinePairSOCWR}
+    dummy_line_pairs::Vector{DummyLinePairSOCWR} = DummyLinePairSOCWR[]
 
-    vars::NamedTuple{(:p_flow, :q_flow), Tuple{LambdaState, LambdaState}}
+    vars::NamedTuple{
+        (:p_flow, :q_flow, :p_dummy, :q_dummy),
+        Tuple{LambdaState, LambdaState, LambdaState, LambdaState},
+    }
 
     qp_optimizer::Any
 
@@ -72,6 +82,12 @@ Base.@kwdef mutable struct SOCWRPowerWorkspaceALADIN <: AbstractALADINWorkspace
     alpha3::Float64 = 1.0
     alpha2_init::Float64 = 1.0
     line_search::Bool = true
+    globalization::Symbol = :armijo_l2
+    lam_bar::Float64 = 0.0        # frozen L1 exact-penalty weight for :alg3 (0 = unset)
+    kap_bar::Float64 = 0.0        # :alg3_original — local-constraint weight κ̄ (0 = unset)
+    alg3_lam_bar::Float64 = 0.0   # :alg3_original — user-fixed λ̄ = κ̄ (0 = auto-majorising)
+    alg3_branch::Symbol = :none   # :alg3_original — last branch taken (:a / :b / :c)
+    alg3_c::Symbol = :none        # :alg3_original — status of the last branch (c) (core/branch_c.jl)
 
     sigma_v2::Float64 = 5.0
     sigma_r::Float64 = 5.0
@@ -114,12 +130,13 @@ Base.@kwdef mutable struct SOCWRHybridWorkspaceALADIN <: AbstractALADINWorkspace
         Vector{Dict{Int, JuMP.VariableRef}}()
     q_inj_vars::Vector{Dict{Int, JuMP.VariableRef}} =
         Vector{Dict{Int, JuMP.VariableRef}}()
+    dummy_line_pairs::Vector{DummyLinePairSOCWR} = DummyLinePairSOCWR[]
 
     vars::NamedTuple{
-        (:v2, :p_flow, :q_flow, :r, :t, :p_inj, :q_inj),
+        (:v2, :p_flow, :q_flow, :r, :t, :p_inj, :q_inj, :p_dummy, :q_dummy),
         Tuple{
             LambdaState, LambdaState, LambdaState, LambdaState, LambdaState,
-            LambdaState, LambdaState,
+            LambdaState, LambdaState, LambdaState, LambdaState,
         },
     }
 
@@ -133,6 +150,12 @@ Base.@kwdef mutable struct SOCWRHybridWorkspaceALADIN <: AbstractALADINWorkspace
     alpha3::Float64 = 1.0
     alpha2_init::Float64 = 1.0
     line_search::Bool = true
+    globalization::Symbol = :armijo_l2
+    lam_bar::Float64 = 0.0        # frozen L1 exact-penalty weight for :alg3 (0 = unset)
+    kap_bar::Float64 = 0.0        # :alg3_original — local-constraint weight κ̄ (0 = unset)
+    alg3_lam_bar::Float64 = 0.0   # :alg3_original — user-fixed λ̄ = κ̄ (0 = auto-majorising)
+    alg3_branch::Symbol = :none   # :alg3_original — last branch taken (:a / :b / :c)
+    alg3_c::Symbol = :none        # :alg3_original — status of the last branch (c) (core/branch_c.jl)
 
     sigma_v2::Float64 = 10.0
     sigma_r::Float64 = 5.0
@@ -173,13 +196,19 @@ _get_rhos(ws::SOCWRHybridWorkspaceALADIN) = (rho = ws.rho[],)
 # State
 # ------------------------------------------------------------
 
-function build_workspace(
+build_workspace(sys::DistributedSystem, cfg::ALADINConfig, optimizer_factory, ::ALADIN{State, SOCWR}) =
+    _build_socwr_state_workspace_aladin(sys, cfg, optimizer_factory, SOCWR)
+build_workspace(sys::DistributedSystem, cfg::ALADINConfig, optimizer_factory, ::ALADIN{State, SOCWRNL}) =
+    _build_socwr_state_workspace_aladin(sys, cfg, optimizer_factory, SOCWRNL)
+
+function _build_socwr_state_workspace_aladin(
     sys::DistributedSystem,
     cfg::ALADINConfig,
     optimizer_factory,
-    ::ALADIN{State, SOCWR},
+    zone_model::Type{<:OPFModel},
 )
     partitions = build_partitions(PartitionSOCWR, sys)
+    _set_zone_model!(partitions, zone_model)
     id = partitions.zones
     inter = sys.interzonal_branches
 
@@ -202,6 +231,8 @@ function build_workspace(
         ),
         qp_optimizer = _resolve_qp_optimizer(cfg.qp_optimizer),
         stopping_criterion = cfg.stopping_criterion,
+        globalization = cfg.globalization,
+        alg3_lam_bar = cfg.alg3_lam_bar,
         rho = Ref(cfg.rho),
         mu = Ref(cfg.mu),
         alpha1 = cfg.alpha1,
@@ -217,19 +248,26 @@ end
 # Power
 # ------------------------------------------------------------
 
-function build_workspace(
+build_workspace(sys::DistributedSystem, cfg::ALADINConfig, optimizer_factory, ::ALADIN{Power, SOCWR}) =
+    _build_socwr_power_workspace_aladin(sys, cfg, optimizer_factory, SOCWR)
+build_workspace(sys::DistributedSystem, cfg::ALADINConfig, optimizer_factory, ::ALADIN{Power, SOCWRNL}) =
+    _build_socwr_power_workspace_aladin(sys, cfg, optimizer_factory, SOCWRNL)
+
+function _build_socwr_power_workspace_aladin(
     sys::DistributedSystem,
     cfg::ALADINConfig,
     optimizer_factory,
-    ::ALADIN{Power, SOCWR},
+    zone_model::Type{<:OPFModel},
 )
     partitions = build_partitions(PartitionSOCWR, sys)
+    _set_zone_model!(partitions, zone_model)
     id = partitions.zones
     inter = sys.interzonal_branches
 
-    zones, interzonal_line_pairs =
+    zones, interzonal_line_pairs, dummy_pairs =
         init_power_partition!(partitions, sys, optimizer_factory, cfg)
     n_edge = length(interzonal_line_pairs)
+    n_dummy = length(dummy_pairs)
 
     ws = SOCWRPowerWorkspaceALADIN(;
         partitions = partitions,
@@ -237,12 +275,17 @@ function build_workspace(
         interzonal = inter,
         zones = zones,
         interzonal_line_pairs = interzonal_line_pairs,
+        dummy_line_pairs = dummy_pairs,
         vars = (
             p_flow = LambdaState(n_edge),
             q_flow = LambdaState(n_edge),
+            p_dummy = LambdaState(n_dummy),
+            q_dummy = LambdaState(n_dummy),
         ),
         qp_optimizer = _resolve_qp_optimizer(cfg.qp_optimizer),
         stopping_criterion = cfg.stopping_criterion,
+        globalization = cfg.globalization,
+        alg3_lam_bar = cfg.alg3_lam_bar,
         rho = Ref(cfg.rho),
         mu = Ref(cfg.mu),
         alpha1 = cfg.alpha1,
@@ -261,13 +304,19 @@ end
 # Hybrid
 # ------------------------------------------------------------
 
-function build_workspace(
+build_workspace(sys::DistributedSystem, cfg::ALADINConfig, optimizer_factory, ::ALADIN{Hybrid, SOCWR}) =
+    _build_socwr_hybrid_workspace_aladin(sys, cfg, optimizer_factory, SOCWR)
+build_workspace(sys::DistributedSystem, cfg::ALADINConfig, optimizer_factory, ::ALADIN{Hybrid, SOCWRNL}) =
+    _build_socwr_hybrid_workspace_aladin(sys, cfg, optimizer_factory, SOCWRNL)
+
+function _build_socwr_hybrid_workspace_aladin(
     sys::DistributedSystem,
     cfg::ALADINConfig,
     optimizer_factory,
-    ::ALADIN{Hybrid, SOCWR},
+    zone_model::Type{<:OPFModel},
 )
     partitions = build_partitions(PartitionSOCWR, sys)
+    _set_zone_model!(partitions, zone_model)
     id = partitions.zones
     inter = sys.interzonal_branches
     sectioning = cfg.sectioning
@@ -276,11 +325,19 @@ function build_workspace(
         zones, bus_pairs, interzonal_line_pairs =
             init_hybrid_partition!(partitions, sys, optimizer_factory, cfg, sectioning)
         split_pairs = SplitBusPairSOCWR[]
+        dummy_pairs = DummyLinePairSOCWR[]
+        p_inj_vars = Vector{Dict{Int, JuMP.VariableRef}}()
+        q_inj_vars = Vector{Dict{Int, JuMP.VariableRef}}()
+    elseif sectioning isa DummyBus
+        zones, bus_pairs, interzonal_line_pairs, dummy_pairs =
+            init_hybrid_partition!(partitions, sys, optimizer_factory, cfg, sectioning)
+        split_pairs = SplitBusPairSOCWR[]
         p_inj_vars = Vector{Dict{Int, JuMP.VariableRef}}()
         q_inj_vars = Vector{Dict{Int, JuMP.VariableRef}}()
     elseif sectioning isa SplitBus
         zones, bus_pairs, interzonal_line_pairs, split_pairs, p_inj_vars, q_inj_vars =
             init_hybrid_partition!(partitions, sys, optimizer_factory, cfg, sectioning)
+        dummy_pairs = DummyLinePairSOCWR[]
     else
         error("ALADIN{Hybrid, SOCWR}: unsupported sectioning $(sectioning)")
     end
@@ -288,6 +345,7 @@ function build_workspace(
     n_bus = length(bus_pairs)
     n_edge = length(interzonal_line_pairs)
     n_split = length(split_pairs)
+    n_dummy = length(dummy_pairs)
 
     ws = SOCWRHybridWorkspaceALADIN(;
         partitions = partitions,
@@ -299,6 +357,7 @@ function build_workspace(
         split_bus_pairs = split_pairs,
         p_inj_vars = p_inj_vars,
         q_inj_vars = q_inj_vars,
+        dummy_line_pairs = dummy_pairs,
         vars = (
             v2 = LambdaState(n_bus),
             p_flow = LambdaState(n_edge),
@@ -307,9 +366,13 @@ function build_workspace(
             t = LambdaState(n_edge),
             p_inj = LambdaState(n_split),
             q_inj = LambdaState(n_split),
+            p_dummy = LambdaState(n_dummy),
+            q_dummy = LambdaState(n_dummy),
         ),
         qp_optimizer = _resolve_qp_optimizer(cfg.qp_optimizer),
         stopping_criterion = cfg.stopping_criterion,
+        globalization = cfg.globalization,
+        alg3_lam_bar = cfg.alg3_lam_bar,
         rho = Ref(cfg.rho),
         mu = Ref(cfg.mu),
         alpha1 = cfg.alpha1,

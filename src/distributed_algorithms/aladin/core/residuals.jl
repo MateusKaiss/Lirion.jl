@@ -277,11 +277,6 @@ end
 # AC dummy-line flow helpers
 # ------------------------------------------------------------
 
-# side :i is half-A, whose TO bus IS the dummy bus D -> its share of the flow across D is
-# the TO-side flow (-p_reverse). side :j is half-B, whose FROM bus is D -> from-side.
-# Measuring both from-side equates the flow at f_orig with the flow at D; they differ by
-# exactly half-A's series loss (phantom power). DC is immune (p_rev == -p_fr there).
-# Mirrors _ac_flow_at_to / _pq_flow_to_exprs.
 @inline function _dummy_ac_pf_at(pair::DummyLinePairAC, y::Vector{Float64}, side::Symbol)
     if side === :i
         theta_f = y[pair.from_theta_col_i]
@@ -469,6 +464,26 @@ end
     return sq, mx
 end
 
+@inline function _r_pri_dummy_pq_socwr(ws)
+    sq = 0.0
+    mx = 0.0
+    @inbounds for pair in ws.dummy_line_pairs
+        yi = ws.zones[pair.zone_i].y
+        yj = ws.zones[pair.zone_j].y
+        dpf = abs(
+            _socwr_dummy_flow_value_at_y(pair, yi, :i, :p) -
+            _socwr_dummy_flow_value_at_y(pair, yj, :j, :p),
+        )
+        dqf = abs(
+            _socwr_dummy_flow_value_at_y(pair, yi, :i, :q) -
+            _socwr_dummy_flow_value_at_y(pair, yj, :j, :q),
+        )
+        sq += dpf * dpf + dqf * dqf
+        mx = max(mx, dpf, dqf)
+    end
+    return sq, mx
+end
+
 @inline function _r_pri_split_socwr(ws)
     sq = 0.0
     mx = 0.0
@@ -513,8 +528,9 @@ end
 # ------------------------------------------------------------
 
 function compute_residuals!(ws::SOCWRPowerWorkspaceALADIN)
-    sq, mx = _r_pri_pq_socwr(ws)
-    ws.r_primal = _final_norm(ws.stopping_criterion, sq, mx)
+    sq_e, mx_e = _r_pri_pq_socwr(ws)
+    sq_d, mx_d = _r_pri_dummy_pq_socwr(ws)
+    ws.r_primal = _final_norm(ws.stopping_criterion, sq_e + sq_d, max(mx_e, mx_d))
     _compute_r_step_primal!(ws)
     _compute_lambda_step!(ws)
     _compute_r_dual!(ws)
@@ -530,10 +546,11 @@ function compute_residuals!(ws::SOCWRHybridWorkspaceALADIN)
     sq_rt, mx_rt = _r_pri_rt_socwr(ws)
     sq_pq, mx_pq = _r_pri_pq_socwr(ws)
     sq_s, mx_s = _r_pri_split_socwr(ws)
+    sq_d, mx_d = _r_pri_dummy_pq_socwr(ws)
     ws.r_primal = _final_norm(
         ws.stopping_criterion,
-        sq_b + sq_rt + sq_pq + sq_s,
-        max(mx_b, mx_rt, mx_pq, mx_s),
+        sq_b + sq_rt + sq_pq + sq_s + sq_d,
+        max(mx_b, mx_rt, mx_pq, mx_s, mx_d),
     )
     _compute_r_step_primal!(ws)
     _compute_lambda_step!(ws)
