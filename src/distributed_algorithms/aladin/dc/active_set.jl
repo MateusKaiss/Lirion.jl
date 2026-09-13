@@ -2,10 +2,14 @@
 # ALADIN-DC — Active-constraint Jacobian
 # ============================================================
 
+# DC row-activity / LICQ thresholds; recorded in aladin_runtime_manifest().
+const _DC_ACTIVE_DUAL_TOL = 1e-6
+const _DC_ACTIVE_DEP_TOL = 1e-10
+
 function build_active_jacobian(
     zone::AladinZoneData;
-    dual_tol::Float64 = 1e-6,
-    dep_tol::Float64 = 1e-10,
+    dual_tol::Float64 = _DC_ACTIVE_DUAL_TOL,
+    dep_tol::Float64 = _DC_ACTIVE_DEP_TOL,
 )::SparseArrays.SparseMatrixCSC{Float64, Int}
     ineq_rows = Int[]
     ineq_cols = Int[]
