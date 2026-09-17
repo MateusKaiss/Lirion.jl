@@ -153,6 +153,8 @@ function build_aladin_zone_data(
     obj = part.objective_params
     model = part.local_model::JuMP.Model
 
+    @assert !(haskey(model, :curtailment) && any(!=(0.0), obj.curtailment_cost)) "ALADIN-DC: costed load curtailment is not supported (its cost is omitted from the coordinator gradient and Armijo merit). Model has :curtailment with a nonzero curtailment_cost."
+
     all_vars, n_vars, var_to_col = _build_var_layout(model)
 
     pg_cols, pg_c2_sbase2, pg_c1_sbase = _collect_pg_layout(model, var_to_col, obj)
