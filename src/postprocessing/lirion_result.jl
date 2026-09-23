@@ -1,16 +1,6 @@
 # ============================================================
 # LirionResult — user-facing result container
 # ============================================================
-#
-# Replaces the legacy Dict-based centralized result and the NamedTuple-based
-# distributed result. Everything lives in DataFrames mirroring the input
-# matpower tables (bus, gen, branch) with the optimal values appended as
-# new columns. For distributed runs the per-zone tables and consensus
-# diagnostics are also exposed.
-#
-# Advanced users can still reach the JuMP model / SystemData / Partitions via
-# `result.model`, `result.system`, `result.partitions`.
-# ============================================================
 
 using DataFrames
 
@@ -26,7 +16,8 @@ Fields (user-facing):
 - `sectioning`      : `:none` / `:tie_line` / `:dummy_bus` / `:split_bus`
 - `objective`       : total generation cost
 - `status`          : termination status (`:optimal`, `:local_optimal`,
-                       `:iteration_limit`, etc.)
+                       `:converged`, `:iteration_limit`, `:stalled` — ALADIN
+                       hit max_iter with a frozen iterate — etc.)
 - `solve_time`      : wall-clock elapsed time in seconds
 - `iter_done`       : iteration count (`nothing` for centralized)
 
@@ -290,10 +281,6 @@ end
 function _build_consensus_df(ws::Any, partitions, sys)::DataFrame
     rows = NamedTuple[]
 
-    # ALADIN workspaces carry explicit `SharedBusPair` / `InterzonalLinePair`
-    # structs AND a `zones` field with cached `y` buffers. ADMM uses
-    # `NTuple`-based `bus_pairs` / `branch_pairs` for DummyBus/SplitBus
-    # bookkeeping and exposes per-zone state via `partitions.parts[k].local_model`.
     is_aladin =
         hasproperty(ws, :zones) &&
         hasproperty(ws, :bus_pairs) && !isempty(ws.bus_pairs) &&
@@ -766,7 +753,10 @@ function build_lirion_result_distributed(
         config isa ALADINConfig ? :aladin :
         :distributed
     max_iter = hasproperty(config, :max_iter) ? config.max_iter : 0
-    status_sym = iter_done >= max_iter ? :iteration_limit : :converged
+    # recorded terminal status wins; iter_done heuristic is the fallback
+    ts = hasproperty(diag, :meta) ? get(diag.meta, :terminal_status, nothing) : nothing
+    status_sym = ts isa Symbol ? ts :
+        (iter_done >= max_iter ? :iteration_limit : :converged)
 
     return LirionResult(
         algo_sym,

@@ -27,6 +27,56 @@ const _PSD_DELTA_LAST = Base.RefValue{Float64}(0.0)
 const _PSD_DELTA_LOCK = ReentrantLock()
 const _SD_PER_ITER = Ref(false)
 
+const _ALMOST_LOCK = ReentrantLock()
+const _ALMOST_ZONE_SOLVES = Ref(0)
+const _ALMOST_QP_SOLVES = Ref(0)
+
+@inline _is_almost_status(ts) =
+    ts == MOI.ALMOST_OPTIMAL || ts == MOI.ALMOST_LOCALLY_SOLVED
+
+function _note_almost_zone_solve!(model::JuMP.Model)
+    _is_almost_status(JuMP.termination_status(model)) || return nothing
+    lock(_ALMOST_LOCK) do
+        _ALMOST_ZONE_SOLVES[] += 1
+    end
+    return nothing
+end
+
+function _note_almost_qp_solve!(model::JuMP.Model)
+    _is_almost_status(JuMP.termination_status(model)) || return nothing
+    lock(_ALMOST_LOCK) do
+        _ALMOST_QP_SOLVES[] += 1
+    end
+    return nothing
+end
+
+function _reset_solve_counters!()
+    lock(_ALMOST_LOCK) do
+        _ALMOST_ZONE_SOLVES[] = 0
+        _ALMOST_QP_SOLVES[] = 0
+    end
+    return nothing
+end
+
+function _take_solve_counters!()
+    return lock(_ALMOST_LOCK) do
+        z = _ALMOST_ZONE_SOLVES[]
+        q = _ALMOST_QP_SOLVES[]
+        _ALMOST_ZONE_SOLVES[] = 0
+        _ALMOST_QP_SOLVES[] = 0
+        (z, q)
+    end
+end
+
+function _flush_solve_counters!(ws::AbstractALADINWorkspace)
+    z, q = _take_solve_counters!()
+    zv = get!(ws.hist.meta, :almost_zone_solves, Int[])::Vector{Int}
+    qv = get!(ws.hist.meta, :almost_qp_solves, Int[])::Vector{Int}
+    isempty(zv) ? push!(zv, z) : (zv[end] += z)
+    isempty(qv) ? push!(qv, q) : (qv[end] += q)
+    return nothing
+end
+
 function _sd_now(ws)::Float64
     lam1 = 0.0; nlam = 0
     for st in values(ws.vars)
@@ -88,14 +138,18 @@ end
     for (k, v) in pairs(_get_rhos(ws))
         _push_rho_aladin!(ws.hist, k, v)
     end
-    # N5: δ-PSD applied this iteration (max over zones; take-and-reset)
+    # δ-PSD applied this iteration (max over zones; take-and-reset)
     delta = lock(_PSD_DELTA_LOCK) do
         d = _PSD_DELTA_LAST[]
         _PSD_DELTA_LAST[] = 0.0
         d
     end
     push!(get!(ws.hist.meta, :psd_delta, Float64[])::Vector{Float64}, delta)
-    # C7: s_d per-iteration (opt-in; serial context — safe for JuMP.dual)
+    # ALMOST_*-accepted zone / coordinator-QP solves this iteration (take-and-reset)
+    z_almost, q_almost = _take_solve_counters!()
+    push!(get!(ws.hist.meta, :almost_zone_solves, Int[])::Vector{Int}, z_almost)
+    push!(get!(ws.hist.meta, :almost_qp_solves, Int[])::Vector{Int}, q_almost)
+    # s_d per-iteration (opt-in; serial context — safe for JuMP.dual)
     if _SD_PER_ITER[]
         push!(get!(ws.hist.meta, :sd, Float64[])::Vector{Float64}, _sd_now(ws))
     end
