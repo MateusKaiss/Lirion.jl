@@ -14,12 +14,6 @@ function add_active_generation_variables!(model::JuMP.Model, gen::GenData)
     pmax = gen.pmax
     pmax_ts = gen.pmax_ts
 
-    # We keep the static nameplate (pmax[g]) as the variable's hard upper
-    # bound because JuMP bounds can only be scalars. The per-period
-    # availability ceiling pmax_ts[g, t] is enforced by the curtailment
-    # constraint (for curtailable gens) or by an extra inequality
-    # constraint (for non-curtailable gens, only when it is strictly
-    # tighter than pmax).
     @variable(
         model,
         p_generation[g = 1:G, t = 1:T; gen.existing[g]],
@@ -27,9 +21,7 @@ function add_active_generation_variables!(model::JuMP.Model, gen::GenData)
         upper_bound = pmax[g],
     )
 
-    # Warm start clipped to the per-period availability — otherwise a pg
-    # from the matpower `pg` field (> pmax_ts[g, t]) puts Ipopt far outside
-    # the feasible region and can trigger LOCALLY_INFEASIBLE.
+    # warm start clipped to the per-period availability
     @inbounds for g in 1:G
         gen.existing[g] || continue
         base = isnan(pg_start[g]) ? pg_fallback[g] : pg_start[g]
@@ -42,10 +34,7 @@ function add_active_generation_variables!(model::JuMP.Model, gen::GenData)
 
     model[:p_generation] = p_generation
 
-    # Time-varying bounds on active power. pmax is the upper cap; pmin is
-    # the lower cap (useful for must-run windows). We only add the
-    # inequality when the time series value is STRICTLY tighter than the
-    # scalar variable bound, to avoid inflating the constraint count.
+    # time-varying bounds on active power (only when strictly tighter)
     pmin_ts = gen.pmin_ts
     for g in 1:G
         gen.existing[g] || continue

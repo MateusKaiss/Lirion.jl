@@ -173,10 +173,6 @@ end
 # Branch pairs
 # ------------------------------------------------------------
 
-# `extract_fn` is the FROM-side extractor, correct for half-B (whose from bus IS the
-# dummy bus). Half-A's dummy end is its TO bus and needs `extract_fn_a`; averaging a
-# from-side value with a to-side one would make the consensus target a quantity that is
-# neither. Defaults to extract_fn for DC, where p_rev == -p_fr makes them identical.
 function _consensus_branch_pairs!(
     consensus::AbstractVector{Float64},
     counts::AbstractVector{Int},

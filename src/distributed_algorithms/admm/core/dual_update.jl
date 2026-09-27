@@ -126,11 +126,6 @@ end
 # Branch pairs
 # ------------------------------------------------------------
 
-# `extract_fn` is the FROM-side extractor, correct for half-B (whose from bus IS the
-# dummy bus). Half-A's dummy end is its TO bus, so it needs `extract_fn_a` — the dual has
-# to be driven by the SAME residual the objective/consensus minimise, otherwise the
-# multipliers chase a quantity nobody optimises and the run diverges. Defaults to
-# extract_fn for the DC path, where p_rev == -p_fr makes the two identical.
 function _update_branch_pairs_duals_single!(
     duals::AbstractMatrix{Float64},
     partitions::Partitions,
@@ -175,10 +170,7 @@ function _update_branch_pairs_duals_ac!(
         la = pa.branch_idx_full_to_zone[ga]
         lb = pb.branch_idx_full_to_zone[gb]
         if la != 0
-            # half-A: dummy bus is its TO end. The dual must be driven by the SAME
-            # residual the objective/consensus use, i.e. the TO-side flow — mixing sides
-            # here makes the multipliers chase a quantity nobody minimises and the run
-            # diverges. See _pq_flow_to_exprs.
+            # half-A: dummy bus is its TO end -> to-side accessor.
             p_expr, q_expr = _pq_flow_to_exprs(pa, la)
             p_val = JuMP.value(p_expr)
             q_val = JuMP.value(q_expr)

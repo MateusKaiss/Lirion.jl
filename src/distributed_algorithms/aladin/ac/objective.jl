@@ -347,8 +347,6 @@ end
     zone::AladinZoneDataAC, pair::DummyLinePairAC, side::Symbol,
 )
     if side === :i
-        # half-A: the dummy bus is its TO end, so its share of the flow across D is the
-        # TO-side flow (see _ac_flow_at_to). Side :j (half-B) has D as its FROM end.
         θ_f = zone.x_prev[pair.from_theta_col_i]
         θ_t = zone.x_prev[pair.to_theta_col_i]
         vm_f = zone.x_prev[pair.from_vm_col_i]
@@ -448,19 +446,7 @@ function update_objective!(part::PartitionAC, ws::ACStateWorkspaceALADIN)
     zone_pos = part.position
     zone_data = ws.zones[zone_pos]
 
-    # Validated option, default off — enable via ENV LIRION_GAUGEFIX
-    # (per-zone angle-gauge anchoring, kept for reproducibility). A zone
-    # without the global reference bus has a free uniform-θ (gauge) mode pinned
-    # only by the consensus; the tie/state estac floor decomposes as 68% this
-    # mode + 32% ρσ-amplified physical residual (~1.8e-6, above solver tol).
-    # Fix ONE shared θ to the PEER zone's consensus iterate (distributed info
-    # only) — eliminates the gauge freedom; bounds updated so the QP's
-    # active-bound detection freezes the column consistently. Combo under test:
-    # gauge-fix + smaller ρ (shrinks the amplification of the residual part).
     if haskey(ENV, "LIRION_GAUGEFIX") && !has_reference_bus(part.bus)
-        # anchor choice: env value "N" = N-th bus pair touching this zone
-        # (clamped; "1"/non-numeric = first). Used to test whether the converged
-        # point depends on the anchor (bias) or is anchor-independent.
         pairs_here = [p for p in ws.bus_pairs
                       if p.zone_i == zone_pos || p.zone_j == zone_pos]
         if !isempty(pairs_here)
@@ -508,10 +494,6 @@ function update_objective!(part::PartitionAC, ws::ACPowerWorkspaceALADIN)
 
     pflow_mode = ws.proximal_mode === :pflow
 
-    # In :pflow, θ and vm fall through to σ_other (mild regularization)
-    # instead of getting their own σ_theta / σ_vm penalty. Their consensus
-    # pressure comes from the flow term added below. Matches the design of
-    # `_build_quad_static_ac_pflow!` (θ/vm class = 0 → σ_other).
     sigma_theta_eff = pflow_mode ? ws.sigma_other : ws.sigma_theta
     sigma_vm_eff = pflow_mode ? ws.sigma_other : ws.sigma_vm
 
@@ -582,17 +564,8 @@ function update_objective!(part::PartitionAC, ws::ACHybridWorkspaceALADIN)
 end
 
 # ============================================================
-# Stationarity-residual contribution of the AC :pflow flow proximal (A-6 fix)
+# Stationarity-residual contribution of the AC :pflow flow proximal
 # ============================================================
-# The AC flow proximal ½ρσ_pflow(p(y)−p_prev)² + ½ρσ_qflow(q(y)−q_prev)² is a
-# NonlinearExpr added straight to the local objective (see _ac_flow_prox! above),
-# so it is NOT in zone.quad_static and the generic r_step_primal misses its
-# gradient. This hook adds ρσ(p(y)−p_prev)·∇p(y) (+ q analogue) per flow term,
-# MIRRORING the objective exactly: interzonal edges use the from-side expression
-# and from-side prev; dummy pairs use the TO-side quantity on side :i and the
-# from-side on side :j — the same convention as the objective after the A-6b fix
-# (2026-07-30), under which every proximal term vanishes at y = x. If the
-# objective's flow-proximal terms change, keep this hook in sync.
 function _add_extra_prox_grad!(
     grad::Vector{Float64},
     ws::Union{ACPowerWorkspaceALADIN, ACHybridWorkspaceALADIN},
@@ -619,11 +592,7 @@ function _add_extra_prox_grad!(
         grad[zone.edge_to_theta_col[le]] +=
             cp * lin.dpf_dtheta_t + cq * lin.dqf_dtheta_t
     end
-
-    # Dummy pairs mirror the (A-6b-fixed) objective: side :i penalises the
-    # TO-side flow through the dummy bus (expression −p_reverse, centre
-    # _ac_flow_at_to), side :j the from-side flow — so the gradients here use the
-    # matching linearisations, exactly as the coordinator QP does.
+    # dummy-bus pairs add the same flow-proximal gradient terms.
     @inbounds for pair in ws.dummy_line_pairs
         if pair.zone_i == zone_pos
             lin = _dummy_ac_flow_linearisation_to(
@@ -660,10 +629,6 @@ function _add_extra_prox_grad!(
     return nothing
 end
 
-# Structural mirror of _add_extra_prox_grad! — the columns the AC :pflow
-# flow-proximal gradient can touch (4 per interzonal line, 4 per dummy side).
-# Used by _structural_nprox to derive ε_estac = n_prox·ε_abs; MUST stay in sync
-# with the gradient loops above.
 function _extra_prox_support!(
     sup::Set{Int},
     ws::Union{ACPowerWorkspaceALADIN, ACHybridWorkspaceALADIN},

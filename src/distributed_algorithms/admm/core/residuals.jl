@@ -193,9 +193,6 @@ end
 # Branch pairs
 # ------------------------------------------------------------
 
-# `extract_fn` is the FROM-side extractor (correct for half-B); half-A's dummy end is its
-# TO bus and needs `extract_fn_a`, so the residual measures the same quantity the
-# consensus/objective/duals use. Defaults to extract_fn for DC (p_rev == -p_fr there).
 function _primal_residual_branch_pairs(
     partitions::Partitions,
     consensus::AbstractVector{Float64},
@@ -235,8 +232,7 @@ function _primal_residual_branch_pairs_ac(
         la = pa.branch_idx_full_to_zone[ga]
         lb = pb.branch_idx_full_to_zone[gb]
         if la != 0
-            # half-A: dummy bus is its TO end -> residual must measure the SAME quantity
-            # the consensus/objective use, i.e. the TO-side flow (see _pq_flow_to_exprs).
+            # half-A: dummy bus is its TO end -> to-side accessor.
             p_expr, q_expr = _pq_flow_to_exprs(pa, la)
             p_val = JuMP.value(p_expr)
             q_val = JuMP.value(q_expr)
