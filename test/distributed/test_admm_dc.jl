@@ -50,12 +50,8 @@ const DC_SPLITBUS_3ZONE_CASES = [
 # ------------------------
 # DC - DUMMY-BUS POWER (only P consensus, θ_d ambiguous — OK because d is artificial)
 # ------------------------
-# Note: case3_lmbd__api intentionally excluded. Without θ consensus at the
-# dummy bus, early ADMM iterations can drift to a P target that violates the
-# tight generation / line bounds of the __api variant, producing local
-# infeasibility (OTHER_ERROR from the solver). Hybrid coupling avoids this by
-# disciplining θ; power-only alone cannot recover. This is an inherent
-# limitation of power-only DummyBus on tightly-bounded problems, not a bug.
+# case3_lmbd__api excluded: without θ consensus at the dummy bus, power-only
+# ADMM can drift into local infeasibility under the __api variant's tight bounds.
 const DC_DUMMYBUS_POWER_CASES = [
     "pglib_opf_case3_lmbd.m",
     "pglib_opf_case14_ieee.m",
@@ -411,11 +407,8 @@ end
 # ============================================================
 # DC - DUMMY-BUS POWER (Method 2 with power-only coupling)
 # ------------------------------------------------------------
-# Theory: with DummyBus sectioning, the dummy bus `d` is artificial; its θ
-# is gauge-invariant. Enforcing P_{m,d} = P_{d,n} (power consensus on the two
-# halves of each split tie-line) is sufficient to pin the physical flow
-# through d, which in DC is all that the gen dispatch depends on.
-# Expected: distributed cost ≈ centralized cost (like hybrid).
+# Dummy bus d is artificial (θ_d free); P consensus on the two halves of each
+# split tie-line pins the flow through d.
 # ============================================================
 function run_admm_dc_dummybus_power_tests(;
     rtol = 0.05,

@@ -71,6 +71,7 @@ function _pm_obj(file::AbstractString, tag::Symbol, optimizer, has_storage::Bool
             tag === :ACR ? ACRPowerModel :
             tag === :LPAC ? LPACCPowerModel :
             tag === :SOCWR ? SOCWRPowerModel :
+            tag === :SOCWRNL ? SOCWRPowerModel :
             tag === :SOCBF ? SOCBFPowerModel :
             error("no storage PM model for $tag")
         return Float64(PowerModels._solve_opf_strg(pm, pm_model, optimizer)["objective"])
@@ -82,6 +83,7 @@ function _pm_obj(file::AbstractString, tag::Symbol, optimizer, has_storage::Bool
         tag === :ACR ? ACRPowerModel :
         tag === :LPAC ? LPACCPowerModel :
         tag === :SOCWR ? SOCWRConicPowerModel :
+        tag === :SOCWRNL ? SOCWRPowerModel :
         tag === :QC ? QCRMPowerModel :
         tag === :SDPWRM ? SDPWRMPowerModel :
         tag === :SOCBF ? SOCBFConicPowerModel :
@@ -114,6 +116,7 @@ function _models_for(case::AbstractString)
         (:IVR, Lirion.ivr, IPOPT_QUIET),
         (:LPAC, Lirion.lpac, IPOPT_QUIET),
         (:SOCWR, Lirion.socwr, CLARABEL_QUIET),
+        (:SOCWRNL, Lirion.socwrnl, IPOPT_QUIET),
         (:QC, Lirion.qc, IPOPT_QUIET),
         (:SOCBF, Lirion.socbf, CLARABEL_QUIET),
         (:BFA, Lirion.bfa, CLARABEL_QUIET),

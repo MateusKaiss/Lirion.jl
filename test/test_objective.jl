@@ -146,6 +146,8 @@ end
         return Lirion.lpac()
     elseif model_type == Lirion.SOCWR
         return Lirion.socwr()
+    elseif model_type == Lirion.SOCWRNL
+        return Lirion.socwrnl()
     elseif model_type == Lirion.QC
         return Lirion.qc()
     elseif model_type == Lirion.SDPWRM
@@ -202,6 +204,12 @@ end
             return Float64(
                 PowerModels._solve_opf_strg(pm_data, SOCWRPowerModel, optimizer)["objective"],
             )
+        elseif model_type == Lirion.SOCWRNL
+            # Smooth-NLP SOCWR ↔ PowerModels SOCWRPowerModel (quadratic form),
+            # NOT the conic SOCWRConicPowerModel.
+            return Float64(
+                PowerModels._solve_opf_strg(pm_data, SOCWRPowerModel, optimizer)["objective"],
+            )
         elseif model_type == Lirion.SOCBF
             return Float64(
                 PowerModels._solve_opf_strg(pm_data, SOCBFPowerModel, optimizer)["objective"],
@@ -227,6 +235,12 @@ end
         elseif model_type == Lirion.SOCWR
             return Float64(
                 PowerModels.solve_opf(pm_data, SOCWRConicPowerModel, optimizer)["objective"],
+            )
+        elseif model_type == Lirion.SOCWRNL
+            # Smooth-NLP SOCWR ↔ PowerModels SOCWRPowerModel (quadratic form),
+            # NOT the conic SOCWRConicPowerModel.
+            return Float64(
+                PowerModels.solve_opf(pm_data, SOCWRPowerModel, optimizer)["objective"],
             )
         elseif model_type == Lirion.QC
             return Float64(
@@ -378,10 +392,23 @@ function run_test_objective()
         )
 
         socwr_optimizer = Clarabel.Optimizer
+        # SOCWR is now mathematically canonical (per-bus-pair voltage products,
+        # identical to PowerModels SOCWRConicPowerModel), so parity is exact up
+        # to solver tolerance — hold it to 1e-4 rather than the 5% default.
         run_model_tests(
             Lirion.SOCWR,
             "SOCWR";
             optimizer = socwr_optimizer,
+            case_list = reduced_list,
+            tol = 1e-4,
+        )
+
+        # SOCWRNL: same W-space relaxation, smooth-NLP form — solved by Ipopt and
+        # validated against PowerModels SOCWRPowerModel (the quadratic model).
+        run_model_tests(
+            Lirion.SOCWRNL,
+            "SOCWRNL";
+            optimizer = Ipopt.Optimizer,
             case_list = reduced_list,
         )
 

@@ -113,18 +113,6 @@ end
 
 # Helpers ---------------------------------------------------------------
 
-"""
-    _period_obj(file, model, optimizer, t_sub)
-
-Solve the case at `file` (which must have a bus_timeseries) keeping only
-the data for period `t_sub`, replicated as a single-period problem. The
-case is loaded, the timeseries is trimmed in-memory to just `t_sub`, and
-the reduced case is re-solved. Returns the objective.
-
-Caveat: this relies on `Lirion.load` returning a mutable CaseRaw; when
-that is not available we fall back to solving the full multi-period run
-and extracting the per-period contribution via the cost expression.
-"""
 function _solve_flat_timeseries_singleperiod(
     multi_file::AbstractString, base_file::AbstractString; model, optimizer,
 )

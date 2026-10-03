@@ -14,6 +14,7 @@ qc = 63344.57677507865
 sdpwrm = 63352.2366123251
 socbf = 63344.57821868385
 socwr = 63344.57823049064
+socwrnl = 63344.571424835725
 
 [pm_reference]
 ac = 63352.201086064175
@@ -38,3 +39,4 @@ qc = "local_optimal"
 sdpwrm = "almost_optimal"
 socbf = "optimal"
 socwr = "optimal"
+socwrnl = "local_optimal"

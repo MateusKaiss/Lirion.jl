@@ -211,12 +211,9 @@ end
 # ============================================================
 # ALADIN AC - HYBRID + proximal_mode=:pflow
 # ------------------------------------------------------------
-# Same consensus as the default Hybrid (shared θ/|V| + tie-line p/q_flow); the
-# prox additionally regularises the flow expressions on the tie-lines, and the
-# coordinator-QP Hessian carries the matching Gauss-Newton flow curvature
-# (ρ·σ_pflow·∇p∇pᵀ + ρ·σ_qflow·∇q∇qᵀ) + a PSD safeguard so the nonconvex AC QP
-# never goes indefinite. Uses FIXED ρ/μ (adaptive off) like the SOCWR pflow
-# path — the adaptive μ growth saturates μ_upper and stalls the dual residual.
+# Hybrid consensus + flow proximal on the tie-lines; the coordinator-QP
+# Hessian carries the matching Gauss-Newton flow curvature + PSD safeguard.
+# Fixed ρ/μ (adaptive μ growth saturates μ_upper and stalls the dual residual).
 # ============================================================
 function run_aladin_ac_hybrid_pflow_tests(;
     rtol = 0.01,
@@ -277,13 +274,8 @@ end
 # ============================================================
 # ALADIN AC - DUMMYBUS HYBRID + proximal_mode=:pflow
 # ------------------------------------------------------------
-# Coverage for the DUMMY-EDGE branch of _add_flow_gn_curvature_ac
-# (ac/sensitivities.jl): the tie-line pflow test only exercises interzonal
-# edges, so this drives the flow Gauss-Newton curvature through DummyLinePairAC.
-# Fixed ρ/μ (adaptive off) like the other pflow paths. rtol=0.05 matches the
-# primal AC DummyBus suites — AC DummyBus on the 3-bus case is nonconvex-hard and
-# lands ~1% off the centralized local optimum (the primal path shows the same);
-# case3 uses a milder σ_pflow so the dual residual settles within max_iter.
+# Drives the flow Gauss-Newton curvature through the dummy-edge branch
+# (DummyLinePairAC). Fixed ρ/μ; rtol=0.05 as in the primal AC DummyBus suites.
 # ============================================================
 function run_aladin_ac_dummybus_pflow_hybrid_tests(;
     rtol = 0.05,

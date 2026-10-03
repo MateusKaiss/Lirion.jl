@@ -24,6 +24,7 @@ const _MODEL_CTOR = Dict{String, Any}(
     "ivr" => Lirion.ivr,
     "lpac" => Lirion.lpac,
     "socwr" => Lirion.socwr,
+    "socwrnl" => Lirion.socwrnl,
     "qc" => Lirion.qc,
     "sdpwrm" => Lirion.sdpwrm,
     "socbf" => Lirion.socbf,

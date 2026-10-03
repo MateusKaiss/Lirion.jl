@@ -424,10 +424,8 @@ end
 # ============================================================
 # SOCWR - DUMMY-BUS POWER (Method 2 with power-only coupling)
 # ------------------------------------------------------------
-# Theory: with DummyBus sectioning, the dummy bus `d` is artificial; its V²
-# and θ are gauge-invariant for cost purposes. Enforcing P_{m,d} = P_{d,n}
-# and Q_{m,d} = Q_{d,n} through the branch_pairs is sufficient to pin the
-# physical transfer; the artificial generators at d close the local KCLs.
+# Dummy bus d is artificial (V²_d, θ_d free); P/Q consensus through the
+# branch_pairs pins the transfer.
 # ============================================================
 function run_admm_socwr_dummybus_power_tests(;
     rtol = 0.05,
