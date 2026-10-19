@@ -10,33 +10,25 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        julia-version: ['1.10', '1.11']
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Julia
-        uses: julia-actions/setup-julia@v1
+        uses: julia-actions/setup-julia@v2
         with:
-          version: '1.9'
+          version: ${{ matrix.julia-version }}
 
-      - name: Cache Julia deps
-        uses: actions/cache@v3
-        with:
-          path: ~/.julia/artifacts
-          key: ${{ runner.os }}-julia-artifacts-${{ hashFiles('**/Project.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-julia-artifacts-
+      - uses: julia-actions/cache@v2
+
       - name: Install dependencies
-        run: |
-          julia --project=. -e '
-            using Pkg;
-            Pkg.activate(".");
-            Pkg.instantiate()
-          '
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
+
       - name: Run tests
-        run: |
-          julia --project=. -e '
-            using Pkg;
-            Pkg.test()
-          '
+        run: julia --project=. -e 'using Pkg; Pkg.test()'
