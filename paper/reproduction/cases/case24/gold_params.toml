@@ -1,0 +1,553 @@
+# ====================================================================
+# Parameters for case24_ieee_rts (k = 3 zones), paper Table I
+# ====================================================================
+# One [[cell]] per (formulation, sectioning, coupling): 18 blocks, each with
+# a [cell.admm] and a [cell.aladin] sub-block = 36 method-rows.
+# run.jl reads every block whose status is "pass" and solves it with these
+# exact parameters; status = "non_convergent" blocks are the cells the
+# paper prints as x: they are written out as placeholders and not solved.
+#
+# Keys the driver consumes:
+#   ADMM   : rho, adaptive, max_iter  (+ lifted_flow on three case500 SOCWRNL cells)
+#   ALADIN : rho, mu, rho_growth, mu_growth, qp_reg, adaptive, alpha3, mode,
+#            globalization, max_iter, and the canonicity toggles
+#            (AC/DC: no_prox, modgrad, bound_detect; SOCWRNL: prox_mode,
+#            bound_detect, lam_bar).
+#   max_iter is the certified stopping iteration plus a 2000-iteration margin
+#   (case500 keeps the run-length cap used in the reproduction).
+# verdict / expected_gap_pct / note are provenance only (ignored by run.jl).
+# ====================================================================
+
+[_meta]
+case = "case24_ieee_rts"
+k = 3
+cell_blocks = 18
+method_rows = 36
+pass = 33
+non_convergent = 3
+
+# --------------------------------------------------------------------
+# DC
+# --------------------------------------------------------------------
+# DC  state / tie_line
+[[cell]]
+case = "case24_ieee_rts"
+k = 3
+formulation = "dc"
+sectioning = "tie_line"
+coupling = "state"
+  [cell.admm]
+    verdict = "pass"
+  status = "pass"
+  rho = 10000000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 4317
+  [cell.aladin]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  mu = 1000000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 0.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  no_prox = false
+  modgrad = false
+  bound_detect = "primal_dual"
+  max_iter = 2191
+  globalization = "alg3_original"
+
+# DC  power / tie_line
+[[cell]]
+case = "case24_ieee_rts"
+k = 3
+formulation = "dc"
+sectioning = "tie_line"
+coupling = "power"
+  [cell.admm]
+    verdict = "pass"
+  status = "pass"
+  rho = 10000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 2032
+  [cell.aladin]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  mu = 10000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 1000.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  no_prox = false
+  modgrad = false
+  bound_detect = "primal_dual"
+  max_iter = 2030
+  globalization = "alg3_original"
+
+# DC  power / dummy_bus
+[[cell]]
+case = "case24_ieee_rts"
+k = 3
+formulation = "dc"
+sectioning = "dummy_bus"
+coupling = "power"
+  [cell.admm]
+    verdict = "pass"
+  status = "pass"
+  rho = 10000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 2026
+  [cell.aladin]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  mu = 10000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 100.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  no_prox = false
+  modgrad = false
+  bound_detect = "primal_dual"
+  max_iter = 2041
+  globalization = "alg3"
+
+# DC  hybrid / tie_line
+[[cell]]
+case = "case24_ieee_rts"
+k = 3
+formulation = "dc"
+sectioning = "tie_line"
+coupling = "hybrid"
+  [cell.admm]
+    verdict = "pass"
+  status = "pass"
+  rho = 10000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 3416
+  [cell.aladin]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  mu = 10000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 100.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  no_prox = false
+  modgrad = false
+  bound_detect = "primal_dual"
+  max_iter = 2031
+  globalization = "alg3_original"
+
+# DC  hybrid / dummy_bus
+[[cell]]
+case = "case24_ieee_rts"
+k = 3
+formulation = "dc"
+sectioning = "dummy_bus"
+coupling = "hybrid"
+  [cell.admm]
+    verdict = "pass"
+  status = "pass"
+  rho = 10000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 4011
+  [cell.aladin]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  mu = 10000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 10.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  no_prox = false
+  modgrad = false
+  bound_detect = "primal_dual"
+  max_iter = 2072
+  globalization = "alg3_original"
+
+# DC  hybrid / split_bus
+[[cell]]
+case = "case24_ieee_rts"
+k = 3
+formulation = "dc"
+sectioning = "split_bus"
+coupling = "hybrid"
+  [cell.admm]
+    verdict = "pass"
+  status = "pass"
+  rho = 10000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 4830
+  [cell.aladin]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  mu = 10000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 1.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  no_prox = false
+  modgrad = false
+  bound_detect = "primal_dual"
+  max_iter = 2013
+  globalization = "alg3_original"
+
+# --------------------------------------------------------------------
+# AC
+# --------------------------------------------------------------------
+# AC  state / tie_line
+[[cell]]
+case = "case24_ieee_rts"
+k = 3
+formulation = "ac"
+sectioning = "tie_line"
+coupling = "state"
+  [cell.admm]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 2352
+  [cell.aladin]
+    verdict = "non_convergent"
+  status = "non_convergent"
+  note = "paper 1163->x (a->x); non-certifying, no gold champion config. Covered by ADMM."
+
+# AC  power / tie_line
+[[cell]]
+case = "case24_ieee_rts"
+k = 3
+formulation = "ac"
+sectioning = "tie_line"
+coupling = "power"
+  [cell.admm]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 2068
+  [cell.aladin]
+    verdict = "non_convergent"
+  status = "non_convergent"
+  note = "paper 83->x (a->x); non-certifying, no gold champion config. Covered by ADMM."
+
+# AC  power / dummy_bus
+[[cell]]
+case = "case24_ieee_rts"
+k = 3
+formulation = "ac"
+sectioning = "dummy_bus"
+coupling = "power"
+  [cell.admm]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 2064
+  [cell.aladin]
+    verdict = "pass"
+  status = "pass"
+  rho = 100.0
+  mu = 1000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 0.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  no_prox = true
+  modgrad = true
+  bound_detect = "primal_dual"
+  max_iter = 2176
+  globalization = "alg3"
+
+# AC  hybrid / tie_line
+[[cell]]
+case = "case24_ieee_rts"
+k = 3
+formulation = "ac"
+sectioning = "tie_line"
+coupling = "hybrid"
+  [cell.admm]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 2140
+  [cell.aladin]
+    verdict = "pass"
+  status = "pass"
+  rho = 100.0
+  mu = 1000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 0.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  no_prox = true
+  modgrad = true
+  bound_detect = "primal_dual"
+  max_iter = 2446
+  globalization = "alg3_original"
+
+# AC  hybrid / dummy_bus
+[[cell]]
+case = "case24_ieee_rts"
+k = 3
+formulation = "ac"
+sectioning = "dummy_bus"
+coupling = "hybrid"
+  [cell.admm]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 2122
+  [cell.aladin]
+    verdict = "pass"
+  status = "pass"
+  rho = 1.0
+  mu = 1000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 0.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  no_prox = true
+  modgrad = true
+  bound_detect = "primal_dual"
+  max_iter = 2378
+  globalization = "alg3"
+
+# AC  hybrid / split_bus
+[[cell]]
+case = "case24_ieee_rts"
+k = 3
+formulation = "ac"
+sectioning = "split_bus"
+coupling = "hybrid"
+  [cell.admm]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 2170
+  [cell.aladin]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  mu = 10000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 0.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  no_prox = true
+  modgrad = true
+  bound_detect = "primal_dual"
+  max_iter = 2093
+  globalization = "alg3"
+
+# --------------------------------------------------------------------
+# SOCWRNL
+# --------------------------------------------------------------------
+# SOCWRNL  state / tie_line
+[[cell]]
+case = "case24_ieee_rts"
+k = 3
+formulation = "socwrnl"
+sectioning = "tie_line"
+coupling = "state"
+  [cell.admm]
+    verdict = "pass"
+  status = "pass"
+  rho = 100000.0
+  adaptive = false
+  max_iter = 2329
+  [cell.aladin]
+    verdict = "nao_certificavel"
+  status = "non_convergent"
+  note = "paper x->x. ALADIN tie/state does not certify for case24 (0/14 configs; gap ~-12.69% >> 1% gate). Covered by ADMM."
+
+# SOCWRNL  power / tie_line
+[[cell]]
+case = "case24_ieee_rts"
+k = 3
+formulation = "socwrnl"
+sectioning = "tie_line"
+coupling = "power"
+  [cell.admm]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  adaptive = false
+  max_iter = 2069
+  [cell.aladin]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  mu = 1.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 0.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  prox_mode = "canonical"
+  bound_detect = "primal_dual"
+  lam_bar = 0.0
+  max_iter = 26218
+  globalization = "armijo_l2"
+
+# SOCWRNL  power / dummy_bus
+[[cell]]
+case = "case24_ieee_rts"
+k = 3
+formulation = "socwrnl"
+sectioning = "dummy_bus"
+coupling = "power"
+  [cell.admm]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  adaptive = false
+  max_iter = 2065
+  [cell.aladin]
+    verdict = "pass"
+  status = "pass"
+  rho = 30.0
+  mu = 1000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 0.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  prox_mode = "prox_in_B"
+  bound_detect = "primal"
+  lam_bar = 0.0
+  max_iter = 2169
+  globalization = "alg3_original"
+
+# SOCWRNL  hybrid / tie_line
+[[cell]]
+case = "case24_ieee_rts"
+k = 3
+formulation = "socwrnl"
+sectioning = "tie_line"
+coupling = "hybrid"
+  [cell.admm]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  adaptive = false
+  max_iter = 2071
+  [cell.aladin]
+    verdict = "pass"
+  status = "pass"
+  rho = 100.0
+  mu = 100.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 0.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  prox_mode = "canonical"
+  bound_detect = "primal_dual"
+  lam_bar = 0.0
+  max_iter = 2348
+  globalization = "alg3"
+
+# SOCWRNL  hybrid / dummy_bus
+[[cell]]
+case = "case24_ieee_rts"
+k = 3
+formulation = "socwrnl"
+sectioning = "dummy_bus"
+coupling = "hybrid"
+  [cell.admm]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  adaptive = false
+  max_iter = 2090
+  [cell.aladin]
+    verdict = "pass"
+  status = "pass"
+  rho = 10.0
+  mu = 1000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 0.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  prox_mode = "prox_in_B"
+  bound_detect = "primal"
+  lam_bar = 0.0
+  max_iter = 2280
+  globalization = "alg3_original"
+
+# SOCWRNL  hybrid / split_bus
+[[cell]]
+case = "case24_ieee_rts"
+k = 3
+formulation = "socwrnl"
+sectioning = "split_bus"
+coupling = "hybrid"
+  [cell.admm]
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  adaptive = false
+  max_iter = 2155
+  [cell.aladin]
+    verdict = "pass"
+  status = "pass"
+  rho = 30.0
+  mu = 100.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 0.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  prox_mode = "canonical"
+  bound_detect = "primal_dual"
+  lam_bar = 0.0
+  max_iter = 2295
+  globalization = "full_step"
+
