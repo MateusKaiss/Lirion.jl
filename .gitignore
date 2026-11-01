@@ -63,3 +63,4 @@ test/*/*.toml
 # Local analysis scratch (probes, diagnostics and intermediate scripts live
 # here and are never versioned; permanent findings go into the docs/paper)
 **/scratch/
+/Manifest.toml

@@ -538,7 +538,7 @@ coupling = "hybrid"
     expected_gap_pct = -0.02881114007
     verdict = "pass"
   status = "pass"
-  note = "paper 11k->14k. Champion socwrnl_c500_dummyhybrid_v5 (alg3_original canonical rho10 mu100 lam1e4) converged @13795, gap -0.0288%, git bf558c6. REQUIRES source tree containing bf558c6."
+  note = "champion: socwrnl dummy/hybrid, alg3_original (rho=10, mu=100, lambda=1e4); converged at obj 13795 (gap -0.0288%)."
   rho = 10.0
   mu = 100.0
   rho_growth = 1.0
