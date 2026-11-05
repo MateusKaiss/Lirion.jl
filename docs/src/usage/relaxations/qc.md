@@ -2,12 +2,12 @@
 
 The quadratic-convex relaxation of the AC power flow, run with `model = qc()`. It is a relaxation like SOCWR, so its optimum is a lower bound on the true AC cost; it tightens the voltage-product blocks with McCormick envelopes instead of a single cone. For the formulation, see [QC (Quadratic Convex)](@ref).
 
-All examples use `pglib_opf_case57_ieee.m` from the [PGLib-OPF library](https://github.com/power-grid-lib/pglib-opf).
+All examples use `pglib_opf_case24_ieee_rts.m` from the [PGLib-OPF library](https://github.com/power-grid-lib/pglib-opf).
 
 ```julia
 using Lirion
 
-result = solve("pglib_opf_case57_ieee.m"; model = qc())
+result = solve("pglib_opf_case24_ieee_rts.m"; model = qc())
 
 result.objective   # optimal cost (a lower bound on the AC optimum)
 result.status      # solver status
@@ -22,7 +22,7 @@ QC runs on Ipopt by default. To swap in another solver, or to set options on the
 ```julia
 using JuMP, Ipopt
 
-result = solve("pglib_opf_case57_ieee.m";
+result = solve("pglib_opf_case24_ieee_rts.m";
     model = qc(),
     optimizer = optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000),
 )
