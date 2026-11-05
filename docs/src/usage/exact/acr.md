@@ -3,11 +3,11 @@
 The AC model in rectangular voltage coordinates, run with `model = acr()`.
 For the formulation, see [AC Rectangular (ACR)](@ref).
 
-All examples use `pglib_opf_case57_ieee.m` from the [PGLib-OPF library](https://github.com/power-grid-lib/pglib-opf).
+All examples use `pglib_opf_case24_ieee_rts.m` from the [PGLib-OPF library](https://github.com/power-grid-lib/pglib-opf).
 
 ```julia
 using Lirion
-result = solve("pglib_opf_case57_ieee.m"; model = acr())
+result = solve("pglib_opf_case24_ieee_rts.m"; model = acr())
 
 result.objective   # optimal cost
 result.status      # solver status
@@ -22,7 +22,7 @@ ACR runs on Ipopt by default. To swap in another solver, or to set options on th
 ```julia
 using JuMP, Ipopt
 
-result = solve("pglib_opf_case57_ieee.m";
+result = solve("pglib_opf_case24_ieee_rts.m";
     model = acr(),
     optimizer = optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000),
 )
