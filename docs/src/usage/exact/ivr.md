@@ -3,11 +3,11 @@
 The current–voltage model in rectangular coordinates, run with `model = ivr()`.
 For the formulation, see [IVR](@ref).
 
-All examples use `pglib_opf_case57_ieee.m` from the [PGLib-OPF library](https://github.com/power-grid-lib/pglib-opf).
+All examples use `pglib_opf_case24_ieee_rts.m` from the [PGLib-OPF library](https://github.com/power-grid-lib/pglib-opf).
 
 ```julia
 using Lirion
-result = solve("pglib_opf_case57_ieee.m"; model = ivr())
+result = solve("pglib_opf_case24_ieee_rts.m"; model = ivr())
 
 result.objective   # optimal cost
 result.status      # solver status
@@ -22,7 +22,7 @@ IVR runs on Ipopt by default. To swap in another solver, or to set options on th
 ```julia
 using JuMP, Ipopt
 
-result = solve("pglib_opf_case57_ieee.m";
+result = solve("pglib_opf_case24_ieee_rts.m";
     model = ivr(),
     optimizer = optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000),
 )
