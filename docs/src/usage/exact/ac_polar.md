@@ -3,11 +3,11 @@
 The AC model in polar coordinates, run with `model = ac()`.
 For the formulation, see [AC Polar](@ref).
 
-All examples use `pglib_opf_case57_ieee.m` from the [PGLib-OPF library](https://github.com/power-grid-lib/pglib-opf).
+All examples use `pglib_opf_case24_ieee_rts.m` from the [PGLib-OPF library](https://github.com/power-grid-lib/pglib-opf).
 
 ```julia
 using Lirion
-result = solve("pglib_opf_case57_ieee.m"; model = ac())
+result = solve("pglib_opf_case24_ieee_rts.m"; model = ac())
 
 result.objective   # optimal cost
 result.status      # solver status
@@ -22,7 +22,7 @@ AC Polar runs on Ipopt by default. To swap in another solver, or to set options 
 ```julia
 using JuMP, Ipopt
 
-result = solve("pglib_opf_case57_ieee.m";
+result = solve("pglib_opf_case24_ieee_rts.m";
     model = ac(),
     optimizer = optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000),
 )
