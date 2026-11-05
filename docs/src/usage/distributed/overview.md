@@ -14,7 +14,7 @@ The distributed algorithms run on the DC, AC, and SOCWR models.
 ```julia
 using Lirion
 
-result = solve("pglib_opf_case57_ieee.m";
+result = solve("paper/cases/partitioned/case24_ieee_rts/std/k3/case.m";
     model = ac(),
     algorithm = admm(rho = 1e3),
 )
@@ -27,7 +27,7 @@ result = solve("pglib_opf_case57_ieee.m";
 ```julia
 using Lirion
 
-result = solve("pglib_opf_case57_ieee.m";
+result = solve("paper/cases/partitioned/case24_ieee_rts/std/k3/case.m";
     model = dc(),
     algorithm = aladin(),
 )
