@@ -2,12 +2,12 @@
 
 The LPAC model, which gives voltage magnitude and reactive power back to a linear model, run with `model = lpac()`. For the formulation, see [LPAC](@ref).
 
-All examples use `pglib_opf_case57_ieee.m` from the [PGLib-OPF library](https://github.com/power-grid-lib/pglib-opf).
+All examples use `pglib_opf_case24_ieee_rts.m` from the [PGLib-OPF library](https://github.com/power-grid-lib/pglib-opf).
 
 ```julia
 using Lirion
 
-result = solve("pglib_opf_case57_ieee.m"; model = lpac())
+result = solve("pglib_opf_case24_ieee_rts.m"; model = lpac())
 
 result.objective   # optimal cost
 result.status      # solver status
@@ -22,7 +22,7 @@ LPAC runs on Ipopt by default. To swap in another solver, or to set options on t
 ```julia
 using JuMP, Ipopt
 
-result = solve("pglib_opf_case57_ieee.m";
+result = solve("pglib_opf_case24_ieee_rts.m";
     model = lpac(),
     optimizer = optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000),
 )
