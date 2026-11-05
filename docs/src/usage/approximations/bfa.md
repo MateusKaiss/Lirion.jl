@@ -2,12 +2,12 @@
 
 The branch-flow (LinDistFlow) approximation, run with `model = bfa()`. For the formulation, see [BFA (LinDistFlow)](@ref).
 
-All examples use `pglib_opf_case57_ieee.m` from the [PGLib-OPF library](https://github.com/power-grid-lib/pglib-opf).
+All examples use `pglib_opf_case24_ieee_rts.m` from the [PGLib-OPF library](https://github.com/power-grid-lib/pglib-opf).
 
 ```julia
 using Lirion
 
-result = solve("pglib_opf_case57_ieee.m"; model = bfa())
+result = solve("pglib_opf_case24_ieee_rts.m"; model = bfa())
 
 result.objective   # optimal cost
 result.status      # solver status
@@ -22,7 +22,7 @@ BFA runs on Clarabel by default. To swap in another solver, or to set options on
 ```julia
 using JuMP, Clarabel
 
-result = solve("pglib_opf_case57_ieee.m";
+result = solve("pglib_opf_case24_ieee_rts.m";
     model = bfa(),
     optimizer = optimizer_with_attributes(Clarabel.Optimizer, "max_iter" => 1000),
 )
