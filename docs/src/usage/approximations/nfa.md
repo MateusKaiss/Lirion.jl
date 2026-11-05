@@ -2,12 +2,12 @@
 
 The network flow approximation, run with `model = nfa()`. For the formulation, see [NFA](@ref).
 
-All examples use `pglib_opf_case57_ieee.m` from the [PGLib-OPF library](https://github.com/power-grid-lib/pglib-opf).
+All examples use `pglib_opf_case24_ieee_rts.m` from the [PGLib-OPF library](https://github.com/power-grid-lib/pglib-opf).
 
 ```julia
 using Lirion
 
-result = solve("pglib_opf_case57_ieee.m"; model = nfa())
+result = solve("pglib_opf_case24_ieee_rts.m"; model = nfa())
 
 result.objective   # optimal cost
 result.status      # solver status
@@ -24,7 +24,7 @@ NFA runs on OSQP by default. To swap in another solver, or to set options on the
 ```julia
 using JuMP, OSQP
 
-result = solve("pglib_opf_case57_ieee.m";
+result = solve("pglib_opf_case24_ieee_rts.m";
     model = nfa(),
     optimizer = optimizer_with_attributes(OSQP.Optimizer, "max_iter" => 1000),
 )
