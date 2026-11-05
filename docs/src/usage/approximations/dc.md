@@ -2,12 +2,12 @@
 
 The linear DC power flow, run with `model = dc()`. For the formulation, see [DC](@ref).
 
-All examples use `pglib_opf_case57_ieee.m` from the [PGLib-OPF library](https://github.com/power-grid-lib/pglib-opf).
+All examples use `pglib_opf_case24_ieee_rts.m` from the [PGLib-OPF library](https://github.com/power-grid-lib/pglib-opf).
 
 ```julia
 using Lirion
 
-result = solve("pglib_opf_case57_ieee.m"; model = dc())
+result = solve("pglib_opf_case24_ieee_rts.m"; model = dc())
 
 result.objective   # optimal cost
 result.status      # solver status
@@ -22,7 +22,7 @@ DC runs on OSQP by default. To swap in another solver, or to set options on the 
 ```julia
 using JuMP, OSQP
 
-result = solve("pglib_opf_case57_ieee.m";
+result = solve("pglib_opf_case24_ieee_rts.m";
     model = dc(),
     optimizer = optimizer_with_attributes(OSQP.Optimizer, "max_iter" => 1000),
 )
