@@ -29,7 +29,7 @@ Override the default, or set options on it, with the `optimizer` keyword. It tak
 ```julia
 using JuMP, Ipopt
 
-result = solve("pglib_opf_case57_ieee.m";
+result = solve("pglib_opf_case24_ieee_rts.m";
     model = ac(),
     optimizer = optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000, "tol" => 1e-8),
 )
