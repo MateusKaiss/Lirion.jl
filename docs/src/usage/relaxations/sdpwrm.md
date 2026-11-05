@@ -2,12 +2,12 @@
 
 The semidefinite W-matrix relaxation of the AC power flow, run with `model = sdpwrm()`. It is a relaxation like SOCWR and QC, so its optimum is a lower bound on the true AC cost; it collects the voltage-product blocks into one matrix and imposes a single positive-semidefinite condition over the whole network. For the formulation, see [SDPWRM](@ref).
 
-All examples use `pglib_opf_case57_ieee.m` from the [PGLib-OPF library](https://github.com/power-grid-lib/pglib-opf).
+All examples use `pglib_opf_case24_ieee_rts.m` from the [PGLib-OPF library](https://github.com/power-grid-lib/pglib-opf).
 
 ```julia
 using Lirion
 
-result = solve("pglib_opf_case57_ieee.m"; model = sdpwrm())
+result = solve("pglib_opf_case24_ieee_rts.m"; model = sdpwrm())
 
 result.objective   # optimal cost (a lower bound on the AC optimum)
 result.status      # solver status
@@ -22,7 +22,7 @@ SDPWRM runs on Clarabel by default. To swap in another solver, or to set options
 ```julia
 using JuMP, Clarabel
 
-result = solve("pglib_opf_case57_ieee.m";
+result = solve("pglib_opf_case24_ieee_rts.m";
     model = sdpwrm(),
     optimizer = optimizer_with_attributes(Clarabel.Optimizer, "max_iter" => 1000),
 )
