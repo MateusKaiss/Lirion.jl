@@ -1,0 +1,95 @@
+% =============================================================================
+% Lirion.jl documentation — bibliography (STAGING SCAFFOLD)
+% Used by DocumenterCitations via docs/make.jl (CitationBibliography) and the
+% `@bibliography` block in src/references.md.
+%
+% Fields marked "% CHECK" should be double-checked against the source before
+% the release build. Everything else was cross-checked against the publishers.
+% =============================================================================
+
+% --- ADMM (Boyd et al., Foundations and Trends) ------------------------------
+@article{Boyd2011,
+  author    = {Boyd, Stephen and Parikh, Neal and Chu, Eric and Peleato, Borja and Eckstein, Jonathan},
+  title     = {Distributed Optimization and Statistical Learning via the Alternating Direction Method of Multipliers},
+  journal   = {Foundations and Trends in Machine Learning},
+  volume    = {3},
+  number    = {1},
+  pages     = {1--122},
+  year      = {2011},
+  doi       = {10.1561/2200000016},
+  publisher = {Now Publishers}
+}
+
+% --- ALADIN (Houska, Frasch, Diehl) ------------------------------------------
+% NOTE: the canonical ALADIN paper is in *SIAM Journal on Optimization*
+% (SIOPT), not "SIAM J. Control & Optimization". Volume/pages below are the
+% published values; % CHECK against the PDF (Houska2016a.pdf) if in doubt.
+@article{Houska2016,
+  author  = {Houska, Boris and Frasch, Janick and Diehl, Moritz},
+  title   = {An Augmented {Lagrangian} Based Algorithm for Distributed Non-Convex Optimization},
+  journal = {SIAM Journal on Optimization},
+  volume  = {26},
+  number  = {2},
+  pages   = {1101--1127},
+  year    = {2016},
+  doi     = {10.1137/140975991}
+}
+
+% --- SOC / Jabr radial conic relaxation --------------------------------------
+@article{Jabr2006,
+  author  = {Jabr, Rabih A.},
+  title   = {Radial Distribution Load Flow Using Conic Programming},
+  journal = {IEEE Transactions on Power Systems},
+  volume  = {21},
+  number  = {3},
+  pages   = {1458--1459},
+  year    = {2006},
+  month   = aug,
+  doi     = {10.1109/TPWRS.2006.879234}
+}
+
+% --- PowerModels.jl (Coffrin et al., PSCC 2018) ------------------------------
+@inproceedings{Coffrin2018,
+  author    = {Coffrin, Carleton and Bent, Russell and Sundar, Kaarthik and Ng, Yeesian and Lubin, Miles},
+  title     = {{PowerModels.jl}: An Open-Source Framework for Exploring Power Flow Formulations},
+  booktitle = {2018 Power Systems Computation Conference (PSCC)},
+  pages     = {1--8},
+  year      = {2018},
+  doi       = {10.23919/PSCC.2018.8442948}
+}
+
+% --- Distribution system modeling (Kersting textbook) ------------------------
+@book{Kersting2012,
+  author    = {Kersting, William H.},
+  title     = {Distribution System Modeling and Analysis},
+  edition   = {3rd},
+  publisher = {CRC Press},
+  address   = {Boca Raton, FL},
+  year      = {2012}
+}
+
+% --- LinDistFlow (Baran & Wu) — basis for the BFA approximation --------------
+% The BFA / LinDistFlow linearization originates from Baran & Wu (1989). Cite
+% this alongside Kersting for the branch-flow / LinDistFlow model.
+@article{BaranWu1989,
+  author  = {Baran, Mesut E. and Wu, Felix F.},
+  title   = {Optimal Sizing of Capacitors Placed on a Radial Distribution System},
+  journal = {IEEE Transactions on Power Delivery},
+  volume  = {4},
+  number  = {1},
+  pages   = {735--743},
+  year    = {1989},
+  doi     = {10.1109/61.19266}
+}
+
+% --- Consistency constraints / decomposition methods (Harris et al.) ---------
+% Venue confirmed: 2022 IEEE Texas Power and Energy Conference (TPEC).
+% CHECK pages/DOI on IEEE Xplore before the camera-ready.
+@inproceedings{Harris2022,
+  author    = {Harris, Rachel and Alkhraijah, Mohannad and Huggins, David and Molzahn, Daniel K.},
+  title     = {On the Impacts of Different Consistency Constraint Formulations for Distributed Optimal Power Flow},
+  booktitle = {2022 {IEEE} Texas Power and Energy Conference (TPEC)},
+  year      = {2022},
+  publisher = {IEEE},
+  url       = {https://molzahn.github.io/pubs/harris_alkhraijah_huggins_molzahn-consistency_constraints_distributed_opf.pdf}
+}
