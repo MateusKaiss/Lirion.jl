@@ -148,7 +148,7 @@ it is defined (Constraint 8).
 
 ## Constraints
 
-Each constraint is numbered continuously within the model, as in the author's notes.
+Each constraint is numbered continuously within the model.
 
 ### Constraint 1: secant of the magnitude
 
@@ -611,18 +611,16 @@ d = \frac{\theta^{\max} - \theta^{\min}}{2},
 s_f = v_f^{\min} + v_f^{\max}, \qquad s_t = v_t^{\min} + v_t^{\max}.
 ```
 
-!!! note "Cut 1 / Cut 2 are derived on the SOCWR page, not a gap here"
-    In the source notes (L4 p.19) the two lines labelled "Cut 1" and "Cut 2" were left
-    blank. This is **not** a content gap: the two LNC cuts are fully derived in
-    [SOCWR (Jabr conic relaxation)](@ref) (McCormick bridge, the six-step construction, and the explicit
-    Cut 1 / Cut 2), and QC posts the identical pair on the shared ``W_r, W_i`` blocks. They
-    are cross-referenced here rather than duplicated. The implementation confirms this: in
-    `src/modeling/branch/qc.jl`, `add_qc_lnc_cuts!` writes exactly the SOCWR LNC block.
+!!! note "The two LNC cuts come from the SOCWR page"
+    QC posts the same pair of lifted nonlinear cuts as
+    [SOCWR (Jabr conic relaxation)](@ref), on the shared ``W_r, W_i`` blocks. They are
+    derived in full there (the McCormick bridge and the explicit Cut 1 / Cut 2), so this page
+    cross-references them rather than repeating the construction.
 
 ## QC Formulation
 
 The formulation below collects, in consolidated form and **without re-deriving**, exactly
-the blocks the code posts. The derivation above justifies each piece. The model is assembled
+the blocks the model builds. The derivation above justifies each piece. The model is assembled
 as an **NLP** and solved with Ipopt.
 
 ### Sets
@@ -999,7 +997,7 @@ p^g_{g,t} + p^c_{g,t} = \overline{P}^{ts}_{g,t}, \qquad g\in\mathcal{G}^c,\ t\in
 ### Storage constraints
 
 !!! note "QC storage is the SOCWR W-space model (not the AC Polar one)"
-    There is **no** `constraints_qc.jl`. When a case carries storage, QC dispatches to
+    QC borrows the SOCWR storage model. When a case carries storage, QC dispatches to
     `add_socwr_storage_constraints!` (`storage/dispatch.jl`), so storage is relaxed in
     W-space: non-simultaneity is a **binary big-M** (not the bilinear ``cd=0`` of
     [AC Polar](@ref)), and the inverter limit is a **rotated cone** on a squared-current

@@ -678,7 +678,7 @@ minus sign, ``P^s>0`` absorbs from the grid):
 
 ### Jabr cone
 
-One rotated second-order cone **per bus pair**, not per branch. The code groups
+One rotated second-order cone **per bus pair**. The code groups
 parallel branches and emits the cone once, on the shared pair products, through
 the representative branch of each pair.
 

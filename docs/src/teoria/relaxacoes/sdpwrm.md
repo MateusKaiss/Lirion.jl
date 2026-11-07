@@ -530,8 +530,7 @@ block ``w_{b,t}=W^{\mathrm{re}}_{t,\operatorname{idx}(b)\,\operatorname{idx}(b)}
 
 The two shunt terms carry opposite signs, as they do throughout Lirion: the conductance
 draws active power (``-g^{sh}_b w_{b,t}``), while the stored susceptance
-(`pf.shunt_susceptance`) enters reactive balance with a plus (``+b^{sh}_b w_{b,t}``), the
-sign the code posts.
+(`pf.shunt_susceptance`) enters reactive balance with a plus (``+b^{sh}_b w_{b,t}``).
 
 ### Positive-semidefinite constraint
 
@@ -620,7 +619,7 @@ p^g_{g,t}+p^c_{g,t}=\overline{P}^{ts}_{g,t}\ (g\in\mathcal{G}^c). \tag{18}
 
 ### Storage constraints (W-space)
 
-SDPWRM has no storage file of its own. The dispatch sends storage to the SOCWR W-space
+SDPWRM reuses the SOCWR storage model. Storage dispatches to the W-space
 block `add_socwr_storage_constraints!`. Non-simultaneity is the binary big-M pair (Eq. 20),
 not the bilinear ``c\,d = 0`` of AC Polar, and the converter-current bound rests on the
 single global ``V^{\min}`` floor. **Energy balance:**
