@@ -1,0 +1,18 @@
+\usepackage{tikz}
+\usepackage{amsmath}
+\usetikzlibrary{arrows.meta,calc,positioning,fit,backgrounds}
+\definecolor{cpl}{RGB}{28,90,214}   % coupling blue
+\definecolor{gh}{RGB}{110,110,110}  % ghost grey
+\tikzset{
+  bus/.style={circle, draw, line width=0.7pt, minimum size=15pt, inner sep=0pt, font=\footnotesize},
+  ghost/.style={circle, draw=gh, line width=0.7pt, densely dotted, minimum size=15pt, inner sep=0pt, font=\footnotesize, text=gh},
+  branch/.style={line width=0.75pt},
+  stub/.style={gh, line width=0.75pt, densely dotted},
+  halfl/.style={line width=0.75pt},
+  zbox/.style={draw, fill=black!9, rounded corners=2pt, inner sep=3pt, font=\footnotesize},
+  couple/.style={cpl, densely dotted, line width=0.9pt},
+  cplab/.style={font=\scriptsize, text=cpl, inner sep=1.5pt},
+  zone/.style={draw, dashed, rounded corners=7pt, line width=0.8pt, inner sep=0pt},
+  zlab/.style={font=\scriptsize\itshape, text=black!55},
+  gen/.style={circle, draw, line width=0.6pt, minimum size=11pt, inner sep=0pt, font=\scriptsize},
+}

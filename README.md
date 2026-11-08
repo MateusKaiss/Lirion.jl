@@ -18,26 +18,27 @@ Lirion was built to bridge implementation clarity and theoretical rigor in Optim
 
 It provides:
 
-- **Eleven centralized OPF formulations**:
+- **Twelve centralized OPF formulations**:
   - **DC** — linear active-power approximation (LP)
   - **AC** — full nonlinear AC in polar coordinates (NLP)
   - **ACR** — full nonlinear AC in rectangular coordinates (NLP)
   - **IVR** — current-voltage rectangular formulation (NLP)
-  - **LPAC** — linear-programming AC approximation (QCQP)
+  - **LPAC** — LP-based AC approximation (QCQP)
   - **SOCWR** — W-rectangular second-order cone relaxation (SOCP)
+  - **SOCWRNL** — smooth nonlinear form of the SOCWR relaxation (NLP)
   - **QC** — quadratic-convex relaxation (QCQP)
   - **SDPWRM** — semidefinite W-matrix relaxation (SDP)
   - **SOCBF** — branch-flow second-order cone relaxation (SOCP)
   - **BFA** — linearized branch-flow approximation / LinDistFlow (LP)
   - **NFA** — network-flow approximation, active-power only (LP)
-- **Distributed OPF** — two decomposition algorithms over DC / AC / SOCWR, each with its own variants:
+- **Distributed OPF** — two decomposition algorithms over DC / AC / SOCWR / SOCWRNL, each with its own variants:
   - **ADMM** — alternating direction method of multipliers
     - fixed or **adaptive penalty (ρ)** with residual balancing
   - **ALADIN** — augmented Lagrangian based alternating direction inexact Newton
     - **proximal mode** (`:primal` / `:pflow`) and **stopping criterion** (`:boyd` / `:hfd`)
     - optional **adaptive ρ / μ** growth
   - **Coupling variables** — which boundary quantities neighboring zones exchange:
-    - **`:state`** — voltage state only: θ (DC), θ + V (AC), or v², R, T (SOCWR)
+    - **`:state`** — voltage state only: θ (DC), θ + V (AC), or v², R, T (SOCWR / SOCWRNL)
     - **`:power`** — branch active/reactive flows only
     - **`:hybrid`** — both state and power.
   - **Network sectioning** — how the grid is split into zones:
@@ -47,8 +48,8 @@ It provides:
 
 > **Supported combinations.**
 > - **`:state`** — works only with `:tie_line`
-> - **`:power`** — works with `:tie_line` or `:dummy_bus`
-> - **`:hybrid`** — works with all three (`:tie_line`, `:dummy_bus`, `:split_bus`), except under **ALADIN + SOCWR**, which does not support `:dummy_bus`
+> - **`:power`** — works with `:tie_line`, or with `:dummy_bus` for DC / AC / SOCWRNL (the conic **SOCWR** does not support `:dummy_bus` under ALADIN)
+> - **`:hybrid`** — works with all three (`:tie_line`, `:dummy_bus`, `:split_bus`), except the conic **SOCWR**, which does not support `:dummy_bus` (its smooth sibling **SOCWRNL** does)
 
 ---
 
@@ -85,149 +86,83 @@ using Lirion
 
 ## Quick Examples
 
-Below are examples showing the **centralized** and **distributed** (ADMM / ALADIN) workflows in Lirion.
+The centralized and distributed examples below use `pglib_opf_case24_ieee_rts.m` from
+the **PGLib-OPF** benchmark library, shipped with Lirion. They assume you cloned the
+repository and started Julia from its root (`git clone … && cd Lirion.jl && julia
+--project`); otherwise pass an absolute path to any MATPOWER file. The documentation
+has a page for each formulation and each algorithm.
 
-The example cases below are based on the **PGLib-OPF** benchmark library and are included in the repository for convenience.
-
-If no solver is specified, Lirion automatically selects its default solver per formulation:
+If you don't pass a solver, Lirion uses a per-formulation default:
 
 - **OSQP** — DC, NFA
-- **Ipopt** — AC, ACR, IVR, LPAC, QC
+- **Ipopt** — AC, ACR, IVR, LPAC, QC, SOCWRNL
 - **Clarabel** — SOCWR, SOCBF, SDPWRM, BFA
-
-For detailed installation instruction and solver selection guidance, please refer to documentation of each solver and to the basic modelling of each problem herein formulated. 
 
 ---
 
-### 🔹 Centralized Example
+### Centralized
 
-**Case file:**
-[`test/matpower_cases/pglib_opf_case118_ieee.m`](https://github.com/MateusKaiss/Lirion.jl/blob/master/test/matpower_cases/pglib_opf_case118_ieee.m)
-
-
-#### Running centralized AC OPF
-
-The first argument is the path to a MATPOWER case file on your local machine.
+A centralized solve takes a case file and a model:
 
 ```julia
 using Lirion
 
-out = solve("pglib_opf_case118_ieee.m";
-    model = ac(),
-    algorithm = centralized(),
-    outputs = false,
-    plots = false,
-)
+result = solve("test/matpower_cases/pglib_opf_case24_ieee_rts.m"; model = ac())
 
-out.objective
+result.objective
 ```
 
-You may switch to any of the eleven available formulations by changing the `model` argument:
+Switch the formulation through the `model` argument; any of the twelve works:
 
 ```julia
-model = dc()      # DC linear approximation       (LP)
-model = ac()      # AC polar (V, θ)               (NLP)
-model = acr()     # AC rectangular (vr, vi)       (NLP)
-model = ivr()     # Current-voltage rectangular   (NLP)
-model = lpac()    # Linear-programming AC         (QCQP)
-model = socwr()   # W-rectangular SOCP            (SOCP)
-model = qc()      # Quadratic-convex relaxation   (QCQP)
-model = sdpwrm()  # Semidefinite W-matrix         (SDP)
-model = socbf()   # Branch-flow SOCP              (SOCP)
-model = bfa()     # Linearized branch flow        (LP)
-model = nfa()     # Network-flow approximation    (LP)
+model = dc()       # DC linear approximation        (LP)
+model = ac()       # AC polar (V, θ)                (NLP)
+model = acr()      # AC rectangular (vr, vi)        (NLP)
+model = ivr()      # Current-voltage rectangular    (NLP)
+model = lpac()     # LP-based AC approximation      (QCQP)
+model = socwr()    # W-rectangular SOCP relaxation  (SOCP)
+model = socwrnl()  # Smooth-NLP SOCWR relaxation    (NLP)
+model = qc()       # Quadratic-convex relaxation    (QCQP)
+model = sdpwrm()   # Semidefinite W-matrix          (SDP)
+model = socbf()    # Branch-flow SOCP relaxation    (SOCP)
+model = bfa()      # Linearized branch flow         (LP)
+model = nfa()      # Network-flow approximation     (LP)
 ```
 
-### 🔹 Distributed Examples
+### Distributed
 
-A distributed run uses the same `solve(...)` entry point; you choose the
-**algorithm** (`admm` / `aladin`), the **coupling**, and the **sectioning**.
-
-**Case file:**
-[`test/matpower_cases/pglib_opf_case73_ieee_rts.m`](https://github.com/MateusKaiss/Lirion.jl/blob/master/test/matpower_cases/pglib_opf_case73_ieee_rts.m)
-
-#### Run a distributed AC OPF with ADMM (hybrid coupling)
+A distributed run uses the same `solve`; swap `centralized()` for `admm(...)` or
+`aladin(...)` and pick the **coupling** and the **sectioning**. The case must carry
+zones (a MATPOWER zone column) — see **Automatic partitioning** below to make one from
+any case; the example uses a shipped three-zone partition of case24.
 
 ```julia
 using Lirion
 
-out = solve("pglib_opf_case73_ieee_rts.m";
-    model = ac(),
+result = solve("paper/cases/partitioned/case24_ieee_rts/std/k3/case.m";
+    model = dc(),
     algorithm = admm(
-        coupling = :hybrid,
-        sectioning = :tie_line,
-        max_iter = 350,
-
-        # A single rho automatically fills the required penalty parameters
-        rho = 1e3,
-
-        eps_abs = 1e-7,
-        eps_rel = 1e-7,
-
-        # Adaptive penalty update
-        adaptive_rho = true,
-        mu_incr = 3.0,
-        mu_decr = 3.0,
-        tau_incr = 1.05,
-        tau_decr = 0.98,
+        coupling = :hybrid, sectioning = :tie_line,
+        rho = 1e3,                       # penalty weight
+        eps_abs = 1e-4, eps_rel = 1e-4,  # convergence tolerance
+        max_iter = 1500,
     ),
-    outputs = false,
-    plots = true,
 )
 
-out.diagnostics
+result.status        # :converged / :stalled / :iteration_limit
+result.objective
+result.diagnostics   # iteration history (residuals, ρ, ...)
 ```
 
-ADMM supports **adaptive penalty (ρ) updates** following residual-balancing rules
-(`mu_incr`, `mu_decr`, `tau_incr`, `tau_decr`). Each coupling has its own required ρ
-parameters: a single `rho=...` fills them all, or set them individually (`rho_theta`,
-`rho_v`, `rho_p`, `rho_q`, `rho_v2`, `rho_r`, `rho_t`), depending on the formulation.
-
-#### Run a distributed AC OPF with ALADIN (state coupling)
-
-```julia
-using Lirion
-
-out = solve("pglib_opf_case73_ieee_rts.m";
-    model = ac(),
-    algorithm = aladin(
-        coupling = :state,
-        sectioning = :tie_line,
-        max_iter = 100,
-
-        # Augmented-Lagrangian penalties
-        rho = 1e3,   # local proximal penalty (subproblems)
-        mu  = 1e4,   # coordinator consensus penalty (QP)
-
-        eps_abs = 1e-4,
-        eps_rel = 1e-4,
-
-        # Optional variants
-        stopping_criterion = :boyd,   # :boyd (2-norm) or :hfd (∞-norm)
-        adaptive = false,             # when true, grows rho / mu across iterations
-    ),
-    outputs = false,
-    plots = false,
-)
-
-out.diagnostics
-```
-
-ALADIN solves local NLPs and reconciles the zones through a **coordinator QP** built
-from first/second-order sensitivities. Beyond `rho`/`mu` it exposes a few variants:
-
-- **`proximal_mode`** — `:primal` (default) or `:pflow` (`:power`/`:hybrid`, DC/SOCWR only)
-- **`stopping_criterion`** — `:boyd` (scaled 2-norm) or `:hfd` (∞-norm)
-- **`adaptive`** — grow `rho` / `mu` via `rho_growth` / `mu_growth` when enabled
-
-#### Switching the configuration
+Swap `admm` for `aladin` to run ALADIN, and change `coupling` / `sectioning` to set
+what the zones exchange and how the grid is cut:
 
 ```julia
 # Algorithm
 algorithm = admm(...)        # ADMM
 algorithm = aladin(...)      # ALADIN
 
-# Coupling — which boundary quantities are exchanged
+# Coupling — which boundary quantities the zones agree on
 coupling = :state            # voltage state (θ / V / v²,R,T)
 coupling = :power            # branch active/reactive flows
 coupling = :hybrid           # both
@@ -238,134 +173,112 @@ sectioning = :dummy_bus      # tie-lines split by dummy buses
 sectioning = :split_bus      # boundary buses cloned across zones
 ```
 
+The distributed solvers run on DC, AC, SOCWR, and SOCWRNL. Not every coupling pairs
+with every sectioning, and the penalty (`rho`) and tolerance settings decide whether,
+and how closely, a run converges, so they are not innocent defaults. The Distributed
+pages in the documentation cover the accepted combinations, the per-model penalties,
+and the convergence settings; AC, SOCWR, and SOCWRNL runs in particular need larger
+iteration budgets than DC.
+
 #### Automatic partitioning
 
-You can let Lirion assign the zones automatically with impedance-weighted **Metis**
-graph partitioning (balanced zones, connectivity-repaired). This needs the optional
-extension dependencies:
+To cut a single-zone case into zones automatically, use impedance-weighted **Metis**
+partitioning (balanced zones, connectivity-repaired). It needs the optional extension
+dependencies:
 
 ```julia
 using Lirion, Metis, Graphs, SimpleWeightedGraphs
 
-# Split a case into 4 zones → writes pglib_opf_case118_ieee_4zones.m
-create_partition("pglib_opf_case118_ieee.m"; k = 4)
+# Split case118 into 4 zones and write the zoned case next to the input
+zoned = create_partition("test/matpower_cases/pglib_opf_case118_ieee.m"; k = 4)
 ```
 
-The resulting zoned case is then solved with any distributed algorithm and any
-sectioning (`:tie_line`, `:dummy_bus`, `:split_bus`) — including partitions where
-a boundary bus is shared by three or more zones.
+The path it returns is then solved like any distributed case:
+
+```julia
+result = solve(zoned;
+    model = dc(),
+    algorithm = admm(
+        coupling = :hybrid, sectioning = :tie_line,
+        rho = 1e4, eps_abs = 1e-4, eps_rel = 1e-4, max_iter = 1000,
+    ),
+)
+```
 
 ## Results
 
-`solve(...)` returns a `LirionResult` holding the solution as DataFrames (mirroring
-the MATPOWER schema), plus summary fields:
+`solve` returns a `LirionResult`: a short summary plus the solution
+as `DataFrame`s following the MATPOWER schema.
 
 ```julia
-out.objective   # optimal cost
-out.status      # :optimal, :local_optimal, ...
-out.bus         # per-bus voltages / angles
-out.gen         # generator dispatch (pg, qg)
-out.branch      # branch flows (pf, qf, pt, qt)
+result.objective   # total generation cost
+result.status      # :optimal / :local_optimal (centralized)
+result.bus         # per-bus voltages / angles
+result.gen         # generator dispatch (pg, qg)
+result.branch      # branch flows (pf, qf, pt, qt)
 ```
 
-Distributed runs additionally expose the per-zone results and the boundary consensus:
+A distributed run fills in the per-zone view and the convergence history, and its
+`status` reports the algorithm's own termination:
 
 ```julia
-out.zones         # per-zone (bus, gen, branch, cost)
-out.consensus     # boundary-variable deviations across zones
-out.diagnostics   # iteration history (residuals, ρ, ...)
+result.status      # :converged / :stalled / :iteration_limit (distributed)
+result.zones       # per-zone (bus, gen, branch, cost)
+result.consensus   # boundary-variable agreement across zones
+result.diagnostics # iteration history (residuals, ρ, ...)
 ```
 
-Export everything to CSV (requires `using CSV, DataFrames`):
+Write everything to CSV (needs `using CSV`):
 
 ```julia
-Lirion.to_csvs(out, "results/")
+Lirion.to_csvs(result, "results/")
 ```
 
 ## Performance & Threading
 
-Lirion has two very different workloads and each one has its own
-optimal threading configuration. The golden rule is **never nest
-parallelism**: either go *deep* (one solver, many BLAS threads) or
-*wide* (many zones, one BLAS thread each).
+Lirion has two very different workloads, and each wants a different threading setup.
+The rule is **never nest parallelism**: go *deep* (centralized: one solver, BLAS on all
+cores) or *wide* (distributed: many zones, one BLAS thread each).
 
-### Centralized — leave the defaults
+**Centralized.** Leave the defaults. Don't set `OPENBLAS_NUM_THREADS=1`, or the dense
+factorizations lose their threads.
 
-One solver instance; give BLAS all the physical cores so matrix
-factorizations are fast. No environment variables needed — in particular,
-do **not** set `OPENBLAS_NUM_THREADS=1` here, or factorizations will be slow.
-
-### Distributed — pin BLAS and set Julia threads
-
-The one setting that **must** be in place before launching Julia is
-`JULIA_NUM_THREADS` (it cannot be changed at runtime). Lirion already scopes
-BLAS to a single thread during the parallel zone solves, so pinning the BLAS
-environment variables below is belt-and-suspenders — it just covers the phases
-outside that scope.
-
-**Linux (bash / zsh):**
+**Distributed.** Set `JULIA_NUM_THREADS` before you launch Julia (it can't change at
+runtime; the `-t N` flag works too), and pin BLAS to one thread:
 
 ```bash
-export JULIA_NUM_THREADS=$(getconf _NPROCESSORS_ONLN)
-export OPENBLAS_NUM_THREADS=1
-export OMP_NUM_THREADS=1
-export MKL_NUM_THREADS=1
+export JULIA_NUM_THREADS=$(getconf _NPROCESSORS_ONLN)   # macOS: $(sysctl -n hw.ncpu)
+export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
 julia --project
 ```
 
-**macOS (bash / zsh):**
+On Windows PowerShell, set `$env:JULIA_NUM_THREADS = $env:NUMBER_OF_PROCESSORS` and the
+three BLAS variables to `"1"`. These counts are logical CPUs (hyperthreads included),
+which is what you want here: one Julia thread per zone.
 
-```bash
-export JULIA_NUM_THREADS=$(sysctl -n hw.ncpu)
-export OPENBLAS_NUM_THREADS=1
-export OMP_NUM_THREADS=1
-export MKL_NUM_THREADS=1
-julia --project
-```
-
-**Windows (PowerShell):**
-
-```powershell
-$env:JULIA_NUM_THREADS   = $env:NUMBER_OF_PROCESSORS
-$env:OPENBLAS_NUM_THREADS = "1"
-$env:OMP_NUM_THREADS      = "1"
-$env:MKL_NUM_THREADS      = "1"
-julia --project
-```
-
-After loading, Lirion prints the active configuration:
-
-```
-[ Info: [Lirion] Threads: Julia=28 | BLAS=1
-```
-
-For the full rationale (why hyperthreads hurt BLAS, why Lirion
-auto-scopes BLAS during distributed runs, verification tips), see
-the **Performance & Threading** page in the documentation.
+Lirion scopes BLAS to one thread for the whole distributed solve (so the variables above
+are belt-and-suspenders) and logs `[Lirion] Threads: Julia=N | BLAS=M` on load so you can
+check it took. For the rationale and verification tips, see the **Performance & Threading**
+page in the documentation.
 
 ---
 
 ## Documentation
 
-Full documentation — installation, centralized & distributed workflows, solver
-configuration, examples, and API reference — is in preparation. The link will
-appear here once it is published.
+The [Lirion documentation](https://mateuskaiss.github.io/Lirion.jl/) comes in two parts.
 
-## Mathematical Foundations Website
+The **user guide** is the practical half: installation, the centralized and
+distributed workflows, solver configuration, worked examples, and the API reference.
 
-Lirion is accompanied by a dedicated technical & instructive website, providing learning resources for anyone interested in expanding their knowledge of these topics.
+The **theory** half builds each model from the ground up instead of just listing it.
+It grows out of the master's research (still ongoing) of the lead developer,
+Mateus Kaiss, and derives every formulation from first principles:
 
-Rather than just cataloguing the formulations, the site builds the theory **from
-the ground up** deriving each model from first
-principles, including:
-
-- **Physical foundations** — from Maxwell's equations and circuit laws to the power-flow equations
-- **Optimization theory** — convexity, KKT conditions, duality, and the relaxation hierarchy
-- **The eleven OPF formulations** (DC, AC, ACR, IVR, LPAC, SOCWR, QC, SDPWRM, SOCBF, BFA, NFA) and how each is derived
-- **Distributed methods** — ADMM and ALADIN derivations and penalty/update rules
-- **Coupling-variable design** and network decomposition analysis
-
-*Link coming soon.*
+- the **twelve OPF formulations** (DC, AC, ACR, IVR, LPAC, SOCWR, SOCWRNL, QC, SDPWRM,
+  SOCBF, BFA, NFA), and where each one comes from;
+- the **distributed methods**, with the ADMM and ALADIN derivations and their penalty
+  and update rules;
+- the **coupling-variable design** and the reasoning behind the network decomposition.
 
 
 ---
@@ -374,9 +287,8 @@ principles, including:
 
 This software is part of an ongoing research program. The following works have been produced as part of this project's development:
 
-1. **[White Paper]** - *Lirion.jl: A Distributed Framework for Power Systems*, (In Preparation).
-2. *On the Impact of Network Sectioning and Coupling Variable Choices in ADMM-Based Distributed Optimal Power Flow*, (In Preparation).
-3. **BSc Thesis** - *Desenvolvimento de Ferramenta para Determinação do Fluxo de Potência Ótimo em Redes Elétricas*, Mateus Kaiss, UFPR (2025). [Link to University Repository/PDF]
+1. **BSc Thesis** — *Desenvolvimento de Ferramenta para Determinação do Fluxo de Potência Ótimo em Redes Elétricas*. Mateus Kaiss, UFPR (2025). [Link to University Repository/PDF]
+2. **White Paper** — *Lirion.jl: A Unified Framework for Centralized and Certified Distributed Optimal Power Flow*. Mateus Kaiss et al. (in preparation).
 
 ## Citing Lirion
 
@@ -385,7 +297,7 @@ If you find Lirion useful in your work, we kindly request that you cite it:
 ```bibtex
 @software{kaiss2026lirion,
   author  = {Kaiss, Mateus and Küster, Kristie Kaminski and Gebbran, Daniel},
-  title   = {{Lirion.jl}: A {Julia} Framework for Centralized and Distributed Optimal Power Flow},
+  title   = {{Lirion.jl}: A Unified Framework for Centralized and Certified Distributed Optimal Power Flow},
   year    = {2026},
   version = {0.1.0},
   url     = {https://github.com/MateusKaiss/Lirion.jl}
@@ -404,11 +316,6 @@ Lirion.jl is the result of a collective research effort under the coordination o
 
 - **Prof. Dr. Kristie Kaminski Küster**: Academic Advisor. Provides critical guidance in power systems engineering, reviews the project's logic and implementation, and coordinates the research group's scientific strategy.
 
-- **Andressa Mathias Pedroso**: Lead Web Developer. Responsible for the design and development of the official Lirion platform and online presence.
-
-## Funding
-
-The authors gratefully acknowledge Brazil's Conselho Nacional de Desenvolvimento Científico e Tecnológico (CNPq) for its support through grant 447271/2024-5 — established in 2024 and executed from 2025 through present — led by Daniel Gebbran as the Principal Investigator. This support has been essential in providing the institutional framework, scientific scope, and computational resources essential for the conceptualization and development of Lirion.jl, enabling the continued development, scientific expansion, and open-source release of this work.
 
 ## Julia community
 
@@ -418,6 +325,10 @@ Lirion does not aim to replicate PowerModels, but rather to explore complementar
 
 **PowerModels.jl**:
 https://github.com/lanl-ansi/PowerModels.jl
+
+## Funding
+
+The authors gratefully acknowledge Brazil's Conselho Nacional de Desenvolvimento Científico e Tecnológico (CNPq) for its support through grant 447271/2024-5 — established in 2024 and executed from 2025 through present — led by Daniel Gebbran as the Principal Investigator. This support has been essential in providing the institutional framework, scientific scope, and computational resources essential for the conceptualization and development of Lirion.jl, enabling the continued development, scientific expansion, and open-source release of this work.
 
 ## License
 
