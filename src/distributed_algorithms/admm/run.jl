@@ -60,7 +60,7 @@ function run_algorithm(
     tag_str = _print_tag(ws)
     final_rhos = _get_rhos(ws)
     rho_lines = [
-        "$(k) inicial: $(initial_rhos[k]) | $(k) final: $(final_rhos[k])"
+        "$(k) initial: $(initial_rhos[k]) | $(k) final: $(final_rhos[k])"
         for k in keys(final_rhos)
     ]
     if _FAST_USE_LOGS

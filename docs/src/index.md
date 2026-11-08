@@ -13,7 +13,7 @@
 
 Lirion is a Julia package for Optimal Power Flow (OPF). You can solve a case centrally, as a single optimization problem, or you can distribute it. In the distributed setting the grid is split into zones. Each zone solves its own subproblem, and the zones coordinate only through the variables they share at their boundaries.
 
-Centralized, Lirion covers a wide range of models. The exact AC formulation comes in polar and rectangular coordinates, and in the current-voltage form. The convex relaxations are SOCWR (Jabr), QC, and SDP. The linear and approximate models are DC, LPAC, NFA, and BFA (LinDistFlow). For the distributed setting, Lirion provides two coordination methods, **ADMM** and **ALADIN**, currently for the DC, AC, and second-order-cone models. Either way, you choose how the grid is partitioned and which variables the zones agree on.
+Centralized, Lirion covers a wide range of models. The exact AC formulation comes in polar and rectangular coordinates, and in the current-voltage form. The convex relaxations are SOCWR (Jabr) and its smooth variant SOCWRNL, QC, SDPWRM, and the branch-flow SOCBF. The linear and approximate models are DC, LPAC, NFA, and BFA (LinDistFlow). For the distributed setting, Lirion provides two coordination methods, **ADMM** and **ALADIN**, currently for the DC, AC, and second-order-cone models. Either way, you choose how the grid is partitioned and which variables the zones agree on.
 
 ## How this documentation is structured
 

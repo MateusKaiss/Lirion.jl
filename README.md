@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/src/assets/logo.png" alt="Lirion.jl" 
+  <img src="https://raw.githubusercontent.com/MateusKaiss/Lirion.jl/master/docs/src/assets/logo.png" alt="Lirion.jl" 
   width="600"/>
 </p>
 
@@ -90,7 +90,7 @@ The centralized and distributed examples below use `pglib_opf_case24_ieee_rts.m`
 the **PGLib-OPF** benchmark library, shipped with Lirion. They assume you cloned the
 repository and started Julia from its root (`git clone … && cd Lirion.jl && julia
 --project`); otherwise pass an absolute path to any MATPOWER file. The documentation
-has a page for each formulation and each algorithm.
+covers the formulations and the distributed algorithms in depth.
 
 If you don't pass a solver, Lirion uses a per-formulation default:
 
@@ -276,8 +276,8 @@ Mateus Kaiss, and derives every formulation from first principles:
 
 - the **twelve OPF formulations** (DC, AC, ACR, IVR, LPAC, SOCWR, SOCWRNL, QC, SDPWRM,
   SOCBF, BFA, NFA), and where each one comes from;
-- the **distributed methods**, with the ADMM and ALADIN derivations and their penalty
-  and update rules;
+- the **distributed methods** — how the grid is sectioned into zones and what the
+  zones exchange at their boundaries;
 - the **coupling-variable design** and the reasoning behind the network decomposition.
 
 
@@ -287,7 +287,7 @@ Mateus Kaiss, and derives every formulation from first principles:
 
 This software is part of an ongoing research program. The following works have been produced as part of this project's development:
 
-1. **BSc Thesis** — *Desenvolvimento de Ferramenta para Determinação do Fluxo de Potência Ótimo em Redes Elétricas*. Mateus Kaiss, UFPR (2025). [Link to University Repository/PDF]
+1. **BSc Thesis** — *Desenvolvimento de Ferramenta para Determinação do Fluxo de Potência Ótimo em Redes Elétricas*. Mateus Kaiss, UFPR (2025).
 2. **White Paper** — *Lirion.jl: A Unified Framework for Centralized and Certified Distributed Optimal Power Flow*. Mateus Kaiss et al. (in preparation).
 
 ## Citing Lirion
@@ -310,9 +310,9 @@ A white paper describing Lirion is in preparation; this entry will be updated wi
 
 Lirion.jl is the result of a collective research effort under the coordination of the Federal University of Parana. The project was conceptualized by Mateus Kaiss and Daniel Gebbran, evolving towards a comprehensive open-source framework. The key collaborators of this work are:
 
-- **Mateus Kaiss**: Researcher and Lead Developer. Responsible for R\&D, implementation, maintenance, and technical architecture of the project.
+- **Mateus Kaiss**: Researcher and Lead Developer. Responsible for R&D, implementation, maintenance, and technical architecture of the project.
 
-- **Daniel Gebbran, PhD**: Research Lead. Established the scientific workflow \& logic, and provides continuous high-level technical direction, including system architecture design, collaborative debugging, and feature implementation oversight. 
+- **Daniel Gebbran, PhD**: Research Lead. Established the scientific workflow & logic, and provides continuous high-level technical direction, including system architecture design, collaborative debugging, and feature implementation oversight.
 
 - **Prof. Dr. Kristie Kaminski Küster**: Academic Advisor. Provides critical guidance in power systems engineering, reviews the project's logic and implementation, and coordinates the research group's scientific strategy.
 

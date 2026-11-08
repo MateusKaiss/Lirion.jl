@@ -17,7 +17,9 @@ using MathOptInterface
 using Clarabel
 
 const MOI = MathOptInterface
-const _FAST_USE_LOGS = true
+
+# progress logs off unless LIRION_VERBOSE=true
+const _FAST_USE_LOGS = get(ENV, "LIRION_VERBOSE", "false") == "true"
 
 function __init__()
     if _FAST_USE_LOGS

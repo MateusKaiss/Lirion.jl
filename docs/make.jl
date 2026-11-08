@@ -2,8 +2,8 @@
 # Lirion.jl — Documentation 
 # =============================================================================
 
-import Documenter
 using Documenter
+using DocumenterCitations
 using Lirion
 
 bib = CitationBibliography(
@@ -53,6 +53,7 @@ Documenter.makedocs(
             "Results" => "usage/results.md",
         ],
         "Theory" => [
+            "Foundations" => "teoria/fundamentos.md",
             "Exact formulations" => [
                 "AC Polar"              => "teoria/exatas/ac_polar.md",
                 "AC Rectangular (ACR)"  => "teoria/exatas/acr.md",
@@ -80,12 +81,9 @@ Documenter.makedocs(
     ],
 )
 
-# --- Deployment: INTENTIONALLY DISABLED in the scaffold ----------------------
-# Do NOT uncomment here. Running this would push the built site to the
-# gh-pages branch of origin. Re-enable only in the release, after confirming
-# the repo slug and that a deploy key / GITHUB_TOKEN is configured.
-#
-# Documenter.deploydocs(
-#     repo         = "github.com/MateusKaiss/Lirion.jl.git",
-#     push_preview = false,
-# )
+# --- Deployment --------------------------------------------------------------
+# deploys only in CI; a local build is a no-op
+Documenter.deploydocs(
+    repo         = "github.com/MateusKaiss/Lirion.jl.git",
+    push_preview = false,
+)

@@ -7,7 +7,7 @@ All examples use `pglib_opf_case24_ieee_rts.m` from the [PGLib-OPF library](http
 ```julia
 using Lirion
 
-result = solve("pglib_opf_case24_ieee_rts.m"; model = dc())
+result = solve("test/matpower_cases/pglib_opf_case24_ieee_rts.m"; model = dc())
 
 result.objective   # optimal cost
 result.status      # solver status
@@ -22,7 +22,7 @@ DC runs on OSQP by default. To swap in another solver, or to set options on the 
 ```julia
 using JuMP, OSQP
 
-result = solve("pglib_opf_case24_ieee_rts.m";
+result = solve("test/matpower_cases/pglib_opf_case24_ieee_rts.m";
     model = dc(),
     optimizer = optimizer_with_attributes(OSQP.Optimizer, "max_iter" => 1000),
 )

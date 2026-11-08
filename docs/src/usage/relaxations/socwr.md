@@ -7,7 +7,7 @@ All examples use `pglib_opf_case24_ieee_rts.m` from the [PGLib-OPF library](http
 ```julia
 using Lirion
 
-result = solve("pglib_opf_case24_ieee_rts.m"; model = socwr())
+result = solve("test/matpower_cases/pglib_opf_case24_ieee_rts.m"; model = socwr())
 
 result.objective   # optimal cost (a lower bound on the AC optimum)
 result.status      # solver status
@@ -22,7 +22,7 @@ SOCWR runs on Clarabel by default. To swap in another solver, or to set options 
 ```julia
 using JuMP, Clarabel
 
-result = solve("pglib_opf_case24_ieee_rts.m";
+result = solve("test/matpower_cases/pglib_opf_case24_ieee_rts.m";
     model = socwr(),
     optimizer = optimizer_with_attributes(Clarabel.Optimizer, "max_iter" => 1000),
 )

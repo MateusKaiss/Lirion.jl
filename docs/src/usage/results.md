@@ -12,7 +12,7 @@ A centralized solve populates the summary fields and the three solution tables.
 
 ```julia
 using Lirion
-result = solve("pglib_opf_case24_ieee_rts.m"; model = ac())
+result = solve("test/matpower_cases/pglib_opf_case24_ieee_rts.m"; model = ac())
 
 result.objective    # total generation cost (Float64)
 result.status       # :optimal, :local_optimal, :infeasible, ...
@@ -134,7 +134,7 @@ At convergence the `deviation` column sits near zero across the board. It is the
 
 A few more fields hold the objects behind a result, rarely needed day to day.
 
-- `result.model` is the underlying `JuMP` model for a centralized run (`nothing` for a distributed one), and `result.system` is the parsed `SystemData`.
+- `result.model` is the underlying `JuMP` model for a centralized run (`nothing` for a distributed one), and `result.system` is the parsed system: a `SystemData` for a centralized run, the partitioned system for a distributed one.
 - `result.partitions` is the `Partitions` object with the per-zone models and the index maps between zone-local and global numbering (`nothing` for a centralized run).
 - `result.diagnostics` is the iteration-by-iteration history. ADMM returns an `ADMMHistory` with `r_primal`, `r_dual`, `eps_primal`, `eps_dual`, the penalty track `rhos`, and a `meta` dictionary. ALADIN returns an `ALADINHistory`, which adds the step residuals `r_step_primal` and `eps_step_primal`, the dual update `lambda_step`, and the coordinator penalty `mus`. A centralized run carries an empty `NoDiagnostics`.
 

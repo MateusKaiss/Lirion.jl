@@ -226,7 +226,6 @@ end
 # ============================================================
 # Main entry point
 # ============================================================
-# TODO: timeseries preprocessing pipeline still needs full review.
 
 function preprocess_case_data!(
     raw_case::CaseRaw,

@@ -7,7 +7,7 @@ All examples use `pglib_opf_case24_ieee_rts.m` from the [PGLib-OPF library](http
 ```julia
 using Lirion
 
-result = solve("pglib_opf_case24_ieee_rts.m"; model = lpac())
+result = solve("test/matpower_cases/pglib_opf_case24_ieee_rts.m"; model = lpac())
 
 result.objective   # optimal cost
 result.status      # solver status
@@ -22,7 +22,7 @@ LPAC runs on Ipopt by default. To swap in another solver, or to set options on t
 ```julia
 using JuMP, Ipopt
 
-result = solve("pglib_opf_case24_ieee_rts.m";
+result = solve("test/matpower_cases/pglib_opf_case24_ieee_rts.m";
     model = lpac(),
     optimizer = optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000),
 )

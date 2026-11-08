@@ -18,13 +18,14 @@ function _print_summary!(
     result;
     rho_lines = (),
 )
-    println("\n$tag Resumo:")
+    _FAST_USE_LOGS || return nothing
+    println("\n$tag Summary:")
     println("→ Total generation cost = $(result.total_cost)")
     for line in rho_lines
         println(line)
     end
-    println("Iterações realizadas: $(result.iter_done)")
-    println("Tempo $algo_name: $(_pretty_time(result.elapsed_s))")
+    println("Iterations: $(result.iter_done)")
+    println("$algo_name time: $(_pretty_time(result.elapsed_s))")
     return nothing
 end
 

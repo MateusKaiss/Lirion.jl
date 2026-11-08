@@ -2,7 +2,7 @@
 
 A distributed solve uses the same `solve` you already know. You keep the model and the case, and you swap the `algorithm`: instead of `centralized()`, you pass `admm(...)` or `aladin(...)`. Lirion then splits the network into zones, each zone solves its own local OPF, and the zones coordinate on the boundary until they agree.
 
-The distributed algorithms run on the DC, AC, and SOCWR models.
+The distributed algorithms run on the DC, AC, SOCWR, and SOCWRNL models.
 
 !!! important "Important"
     The runs below are simple examples. The way you configure a distributed algorithm changes the optimization problem itself, so reading the next pages first is strongly recommended. See [Coupling and sectioning](coupling_sectioning.md), [ADMM settings](@ref), and [ALADIN settings](@ref). For the theory behind the algorithms, see [ADMM](@ref) and [ALADIN](@ref).
