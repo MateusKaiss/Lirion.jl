@@ -4,7 +4,7 @@ Lirion runs two very different workloads and each one has its own
 optimal threading configuration. Getting this right can be the
 difference between a distributed run taking **minutes** and **hours**.
 
-When Lirion loads it prints the current setup:
+With the opt-in flag `LIRION_VERBOSE=true` set before Lirion is precompiled, loading it prints the current setup:
 
 ```
 [ Info: [Lirion] Threads: Julia=1 | BLAS=14
@@ -137,7 +137,7 @@ You still need the `*_NUM_THREADS=1` exports for BLAS / OMP / MKL.
 
 ## Verifying the configuration
 
-After loading Lirion, the info line tells you what the current
+With verbose logging enabled, loading Lirion prints what the current
 session is using:
 
 ```julia
@@ -148,7 +148,7 @@ julia> using Lirion
 - `Julia=28 | BLAS=1` → correctly configured for distributed.
 - `Julia=1  | BLAS=14` → correctly configured for centralized.
 
-The info line prints once, at load. To re-check mid-session, call
+With `LIRION_VERBOSE=true` set at precompilation this line prints once at load; by default Lirion loads silently. To check the configuration at any point, call
 `Lirion.threadinfo()` (not exported, so qualify it with the module);
 it prints the Julia, BLAS, and CPU thread counts.
 

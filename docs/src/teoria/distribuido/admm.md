@@ -3,7 +3,7 @@
 The alternating direction method of multipliers (**ADMM**) is the first of Lirion's two distributed algorithms. It solves the consensus problem set up on the [sectioning page](seccionamento_acoplamento.md#Consistency-constraints) by alternating three cheap steps: every region minimizes its own objective plus a quadratic penalty on its boundary copies, the copies of each shared quantity are averaged, and a dual price per copy is raised by whatever mismatch remains. It asks the regions for nothing but their solutions. Nothing else crosses the boundary, no gradient and no Hessian, which is why it runs on every model Lirion ships, the conic SOCWR included. [ALADIN](aladin.md) solves the same regional subproblems but coordinates them with second-order information and takes far fewer iterations near the solution; it needs that information from the subproblem, which the conic SOCWR supplies only in part, so under ALADIN the conic model stalls near its solver's accuracy. The trade is iteration count against generality. ADMM is slower to converge and indifferent to what the subproblem is. The form implemented is the general consensus ADMM of Boyd et al. [Boyd2011](@cite), with one penalty per coupled quantity.
 
 !!! note "What ADMM guarantees"
-    ADMM drives the copies of every shared quantity to a common value up to a tolerance; the copies agree to ``\epsilon``, never exactly. For a convex model (DC, SOCWR, SOCWRNL) the consensus problem is equivalent to the centralized one and ADMM converges to its optimum [Boyd2011](@cite), so the distributed cost meets the centralized oracle. For the non-convex AC model the same iteration is a local method with no convergence guarantee. It finds a point where the regions agree and each is locally optimal, which is what the centralized AC solve offers too.
+    ADMM drives the copies of every shared quantity to a common value up to a tolerance; the copies agree to ``\epsilon``, never exactly. For a convex model (DC, SOCWR, SOCWRNL) under a sectioning that keeps the full boundary coupling, `:state` or `:hybrid`, the consensus problem is the centralized one split across regions, and ADMM converges to its optimum [Boyd2011](@cite), so the distributed cost meets the centralized oracle. Power coupling is weaker. It reconciles only the boundary flow and leaves the voltage and angle continuity across the cut free, so it solves a relaxation, and for a convex model its optimum is a lower bound on the centralized cost rather than a match. For the non-convex AC model the same iteration is a local method with no convergence guarantee. It finds a point where the regions agree and each is locally optimal, which is what the centralized AC solve offers too.
 
 ## Derivation
 
@@ -115,7 +115,7 @@ for each block ``b`` on its own residual pair. When the copies lag the consensus
 
 ## ADMM iteration
 
-The constructor `admm()` builds the configuration for `solve`; the loop below lives in `src/distributed_algorithms/admm/`. Everything is in per unit, with ``\theta_{ref} = 0`` pinned in each region.
+The constructor `admm()` builds the configuration for `solve`; the loop below lives in `src/distributed_algorithms/admm/`. Everything is in per unit. The reference angle ``\theta_{ref} = 0`` is pinned only in the region that owns the system reference bus, not in every region.
 
 ### Sets
 
@@ -261,7 +261,7 @@ with the floor ignored when ``\rho^{\mathrm{floor}} = 0``. A changed ``\rho_b`` 
 ## What it captures / what it loses
 
 !!! info "Philosophy"
-    **Captures:** the full regional model. Every region solves its own exact or relaxed OPF with its own solver, in parallel, and the coordination needs only the solutions, so the method runs unchanged on DC, AC, SOCWR, and SOCWRNL, on any sectioning, and on buses shared by any number of regions. Convergence to the centralized optimum is guaranteed for the convex models, and the per-block penalties let state and power converge at their own rates.
+    **Captures:** the full regional model. Every region solves its own exact or relaxed OPF with its own solver, in parallel, and the coordination needs only the solutions, so the method runs unchanged on DC, AC, SOCWR, and SOCWRNL, on any sectioning, and on buses shared by any number of regions. Convergence to the centralized optimum is guaranteed for the convex models under state or hybrid coupling, and the per-block penalties let state and power converge at their own rates.
 
     **Loses:** curvature across the boundary. The coordination step is an average, so the regions learn about each other one hop per iteration and the rate depends on ``\rho`` and on the conditioning of the cut; a poor ``\rho`` costs hundreds of iterations, and the adaptive rule narrows that risk without removing it. The consensus is reached to a tolerance, never exactly, so the boundary quantities read from two regions differ by up to ``\epsilon``. On the non-convex AC model the method is local and offers no guarantee.
 

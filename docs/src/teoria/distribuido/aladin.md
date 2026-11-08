@@ -52,8 +52,7 @@ holds a copy of. For a tie-line cut with one shared angle ``\theta_h`` between
 two regions, ``A_1 x^{(1)} = \theta_h^{(1)}`` and ``A_2 x^{(2)} = -\theta_h^{(2)}``,
 so the coupling row reads ``\theta_h^{(1)} - \theta_h^{(2)} = 0``. Under `:power`
 the row is a difference of flows, which in the DC model are themselves linear in
-the angles; under `:split_bus` it is a sum of injections. In every case the
-coupling is a set of affine rows, which is the form [Houska2016](@cite) assumes.
+the angles; under `:split_bus` it is a sum of injections. In DC, and under state coupling for every model, these rows are affine, the form [Houska2016](@cite) assumes. Under AC power or hybrid coupling the shared flow is a nonlinear function of the region's variables, which Lirion linearizes in the coordinator QP. That is an extension beyond the paper's affine assumption, with the same fixed points.
 Every coupling row carries one multiplier ``\lambda_j``, the price of its
 mismatch, and ``\lambda`` is shared by all the regions that enter the row.
 
@@ -420,6 +419,14 @@ repeat for ``k = 1, 2, \dots`` until `max_iter` (default 100):
     Hessian. Adding
     ``\rho\Sigma_r`` damps the correction and slows the local rate at large
     ``\rho``, and it is the choice the shipped campaigns were run with.
+
+    **Nonlinear coupling.** The paper assumes the coupling ``\sum_r A_r y_r = b``
+    is affine. It is, for DC and for state coupling. Under AC power or hybrid
+    coupling, and under dummy-bus, the coupled flow is a nonlinear function of the
+    region's variables, so Lirion linearizes it in the coordinator QP, and the
+    coordinator curvature carries no ``\lambda^{\top}\nabla^2 c`` term for that
+    coupling. This is a Newton-type extension with the same fixed points, outside
+    the affine setting the paper proves its rate for.
 
     **The conic SOCWR.** The paper assumes twice-differentiable ``f_r`` and
     ``h_r``. The cones of the conic SOCWR are not, so its ``B_r`` carries no cone
