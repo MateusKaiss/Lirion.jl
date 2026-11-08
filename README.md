@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/MateusKaiss/Lirion.jl/master/docs/src/assets/logo.png" alt="Lirion.jl" 
+  <img src="docs/src/assets/logo.png" alt="Lirion.jl" 
   width="600"/>
 </p>
 
@@ -10,6 +10,11 @@
 
 <p align="center">
   A Julia package for solving Optimal Power Flow (OPF) problems using both centralized and distributed algorithms.
+</p>
+
+<p align="center">
+  <a href="https://mateuskaiss.github.io/Lirion.jl/"><img src="https://img.shields.io/badge/docs-blue.svg" alt="Documentation"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
 ## Why Lirion?  
