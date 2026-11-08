@@ -39,6 +39,83 @@ function build_quad_branch_rt_expr!(
 end
 
 # ------------------------------------------------------------
+# Power — SOCWRNL lifted flow penalty (opt-in)
+# ------------------------------------------------------------
+
+const _SOCWRNL_LIFTED_FLOW_ENV = "LIRION_SOCWRNL_LIFTED_FLOW"
+const _SOCWRNL_LIFT_KEY = :socwrnl_lifted_pq
+
+@inline function _socwrnl_lifted_flow_env_enabled()::Bool
+    v = lowercase(strip(get(ENV, _SOCWRNL_LIFTED_FLOW_ENV, "")))
+    return v == "1" || v == "true" || v == "yes" || v == "on"
+end
+
+# Lifted carrier store: (zone branch l, side) -> (vp, vq), kept in model.ext.
+const _LiftStore = Dict{Tuple{Int, Symbol}, Tuple{JuMP.VariableRef, JuMP.VariableRef}}
+
+# Serial (quadratic builder only); creates the store on first use.
+@inline function _lift_store!(part::PartitionSOCWR)::Union{Nothing, _LiftStore}
+    m = part.local_model::JuMP.Model
+    s = get(m.ext, _SOCWRNL_LIFT_KEY, nothing)
+    s === nothing || return s::_LiftStore
+    (part.zone_model === SOCWRNL && _socwrnl_lifted_flow_env_enabled()) || return nothing
+    s = _LiftStore()
+    m.ext[_SOCWRNL_LIFT_KEY] = s
+    return s
+end
+
+# Read-only lookup.
+@inline function _lift_store(part::PartitionSOCWR)::Union{Nothing, _LiftStore}
+    s = get((part.local_model::JuMP.Model).ext, _SOCWRNL_LIFT_KEY, nothing)
+    return s === nothing ? nothing : s::_LiftStore
+end
+
+@inline _pq_flow_side_exprs(m::JuMP.Model, l::Int, side::Symbol) =
+    side === :to ? _pq_flow_to_exprs(m, l) : _pq_flow_from_exprs(m, l)
+
+# Penalty carriers for the QUADRATIC builder: may create the lifted pair.
+function _pq_penalty_carriers!(part::PartitionSOCWR, l::Int, side::Symbol)
+    m = part.local_model::JuMP.Model
+    store = _lift_store!(part)
+    store === nothing && return _pq_flow_side_exprs(m, l, side)
+    key = (l, side)
+    vv = get(store, key, nothing)
+    vv === nothing || return vv
+    p, q = _pq_flow_side_exprs(m, l, side)
+    vp = JuMP.@variable(m, base_name = "lift_p[$(l),$(side)]")
+    vq = JuMP.@variable(m, base_name = "lift_q[$(l),$(side)]")
+    # Linear equalities tying the carriers to the Ohm's-law flow of the zone state.
+    JuMP.@constraint(m, vp == p)
+    JuMP.@constraint(m, vq == q)
+    # explicit start (Ipopt starts from VariablePrimalStart)
+    JuMP.set_start_value(vp, 0.0)
+    JuMP.set_start_value(vq, 0.0)
+    store[key] = (vp, vq)
+    return (vp, vq)
+end
+
+# Penalty carriers for the LINEAR builders: read-only, fail-closed.
+function _pq_penalty_carriers(part::PartitionSOCWR, l::Int, side::Symbol)
+    m = part.local_model::JuMP.Model
+    store = _lift_store(part)
+    store === nothing && return _pq_flow_side_exprs(m, l, side)
+    vv = get(store, (l, side), nothing)
+    vv === nothing && error(
+        "SOCWRNL lifted flow: no lifted carrier for zone $(part.id) branch l=$(l) " *
+        "side=$(side) — the quadratic builder must run before the linear term.",
+    )
+    return vv
+end
+
+# True when the lift is active on at least one zone of `parts`.
+function _socwrnl_lifted_flow_active(parts::Partitions{PartitionSOCWR})::Bool
+    for part in parts.parts
+        _lift_store(part) === nothing || return true
+    end
+    return false
+end
+
+# ------------------------------------------------------------
 # Power
 # ------------------------------------------------------------
 
@@ -49,13 +126,12 @@ function build_quad_branch_pq_expr!(
     zone_edges::Vector{Int},
     branch_pairs::Vector{NTuple{4, Int}} = NTuple{4, Int}[],
 )
-    m = part.local_model::JuMP.Model
     quad = zero(JuMP.QuadExpr)
 
     @inbounds for e in zone_edges
         l = part.branch_idx_full_to_zone[e]
         l == 0 && continue
-        p, q = _pq_flow_from_exprs(m, l)
+        p, q = _pq_penalty_carriers!(part, l, :from)
         quad += 0.5 * rho_p * p^2 + 0.5 * rho_q * q^2
     end
     pos = part.position
@@ -64,7 +140,7 @@ function build_quad_branch_pq_expr!(
             l = part.branch_idx_full_to_zone[ga]
             if l != 0
                 # half-A: dummy bus is its TO end -> TO-side flow (see _pq_flow_to_exprs).
-                p, q = _pq_flow_to_exprs(m, l)
+                p, q = _pq_penalty_carriers!(part, l, :to)
                 quad += 0.5 * rho_p * p^2 + 0.5 * rho_q * q^2
             end
         end
@@ -72,7 +148,7 @@ function build_quad_branch_pq_expr!(
             l = part.branch_idx_full_to_zone[gb]
             if l != 0
                 # half-B: dummy bus is its FROM end -> from-side is correct.
-                p, q = _pq_flow_from_exprs(m, l)
+                p, q = _pq_penalty_carriers!(part, l, :from)
                 quad += 0.5 * rho_p * p^2 + 0.5 * rho_q * q^2
             end
         end
@@ -186,13 +262,12 @@ function build_linear_branch_pq_term(
     rho_p::Float64,
     rho_q::Float64,
 )::JuMP.AffExpr
-    m = part.local_model::JuMP.Model
     lin = zero(JuMP.AffExpr)
 
     @inbounds for (k, e) in enumerate(interzonal)
         l = part.branch_idx_full_to_zone[e]
         l == 0 && continue
-        p, q = _pq_flow_from_exprs(m, l)
+        p, q = _pq_penalty_carriers(part, l, :from)
 
         p_cons = p_consensus[k]
         q_cons = q_consensus[k]
@@ -215,7 +290,6 @@ function build_linear_dummy_pq_term(
     rho_p::Float64,
     rho_q::Float64,
 )::JuMP.AffExpr
-    m = part.local_model::JuMP.Model
     lin = zero(JuMP.AffExpr)
     isempty(branch_pairs) && return lin
 
@@ -229,7 +303,7 @@ function build_linear_dummy_pq_term(
             l = part.branch_idx_full_to_zone[ga]
             if l != 0
                 # half-A: dummy bus is its TO end -> TO-side flow (see _pq_flow_to_exprs).
-                p, q = _pq_flow_to_exprs(m, l)
+                p, q = _pq_penalty_carriers(part, l, :to)
                 lin += (p_dual - rho_p * p_cons) * p +
                        (q_dual - rho_q * q_cons) * q
             end
@@ -238,7 +312,7 @@ function build_linear_dummy_pq_term(
             l = part.branch_idx_full_to_zone[gb]
             if l != 0
                 # half-B: dummy bus is its FROM end -> from-side is correct.
-                p, q = _pq_flow_from_exprs(m, l)
+                p, q = _pq_penalty_carriers(part, l, :from)
                 lin += (p_dual - rho_p * p_cons) * p +
                        (q_dual - rho_q * q_cons) * q
             end

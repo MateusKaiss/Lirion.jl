@@ -433,11 +433,8 @@ end
 # ============================================================
 # AC - DUMMY-BUS POWER (Method 2 with power-only coupling)
 # ------------------------------------------------------------
-# Theory: dummy bus d is artificial; θ_d, V_d gauge-invariant for cost.
-# Enforcing P_{m,d} = P_{d,n} and Q_{m,d} = Q_{d,n} pins the physical
-# transfer; artificial gens close the local KCLs. In AC (NLP) the method
-# is empirically less stable than SOCWR — tightly-bounded variants can
-# produce NaN or infeasibility in some iterations.
+# Dummy bus d is artificial (θ_d, V_d free); P/Q consensus on the two halves
+# pins the transfer. Less stable than SOCWR on tightly-bounded variants.
 # ============================================================
 function run_admm_ac_dummybus_power_tests(;
     rtol = 0.05,

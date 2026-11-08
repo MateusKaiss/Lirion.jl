@@ -42,6 +42,23 @@ end
 # Public API — solve
 # ============================================================
 
+"""
+    solve(path; model, algorithm=centralized(), optimizer=nothing, outputs=false, plots=false)
+
+Solve an OPF on the MATPOWER case at `path` and return a [`LirionResult`](@ref).
+
+- `model`: the formulation, e.g. `ac()`, `dc()`, `socwr()` (required).
+- `algorithm`: `centralized()` by default, or `admm(...)` / `aladin(...)` for a
+  distributed solve, which needs a case that already carries zones.
+- `optimizer`: a JuMP optimizer to override the per-model default.
+- `outputs`: write the solution tables to CSV next to the case.
+- `plots`: write convergence plots (distributed only; needs `using PlotlyLight`).
+
+```julia
+result = solve("case.m"; model = ac())
+result.objective
+```
+"""
 function solve(
     path::AbstractString;
     model::Type{<:OPFModel},

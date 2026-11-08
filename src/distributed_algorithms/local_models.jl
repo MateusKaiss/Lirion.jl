@@ -172,7 +172,7 @@ function build_local_model!(
     interzonal_branches,
 )
     part.zone_edges = _zone_cut_edges(part, interzonal_branches)
-    model = _setup_partition_model!(part, sys_zone, SOCWR, optimizer_factory)
+    model = _setup_partition_model!(part, sys_zone, part.zone_model, optimizer_factory)
     part.v2_var = model[:v_magnitude_sq]
     for I in keys(part.v2_var)
         set_start_value(part.v2_var[I], 1.0)
@@ -192,7 +192,7 @@ function build_local_model!(
     interzonal_branches,
 )
     part.zone_edges = _zone_cut_edges(part, interzonal_branches)
-    _setup_partition_model!(part, sys_zone, SOCWR, optimizer_factory)
+    _setup_partition_model!(part, sys_zone, part.zone_model, optimizer_factory)
     return nothing
 end
 
@@ -208,7 +208,7 @@ function build_local_model!(
     interzonal_branches,
 )
     part.zone_edges = _zone_cut_edges(part, interzonal_branches)
-    model = _setup_partition_model!(part, sys_zone, SOCWR, optimizer_factory)
+    model = _setup_partition_model!(part, sys_zone, part.zone_model, optimizer_factory)
     part.v2_var = model[:v_magnitude_sq]
     for I in keys(part.v2_var)
         set_start_value(part.v2_var[I], 1.0)

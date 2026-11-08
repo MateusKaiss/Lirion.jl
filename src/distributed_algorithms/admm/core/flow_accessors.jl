@@ -68,8 +68,7 @@ end
     return JuMP.value(p)
 end
 
-# TO-side counterparts, for the dummy-bus half whose TO end IS the dummy bus.
-# See _pq_flow_to_exprs for why mixing sides leaks the half's series loss.
+# TO-side counterparts (dummy-bus half whose TO end is the dummy bus)
 @inline function _socwr_p_value_to(part::PartitionSOCWR, l::Int)
     p, _ = _pq_flow_to_exprs(part.local_model, l)
     return JuMP.value(p)

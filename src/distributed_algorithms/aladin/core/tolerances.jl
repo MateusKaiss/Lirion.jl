@@ -423,6 +423,22 @@ end
     return ni, nj
 end
 
+@inline function _norms_dummy_pq_socwr(ws)
+    ni = 0.0
+    nj = 0.0
+    @inbounds for pair in ws.dummy_line_pairs
+        yi = ws.zones[pair.zone_i].y
+        yj = ws.zones[pair.zone_j].y
+        pfi = _socwr_dummy_flow_value_at_y(pair, yi, :i, :p)
+        pfj = _socwr_dummy_flow_value_at_y(pair, yj, :j, :p)
+        qfi = _socwr_dummy_flow_value_at_y(pair, yi, :i, :q)
+        qfj = _socwr_dummy_flow_value_at_y(pair, yj, :j, :q)
+        ni += pfi * pfi + qfi * qfi
+        nj += pfj * pfj + qfj * qfj
+    end
+    return ni, nj
+end
+
 function compute_tolerances!(
     ws::SOCWRStateWorkspaceALADIN,
     eps_abs::Float64,
@@ -442,8 +458,11 @@ function compute_tolerances!(
     eps_abs::Float64,
     eps_rel::Float64,
 )
-    n = 2 * length(ws.interzonal_line_pairs)
-    ni, nj = _norms_edge_pq_socwr(ws)
+    n = 2 * length(ws.interzonal_line_pairs) + 2 * length(ws.dummy_line_pairs)
+    ni_e, nj_e = _norms_edge_pq_socwr(ws)
+    ni_d, nj_d = _norms_dummy_pq_socwr(ws)
+    ni = ni_e + ni_d
+    nj = nj_e + nj_d
     _finalize_eps!(ws, n, ni, nj, eps_abs, eps_rel)
     return nothing
 end
@@ -455,13 +474,14 @@ function compute_tolerances!(
 )
     n =
         length(ws.bus_pairs) + 4 * length(ws.interzonal_line_pairs) +
-        2 * length(ws.split_bus_pairs)
+        2 * length(ws.split_bus_pairs) + 2 * length(ws.dummy_line_pairs)
     ni_b, nj_b = _norms_bus_v2_socwr(ws)
     ni_rt, nj_rt = _norms_edge_rt_socwr(ws)
     ni_pq, nj_pq = _norms_edge_pq_socwr(ws)
     ni_sp, nj_sp = _norms_split_pq_socwr(ws)
-    ni = ni_b + ni_rt + ni_pq + ni_sp
-    nj = nj_b + nj_rt + nj_pq + nj_sp
+    ni_d, nj_d = _norms_dummy_pq_socwr(ws)
+    ni = ni_b + ni_rt + ni_pq + ni_sp + ni_d
+    nj = nj_b + nj_rt + nj_pq + nj_sp + nj_d
     _finalize_eps!(ws, n, ni, nj, eps_abs, eps_rel)
     return nothing
 end

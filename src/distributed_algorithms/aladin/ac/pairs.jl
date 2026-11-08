@@ -107,7 +107,12 @@ function _build_shared_bus_pairs(
     pairs = SharedBusPairAC[]
     for consensus_idx in sort!(collect(keys(visits)))
         cidx_visits = visits[consensus_idx]
-        length(cidx_visits) >= 2 || continue
+        if length(cidx_visits) < 2
+            @warn "ALADIN-AC pair formation: shared bus $(bus_id_by_cidx[consensus_idx]) " *
+                  "(consensus_idx $(consensus_idx)) is present in only " *
+                  "$(length(cidx_visits)) zone(s) — coupling DROPPED. Check the partition."
+            continue
+        end
         sort!(cidx_visits; by = first)
         root_zone, root_theta_col, root_vm_col = cidx_visits[1]
         for k in 2:length(cidx_visits)
@@ -143,7 +148,12 @@ function _build_interzonal_line_pairs(
             local_idx === nothing && continue
             push!(line_visits, (zone_pos, local_idx))
         end
-        length(line_visits) == 2 || continue
+        if length(line_visits) != 2
+            @warn "ALADIN-AC pair formation: interzonal line $(line_global) " *
+                  "(consensus_idx $(consensus_idx)) found in $(length(line_visits)) " *
+                  "zone(s), expected 2 — coupling DROPPED. Check the partition."
+            continue
+        end
         zone_i, local_i = line_visits[1]
         zone_j, local_j = line_visits[2]
         push!(
@@ -177,7 +187,13 @@ function _build_dummy_line_pairs(
         part_b = partitions.parts[zone_b]
         local_a = part_a.branch_idx_full_to_zone[line_global_a]
         local_b = part_b.branch_idx_full_to_zone[line_global_b]
-        (local_a == 0 || local_b == 0) && continue
+        if local_a == 0 || local_b == 0
+            @warn "ALADIN-AC pair formation: dummy line pair $(consensus_idx) " *
+                  "(lines $(line_global_a) in zone $(zone_a), $(line_global_b) in zone $(zone_b)) " *
+                  "has a half missing from its zone (local ids $(local_a), $(local_b)) — " *
+                  "coupling DROPPED. Check the partition."
+            continue
+        end
 
         zone_data_a = zones[zone_a]
         zone_data_b = zones[zone_b]
@@ -252,7 +268,13 @@ function _build_split_bus_pairs(
             push!(p_cols, zones[zone].var_to_col[p_inj_var])
             push!(q_cols, zones[zone].var_to_col[q_inj_var])
         end
-        (ok && length(copy_zones) >= 2) || continue
+        if !(ok && length(copy_zones) >= 2)
+            @warn "ALADIN-AC pair formation: split bus $(bus_id) (group $(consensus_idx), " *
+                  "zones $(group_zones)) has $(length(copy_zones)) usable injection " *
+                  "copies$(ok ? "" : " (a zone lacks its p_inj/q_inj variable)") — " *
+                  "coupling DROPPED. Check the partition."
+            continue
+        end
         push!(pairs, SplitBusPairAC(consensus_idx, bus_id, copy_zones, p_cols, q_cols))
     end
     return pairs

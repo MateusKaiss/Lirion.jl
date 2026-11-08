@@ -13,6 +13,7 @@ lpac = 189478.0284538199
 qc = 189706.17253221537
 socbf = 189706.17688306543
 socwr = 189706.07934969553
+socwrnl = 189706.05847366256
 
 [pm_reference]
 ac = 189764.0771673736
@@ -35,3 +36,4 @@ lpac = "local_optimal"
 qc = "local_optimal"
 socbf = "optimal"
 socwr = "almost_optimal"
+socwrnl = "local_optimal"

@@ -3,6 +3,22 @@
 # ============================================================
 
 # ============================================================
+# Zone cost — W-space override (diagonal conic / exact SOCWRNL)
+# ============================================================
+@inline function _add_zone_cost!(
+    qp_obj::JuMP.QuadExpr,
+    zone::AladinZoneDataSOCWR,
+    dy::Vector{JuMP.VariableRef},
+)
+    if zone.exact_hessian
+        _add_full_hessian_zone_cost!(qp_obj, zone, dy)
+    else
+        _add_diagonal_zone_cost!(qp_obj, zone, dy)
+    end
+    return nothing
+end
+
+# ============================================================
 # Pair coupling expressions
 # ============================================================
 
@@ -143,6 +159,44 @@ end
     return expr
 end
 
+# ------------------------------------------------------------
+# Dummy p/q flow consensus (DummyBus sectioning)
+# ------------------------------------------------------------
+
+@inline function _add_socwr_dummy_flow_grad!(
+    expr::JuMP.AffExpr,
+    dy::Vector{JuMP.VariableRef},
+    cols::Vector{Int},
+    coefs::Vector{Float64},
+    sign::Float64,
+)
+    @inbounds for i in eachindex(cols)
+        JuMP.add_to_expression!(expr, sign * coefs[i], dy[cols[i]])
+    end
+    return nothing
+end
+
+@inline function _dummy_pq_coupling_expr_socwr!(
+    expr::JuMP.AffExpr,
+    zones::Vector{AladinZoneDataSOCWR},
+    dy_all::Vector{Vector{JuMP.VariableRef}},
+    pair::DummyLinePairSOCWR,
+    which::Symbol,   # :p or :q
+)
+    zi = zones[pair.zone_i]
+    zj = zones[pair.zone_j]
+
+    fi = _socwr_dummy_flow_value_at_y(pair, zi.y, :i, which)
+    fj = _socwr_dummy_flow_value_at_y(pair, zj.y, :j, which)
+    JuMP.add_to_expression!(expr, fi - fj)
+
+    coefs_i = which === :p ? pair.pcoef_i : pair.qcoef_i
+    coefs_j = which === :p ? pair.pcoef_j : pair.qcoef_j
+    _add_socwr_dummy_flow_grad!(expr, dy_all[pair.zone_i], pair.cols_i, coefs_i, +1.0)
+    _add_socwr_dummy_flow_grad!(expr, dy_all[pair.zone_j], pair.cols_j, coefs_j, -1.0)
+    return expr
+end
+
 # ============================================================
 # Dispatch
 # ============================================================
@@ -219,9 +273,12 @@ function solve_coordinator_qp!(ws::SOCWRPowerWorkspaceALADIN)
     qp_model, dy_all, qp_obj = _build_qp_skeleton(ws)
 
     n_edge = length(ws.interzonal_line_pairs)
+    n_dummy = length(ws.dummy_line_pairs)
 
     s_p = JuMP.@variable(qp_model, [1:n_edge], base_name = "sp")
     s_q = JuMP.@variable(qp_model, [1:n_edge], base_name = "sq")
+    s_pd = JuMP.@variable(qp_model, [1:n_dummy], base_name = "spd")
+    s_qd = JuMP.@variable(qp_model, [1:n_dummy], base_name = "sqd")
 
     mu = ws.mu[]
     @inbounds for k in 1:n_edge
@@ -230,10 +287,18 @@ function solve_coordinator_qp!(ws::SOCWRPowerWorkspaceALADIN)
         JuMP.add_to_expression!(qp_obj, ws.vars.q_flow.lambda[k], s_q[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_q[k], s_q[k])
     end
+    @inbounds for k in 1:n_dummy
+        JuMP.add_to_expression!(qp_obj, ws.vars.p_dummy.lambda[k], s_pd[k])
+        JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_pd[k], s_pd[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.q_dummy.lambda[k], s_qd[k])
+        JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_qd[k], s_qd[k])
+    end
     JuMP.@objective(qp_model, Min, qp_obj)
 
     cons_p = Vector{JuMP.ConstraintRef}(undef, n_edge)
     cons_q = Vector{JuMP.ConstraintRef}(undef, n_edge)
+    cons_pd = Vector{JuMP.ConstraintRef}(undef, n_dummy)
+    cons_qd = Vector{JuMP.ConstraintRef}(undef, n_dummy)
     @inbounds for k in 1:n_edge
         ep = zero(JuMP.AffExpr)
         _pq_coupling_expr_socwr!(ep, ws.zones, dy_all, ws.interzonal_line_pairs[k], :p)
@@ -242,6 +307,15 @@ function solve_coordinator_qp!(ws::SOCWRPowerWorkspaceALADIN)
         eq = zero(JuMP.AffExpr)
         _pq_coupling_expr_socwr!(eq, ws.zones, dy_all, ws.interzonal_line_pairs[k], :q)
         cons_q[k] = JuMP.@constraint(qp_model, eq == s_q[k])
+    end
+    @inbounds for k in 1:n_dummy
+        epd = zero(JuMP.AffExpr)
+        _dummy_pq_coupling_expr_socwr!(epd, ws.zones, dy_all, ws.dummy_line_pairs[k], :p)
+        cons_pd[k] = JuMP.@constraint(qp_model, epd == s_pd[k])
+
+        eqd = zero(JuMP.AffExpr)
+        _dummy_pq_coupling_expr_socwr!(eqd, ws.zones, dy_all, ws.dummy_line_pairs[k], :q)
+        cons_qd[k] = JuMP.@constraint(qp_model, eqd == s_qd[k])
     end
 
     JuMP.optimize!(qp_model)
@@ -254,6 +328,12 @@ function solve_coordinator_qp!(ws::SOCWRPowerWorkspaceALADIN)
     @inbounds for k in 1:n_edge
         nu_p[k] = -JuMP.dual(cons_p[k])
         nu_q[k] = -JuMP.dual(cons_q[k])
+    end
+    nu_pd = ws.vars.p_dummy.nu
+    nu_qd = ws.vars.q_dummy.nu
+    @inbounds for k in 1:n_dummy
+        nu_pd[k] = -JuMP.dual(cons_pd[k])
+        nu_qd[k] = -JuMP.dual(cons_qd[k])
     end
     return nothing
 end
@@ -268,6 +348,7 @@ function solve_coordinator_qp!(ws::SOCWRHybridWorkspaceALADIN)
     n_bus = length(ws.bus_pairs)
     n_edge = length(ws.interzonal_line_pairs)
     n_split = length(ws.split_bus_pairs)
+    n_dummy = length(ws.dummy_line_pairs)
 
     s_v2 = JuMP.@variable(qp_model, [1:n_bus], base_name = "sv2")
     s_r = JuMP.@variable(qp_model, [1:n_edge], base_name = "sr")
@@ -276,6 +357,8 @@ function solve_coordinator_qp!(ws::SOCWRHybridWorkspaceALADIN)
     s_q = JuMP.@variable(qp_model, [1:n_edge], base_name = "sq")
     s_pinj = JuMP.@variable(qp_model, [1:n_split], base_name = "spi")
     s_qinj = JuMP.@variable(qp_model, [1:n_split], base_name = "sqi")
+    s_pd = JuMP.@variable(qp_model, [1:n_dummy], base_name = "spd")
+    s_qd = JuMP.@variable(qp_model, [1:n_dummy], base_name = "sqd")
 
     mu = ws.mu[]
     @inbounds for k in 1:n_bus
@@ -298,6 +381,12 @@ function solve_coordinator_qp!(ws::SOCWRHybridWorkspaceALADIN)
         JuMP.add_to_expression!(qp_obj, ws.vars.q_inj.lambda[k], s_qinj[k])
         JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_qinj[k], s_qinj[k])
     end
+    @inbounds for k in 1:n_dummy
+        JuMP.add_to_expression!(qp_obj, ws.vars.p_dummy.lambda[k], s_pd[k])
+        JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_pd[k], s_pd[k])
+        JuMP.add_to_expression!(qp_obj, ws.vars.q_dummy.lambda[k], s_qd[k])
+        JuMP.add_to_expression!(qp_obj, 0.5 * mu, s_qd[k], s_qd[k])
+    end
     JuMP.@objective(qp_model, Min, qp_obj)
 
     cons_v2 = Vector{JuMP.ConstraintRef}(undef, n_bus)
@@ -307,6 +396,8 @@ function solve_coordinator_qp!(ws::SOCWRHybridWorkspaceALADIN)
     cons_q = Vector{JuMP.ConstraintRef}(undef, n_edge)
     cons_pinj = Vector{JuMP.ConstraintRef}(undef, n_split)
     cons_qinj = Vector{JuMP.ConstraintRef}(undef, n_split)
+    cons_pd = Vector{JuMP.ConstraintRef}(undef, n_dummy)
+    cons_qd = Vector{JuMP.ConstraintRef}(undef, n_dummy)
 
     @inbounds for k in 1:n_bus
         ev = zero(JuMP.AffExpr)
@@ -339,6 +430,15 @@ function solve_coordinator_qp!(ws::SOCWRHybridWorkspaceALADIN)
         _qinj_coupling_expr_socwr!(eqi, ws.zones, dy_all, ws.split_bus_pairs[k])
         cons_qinj[k] = JuMP.@constraint(qp_model, eqi == s_qinj[k])
     end
+    @inbounds for k in 1:n_dummy
+        epd = zero(JuMP.AffExpr)
+        _dummy_pq_coupling_expr_socwr!(epd, ws.zones, dy_all, ws.dummy_line_pairs[k], :p)
+        cons_pd[k] = JuMP.@constraint(qp_model, epd == s_pd[k])
+
+        eqd = zero(JuMP.AffExpr)
+        _dummy_pq_coupling_expr_socwr!(eqd, ws.zones, dy_all, ws.dummy_line_pairs[k], :q)
+        cons_qd[k] = JuMP.@constraint(qp_model, eqd == s_qd[k])
+    end
 
     JuMP.optimize!(qp_model)
     _check_qp_status!(qp_model, "ALADIN-hybrid/SOCWR coordinator QP")
@@ -364,6 +464,12 @@ function solve_coordinator_qp!(ws::SOCWRHybridWorkspaceALADIN)
     @inbounds for k in 1:n_split
         nu_pinj[k] = -JuMP.dual(cons_pinj[k])
         nu_qinj[k] = -JuMP.dual(cons_qinj[k])
+    end
+    nu_pd = ws.vars.p_dummy.nu
+    nu_qd = ws.vars.q_dummy.nu
+    @inbounds for k in 1:n_dummy
+        nu_pd[k] = -JuMP.dual(cons_pd[k])
+        nu_qd[k] = -JuMP.dual(cons_qd[k])
     end
     return nothing
 end

@@ -64,8 +64,10 @@ include(joinpath(@__DIR__, "distributed", "test_aladin_dc.jl"))
 include(joinpath(@__DIR__, "distributed", "test_aladin_ac.jl"))
 include(joinpath(@__DIR__, "distributed", "test_aladin_socwr.jl"))
 include(joinpath(@__DIR__, "distributed", "test_aladin_qp_dual_sign.jl"))
+include(joinpath(@__DIR__, "distributed", "test_aladin_invariants.jl"))
 include(joinpath(@__DIR__, "distributed", "test_dummybus_ybus_equiv.jl"))
 include(joinpath(@__DIR__, "distributed", "test_paper_regressions.jl"))
+include(joinpath(@__DIR__, "distributed", "test_stall_exit.jl"))
 include(joinpath(@__DIR__, "partitioning", "test_connectivity.jl"))
 
 @testset "Lirion - All Tests" begin
@@ -179,6 +181,7 @@ include(joinpath(@__DIR__, "partitioning", "test_connectivity.jl"))
     )
     run_aladin_dc_dummybus_hybrid_tests(; rtol = 0.05)
     run_aladin_dc_dummybus_power_tests(; rtol = 0.05)
+    run_aladin_dc_alg3_original_tests()
 
     # Distributed ALADIN — AC
     run_aladin_ac_state_tests(;
@@ -258,14 +261,24 @@ include(joinpath(@__DIR__, "partitioning", "test_connectivity.jl"))
         central_optimizer = DEFAULT_SOCWR_SOLVER,
         distributed_optimizer = DEFAULT_SOCWR_SOLVER,
     )
+    run_aladin_socwr_alg3_original_tests()
 
     run_aladin_qp_dual_sign_tests()
+    run_aladin_invariant_tests()
     run_dummybus_ybus_equiv_tests()
     run_paper_regression_tests()
+    run_stall_exit_tests()          # frozen early exit → :stalled, never :converged
 
     # Partitioner: zone connectivity repair (pure unit tests + guarded e2e)
     run_partition_connectivity_tests()
     run_partition_connectivity_e2e_tests()
+
+    # run_case_suite only RECORDS a centralized / distributed solve that threw
+    # (track_failure) and returns — without this assertion such a case is
+    # printed by print_failures() but never fails the suite.
+    @testset "no tracked solve failure" begin
+        @test isempty(GLOBAL_FAILED_CASES)
+    end
 end
 
 print_failures()

@@ -125,8 +125,7 @@ function run_partition_connectivity_e2e_tests()
             catch
                 false
             end
-        root = get(ENV, "PGLIB_OPF_ROOT",
-            "/home/mateus-kaiss/Downloads/papers/pglib-opf-master")
+        root = get(ENV, "PGLIB_OPF_ROOT", "")
         if !ext_active || !isdir(root)
             @test_skip "Metis extension / PGLib data unavailable — e2e skipped"
             return nothing

@@ -1,2 +1,14 @@
+# docs/Project.toml — environment for the Lirion.jl documentation build.
+#
+# Lirion itself is not listed as a dependency: the docs environment develops
+# the parent package (Pkg.develop(path="..")), which is what makes
+# `using Lirion` resolve during the build.
+
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+DocumenterCitations = "daee34ce-89f3-4625-b898-19384cb65244"
+
+[compat]
+Documenter = "1"
+DocumenterCitations = "1"
+julia = "1.10"

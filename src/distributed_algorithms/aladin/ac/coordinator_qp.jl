@@ -6,36 +6,11 @@
 # Zone cost — AC override (full sparse Hessian)
 # ============================================================
 
-@inline function _add_zone_cost!(
+@inline _add_zone_cost!(
     qp_obj::JuMP.QuadExpr,
     zone::AladinZoneDataAC,
     dy::Vector{JuMP.VariableRef},
-)
-    @inbounds for k in 1:zone.n_vars
-        gk = zone.g[k]
-        if gk != 0.0
-            JuMP.add_to_expression!(qp_obj, gk, dy[k])
-        end
-    end
-
-    H = zone.hess
-    row_idx = SparseArrays.rowvals(H)
-    nz_vals = SparseArrays.nonzeros(H)
-    @inbounds for col in 1:size(H, 2)
-        for k in SparseArrays.nzrange(H, col)
-            r = row_idx[k]
-            r > col && continue
-            v = nz_vals[k]
-            v == 0.0 && continue
-            if r == col
-                JuMP.add_to_expression!(qp_obj, 0.5 * v, dy[r], dy[col])
-            else
-                JuMP.add_to_expression!(qp_obj, v, dy[r], dy[col])
-            end
-        end
-    end
-    return nothing
-end
+) = _add_full_hessian_zone_cost!(qp_obj, zone, dy)
 
 # ============================================================
 # AC flow linearisation (Taylor expansion at current y)
@@ -142,25 +117,6 @@ end
     )
 end
 
-# Same Taylor expansion, but of the power ARRIVING AT the branch's TO bus (-p_reverse,
-# -q_reverse) instead of the power leaving its FROM bus.
-#
-# dummy_bus cuts line f_orig--t_orig at a new bus D: half-A = f_orig->D (D is its TO bus)
-# and half-B = D->t_orig (D is its FROM bus). The coupling must equate the power CROSSING
-# D, so half-A contributes its TO-side flow. Linearising both halves from-side instead
-# equates the flow at f_orig (far end) with the flow at D (near end); the two differ by
-# exactly half-A's series loss, which leaks in as phantom power. DC is immune because
-# there p_rev == -p_fr identically. Mirrors the ADMM fix (_pq_flow_to_exprs).
-#
-# Values (g_to = 0, b_to = b_sh/2, tap acts on the FROM side only, so vt is NOT scaled):
-#   p_to = -p_rev = -g*vt^2            + tau*vf*vt*( g*c - b*s)
-#   q_to = -q_rev = (b + b_sh/2)*vt^2  + tau*vf*vt*(-b*c - g*s)
-# with delta = theta_f - theta_t - tap_angle, c = cos(delta), s = sin(delta),
-# dc/dtheta_f = -s, ds/dtheta_f = c.
-#
-# Results are returned in the SAME _ACFlowLin fields (pf/dpf_*) so the coordinator's
-# pair-coupling code stays untouched — the fields mean "this side's contribution to the
-# flow across D", which is from-side for half-B and to-side for half-A.
 @inline function _dummy_ac_flow_linearisation_to(
     y::Vector{Float64},
     from_theta_col::Int,
@@ -295,10 +251,6 @@ end
     zi = zones[pair.zone_i]
     zj = zones[pair.zone_j]
 
-    # side i is half-A (f_orig->D): the dummy bus is its TO end, so its contribution to
-    # the flow across D is the TO-side flow. side j is half-B (D->t_orig): D is its FROM
-    # end, so the from-side linearisation is already correct. See
-    # _dummy_ac_flow_linearisation_to.
     lin_i = _dummy_ac_flow_linearisation_to(
         zi.y,
         pair.from_theta_col_i, pair.to_theta_col_i,
@@ -403,17 +355,6 @@ end
 # STATE
 # ------------------------------------------------------------
 
-# Validated option, default :off (gauge regularization, deterministic — no
-# anchor-bus choice). Kept for reproducibility of the gauge investigation.
-# The zone-wide uniform-θ (gauge) mode of a floating zone is flat in the raw
-# Lagrangian; the QP's prox curvature centers the step on y, but nothing anchors
-# the LEVEL of y to anything consensus-consistent (observed: x and y drift
-# together, cycle_trace 2026-07-28; hard single-bus anchoring works for 1/5
-# anchors only). This adds a rank-1 penalty on the gauge LEVEL of the step:
-#   :v1  ½γ·(mean(θ_flut of y+Δ) − mean(θ_flut of x_prev))²   (proximal level)
-#   :v2  ½γ·(mean over shared pairs of [θ_peer − θ_flut](y+Δ))² (soft spread anchor)
-# Both are consensus-consistent targets (never mean→0) and touch ONLY the gauge
-# direction (rank-1), leaving well-conditioned directions intact.
 const _GAUGE_REG = Ref{Tuple{Symbol, Float64}}((:off, 0.0))
 
 function _add_gauge_reg_state!(qp_obj, ws::ACStateWorkspaceALADIN, dy_all)

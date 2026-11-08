@@ -28,6 +28,8 @@ Base.@kwdef mutable struct ACStateWorkspaceALADIN <: AbstractALADINWorkspace
     line_search::Bool = true
     globalization::Symbol = :armijo_l2
     lam_bar::Float64 = 0.0        # frozen L1 exact-penalty weight for :alg3 (0 = unset)
+    lam_bar_fixed::Bool = false   # :alg3_original — λ̄ = κ̄ user-fixed (paper-literal)
+    alg3_c_status::Symbol = :none # :alg3_original — outcome of the last branch (c)
 
     sigma_theta::Float64 = 10.0
     sigma_vm::Float64 = 5.0
@@ -77,6 +79,8 @@ Base.@kwdef mutable struct ACPowerWorkspaceALADIN <: AbstractALADINWorkspace
     line_search::Bool = true
     globalization::Symbol = :armijo_l2
     lam_bar::Float64 = 0.0        # frozen L1 exact-penalty weight for :alg3 (0 = unset)
+    lam_bar_fixed::Bool = false   # :alg3_original — λ̄ = κ̄ user-fixed (paper-literal)
+    alg3_c_status::Symbol = :none # :alg3_original — outcome of the last branch (c)
 
     sigma_theta::Float64 = 10.0
     sigma_vm::Float64 = 5.0
@@ -139,6 +143,8 @@ Base.@kwdef mutable struct ACHybridWorkspaceALADIN <: AbstractALADINWorkspace
     line_search::Bool = true
     globalization::Symbol = :armijo_l2
     lam_bar::Float64 = 0.0        # frozen L1 exact-penalty weight for :alg3 (0 = unset)
+    lam_bar_fixed::Bool = false   # :alg3_original — λ̄ = κ̄ user-fixed (paper-literal)
+    alg3_c_status::Symbol = :none # :alg3_original — outcome of the last branch (c)
 
     sigma_theta::Float64 = 10.0
     sigma_vm::Float64 = 5.0
@@ -204,6 +210,8 @@ function build_workspace(
         qp_optimizer = _resolve_qp_optimizer(cfg.qp_optimizer),
         stopping_criterion = cfg.stopping_criterion,
         globalization = cfg.globalization,
+        lam_bar = _alg3_original_lam_bar(cfg),
+        lam_bar_fixed = _alg3_original_lam_bar(cfg) > 0.0,
         rho = Ref(cfg.rho),
         mu = Ref(cfg.mu),
         alpha1 = cfg.alpha1,
@@ -250,6 +258,8 @@ function build_workspace(
         qp_optimizer = _resolve_qp_optimizer(cfg.qp_optimizer),
         stopping_criterion = cfg.stopping_criterion,
         globalization = cfg.globalization,
+        lam_bar = _alg3_original_lam_bar(cfg),
+        lam_bar_fixed = _alg3_original_lam_bar(cfg) > 0.0,
         rho = Ref(cfg.rho),
         mu = Ref(cfg.mu),
         alpha1 = cfg.alpha1,
@@ -329,6 +339,8 @@ function build_workspace(
         qp_optimizer = _resolve_qp_optimizer(cfg.qp_optimizer),
         stopping_criterion = cfg.stopping_criterion,
         globalization = cfg.globalization,
+        lam_bar = _alg3_original_lam_bar(cfg),
+        lam_bar_fixed = _alg3_original_lam_bar(cfg) > 0.0,
         rho = Ref(cfg.rho),
         mu = Ref(cfg.mu),
         alpha1 = cfg.alpha1,
@@ -342,3 +354,10 @@ function build_workspace(
     refresh_rho!(ws)
     return ws
 end
+
+# ------------------------------------------------------------
+# :alg3_original — initial λ̄
+# ------------------------------------------------------------
+
+@inline _alg3_original_lam_bar(cfg::ALADINConfig) =
+    cfg.globalization === :alg3_original ? cfg.alg3_lam_bar : 0.0

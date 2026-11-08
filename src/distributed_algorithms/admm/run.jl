@@ -52,12 +52,15 @@ function run_algorithm(
     ws = build_workspace(sys, config, optimizer_factory, tag)
     initial_rhos = _get_rhos(ws)
 
+    # opt-in zone warm-start (admm/core/warmstart.jl)
+    zone_warmstart_enabled(config) && zone_warmstart!(ws)
+
     run_algorithm!(ws, params)
 
     tag_str = _print_tag(ws)
     final_rhos = _get_rhos(ws)
     rho_lines = [
-        "$(k) inicial: $(initial_rhos[k]) | $(k) final: $(final_rhos[k])"
+        "$(k) initial: $(initial_rhos[k]) | $(k) final: $(final_rhos[k])"
         for k in keys(final_rhos)
     ]
     if _FAST_USE_LOGS

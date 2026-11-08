@@ -7,6 +7,9 @@ using PlotlyLight
 # Primitives
 # ============================================================
 
+@inline _log_safe(v::Real) = (isfinite(v) && v > 0.0) ? Float64(v) : 1e-16
+@inline _log_safe(xs::AbstractVector) = Float64[_log_safe(x) for x in xs]
+
 function _plot_convergence(
     res_primal::Vector{Float64},
     res_dual::Vector{Float64},
@@ -16,13 +19,13 @@ function _plot_convergence(
 )
     x = 1:length(res_primal)
     p = Plot()
-    p(; x, y = res_primal, type = :scatter, mode = "lines",       name = "‖rᵏ‖")
-    p(; x, y = res_dual,   type = :scatter, mode = "lines",       name = "‖sᵏ‖")
-    p(; x, y = eps_primal, type = :scatter, mode = "lines",       name = "epsᵖʳⁱ",  line = (; dash = "dash"))
-    p(; x, y = eps_dual,   type = :scatter, mode = "lines",       name = "epsᵈᵘᵃˡ", line = (; dash = "dash"))
-    p.layout.title         = "Convergência do ADMM"
-    p.layout.xaxis.title   = "Iterações k"
-    p.layout.yaxis.title   = "Resíduo"
+    p(; x, y = _log_safe(res_primal), type = :scatter, mode = "lines",       name = "‖rᵏ‖")
+    p(; x, y = _log_safe(res_dual),   type = :scatter, mode = "lines",       name = "‖sᵏ‖")
+    p(; x, y = _log_safe(eps_primal), type = :scatter, mode = "lines",       name = "epsᵖʳⁱ",  line = (; dash = "dash"))
+    p(; x, y = _log_safe(eps_dual),   type = :scatter, mode = "lines",       name = "epsᵈᵘᵃˡ", line = (; dash = "dash"))
+    p.layout.title         = "ADMM convergence"
+    p.layout.xaxis.title   = "Iteration k"
+    p.layout.yaxis.title   = "Residual"
     p.layout.yaxis.type    = "log"
     PlotlyLight.save(p, path)
     return nothing
@@ -31,9 +34,9 @@ end
 function _plot_rho(rho_vec::Vector{Float64}, path::String; label::String = "rho")
     x = 1:length(rho_vec)
     p = Plot()
-    p(; x, y = rho_vec, type = :scatter, mode = "lines+markers", name = label)
-    p.layout.title       = "Evolução de $(label) no ADMM"
-    p.layout.xaxis.title = "Iterações k"
+    p(; x, y = _log_safe(rho_vec), type = :scatter, mode = "lines+markers", name = label)
+    p.layout.title       = "$(label) over iterations (ADMM)"
+    p.layout.xaxis.title = "Iteration k"
     p.layout.yaxis.title = label
     p.layout.yaxis.type  = "log"
     PlotlyLight.save(p, path)
@@ -48,9 +51,9 @@ function _plot_theta_avg_heatmap(theta_avg_history::Dict{Int,Vector{Float64}}, p
     p = Plot()
     p(; z = z_matrix, x = 1:length(z_matrix[1]), y = buses,
        type = :heatmap, colorscale = "Viridis", colorbar = (; title = "theta_avg"))
-    p.layout.title       = "Evolução de theta_avg por Barra Compartilhada"
-    p.layout.xaxis.title = "Iterações"
-    p.layout.yaxis.title = "Ângulo de fase (rad) por Barra Compartilhada"
+    p.layout.title       = "theta_avg per shared bus"
+    p.layout.xaxis.title = "Iteration"
+    p.layout.yaxis.title = "Phase angle (rad) per shared bus"
     PlotlyLight.save(p, path)
     return nothing
 end
@@ -68,9 +71,9 @@ function _plot_theta_local_heatmaps(
         p = Plot()
         p(; z = z_matrix, x = 1:length(z_matrix[1]), y = buses,
            type = :heatmap, colorscale = "Viridis", colorbar = (; title = "theta (local)"))
-        p.layout.title       = "Zona $zone_id – theta local por Barra Local"
-        p.layout.xaxis.title = "Iterações"
-        p.layout.yaxis.title = "Ângulo de fase (rad) por Barra Local"
+        p.layout.title       = "Zone $zone_id: local theta per local bus"
+        p.layout.xaxis.title = "Iteration"
+        p.layout.yaxis.title = "Phase angle (rad) per local bus"
         PlotlyLight.save(p, "$(base_path)_zone_$zone_id.html")
     end
     return nothing
@@ -89,7 +92,7 @@ function Lirion.save_dc_bus_plots(
     theta_avg_history::Dict{Int,Vector{Float64}};
     stem::String = "admm",
 )
-    _plot_convergence(res_pri, res_du, eps_pri, eps_du, "plot_convergencia_$(stem)_dc.html")
+    _plot_convergence(res_pri, res_du, eps_pri, eps_du, "plot_convergence_$(stem)_dc.html")
     _plot_rho(rho_hist, "plot_rho_$(stem)_dc.html"; label = "rho")
     _plot_theta_avg_heatmap(theta_avg_history, "plot_theta_avg_heatmap_$(stem)_dc.html")
     return nothing
@@ -103,7 +106,7 @@ function Lirion.save_dc_branch_plots(
     rho_hist::Vector{Float64};
     stem::String = "admm_branch",
 )
-    _plot_convergence(res_pri, res_du, eps_pri, eps_du, "plot_convergencia_$(stem).html")
+    _plot_convergence(res_pri, res_du, eps_pri, eps_du, "plot_convergence_$(stem).html")
     _plot_rho(rho_hist, "plot_rho_$(stem).html"; label = "rho")
     return nothing
 end
@@ -128,7 +131,7 @@ function Lirion.build_plots(
     if !isempty(hist.r_primal)
         _plot_convergence(
             hist.r_primal, hist.r_dual, hist.eps_primal, hist.eps_dual,
-            joinpath(outdir, "plot_convergencia_$(stem).html"),
+            joinpath(outdir, "plot_convergence_$(stem).html"),
         )
     end
 
@@ -154,4 +157,4 @@ function Lirion.build_plots(
     return nothing
 end
 
-end # module
+end

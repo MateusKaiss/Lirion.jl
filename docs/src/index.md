@@ -11,45 +11,51 @@
 
 # Introduction
 
-Lirion is a Julia framework for modeling and solving Optimal Power Flow (OPF) problems under both **centralized** and **distributed** optimization paradigms, providing a practical environment for implementing established formulations and investigating novel decomposition and consensus strategies.
+Lirion is a Julia package for Optimal Power Flow (OPF). You can solve a case centrally, as a single optimization problem, or you can distribute it. In the distributed setting the grid is split into zones. Each zone solves its own subproblem, and the zones coordinate only through the variables they share at their boundaries.
 
-At present, Lirion unifies DC, AC, and SOCWR OPF formulations within a modular architecture that spans centralized models and distributed implementations based on ADMM and ALADIN, enabling systematic experimentation with partitioning strategies and coupling-variable design.
-
-!!! important "Mathematical Foundations and Derivations"
-    Lirion is accompanied by a dedicated technical website maintained by Mateus Kaiss, the principal developer of the framework.
-
-    The site consolidates mathematical formulations, derivations, and structural studies developed throughout his academic training and research activities, covering both fundamental optimization concepts and advanced theoretical developments that underpin Lirion’s design.
-
-    Researchers, students, and practitioners interested in optimization and Optimal Power Flow — as well as anyone passionate about mathematical modeling — are encouraged to explore this resource.
-
-    [Visit the Lirion Mathematical Foundations Website](https://your-link-here.com)
+Centralized, Lirion covers a wide range of models. The exact AC formulation comes in polar and rectangular coordinates, and in the current-voltage form. The convex relaxations are SOCWR (Jabr) and its smooth variant SOCWRNL, QC, SDPWRM, and the branch-flow SOCBF. The linear and approximate models are DC, LPAC, NFA, and BFA (LinDistFlow). For the distributed setting, Lirion provides two coordination methods, **ADMM** and **ALADIN**, currently for the DC, AC, and second-order-cone models. Either way, you choose how the grid is partitioned and which variables the zones agree on.
 
 ## How this documentation is structured
 
-This documentation is organized into three complementary layers:
+The documentation has two main parts, plus supporting material:
 
-- **Overview and Guides**: high-level explanations of Lirion’s modeling workflow and recommended usage patterns.
-- **Modeling and Algorithms**: centralized formulations, distributed variants (ADMM/ALADIN), and how decomposition choices are expressed in Lirion.
-- **API Reference**: the complete list of functions and types for advanced usage and extension.
+- **[Getting Started](installation.md)** is the practical side: how to run each centralized model, how to pick a solver, the tunable settings, the distributed workflow with ADMM and ALADIN, and how to read the results.
+- **[Theory](teoria/exatas/ac_polar.md)** is the mathematics behind the formulations, and how a distributed problem is cut into zones and coupled at the boundary. These pages are written from the study notes Mateus Kaiss kept throughout his studies.
+- **[Performance](performance.md)** covers threading and getting the most from your machine, and **[References](references.md)** is the bibliography.
 
 ## Centralized Models
 
-Lirion implements classical centralized OPF formulations:
+Lirion implements a broad family of centralized OPF formulations, grouped by how they treat the AC physics:
 
-- DC OPF
-- AC OPF
-- SOCWR OPF
+**Exact AC**
+- AC OPF in polar coordinates (`AC`)
+- AC OPF in rectangular coordinates (`ACR`)
+- Current–voltage rectangular (`IVR`)
+
+**Convex relaxations**
+- Second-order cone / Jabr (`SOCWR`), and its smooth NLP variant (`SOCWRNL`)
+- Quadratic convex (`QC`)
+- Semidefinite (`SDPWRM`)
+- SOC branch-flow (`SOCBF`)
+
+**Linear and approximate**
+- DC OPF (`DC`)
+- LPAC (`LPAC`)
+- Network-flow approximation (`NFA`)
+- LinDistFlow / branch-flow approximation (`BFA`)
 
 ---
 
 ## Distributed Formulations
 
-Beyond centralized models, Lirion provides distributed variants based on the **Alternating Direction Method of Multipliers (ADMM)**.
+Beyond centralized models, Lirion provides distributed solvers based on the **Alternating Direction Method of Multipliers (ADMM)** and the **Augmented Lagrangian Alternating Direction Inexact Newton (ALADIN)** method.
 
 Distributed formulations are structured along three main dimensions:
 
-- The base model (DC, AC, or SOCWR);
-- The choice of **coupling variables**;
-- The **system partitioning strategy**.
+- The base model — currently DC, AC, and the smooth second-order-cone relaxation (`SOCWRNL`);[^socwr]
+- The choice of **coupling variables** (e.g. voltage–angle or power);
+- The **system partitioning strategy** (tie-line, split-bus, or dummy-bus sectioning).
+
+[^socwr]: The conic second-order-cone model (`SOCWR`) is also available and works under ADMM. Under ALADIN the second-order-cone solvers currently limit it, so for distributed solves it is superseded by the smooth `SOCWRNL`; those limitations are discussed in [Sectioning and coupling](teoria/distribuido/seccionamento_acoplamento.md#SOCWR,-and-its-limitations).
 
 ---

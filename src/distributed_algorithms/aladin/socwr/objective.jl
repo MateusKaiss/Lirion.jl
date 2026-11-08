@@ -587,9 +587,6 @@ end
 # Edge (P / Q flow)
 # ------------------------------------------------------------
 
-# Coupling term on p_flow / q_flow: the flows are affine expressions
-# in the zone variables (SOCWR Jabr), so the coupling collapses to a
-# plain AffExpr via the cached expansion.
 @inline function _lambda_edge_pq_socwr!(
     lin::JuMP.AffExpr,
     ws::Union{SOCWRPowerWorkspaceALADIN, SOCWRHybridWorkspaceALADIN},
@@ -643,6 +640,46 @@ end
     return nothing
 end
 
+# ------------------------------------------------------------
+# Dummy branch (P / Q flow)
+# ------------------------------------------------------------
+
+@inline function _lambda_dummy_pq_socwr!(
+    lin::JuMP.AffExpr,
+    ws::Union{SOCWRPowerWorkspaceALADIN, SOCWRHybridWorkspaceALADIN},
+    zone_pos::Int,
+)
+    zone_data = ws.zones[zone_pos]
+    @inbounds for (k, pair) in enumerate(ws.dummy_line_pairs)
+        if pair.zone_i == zone_pos
+            lp = ws.vars.p_dummy.lambda[k]
+            lq = ws.vars.q_dummy.lambda[k]
+            cols = pair.cols_i
+            cp = pair.pcoef_i
+            cq = pair.qcoef_i
+            for i in eachindex(cols)
+                JuMP.add_to_expression!(lin, lp * cp[i], zone_data.all_vars[cols[i]])
+                JuMP.add_to_expression!(lin, lq * cq[i], zone_data.all_vars[cols[i]])
+            end
+            lin.constant += lp * pair.pconst_i
+            lin.constant += lq * pair.qconst_i
+        elseif pair.zone_j == zone_pos
+            lp = -ws.vars.p_dummy.lambda[k]
+            lq = -ws.vars.q_dummy.lambda[k]
+            cols = pair.cols_j
+            cp = pair.pcoef_j
+            cq = pair.qcoef_j
+            for i in eachindex(cols)
+                JuMP.add_to_expression!(lin, lp * cp[i], zone_data.all_vars[cols[i]])
+                JuMP.add_to_expression!(lin, lq * cq[i], zone_data.all_vars[cols[i]])
+            end
+            lin.constant += lp * pair.pconst_j
+            lin.constant += lq * pair.qconst_j
+        end
+    end
+    return nothing
+end
+
 # ============================================================
 # Update objective
 # ============================================================
@@ -674,6 +711,7 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRPowerWorkspaceALADIN)
 
     lin = zero(JuMP.AffExpr)
     _lambda_edge_pq_socwr!(lin, ws, zone_pos)
+    _lambda_dummy_pq_socwr!(lin, ws, zone_pos)
 
     if ws.proximal_mode == :pflow
         _prox_pflow_lin_socwr!(
@@ -705,6 +743,7 @@ function update_objective!(part::PartitionSOCWR, ws::SOCWRHybridWorkspaceALADIN)
     _lambda_edge_rt_socwr!(lin, ws, zone_pos)
     _lambda_edge_pq_socwr!(lin, ws, zone_pos)
     _lambda_split_bus_socwr!(lin, ws, zone_pos)
+    _lambda_dummy_pq_socwr!(lin, ws, zone_pos)
 
     if ws.proximal_mode === :pflow
         _prox_lin_hybrid_pflow_socwr!(

@@ -9,7 +9,8 @@ struct AC <: OPFModel end     # AC polar (V, θ)
 struct ACR <: OPFModel end    # AC rectangular (vr, vi)
 struct IVR <: OPFModel end    # Current-Voltage rectangular (vr, vi, cr, ci)
 struct LPAC <: OPFModel end   # Linear Power AC
-struct SOCWR <: OPFModel end  # SOCP (W-rectangular)
+struct SOCWR <: OPFModel end  # SOCP (W-rectangular), MOI cones — mirrors PowerModels SOCWRConicPowerModel
+struct SOCWRNL <: OPFModel end # Same W-space relaxation, smooth-NLP (quadratic ineqs, Ipopt) — mirrors PowerModels SOCWRPowerModel
 struct QC <: OPFModel end     # Quadratic-Convex relaxation
 struct SDPWRM <: OPFModel end # SDP (W-rectangular matrix)
 struct SOCBF <: OPFModel end  # Branch Flow SOCP
@@ -123,8 +124,14 @@ const _RHO_RULES = Dict{Tuple{DataType, Symbol}, NamedTuple}(
     ),
 )
 
+# SOCWRNL is the smooth-NLP encoding of the SAME W-space relaxation as SOCWR and
+# shares every piece of the distributed consensus machinery (identical coupling
+# variables v_magnitude_sq/R/T/p/q). For all config/rho purposes it IS SOCWR.
+@inline _wspace_family(m::Type{<:OPFModel}) = m === SOCWRNL ? SOCWR : m
+@inline _is_wspace(m::Type{<:OPFModel}) = m === SOCWR || m === SOCWRNL
+
 @inline function _rules_for(base_model::Type{<:OPFModel}, coupling::Symbol)
-    key = (base_model, coupling)
+    key = (_wspace_family(base_model), coupling)
     haskey(_RHO_RULES, key) ||
         error("No rho rules for base_model=$(base_model), coupling=$(coupling)")
     return _RHO_RULES[key]
@@ -153,11 +160,11 @@ function _normalize_rhos_strict(
     allowed = rules.allowed
     required = rules.required
 
-    if base_model === SOCWR
+    if _is_wspace(base_model)
         rho_theta === nothing ||
-            error("SOCWR does not accept rho_theta. Use rho_v2, rho_r, rho_t (or rho=...).")
+            error("$(base_model) does not accept rho_theta. Use rho_v2, rho_r, rho_t (or rho=...).")
         rho_v === nothing ||
-            error("SOCWR does not accept rho_v. Use rho_v2 (or rho=...).")
+            error("$(base_model) does not accept rho_v. Use rho_v2 (or rho=...).")
     end
 
     provided = Set{Symbol}()
@@ -211,12 +218,12 @@ function _normalize_rhos_strict(
     anchor_val = _get_required_value(req_sorted[1])
 
     rho_theta_val =
-        (base_model === SOCWR) ? anchor_val :
+        _is_wspace(base_model) ? anchor_val :
         ((:rho_theta in required) ? _asfloat(rho_theta, :rho_theta) : anchor_val)
 
     rho_v_val = if base_model === AC
         (:rho_v in required) ? _asfloat(rho_v, :rho_v) : anchor_val
-    elseif base_model === SOCWR
+    elseif _is_wspace(base_model)
         (:rho_v2 in required) ? _asfloat(rho_v2, :rho_v2) : anchor_val
     else
         anchor_val
@@ -268,6 +275,9 @@ mutable struct ADMMConfig <: AbstractDistributedConfig
     rho_floor::Float64
     adapt_freeze::Float64
 
+    # opt-in zone warm-start (admm/core/warmstart.jl); also via ENV["LIRION_ZONE_WARMSTART"]
+    zone_warmstart::Bool
+
     function ADMMConfig(
         base_model::Type{<:OPFModel},
         coupling::Symbol,
@@ -289,14 +299,35 @@ mutable struct ADMMConfig <: AbstractDistributedConfig
         adapt_warmup::Integer = 5,
         rho_floor::Real = 0.0,
         adapt_freeze::Real = 100.0,
+        zone_warmstart::Bool = false,
     )
-        base_model in (DC, AC, SOCWR) ||
-            throw(ArgumentError("Invalid base_model=$base_model. Allowed: DC, AC, SOCWR"))
+        base_model in (DC, AC, SOCWR, SOCWRNL) ||
+            throw(ArgumentError("Invalid base_model=$base_model. Allowed: DC, AC, SOCWR, SOCWRNL"))
 
         coupling in (:state, :power, :hybrid) ||
             throw(
                 ArgumentError(
                     "Invalid coupling=$coupling. Allowed: :state, :power, :hybrid",
+                ),
+            )
+
+        # SplitBus injection consensus exists only for :hybrid; DummyBus flow
+        # consensus only for :power / :hybrid.
+        sectioning isa SplitBus && coupling !== :hybrid &&
+            throw(
+                ArgumentError(
+                    "ADMM + SplitBus sectioning requires coupling=:hybrid " *
+                    "(got coupling=$(coupling)): the split-bus injection " *
+                    "consensus exists only in the hybrid workspaces.",
+                ),
+            )
+        sectioning isa DummyBus && !(coupling in (:power, :hybrid)) &&
+            throw(
+                ArgumentError(
+                    "ADMM + DummyBus sectioning requires coupling=:power or " *
+                    ":hybrid (got coupling=$(coupling)): with :state the flow " *
+                    "across the dummy bus is not coupled and the dummy " *
+                    "generators inject power at zero cost.",
                 ),
             )
 
@@ -341,6 +372,7 @@ mutable struct ADMMConfig <: AbstractDistributedConfig
             Int(adapt_warmup),
             Float64(rho_floor),
             Float64(adapt_freeze),
+            zone_warmstart,
         )
     end
 end
@@ -365,6 +397,7 @@ ADMMConfig(
     adapt_warmup::Integer = 5,
     rho_floor::Real = 0.0,
     adapt_freeze::Real = 100.0,
+    zone_warmstart::Bool = false,
 ) = begin
     sec = _sectioning(sectioning)
     rhos = _normalize_rhos_strict(base_model, coupling; rho = rho)
@@ -390,6 +423,7 @@ ADMMConfig(
         adapt_warmup = adapt_warmup,
         rho_floor = rho_floor,
         adapt_freeze = adapt_freeze,
+        zone_warmstart = zone_warmstart,
     )
 end
 
@@ -416,6 +450,7 @@ ADMMConfig(
     adapt_warmup::Integer = 5,
     rho_floor::Real = 0.0,
     adapt_freeze::Real = 100.0,
+    zone_warmstart::Bool = false,
 ) = begin
     sec = _sectioning(sectioning)
 
@@ -453,6 +488,7 @@ ADMMConfig(
         adapt_warmup = adapt_warmup,
         rho_floor = rho_floor,
         adapt_freeze = adapt_freeze,
+        zone_warmstart = zone_warmstart,
     )
 end
 
@@ -489,8 +525,8 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
     proximal_mode::Symbol
     qp_optimizer::Any
     stopping_criterion::Symbol
-    check_primal_step::Bool
     globalization::Symbol
+    alg3_lam_bar::Float64
 
     function ALADINConfig(
         base_model::Type{<:OPFModel},
@@ -518,13 +554,13 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
         proximal_mode::Symbol = :primal,
         qp_optimizer = nothing,
         stopping_criterion::Symbol = :boyd,
-        check_primal_step::Bool = false,
         globalization::Symbol = :armijo_l2,
+        alg3_lam_bar::Real = 0.0,
     )
-        base_model in (DC, AC, SOCWR) ||
+        base_model in (DC, AC, SOCWR, SOCWRNL) ||
             throw(
                 ArgumentError(
-                    "ALADIN is currently implemented for DC, AC, and SOCWR. Got: $(base_model)",
+                    "ALADIN is currently implemented for DC, AC, SOCWR, and SOCWRNL. Got: $(base_model)",
                 ),
             )
         coupling in (:state, :power, :hybrid) ||
@@ -543,6 +579,61 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
                     ":tie_line / :split_bus for ALADIN on SOCWR.",
                 ),
             )
+        # SplitBus injection consensus exists only for :hybrid; DummyBus flow
+        # consensus only for :power / :hybrid.
+        sectioning isa SplitBus && coupling !== :hybrid &&
+            throw(
+                ArgumentError(
+                    "ALADIN + SplitBus sectioning requires coupling=:hybrid " *
+                    "(got coupling=$(coupling)): the split-bus injection " *
+                    "consensus exists only in the hybrid workspaces.",
+                ),
+            )
+        sectioning isa DummyBus && !(coupling in (:power, :hybrid)) &&
+            throw(
+                ArgumentError(
+                    "ALADIN + DummyBus sectioning requires coupling=:power or " *
+                    ":hybrid (got coupling=$(coupling)): with :state the flow " *
+                    "across the dummy bus is not coupled and the dummy " *
+                    "generators inject power at zero cost.",
+                ),
+            )
+        # parameters that are not wired must not be silently accepted
+        active_set_tol == 1e-6 ||
+            throw(
+                ArgumentError(
+                    "active_set_tol=$(active_set_tol) is not wired: ALADIN detects " *
+                    "active box bounds with a fixed 1e-6 tolerance " *
+                    "(core/sensitivities.jl). Leave it at the default.",
+                ),
+            )
+        base_model !== DC &&
+            (sigma_theta_shared != 10.0 || sigma_pg != 1.0 || sigma_other != 1.0) &&
+            throw(
+                ArgumentError(
+                    "sigma_theta_shared / sigma_pg / sigma_other are wired into the " *
+                    "DC workspaces only; base_model=$(base_model) uses the per-class " *
+                    "Σ defaults of its workspace (see SIGMA_EFFECTIVE in " *
+                    "aladin_run_manifest). Got sigma_theta_shared=$(sigma_theta_shared), " *
+                    "sigma_pg=$(sigma_pg), sigma_other=$(sigma_other).",
+                ),
+            )
+
+        # W-space :state/:power is wired for TieLine only (plus SOCWRNL + DummyBus + :power)
+        _is_wspace(base_model) && coupling in (:state, :power) &&
+            !(sectioning isa TieLine) &&
+            !(sectioning isa DummyBus && base_model === SOCWRNL) &&
+            throw(
+                ArgumentError(
+                    "ALADIN on $(base_model) with coupling=$(coupling) is only " *
+                    "supported for :tie_line sectioning (got " *
+                    "$(nameof(typeof(sectioning)))). The SplitBus/Metis builders " *
+                    "ignore the boundary-bus consensus under :state/:power, so " *
+                    "the run would be silently under-coupled. Use :tie_line with " *
+                    ":state/:power, or switch to :hybrid coupling for " *
+                    ":split_bus.",
+                ),
+            )
         max_iter > 0 || throw(ArgumentError("max_iter must be > 0"))
         rho > 0 || throw(ArgumentError("rho must be > 0"))
         mu > 0 || throw(ArgumentError("mu must be > 0"))
@@ -551,7 +642,6 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
         alpha3 > 0 || throw(ArgumentError("alpha3 must be > 0"))
         eps_abs >= 0 || throw(ArgumentError("eps_abs must be ≥ 0"))
         eps_rel >= 0 || throw(ArgumentError("eps_rel must be ≥ 0"))
-        active_set_tol > 0 || throw(ArgumentError("active_set_tol must be > 0"))
         rho_growth >= 1.0 ||
             throw(ArgumentError("rho_growth must be ≥ 1 (monotonic growth)"))
         mu_growth >= 1.0 ||
@@ -590,24 +680,52 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
                     "Invalid stopping_criterion=$stopping_criterion. Allowed: :boyd, :hfd",
                 ),
             )
-        globalization in (:armijo_l2, :alg3) ||
+        globalization in (:armijo_l2, :alg3, :full_step, :alg3_original) ||
             throw(
                 ArgumentError(
                     "Invalid globalization=$globalization. Allowed: :armijo_l2 " *
-                    "(ℓ2 Armijo backtracking) or :alg3 (HFD Algorithm 3, steps a/b/c).",
+                    "(ℓ2 Armijo backtracking), :alg3 (HFD Algorithm 3, steps a/b/c), " *
+                    ":alg3_original (HFD Algorithm 3 with Wolfe dual line search " *
+                    "in step (c) and Theorem-2 λ̄), " *
+                    "or :full_step (HFD Alg.2 step 5 undamped α=1).",
                 ),
             )
-        # B1 (2026-08-03): :alg3 dispatch (_alg3_step!, L1 merit machinery) is
-        # implemented for AC only — DC/SOCWR would silently run :armijo_l2,
-        # violating the declared configuration. Fail loudly; porting the merit
-        # machinery to DC/SOCWR is scoped follow-up work (case39 spec).
-        globalization === :alg3 && base_model in (DC, SOCWR) &&
+        # :alg3_original is implemented for AC, DC, SOCWR and SOCWRNL; fail loudly otherwise
+        globalization === :alg3_original && !(base_model in (AC, DC, SOCWR, SOCWRNL)) &&
             throw(
                 ArgumentError(
-                    "globalization=:alg3 is implemented for AC only (the L1 " *
-                    "merit machinery lives in aladin/ac/line_search.jl); " *
+                    "globalization=:alg3_original is implemented for AC, DC, " *
+                    "SOCWR and SOCWRNL (aladin/{ac,dc,socwr}/line_search.jl); " *
                     "base_model=$base_model would silently fall back to " *
-                    ":armijo_l2. Use :armijo_l2, or port _alg3_step! first.",
+                    ":armijo_l2. Use :alg3 or :armijo_l2.",
+                ),
+            )
+        alg3_lam_bar >= 0 ||
+            throw(
+                ArgumentError(
+                    "alg3_lam_bar must be ≥ 0 (0 = automatic monotone " *
+                    "majorization of the multipliers; > 0 = fixed exact-penalty " *
+                    "weight λ̄ = κ̄ of HFD Algorithm 3, used by :alg3_original).",
+                ),
+            )
+        # :alg3 is implemented for AC, DC, SOCWR and SOCWRNL; fail loudly otherwise
+        globalization === :alg3 && !(base_model in (AC, DC, SOCWR, SOCWRNL)) &&
+            throw(
+                ArgumentError(
+                    "globalization=:alg3 is implemented for AC, DC, SOCWR and " *
+                    "SOCWRNL (the L1 merit machinery lives in aladin/{ac,dc," *
+                    "socwr}/line_search.jl); base_model=$base_model would " *
+                    "silently fall back to :armijo_l2. Use :armijo_l2, or port " *
+                    "_alg3_step! first.",
+                ),
+            )
+        # :full_step is implemented for AC, DC, SOCWR and SOCWRNL; fail loudly otherwise
+        globalization === :full_step && !(base_model in (AC, DC, SOCWR, SOCWRNL)) &&
+            throw(
+                ArgumentError(
+                    "globalization=:full_step is implemented for AC, DC, " *
+                    "SOCWR and SOCWRNL; base_model=$base_model would silently " *
+                    "fall back to :armijo_l2. Use :armijo_l2.",
                 ),
             )
         proximal_mode === :pflow && !(coupling in (:power, :hybrid)) &&
@@ -615,6 +733,16 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
                 ArgumentError(
                     "proximal_mode=:pflow is supported with coupling=:power or " *
                     ":hybrid (got coupling=$(coupling)). Use one of those, or " *
+                    "proximal_mode=:primal.",
+                ),
+            )
+        # :pflow under DummyBus in W-space is not wired (the flow-prox walkers skip dummy flows)
+        proximal_mode === :pflow && sectioning isa DummyBus && _is_wspace(base_model) &&
+            throw(
+                ArgumentError(
+                    "proximal_mode=:pflow is not yet supported for DummyBus " *
+                    "sectioning with W-space models (SOCWR/SOCWRNL); the dummy flow " *
+                    "consensus is not covered by the flow-prox. Use " *
                     "proximal_mode=:primal.",
                 ),
             )
@@ -644,8 +772,8 @@ mutable struct ALADINConfig <: AbstractDistributedConfig
             proximal_mode,
             qp_optimizer,
             stopping_criterion,
-            check_primal_step,
             globalization,
+            Float64(alg3_lam_bar),
         )
     end
 end

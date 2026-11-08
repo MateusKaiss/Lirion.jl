@@ -53,6 +53,22 @@ function init_hybrid_partition!(
 end
 
 # ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    part::PartitionSOCWR,
+    sys_zone::SystemData,
+    optimizer_factory,
+    cfg::ALADINConfig,
+    ::DummyBus,
+    interzonal_branches::Vector{Int},
+)
+    build_local_model!(part, sys_zone, Hybrid, optimizer_factory, interzonal_branches)
+    return build_aladin_zone_data(part; include_edges = true)
+end
+
+# ------------------------------------------------------------
 # Hybrid — SplitBus
 # ------------------------------------------------------------
 
@@ -112,6 +128,7 @@ function init_power_partition!(
     cfg::ALADINConfig,
 )
     inter = sys.interzonal_branches
+    sys_branch_pairs = sys.branch_pairs
 
     n = length(partitions.parts)
     @assert length(sys.parts) == n
@@ -122,7 +139,8 @@ function init_power_partition!(
         )
     end
     interzonal_line_pairs = _build_interzonal_line_pairs(partitions, inter)
-    return zones, interzonal_line_pairs
+    dummy_pairs = _build_dummy_line_pairs(partitions, zones, sys_branch_pairs)
+    return zones, interzonal_line_pairs, dummy_pairs
 end
 
 # ------------------------------------------------------------
@@ -150,6 +168,35 @@ function init_hybrid_partition!(
     bus_pairs = _build_shared_bus_pairs(partitions, zones)
     interzonal_line_pairs = _build_interzonal_line_pairs(partitions, inter)
     return zones, bus_pairs, interzonal_line_pairs
+end
+
+# ------------------------------------------------------------
+# Hybrid — DummyBus
+# ------------------------------------------------------------
+
+function init_hybrid_partition!(
+    partitions::Partitions{PartitionSOCWR},
+    sys::DistributedSystem,
+    optimizer_factory,
+    cfg::ALADINConfig,
+    sectioning::DummyBus,
+)
+    inter = sys.interzonal_branches
+    sys_branch_pairs = sys.branch_pairs
+
+    n = length(partitions.parts)
+    @assert length(sys.parts) == n
+    zones = Vector{AladinZoneDataSOCWR}(undef, n)
+    @inbounds for i in 1:n
+        zones[i] = init_hybrid_partition!(
+            partitions.parts[i], sys.parts[i], optimizer_factory, cfg,
+            sectioning, inter,
+        )
+    end
+    bus_pairs = _build_shared_bus_pairs(partitions, zones)
+    interzonal_line_pairs = _build_interzonal_line_pairs(partitions, inter)
+    dummy_pairs = _build_dummy_line_pairs(partitions, zones, sys_branch_pairs)
+    return zones, bus_pairs, interzonal_line_pairs, dummy_pairs
 end
 
 # ------------------------------------------------------------

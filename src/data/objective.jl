@@ -25,10 +25,6 @@ function get_objective_parameters(
     T = case_raw.T
     has_timeseries = T > 1
 
-    # N1 (2026-08-02): Lirion builds POLYNOMIAL objectives only. A gencost row
-    # with MODEL = 1 (piecewise-linear) would have its breakpoint table silently
-    # read as polynomial coefficients — a wrong objective with no warning
-    # (latent defect D3, full math audit 2026-07-03). Fail loudly instead.
     if case_raw.gencost !== nothing
         for (g, m) in enumerate(case_raw.gencost.model)
             m == 2 || error(

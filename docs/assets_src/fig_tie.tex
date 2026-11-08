@@ -1,0 +1,31 @@
+\documentclass[border=5pt]{standalone}
+\input{preamble.tex}
+\begin{document}
+\begin{tikzpicture}
+% ---------------- Zone A (top) ----------------
+\node[bus]   (gA) at (0.0,2.35) {$g$};
+\node[bus]   (hA) at (1.5,2.35) {$h$};
+\node[ghost] (iA) at (3.0,2.35) {$i$};
+\draw[stub]   (-0.95,2.35) -- (gA);
+\draw[branch] (gA) -- (hA);
+\draw[branch] (hA) -- (iA);
+\node[zone, fit=(gA)(hA)(iA), inner xsep=11pt, inner ysep=13pt] (zA) {};
+\node[zlab, anchor=north east] at ([shift={(-3pt,-2pt)}]zA.north east) {Zone A};
+
+% ---------------- Zone B (bottom) ----------------
+\node[ghost] (hB) at (1.5,0.0) {$h$};
+\node[bus]   (iB) at (3.0,0.0) {$i$};
+\draw[branch] (hB) -- (iB);
+\draw[stub]   (iB) -- (3.95,0.0);
+\node[zone, fit=(hB)(iB), inner xsep=11pt, inner ysep=13pt] (zB) {};
+\node[zlab, anchor=south east] at ([shift={(-3pt,2pt)}]zB.south east) {Zone B};
+
+% ---------------- consensus (middle band) ----------------
+\node[zbox] (zh) at (1.5,1.175) {$\bar\theta_h$};
+\node[zbox] (zi) at (3.0,1.175) {$\bar\theta_i$};
+\draw[couple] (hA) -- (zh);
+\draw[couple] (hB) -- (zh);
+\draw[couple] (iA) -- (zi);
+\draw[couple] (iB) -- (zi);
+\end{tikzpicture}
+\end{document}

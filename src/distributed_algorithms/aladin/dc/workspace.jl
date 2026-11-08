@@ -25,6 +25,9 @@ Base.@kwdef mutable struct DCStateWorkspaceALADIN <: AbstractALADINWorkspace
     alpha3::Float64 = 1.0
     alpha2_init::Float64 = 1.0
     line_search::Bool = true
+    globalization::Symbol = :armijo_l2
+    lam_bar::Float64 = 0.0        # frozen L1 exact-penalty weight for :alg3 (0 = unset)
+    lam_bar_fixed::Bool = false   # :alg3_original — λ̄ = κ̄ user-fixed (paper-literal)
 
     sigma_theta_shared::Float64 = 10.0
     sigma_pg::Float64 = 1.0
@@ -68,6 +71,9 @@ Base.@kwdef mutable struct DCPowerWorkspaceALADIN <: AbstractALADINWorkspace
     alpha3::Float64 = 1.0
     alpha2_init::Float64 = 1.0
     line_search::Bool = true
+    globalization::Symbol = :armijo_l2
+    lam_bar::Float64 = 0.0        # frozen L1 exact-penalty weight for :alg3 (0 = unset)
+    lam_bar_fixed::Bool = false   # :alg3_original — λ̄ = κ̄ user-fixed (paper-literal)
 
     sigma_theta_shared::Float64 = 10.0
     sigma_pg::Float64 = 1.0
@@ -113,8 +119,6 @@ Base.@kwdef mutable struct DCHybridWorkspaceALADIN <: AbstractALADINWorkspace
     qp_optimizer::Any
 
     rho_bus::Base.RefValue{Float64}
-    rho_edge::Base.RefValue{Float64}
-    rho_inj::Base.RefValue{Float64}
     mu::Base.RefValue{Float64}
 
     alpha1::Float64 = 1.0
@@ -122,6 +126,9 @@ Base.@kwdef mutable struct DCHybridWorkspaceALADIN <: AbstractALADINWorkspace
     alpha3::Float64 = 1.0
     alpha2_init::Float64 = 1.0
     line_search::Bool = true
+    globalization::Symbol = :armijo_l2
+    lam_bar::Float64 = 0.0        # frozen L1 exact-penalty weight for :alg3 (0 = unset)
+    lam_bar_fixed::Bool = false   # :alg3_original — λ̄ = κ̄ user-fixed (paper-literal)
 
     sigma_theta_shared::Float64 = 10.0
     sigma_pg::Float64 = 1.0
@@ -152,11 +159,7 @@ end
 
 _get_rhos(ws::DCStateWorkspaceALADIN) = (rho = ws.rho[],)
 _get_rhos(ws::DCPowerWorkspaceALADIN) = (rho = ws.rho[],)
-_get_rhos(ws::DCHybridWorkspaceALADIN) = (
-    rho_bus = ws.rho_bus[],
-    rho_edge = ws.rho_edge[],
-    rho_inj = ws.rho_inj[],
-)
+_get_rhos(ws::DCHybridWorkspaceALADIN) = (rho_bus = ws.rho_bus[],)
 
 # ============================================================
 # Builders
@@ -192,6 +195,9 @@ function build_workspace(
         alpha2 = cfg.alpha2,
         alpha3 = cfg.alpha3,
         alpha2_init = cfg.alpha2,
+        globalization = cfg.globalization,
+        lam_bar = _alg3_original_lam_bar(cfg),
+        lam_bar_fixed = _alg3_original_lam_bar(cfg) > 0.0,
         sigma_theta_shared = cfg.sigma_theta_shared,
         sigma_pg = cfg.sigma_pg,
         sigma_other = cfg.sigma_other,
@@ -239,6 +245,9 @@ function build_workspace(
         alpha2 = cfg.alpha2,
         alpha3 = cfg.alpha3,
         alpha2_init = cfg.alpha2,
+        globalization = cfg.globalization,
+        lam_bar = _alg3_original_lam_bar(cfg),
+        lam_bar_fixed = _alg3_original_lam_bar(cfg) > 0.0,
         sigma_theta_shared = cfg.sigma_theta_shared,
         sigma_pg = cfg.sigma_pg,
         sigma_other = cfg.sigma_other,
@@ -308,13 +317,14 @@ function build_workspace(
         qp_optimizer = _resolve_qp_optimizer(cfg.qp_optimizer),
         stopping_criterion = cfg.stopping_criterion,
         rho_bus = Ref(cfg.rho),
-        rho_edge = Ref(cfg.rho),
-        rho_inj = Ref(cfg.rho),
         mu = Ref(cfg.mu),
         alpha1 = cfg.alpha1,
         alpha2 = cfg.alpha2,
         alpha3 = cfg.alpha3,
         alpha2_init = cfg.alpha2,
+        globalization = cfg.globalization,
+        lam_bar = _alg3_original_lam_bar(cfg),
+        lam_bar_fixed = _alg3_original_lam_bar(cfg) > 0.0,
         sigma_theta_shared = cfg.sigma_theta_shared,
         sigma_pg = cfg.sigma_pg,
         sigma_other = cfg.sigma_other,

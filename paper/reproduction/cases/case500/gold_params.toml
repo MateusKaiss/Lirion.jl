@@ -1,0 +1,588 @@
+# ====================================================================
+# Parameters for case500_goc (k = 20 zones), paper Table I
+# ====================================================================
+# One [[cell]] per (formulation, sectioning, coupling): 18 blocks, each with
+# a [cell.admm] and a [cell.aladin] sub-block = 36 method-rows.
+# run.jl reads every block whose status is "pass" and solves it with these
+# exact parameters; status = "non_convergent" blocks are the cells the
+# paper prints as x: they are written out as placeholders and not solved.
+#
+# Keys the driver consumes:
+#   ADMM   : rho, adaptive, max_iter  (+ lifted_flow on three case500 SOCWRNL cells)
+#   ALADIN : rho, mu, rho_growth, mu_growth, qp_reg, adaptive, alpha3, mode,
+#            globalization, max_iter, and the canonicity toggles
+#            (AC/DC: no_prox, modgrad, bound_detect; SOCWRNL: prox_mode,
+#            bound_detect, lam_bar).
+#   max_iter is the certified stopping iteration plus a 2000-iteration margin
+#   (case500 keeps the run-length cap used in the reproduction).
+# verdict / expected_gap_pct / note are provenance only (ignored by run.jl).
+# ====================================================================
+
+[_meta]
+case = "case500_goc"
+k = 20
+cell_blocks = 18
+method_rows = 36
+pass = 23
+non_convergent = 13
+
+# --------------------------------------------------------------------
+# DC
+# --------------------------------------------------------------------
+# DC  state / tie_line
+[[cell]]
+case = "case500_goc"
+k = 20
+formulation = "dc"
+sectioning = "tie_line"
+coupling = "state"
+  [cell.admm]
+    expected_gap_pct = -0.4798484329
+    verdict = "pass"
+  status = "pass"
+  rho = 5000000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 80000
+  [cell.aladin]
+    expected_gap_pct = -0.00002257227222
+    verdict = "pass"
+  status = "pass"
+  rho = 300000.0
+  mu = 300000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 100000.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  no_prox = false
+  modgrad = false
+  bound_detect = "primal_dual"
+  max_iter = 80000
+  globalization = "armijo_l2"
+
+# DC  power / tie_line
+[[cell]]
+case = "case500_goc"
+k = 20
+formulation = "dc"
+sectioning = "tie_line"
+coupling = "power"
+  [cell.admm]
+    expected_gap_pct = -0.1516330127
+    verdict = "pass"
+  status = "pass"
+  rho = 10000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 80000
+  [cell.aladin]
+    expected_gap_pct = -0.1879
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  mu = 10.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 100.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  no_prox = false
+  modgrad = false
+  bound_detect = "primal_dual"
+  max_iter = 80000
+  globalization = "alg3_original"
+
+# DC  power / dummy_bus
+[[cell]]
+case = "case500_goc"
+k = 20
+formulation = "dc"
+sectioning = "dummy_bus"
+coupling = "power"
+  [cell.admm]
+    expected_gap_pct = -0.1433249933
+    verdict = "pass"
+  status = "pass"
+  rho = 10000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 80000
+  [cell.aladin]
+    expected_gap_pct = -0.1774
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  mu = 10.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 100.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  no_prox = false
+  modgrad = false
+  bound_detect = "primal_dual"
+  max_iter = 80000
+  globalization = "alg3_original"
+
+# DC  hybrid / tie_line
+[[cell]]
+case = "case500_goc"
+k = 20
+formulation = "dc"
+sectioning = "tie_line"
+coupling = "hybrid"
+  [cell.admm]
+    expected_gap_pct = -0.01389921999
+    verdict = "pass"
+  status = "pass"
+  rho = 100.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 80000
+  [cell.aladin]
+    expected_gap_pct = 0.0000002310545179
+    verdict = "pass"
+  status = "pass"
+  rho = 10000.0
+  mu = 10000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 0.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  no_prox = false
+  modgrad = false
+  bound_detect = "primal_dual"
+  max_iter = 30000
+  globalization = "alg3_original"
+
+# DC  hybrid / dummy_bus
+[[cell]]
+case = "case500_goc"
+k = 20
+formulation = "dc"
+sectioning = "dummy_bus"
+coupling = "hybrid"
+  [cell.admm]
+    expected_gap_pct = -0.001274288918
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 80000
+  [cell.aladin]
+    verdict = "non_convergent"
+  status = "non_convergent"
+  note = "paper x->x. Best attempt alg3_original rho1000 mu1e5 qp100 stalled @18328 (gap -0.00269%); scan champion mu3 stalled @33170. No Tier-2 crossing. Covered by ADMM."
+  rho = 1000.0
+  mu = 100000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 100.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  no_prox = false
+  modgrad = false
+  bound_detect = "primal_dual"
+  max_iter = 80000
+  globalization = "alg3_original"
+
+# DC  hybrid / split_bus
+[[cell]]
+case = "case500_goc"
+k = 20
+formulation = "dc"
+sectioning = "split_bus"
+coupling = "hybrid"
+  [cell.admm]
+    expected_gap_pct = 0.001411051693
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 80000
+  [cell.aladin]
+    expected_gap_pct = 0.000000237521952
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  mu = 100000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 100.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  no_prox = false
+  modgrad = false
+  bound_detect = "primal_dual"
+  max_iter = 30000
+  globalization = "alg3_original"
+
+# --------------------------------------------------------------------
+# AC
+# --------------------------------------------------------------------
+# AC  state / tie_line
+[[cell]]
+case = "case500_goc"
+k = 20
+formulation = "ac"
+sectioning = "tie_line"
+coupling = "state"
+  [cell.admm]
+    verdict = "non_convergent"
+  status = "non_convergent"
+  note = "paper x->x. Best: rho1e7 (ac_case500_admm_c15k), iteration_limit @15000, gap -4.06%."
+  rho = 10000000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 15000
+  [cell.aladin]
+    verdict = "non_convergent"
+  status = "non_convergent"
+  note = "paper x->x. Best: alg3_original/levenberg/reg1.0 B_no_prox (ac_c500_tiestate_flip), iteration_limit @60000, gap 3.80%."
+  mode = "primal"
+  no_prox = true
+  modgrad = true
+  bound_detect = "primal_dual"
+  globalization = "alg3_original"
+
+# AC  power / tie_line
+[[cell]]
+case = "case500_goc"
+k = 20
+formulation = "ac"
+sectioning = "tie_line"
+coupling = "power"
+  [cell.admm]
+    expected_gap_pct = -0.2425027525
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 15000
+  [cell.aladin]
+    verdict = "non_convergent"
+  status = "non_convergent"
+  note = "paper x->x. Best: armijo_l2 B_no_prox (ac_c500_tiepower_doc), iteration_limit @10000, gap 0.33%."
+  mode = "primal"
+  no_prox = true
+  modgrad = true
+  bound_detect = "primal_dual"
+  globalization = "armijo_l2"
+
+# AC  power / dummy_bus
+[[cell]]
+case = "case500_goc"
+k = 20
+formulation = "ac"
+sectioning = "dummy_bus"
+coupling = "power"
+  [cell.admm]
+    expected_gap_pct = -0.3479395773
+    verdict = "pass"
+  status = "pass"
+  rho = 30.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 15000
+  [cell.aladin]
+    verdict = "non_convergent"
+  status = "non_convergent"
+  note = "paper x->x. Best: armijo_l2 B_no_prox (ac_c500_tiepower_doc dummy/power), iteration_limit @10000, gap 0.064%."
+  mode = "primal"
+  no_prox = true
+  modgrad = true
+  bound_detect = "primal_dual"
+  globalization = "armijo_l2"
+
+# AC  hybrid / tie_line
+[[cell]]
+case = "case500_goc"
+k = 20
+formulation = "ac"
+sectioning = "tie_line"
+coupling = "hybrid"
+  [cell.admm]
+    expected_gap_pct = -0.04804144524
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 15000
+  [cell.aladin]
+    verdict = "non_convergent"
+  status = "non_convergent"
+  note = "paper 6273->x (T1-only). Best: alg3_original B_no_prox rho1e4 mu1e4 (ac_c500_tiehyb_flip_v2) stalled @8051, T1 first-touch 6273, Tier-2 never reached, gap 0.0027%."
+  rho = 10000.0
+  mu = 10000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 0.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  no_prox = true
+  modgrad = true
+  bound_detect = "primal_dual"
+  globalization = "alg3_original"
+
+# AC  hybrid / dummy_bus
+[[cell]]
+case = "case500_goc"
+k = 20
+formulation = "ac"
+sectioning = "dummy_bus"
+coupling = "hybrid"
+  [cell.admm]
+    expected_gap_pct = -0.09419139972
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 15000
+  [cell.aladin]
+    verdict = "non_convergent"
+  status = "non_convergent"
+  note = "paper x->x. Best: alg3_original B_no_prox (ac_c500_dummyhyb_flip) stalled @372, gap 0.35%."
+  mode = "primal"
+  no_prox = true
+  modgrad = true
+  bound_detect = "primal_dual"
+  globalization = "alg3_original"
+
+# AC  hybrid / split_bus
+[[cell]]
+case = "case500_goc"
+k = 20
+formulation = "ac"
+sectioning = "split_bus"
+coupling = "hybrid"
+  [cell.admm]
+    expected_gap_pct = -0.09284369388
+    verdict = "pass"
+  status = "pass"
+  rho = 1000.0
+  adaptive = false
+  bound_detect = "primal_dual"
+  max_iter = 15000
+  [cell.aladin]
+    expected_gap_pct = -0.0001115887374
+    verdict = "non_convergent"
+  status = "non_convergent"
+  note = "non-certifying cell; held uncertified"
+  no_prox = true
+  modgrad = true
+  bound_detect = "primal_dual"
+  rho = 1000.0
+  mu = 10000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 0.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  max_iter = 30000
+  globalization = "alg3_original"
+
+# --------------------------------------------------------------------
+# SOCWRNL
+# --------------------------------------------------------------------
+# SOCWRNL  state / tie_line
+[[cell]]
+case = "case500_goc"
+k = 20
+formulation = "socwrnl"
+sectioning = "tie_line"
+coupling = "state"
+  [cell.admm]
+    verdict = "non_convergent"
+  status = "non_convergent"
+  note = "paper x->x. Best: rho1e6 (socwrnl_case500_admm_v3), gap -4.58%."
+  rho = 1000000.0
+  adaptive = false
+  max_iter = 40000
+  [cell.aladin]
+    verdict = "non_convergent"
+  status = "non_convergent"
+  note = "paper x->x. Best: alg3_original canonical mu1e4/1e5 (socwrnl_case500_aladin_tiestate_mu1e4_1e5_60k), iteration_limit @60000, gap -29.6%."
+  mode = "primal"
+  prox_mode = "canonical"
+  bound_detect = "primal_dual"
+  lam_bar = 0.0
+  globalization = "alg3_original"
+
+# SOCWRNL  power / tie_line
+[[cell]]
+case = "case500_goc"
+k = 20
+formulation = "socwrnl"
+sectioning = "tie_line"
+coupling = "power"
+  [cell.admm]
+    expected_gap_pct = -0.1436
+    verdict = "pass"
+  status = "pass"
+  rho = 10.0
+  adaptive = false
+  max_iter = 40000
+  [cell.aladin]
+    verdict = "non_convergent"
+  status = "non_convergent"
+  note = "paper x->x. Best: alg3_original canonical/prox_in_B seed rho100 mu1 (socwrnl_c500_tiepower_v2), iteration_limit @45000, gap -5.73%."
+  rho = 100.0
+  mu = 1.0
+  mode = "primal"
+  prox_mode = "canonical"
+  bound_detect = "primal_dual"
+  lam_bar = 0.0
+  globalization = "alg3_original"
+
+# SOCWRNL  power / dummy_bus
+[[cell]]
+case = "case500_goc"
+k = 20
+formulation = "socwrnl"
+sectioning = "dummy_bus"
+coupling = "power"
+  [cell.admm]
+    expected_gap_pct = -0.07889711607
+    verdict = "pass"
+  status = "pass"
+  note = "DAGGER: requires env LIRION_SOCWRNL_LIFTED_FLOW=1 (per-cell invocation only). Source socwrnl_lifted_flow_2026-10-12 rho1000 @317."
+  lifted_flow = true
+  rho = 1000.0
+  adaptive = false
+  max_iter = 6000
+  [cell.aladin]
+    expected_gap_pct = -0.1139493506
+    verdict = "non_convergent"
+  status = "non_convergent"
+  note = "non-certifying cell; held uncertified"
+  rho = 30.0
+  mu = 100.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 0.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  prox_mode = "canonical"
+  bound_detect = "primal_dual"
+  lam_bar = 0.0
+  max_iter = 15000
+  globalization = "alg3_original"
+
+# SOCWRNL  hybrid / tie_line
+[[cell]]
+case = "case500_goc"
+k = 20
+formulation = "socwrnl"
+sectioning = "tie_line"
+coupling = "hybrid"
+  [cell.admm]
+    expected_gap_pct = 0.002722816531
+    verdict = "pass"
+  status = "pass"
+  note = "DAGGER: requires env LIRION_SOCWRNL_LIFTED_FLOW=1 (per-cell invocation only). Source socwrnl_lifted_flow_2026-10-12 rho1000 @329."
+  lifted_flow = true
+  rho = 1000.0
+  adaptive = false
+  max_iter = 6000
+  [cell.aladin]
+    verdict = "non_convergent"
+  status = "non_convergent"
+  note = "paper 198->x (T1-only). Best: alg3_original prox_in_B seed rho1000 mu1e4 (socwrnl_c500_tiehyb_flip_v2), iteration_limit @40000, T1=198, Tier-2 never reached, gap 0.185%."
+  rho = 1000.0
+  mu = 10000.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 0.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  prox_mode = "prox_in_B"
+  bound_detect = "primal"
+  lam_bar = 0.0
+  max_iter = 40000
+  globalization = "alg3_original"
+
+# SOCWRNL  hybrid / dummy_bus
+[[cell]]
+case = "case500_goc"
+k = 20
+formulation = "socwrnl"
+sectioning = "dummy_bus"
+coupling = "hybrid"
+  [cell.admm]
+    expected_gap_pct = 0.0006188146667
+    verdict = "pass"
+  status = "pass"
+  note = "DAGGER: requires env LIRION_SOCWRNL_LIFTED_FLOW=1 (per-cell invocation only). Source socwrnl_lifted_flow_2026-10-12 rho1000 @386."
+  lifted_flow = true
+  rho = 1000.0
+  adaptive = false
+  max_iter = 6000
+  [cell.aladin]
+    expected_gap_pct = -0.02881114007
+    verdict = "pass"
+  status = "pass"
+  note = "champion: socwrnl dummy/hybrid, alg3_original (rho=10, mu=100, lambda=1e4); converged at obj 13795 (gap -0.0288%)."
+  rho = 10.0
+  mu = 100.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 0.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  prox_mode = "canonical"
+  bound_detect = "primal_dual"
+  lam_bar = 10000.0
+  max_iter = 15000
+  globalization = "alg3_original"
+
+# SOCWRNL  hybrid / split_bus
+[[cell]]
+case = "case500_goc"
+k = 20
+formulation = "socwrnl"
+sectioning = "split_bus"
+coupling = "hybrid"
+  [cell.admm]
+    expected_gap_pct = -0.0679
+    verdict = "pass"
+  status = "pass"
+  rho = 300.0
+  adaptive = false
+  max_iter = 40000
+  [cell.aladin]
+    expected_gap_pct = -0.00703
+    verdict = "pass"
+  status = "pass"
+  note = "paper 988->1308. Champion socwrnl_case500_aladin_d20k (alg3_original prox_in_B rho30 mu100 lam1e5) converged @1308, gap -0.00703%."
+  rho = 30.0
+  mu = 100.0
+  rho_growth = 1.0
+  mu_growth = 1.0
+  qp_reg = 0.0
+  adaptive = false
+  alpha3 = 1.0
+  mode = "primal"
+  prox_mode = "prox_in_B"
+  bound_detect = "primal"
+  lam_bar = 100000.0
+  max_iter = 20000
+  globalization = "alg3_original"
+

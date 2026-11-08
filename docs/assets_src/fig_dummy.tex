@@ -1,0 +1,31 @@
+\documentclass[border=5pt]{standalone}
+\input{preamble.tex}
+\begin{document}
+\begin{tikzpicture}
+% ---------------- Zone A (top): from-zone, D real + generator ----------------
+\node[bus] (hA) at (0.3,2.35) {$h$};
+\node[bus] (DA) at (1.9,2.35) {$D$};
+\node[gen] (gn) at (1.9,3.05) {$G$};
+\draw[branch] (DA) -- (gn);
+\draw[stub]   (-0.65,2.35) -- (hA);
+\draw[halfl]  (hA) -- (DA);
+\node[font=\scriptsize, text=black!60, anchor=south] at (1.1,2.45) {$\tfrac{r}{2},\tfrac{x}{2}$};
+\node[zone, fit=(hA)(DA)(gn), inner xsep=11pt, inner ysep=10pt] (zA) {};
+\node[zlab, anchor=north west] at ([shift={(3pt,-2pt)}]zA.north west) {Zone A};
+
+% ---------------- Zone B (bottom): to-zone, D ghost ----------------
+\node[ghost] (DB) at (1.9,0.0) {$D$};
+\node[bus]   (iB) at (3.5,0.0) {$i$};
+\draw[halfl]  (DB) -- (iB);
+\draw[stub]   (iB) -- (4.45,0.0);
+\node[font=\scriptsize, text=black!60, anchor=north] at (2.7,-0.1) {$\tfrac{r}{2},\tfrac{x}{2}$};
+\node[zone, fit=(DB)(iB), inner xsep=11pt, inner ysep=13pt] (zB) {};
+\node[zlab, anchor=south east] at ([shift={(-3pt,2pt)}]zB.south east) {Zone B};
+
+% ---------------- consensus: flow through D ----------------
+\node[zbox] (zp) at (1.9,1.175) {$\bar p$};
+\draw[couple] (DA) -- (zp);
+\draw[couple] (DB) -- (zp);
+\node[cplab, anchor=west] at ([xshift=4pt]zp.east) {flow through $D$};
+\end{tikzpicture}
+\end{document}

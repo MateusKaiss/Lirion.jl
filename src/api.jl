@@ -2,22 +2,59 @@
 # Model builders
 # ============================================================
 
+"""
+    dc()
+
+DC linear active-power approximation (LP). Hand the result to `solve`'s `model`
+keyword: `solve(case; model = dc())`. The other eleven builders (`ac`, `acr`,
+`ivr`, `lpac`, `socwr`, `socwrnl`, `qc`, `sdpwrm`, `socbf`, `bfa`, `nfa`) follow
+the same pattern; the Theory pages cover what each one solves.
+"""
 dc() = DC
+
+"AC optimal power flow in polar coordinates (NLP)."
 ac() = AC
+
+"AC optimal power flow in rectangular coordinates (NLP)."
 acr() = ACR
+
+"Current-voltage rectangular AC formulation (NLP)."
 ivr() = IVR
+
+"LP-based AC approximation (QCQP)."
 lpac() = LPAC
+
+"W-rectangular second-order-cone relaxation, Jabr (SOCP)."
 socwr() = SOCWR
+
+"Smooth-NLP form of the SOCWR relaxation (NLP)."
+socwrnl() = SOCWRNL
+
+"Quadratic-convex relaxation (QCQP)."
 qc() = QC
+
+"Semidefinite W-matrix relaxation (SDP)."
 sdpwrm() = SDPWRM
+
+"Branch-flow second-order-cone relaxation (SOCP)."
 socbf() = SOCBF
+
+"Linearized branch-flow approximation / LinDistFlow (LP)."
 bfa() = BFA
+
+"Network-flow approximation, active power only (LP)."
 nfa() = NFA
 
 # ============================================================
 # Algorithm builders
 # ============================================================
 
+"""
+    centralized()
+
+The default algorithm: solve the whole system as one problem. Pass it to `solve`'s
+`algorithm` keyword.
+"""
 centralized() = CentralizedAlgorithm()
 
 @inline _sectioning_name(s::Sectioning) = lowercase(string(nameof(typeof(s))))
@@ -35,6 +72,14 @@ centralized() = CentralizedAlgorithm()
     )
 end
 
+"""
+    admm(; coupling=:hybrid, sectioning=:tie_line, max_iter=350, rho=..., kwargs...)
+
+Build the ADMM distributed algorithm for `solve`'s `algorithm` keyword. `coupling` is
+`:state`, `:power`, or `:hybrid`; `sectioning` is `:tie_line`, `:dummy_bus`, or
+`:split_bus`. A single `rho` fills the per-coupling penalties; the ADMM settings page
+lists the rest.
+"""
 @inline function admm(;
     coupling::Symbol = :hybrid,
     sectioning = :tie_line,
@@ -48,6 +93,13 @@ end
     return ADMMAlgorithm(coupling, _sectioning(sectioning), max_iter, (; kwargs...))
 end
 
+"""
+    aladin(; coupling=:state, sectioning=:tie_line, max_iter=100, rho=..., mu=..., kwargs...)
+
+Build the ALADIN distributed algorithm for `solve`'s `algorithm` keyword. Takes the
+local penalty `rho` and the coordinator penalty `mu`, plus `proximal_mode`,
+`stopping_criterion`, and the globalization; the ALADIN settings page lists them.
+"""
 @inline function aladin(;
     coupling::Symbol = :state,
     sectioning = :tie_line,

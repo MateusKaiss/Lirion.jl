@@ -50,8 +50,7 @@ function build_quad_branch_expr!(
         if za == pos
             l = part.branch_idx_full_to_zone[ga]
             if l != 0
-                # half-A: the dummy bus is its TO end -> TO-side flow (see
-                # _pq_flow_to_exprs; the from-side form leaks half-A's series loss).
+                # half-A: the dummy bus is its TO end -> TO-side flow (see _pq_flow_to_exprs).
                 p, q = _pq_flow_to_exprs(part, l)
                 quad += 0.5 * rho_p * p^2 + 0.5 * rho_q * q^2
             end

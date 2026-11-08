@@ -36,6 +36,7 @@ local_solve!(ws::AbstractADMMWorkspace) =
 
 function _aladin_post_solve!(ws::AbstractALADINWorkspace, i::Integer, part)
     zone = ws.zones[i]
+    _note_almost_zone_solve!(part.local_model)   # count only; accept logic unchanged
     extract_solve_values!(zone, part.local_model)
 
     if ws.iter == 1
@@ -43,8 +44,8 @@ function _aladin_post_solve!(ws::AbstractALADINWorkspace, i::Integer, part)
     end
 
     compute_cost_gradient!(zone)
-    refresh_lagrangian_hessian!(zone, ws)
     detect_active_bounds!(zone)
+    refresh_lagrangian_hessian!(zone, ws)
     return nothing
 end
 

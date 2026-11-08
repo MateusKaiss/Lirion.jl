@@ -48,14 +48,9 @@ mutable struct AladinZoneDataSOCWR <: AbstractAladinZoneData
     # Cost gradient ∇f(y) at the current y (refreshed every iteration).
     g::Vector{Float64}
 
-    # Lagrangian Hessian diagonal. Structurally constant (2·c2·sbase²
-    # on pg cols) plus an iteration-dependent proximal shift ρ·σ added
-    # by `_refresh_hess_diag!`.
     hess_diag::Vector{Float64}
     base_hess_diag::Vector{Float64}   # constant part, cached at build time
 
-    # Constant equality Jacobian (cached once; SOCWR equalities are
-    # all affine, so they never change across iterations).
     eq_jac::SparseArrays.SparseMatrixCSC{Float64, Int}
 
     # Phase-2 QP correction Δy_i.
@@ -64,10 +59,12 @@ mutable struct AladinZoneDataSOCWR <: AbstractAladinZoneData
     # Active box bounds at current y.
     active_bound_cols::Vector{Int}
 
-    # Cached quadratic part of Phase-1 proximal: (ρ/2)·Σ σ_k·v_k²
-    # — see header note in `dc/zone_data.jl`. Mirrors `obj_static`
-    # in ADMM. Refreshed only when ρ changes via `adapt_rho_mu!`.
     quad_static::JuMP.QuadExpr
+
+    # ----- Exact-Hessian coordinator (SOCWRNL only) -----------------------
+    hess::SparseArrays.SparseMatrixCSC{Float64, Int}
+    active_jac::SparseArrays.SparseMatrixCSC{Float64, Int}
+    exact_hessian::Bool
 end
 
 # ============================================================
@@ -128,9 +125,6 @@ function _collect_socwr_cols(
         end
     end
 
-    # `obj.generator_status[g] == 1` ⇔ JuMP sparse axis `gen.existing[g]`
-    # (both derived from `gen_raw.gen_status`), so `pg_var[g, 1]` / `qg_var[g, 1]`
-    # are guaranteed to exist whenever the status filter passes.
     if haskey(model, :p_generation)
         pg_var = model[:p_generation]
         for g in 1:obj.number_of_generators
@@ -140,10 +134,6 @@ function _collect_socwr_cols(
             col == 0 && continue
             push!(pg_cols, col)
 
-            # `obj.generator_costs[1]` is pre-allocated with `obj.number_of_generators`
-            # entries in `build_objective_data`, so direct indexing is safe.
-            # Matpower convention: descending degrees. For quadratic (len 3)
-            # coefs = [c2, c1, c0].
             coefs = obj.generator_costs[1][g]
             @assert length(coefs) <= 3 "ALADIN: generator cost must be at most quadratic (got degree $(length(coefs)-1))"
             c2 = (length(coefs) >= 3) ? coefs[end-2] : 0.0
@@ -171,6 +161,9 @@ function _collect_socwr_cols(
             push!(curt_cols, col)
         end
     end
+
+    unique!(r_cols)
+    unique!(t_cols)
 
     return (
         theta_cols = theta_cols,
@@ -234,6 +227,47 @@ function _collect_socwr_edge_rt_cols(
 end
 
 # ------------------------------------------------------------
+# Affine flow expansion of a single (p, q) expression pair
+# ------------------------------------------------------------
+
+function _socwr_affine_pq_expansion(
+    p_expr::JuMP.AffExpr,
+    q_expr::JuMP.AffExpr,
+    var_to_col::Dict{JuMP.VariableRef, Int},
+)
+    p_terms = p_expr.terms
+    q_terms = q_expr.terms
+    k_cols = Vector{Int}(undef, length(p_terms))
+    k_coefs_p = Vector{Float64}(undef, length(p_terms))
+    k_coefs_q = Vector{Float64}(undef, length(p_terms))
+
+    i = 0
+    for (v, cp) in p_terms
+        col = get(var_to_col, v, 0)
+        col == 0 && continue
+        i += 1
+        k_cols[i] = col
+        k_coefs_p[i] = cp
+        k_coefs_q[i] = get(q_terms, v, 0.0)
+    end
+    resize!(k_cols, i)
+    resize!(k_coefs_p, i)
+    resize!(k_coefs_q, i)
+
+    for (v, cq) in q_terms
+        col = get(var_to_col, v, 0)
+        col == 0 && continue
+        if !(col in k_cols)
+            push!(k_cols, col)
+            push!(k_coefs_p, 0.0)
+            push!(k_coefs_q, cq)
+        end
+    end
+
+    return k_cols, k_coefs_p, k_coefs_q, p_expr.constant, q_expr.constant
+end
+
+# ------------------------------------------------------------
 # Interzonal edge layout — affine flow expansion
 # ------------------------------------------------------------
 
@@ -269,45 +303,14 @@ function _collect_socwr_edge_flow_expansion(
         p_expr = pflow[l, 1]
         q_expr = qflow[l, 1]
 
-        # p_flow and q_flow reference the same set of variables
-        # (v²[from], R[l], T[l]) — walk p's terms to fix the col order
-        # and look up the matching coefficient in q.
-        p_terms = p_expr.terms
-        q_terms = q_expr.terms
-        k_cols = Vector{Int}(undef, length(p_terms))
-        k_coefs_p = Vector{Float64}(undef, length(p_terms))
-        k_coefs_q = Vector{Float64}(undef, length(p_terms))
-
-        i = 0
-        for (v, cp) in p_terms
-            col = get(var_to_col, v, 0)
-            col == 0 && continue
-            i += 1
-            k_cols[i] = col
-            k_coefs_p[i] = cp
-            k_coefs_q[i] = get(q_terms, v, 0.0)
-        end
-        resize!(k_cols, i)
-        resize!(k_coefs_p, i)
-        resize!(k_coefs_q, i)
-
-        # Any q variable that was not in p's terms (unlikely for
-        # SOCWR, but safe) is appended here.
-        for (v, cq) in q_terms
-            col = get(var_to_col, v, 0)
-            col == 0 && continue
-            if !(col in k_cols)
-                push!(k_cols, col)
-                push!(k_coefs_p, 0.0)
-                push!(k_coefs_q, cq)
-            end
-        end
+        k_cols, k_coefs_p, k_coefs_q, k_const_p, k_const_q =
+            _socwr_affine_pq_expansion(p_expr, q_expr, var_to_col)
 
         cols[k] = k_cols
         coefs_p[k] = k_coefs_p
         coefs_q[k] = k_coefs_q
-        const_p[k] = p_expr.constant
-        const_q[k] = q_expr.constant
+        const_p[k] = k_const_p
+        const_q[k] = k_const_q
     end
 
     return cols, coefs_p, coefs_q, const_p, const_q
@@ -323,6 +326,8 @@ function build_aladin_zone_data(
 )::AladinZoneDataSOCWR
     obj = part.objective_params
     model = part.local_model::JuMP.Model
+
+    @assert !(haskey(model, :curtailment) && any(!=(0.0), obj.curtailment_cost)) "ALADIN-SOCWR: costed load curtailment is not supported (its cost is omitted from the coordinator gradient, the merit and the Algorithm-3 Φ). Model has :curtailment with a nonzero curtailment_cost."
 
     all_vars, n_vars, var_to_col = _build_var_layout(model)
 
@@ -345,6 +350,8 @@ function build_aladin_zone_data(
     end
 
     eq_jac = _extract_equality_jacobian(model, var_to_col, n_vars)
+
+    exact_hessian = part.zone_model === SOCWRNL
 
     return AladinZoneDataSOCWR(
         model,
@@ -379,5 +386,8 @@ function build_aladin_zone_data(
         zeros(Float64, n_vars),     # delta
         Int[],                      # active_bound_cols
         zero(JuMP.QuadExpr),        # quad_static
+        SparseArrays.spzeros(Float64, n_vars, n_vars),  # hess (exact, SOCWRNL)
+        SparseArrays.spzeros(Float64, 0, n_vars),       # active_jac (exact, SOCWRNL)
+        exact_hessian,
     )
 end

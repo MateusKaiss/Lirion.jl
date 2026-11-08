@@ -221,26 +221,6 @@ function _switch_from_df(df::DataFrame)
     )
 end
 
-function _prosumer_from_df(df::DataFrame)
-    return Lirion.ProsumerRaw{Float64}(
-        _icol(df, "bus",               0),
-        _fcol(df, "generation",        0.0),
-        _fcol(df, "demand",            0.0),
-        _fcol(df, "q_generation",      0.0),
-        _fcol(df, "q_demand",          0.0),
-        _fcol(df, "cost_injection",    0.0),
-        _fcol(df, "inverter_capacity", 0.0),
-    )
-end
-
-function _consumer_from_df(df::DataFrame)
-    return Lirion.ConsumerRaw{Float64}(
-        _icol(df, "bus",      0),
-        _fcol(df, "demand",   0.0),
-        _fcol(df, "q_demand", 0.0),
-    )
-end
-
 function _bus_ts_from_df(df::DataFrame)
     return Lirion.BusTimeseriesRaw{Float64}(
         _icol(df, "time", 1),
@@ -252,12 +232,14 @@ function _bus_ts_from_df(df::DataFrame)
     )
 end
 
-function _consumer_ts_from_df(df::DataFrame)
-    return Lirion.ConsumerTimeseriesRaw{Float64}(
-        _icol(df, "time",     1),
-        _icol(df, "bus",      0),
-        _fcol(df, "demand",   0.0),
-        _fcol(df, "q_demand", 0.0),
+function _gen_ts_from_df(df::DataFrame)
+    return Lirion.GenTimeseriesRaw{Float64}(
+        _icol(df, "time", 1),
+        _icol(df, "gen_id", 0),
+        _fcol(df, "pmax", NaN),
+        _fcol(df, "pmin", NaN),
+        _fcol(df, "qmax", NaN),
+        _fcol(df, "qmin", NaN),
     )
 end
 
@@ -270,6 +252,14 @@ function _gencost_from_df(df::DataFrame)
     ncost    = _icol(df, "ncost",    0)
     coeffs   = Vector{Vector{Float64}}(undef, n)
 
+    max_k = isempty(ncost) ? 0 : maximum(ncost)
+    props = propertynames(df)
+    coef_cols = Vector{Union{Vector{Float64}, Nothing}}(undef, max_k)
+    @inbounds for j in 1:max_k
+        sj = _sym("c$(j)")
+        coef_cols[j] = sj in props ? _fcol(df, "c$(j)", 0.0) : nothing
+    end
+
     @inbounds for i in 1:n
         k = ncost[i]
         if k <= 0
@@ -278,8 +268,8 @@ function _gencost_from_df(df::DataFrame)
         end
         c = Vector{Float64}(undef, k)
         @inbounds for j in 1:k
-            sj = _sym("c$(j)")
-            c[j] = sj in propertynames(df) ? _fcol(df, "c$(j)", 0.0)[i] : 0.0
+            col = coef_cols[j]
+            c[j] = col === nothing ? 0.0 : col[i]
         end
         coeffs[i] = c
     end
@@ -293,6 +283,14 @@ function _gencost_ts_from_df(df::DataFrame)
     ncost  = _icol(df, "ncost", 0)
     coeffs = Vector{Vector{Float64}}(undef, n)
 
+    max_k = isempty(ncost) ? 0 : maximum(ncost)
+    props = propertynames(df)
+    coef_cols = Vector{Union{Vector{Float64}, Nothing}}(undef, max_k)
+    @inbounds for j in 1:max_k
+        sj = _sym("c$(j)")
+        coef_cols[j] = sj in props ? _fcol(df, "c$(j)", 0.0) : nothing
+    end
+
     @inbounds for i in 1:n
         k = ncost[i]
         if k <= 0
@@ -301,8 +299,8 @@ function _gencost_ts_from_df(df::DataFrame)
         end
         c = Vector{Float64}(undef, k)
         @inbounds for j in 1:k
-            sj = _sym("c$(j)")
-            c[j] = sj in propertynames(df) ? _fcol(df, "c$(j)", 0.0)[i] : 0.0
+            col = coef_cols[j]
+            c[j] = col === nothing ? 0.0 : col[i]
         end
         coeffs[i] = c
     end
@@ -320,33 +318,6 @@ function _gencost_ts_from_df(df::DataFrame)
         _fcol(df, "shutdown", 0.0),
         ncost, coeffs, tou, fit,
     )
-end
-
-function _prosumer_ts_from_df(df::DataFrame)
-    n = nrow(df)
-    time = _icol(df, "time", 1)
-    bus  = _icol(df, "bus",  0)
-
-    if _hascol(df, "p_pv") || _hascol(df, "p_load") || _hascol(df, "p_curtail")
-        return Lirion.ProsumerTimeseriesRaw{Float64}(
-            time, bus,
-            _fcol(df, "p_pv",      0.0),
-            _fcol(df, "p_load",    0.0),
-            _fcol(df, "p_curtail", 0.0),
-        )
-    end
-
-    if _hascol(df, "generation") && _hascol(df, "demand")
-        return Lirion.ProsumerTimeseriesRaw{Float64}(
-            time, bus,
-            _fcol(df, "generation", 0.0),
-            _fcol(df, "demand",     0.0),
-            zeros(n),
-        )
-    end
-
-    @warn "prosumer_timeseries.csv: missing expected columns. Filling zeros."
-    return Lirion.ProsumerTimeseriesRaw{Float64}(time, bus, zeros(n), zeros(n), zeros(n))
 end
 
 # ============================================================
@@ -402,14 +373,6 @@ function Lirion._csv_parse_case(dir::String)::Lirion.CaseRaw
         isfile(p) && (case.switch = _switch_from_df(_read_csv(p)))
     end
 
-    let p = joinpath(d, "prosumer.csv")
-        isfile(p) && (case.prosumer = _prosumer_from_df(_read_csv(p)))
-    end
-
-    let p = joinpath(d, "consumer.csv")
-        isfile(p) && (case.consumer = _consumer_from_df(_read_csv(p)))
-    end
-
     let p = joinpath(d, "bus_name.csv")
         if isfile(p)
             df = _read_csv(p)
@@ -434,22 +397,6 @@ function Lirion._csv_parse_case(dir::String)::Lirion.CaseRaw
             end
         end
 
-        let p = joinpath(tdir, "consumer_timeseries.csv")
-            if isfile(p)
-                case.consumer_timeseries = _consumer_ts_from_df(_read_csv(p))
-                !isempty(case.consumer_timeseries.time) &&
-                    (case.T = max(case.T, maximum(case.consumer_timeseries.time)))
-            end
-        end
-
-        let p = joinpath(tdir, "prosumer_timeseries.csv")
-            if isfile(p)
-                case.prosumer_timeseries = _prosumer_ts_from_df(_read_csv(p))
-                !isempty(case.prosumer_timeseries.time) &&
-                    (case.T = max(case.T, maximum(case.prosumer_timeseries.time)))
-            end
-        end
-
         let p = joinpath(tdir, "gencost_timeseries.csv")
             if isfile(p)
                 case.gencost_timeseries = _gencost_ts_from_df(_read_csv(p))
@@ -457,9 +404,56 @@ function Lirion._csv_parse_case(dir::String)::Lirion.CaseRaw
                     (case.T = max(case.T, maximum(case.gencost_timeseries.time)))
             end
         end
+
+        let p = joinpath(tdir, "gen_timeseries.csv")
+            if isfile(p)
+                case.gen_timeseries = _gen_ts_from_df(_read_csv(p))
+                !isempty(case.gen_timeseries.time) &&
+                    (case.T = max(case.T, maximum(case.gen_timeseries.time)))
+            end
+        end
     end
 
     return case
 end
 
-end # module
+# ============================================================
+# LirionResult → CSV dump
+# ============================================================
+
+function Lirion.to_csvs(result::Lirion.LirionResult, outdir::AbstractString)
+    mkpath(outdir)
+
+    summary_df = DataFrame(
+        algorithm = [String(result.algorithm)],
+        base_model = [String(result.base_model)],
+        coupling = [String(result.coupling)],
+        sectioning = [String(result.sectioning)],
+        objective = [result.objective],
+        status = [String(result.status)],
+        solve_time = [result.solve_time],
+        iter_done = [result.iter_done === nothing ? -1 : result.iter_done],
+    )
+    CSV.write(joinpath(outdir, "summary.csv"), summary_df)
+
+    nrow(result.bus) > 0 && CSV.write(joinpath(outdir, "bus.csv"), result.bus)
+    nrow(result.gen) > 0 && CSV.write(joinpath(outdir, "gen.csv"), result.gen)
+    nrow(result.branch) > 0 && CSV.write(joinpath(outdir, "branch.csv"), result.branch)
+
+    if result.consensus !== nothing && nrow(result.consensus) > 0
+        CSV.write(joinpath(outdir, "consensus.csv"), result.consensus)
+    end
+    if result.zones !== nothing
+        for z in result.zones
+            zdir = joinpath(outdir, "zone_$(z.id)")
+            mkpath(zdir)
+            nrow(z.bus) > 0 && CSV.write(joinpath(zdir, "bus.csv"), z.bus)
+            nrow(z.gen) > 0 && CSV.write(joinpath(zdir, "gen.csv"), z.gen)
+            nrow(z.branch) > 0 && CSV.write(joinpath(zdir, "branch.csv"), z.branch)
+        end
+    end
+
+    return outdir
+end
+
+end

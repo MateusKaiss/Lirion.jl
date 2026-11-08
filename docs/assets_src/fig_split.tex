@@ -1,0 +1,28 @@
+\documentclass[border=5pt]{standalone}
+\input{preamble.tex}
+\begin{document}
+\begin{tikzpicture}
+% ---------------- Zone A (top): home zone, real boundary bus h ----------------
+\node[bus] (hA) at (1.1,2.2) {$h$};
+\draw[stub] (-0.15,2.33) -- (hA);
+\draw[stub] (-0.15,2.07) -- (hA);
+\node[zone, fit=(hA), inner xsep=20pt, inner ysep=12pt] (zA) {};
+\node[zlab, anchor=north east] at ([shift={(-3pt,-2pt)}]zA.north east) {Zone A \textup{(home)}};
+
+% ---------------- Zone B (bottom): owner zone, owns the whole branch ----------------
+\node[ghost] (hB) at (0.9,0.0) {$h$};
+\node[bus]   (iB) at (2.5,0.0) {$i$};
+\draw[branch] (hB) -- (iB);
+\draw[stub]   (iB) -- (3.45,0.0);
+\node[zone, fit=(hB)(iB), inner xsep=11pt, inner ysep=13pt] (zB) {};
+\node[zlab, anchor=south east] at ([shift={(-3pt,2pt)}]zB.south east) {Zone B \textup{(owner)}};
+
+% ---------------- consensus: state + injection ----------------
+\node[zbox] (zth) at (0.2,1.175) {$\bar\theta_h$};
+\node[zbox] (zinj) at (1.9,1.175) {$\textstyle\sum p_{\mathrm{inj}}=0$};
+\draw[couple] (hA) -- (zth);
+\draw[couple] (hB) -- (zth);
+\draw[couple] (hA) -- (zinj);
+\draw[couple] (hB) -- (zinj);
+\end{tikzpicture}
+\end{document}

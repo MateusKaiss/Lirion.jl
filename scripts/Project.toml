@@ -1,8 +1,0 @@
-[deps]
-Arpack = "7d9fca2a-8960-54d3-9f78-7d1dccf2cb97"
-Glob = "c27321d9-0574-5035-807b-f59d2c89b15c"
-Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
-Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
-Lirion = "39f2d509-5c07-4bae-a810-f080f7bd369c"
-SimpleWeightedGraphs = "47aef6b3-ad0c-573a-a1e2-d07658019622"
-Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"

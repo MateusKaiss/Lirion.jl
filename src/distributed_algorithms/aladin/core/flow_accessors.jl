@@ -42,3 +42,25 @@ end
     end
     return acc
 end
+
+@inline function _socwr_dummy_flow_value_at_y(
+    pair::DummyLinePairSOCWR,
+    y::Vector{Float64},
+    side::Symbol,   # :i or :j
+    which::Symbol,  # :p or :q
+)::Float64
+    if side === :i
+        cols = pair.cols_i
+        coefs = which === :p ? pair.pcoef_i : pair.qcoef_i
+        const_val = which === :p ? pair.pconst_i : pair.qconst_i
+    else
+        cols = pair.cols_j
+        coefs = which === :p ? pair.pcoef_j : pair.qcoef_j
+        const_val = which === :p ? pair.pconst_j : pair.qconst_j
+    end
+    acc = const_val
+    @inbounds for i in eachindex(cols)
+        acc += coefs[i] * y[cols[i]]
+    end
+    return acc
+end

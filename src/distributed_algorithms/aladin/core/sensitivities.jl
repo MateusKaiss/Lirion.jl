@@ -35,10 +35,14 @@ end
 
 const _BOUND_DETECT_MODE = Ref(:primal)
 
+# Box-bound activity test shared by every model; recorded in aladin_runtime_manifest().
+const _BOUND_DETECT_TOL = 1e-6
+const _BOUND_DETECT_DUAL_TOL = 1e-3
+
 function detect_active_bounds!(
     zone::AbstractAladinZoneData;
-    tol::Float64 = 1e-6,
-    dual_tol::Float64 = 1e-3,
+    tol::Float64 = _BOUND_DETECT_TOL,
+    dual_tol::Float64 = _BOUND_DETECT_DUAL_TOL,
 )
     active = zone.active_bound_cols
     empty!(active)

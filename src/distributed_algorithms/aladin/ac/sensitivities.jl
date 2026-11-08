@@ -6,7 +6,8 @@
 # AC cost expression
 # ============================================================
 
-function _build_ac_cost_expr(zone::AladinZoneDataAC)
+# Shared by AC and the SOCWRNL exact-Hessian path (explicit Union keeps DC zones out).
+function _build_ac_cost_expr(zone::Union{AladinZoneDataAC, AladinZoneDataSOCWR})
     parts = Any[]
     @inbounds for k in eachindex(zone.pg_cols)
         col = zone.pg_cols[k]
@@ -46,23 +47,16 @@ end
 end
 
 # Modified gradient (HFD Algorithm 2, step 3): gᵢ = ∇fᵢ(yᵢ) + (Cᵢ* − Cᵢ)ᵀκᵢ.
-# Cᵢ (what the QP enforces as CᵢΔy=0) excludes inequality rows with |dual| ≤
-# dual_tol and bounds missed by detect_active_bounds!. Each excluded row with a
-# nonzero multiplier leaves an uncorrected κⱼ∇hⱼ term in the coordinator's
-# effective gradient; the resulting spurious fixed point sustains
-# (H+ρΣ)(y−x) = −C_missingᵀκ_missing ≠ 0, i.e. an estac floor (observed 0.5-26
-# on case14 dummy/split/state cells after :primal_dual, 2026-07-28). Enabling
-# this adds the paper's correction for those rows to the QP's linear term.
-# NOTE: putting weak rows INTO C instead is wrong (over-constrains: measured
-# 10-1000× estac degradation with dual_tol=1e-6) — the paper's remedy is the
-# gradient correction, not set inflation.
 const _MODIFIED_GRADIENT = Ref(false)
 
-# Weak-row floor: rows with |dual| in (floor, dual_tol] enter the evaluator so
-# their Jacobians are available for the gradient correction (not for C).
+# Weak-row floor: rows with |dual| in (floor, dual_tol] enter the evaluator (not C).
 const _MODGRAD_DUAL_FLOOR = 1e-9
 
-function _build_ac_evaluator(zone::AladinZoneDataAC, dual_tol::Float64)
+# Shared with the SOCWRNL exact-Hessian path (see `_build_ac_cost_expr`).
+function _build_ac_evaluator(
+    zone::Union{AladinZoneDataAC, AladinZoneDataSOCWR},
+    dual_tol::Float64,
+)
     model = zone.local_model
     has_duals = JuMP.has_duals(model)
     modgrad = _MODIFIED_GRADIENT[] && has_duals
@@ -109,8 +103,7 @@ end
 # Active-constraint Jacobian
 # ============================================================
 
-# Returns (C̃ dep-trimmed from STRONG rows, modified-gradient correction vector
-# Σ_weak κⱼ∇hⱼ from WEAK rows — zeros unless _MODIFIED_GRADIENT is on).
+# Returns (C̃ from strong rows, gradient correction Σ_weak κⱼ∇hⱼ from weak rows).
 function _extract_active_jacobian_ac(
     evaluator,
     rows::Vector{JuMP.ConstraintRef},
@@ -138,8 +131,7 @@ function _extract_active_jacobian_ac(
 
     sidx = findall(strong)
     widx = findall(!, strong)
-    # weak rows: gradient correction (internal Lagrangian sign, matching the
-    # Hessian's y_duals = -dual convention): g_corr = Σ (-dualⱼ)·∇hⱼ
+    # weak rows: g_corr = Σ (-dualⱼ)·∇hⱼ (internal Lagrangian sign)
     Ct = SparseArrays.sparse(C_all')          # n_vars × n_rows, column = row grad
     rv = SparseArrays.rowvals(Ct)
     nz = SparseArrays.nonzeros(Ct)
@@ -165,6 +157,8 @@ function _extract_lagrangian_hessian_ac(
     n_vars::Int,
 )::SparseArrays.SparseMatrixCSC{Float64, Int}
     H_struct = MOI.hessian_lagrangian_structure(evaluator)
+    # the symmetrisation below assumes lower-triangular structure entries
+    @assert all(t -> t[1] >= t[2], H_struct) "MOI Hessian structure has upper-triangular entries; the lower-triangle symmetrisation in _extract_lagrangian_hessian_ac would double-count them"
     V_H = zeros(length(H_struct))
     y_duals = Float64[-JuMP.dual(ci) for ci in rows]
     if !isempty(H_struct)
@@ -224,6 +218,9 @@ end
 # Orchestrator
 # ============================================================
 
+# Canonical-QP toggle: B_i ≈ ∇²L_i only (HFD Alg. 2), without the proximal ρΣ term.
+const _AC_QP_NO_PROX = Ref(false)
+
 function refresh_sensitivities_ac!(
     zone::AladinZoneDataAC;
     rho::Float64 = 0.0,
@@ -266,15 +263,17 @@ function refresh_sensitivities_ac!(
         end
     end
     H = _extract_lagrangian_hessian_ac(evaluator, rows, y, n_vars)
-    
-    _add_prox_curvature_ac!(
-        H, zone, rho;
-        sigma_theta = sigma_theta,
-        sigma_vm = sigma_vm,
-        sigma_pg = sigma_pg,
-        sigma_qg = sigma_qg,
-        sigma_other = sigma_other,
-    )
+
+    if !_AC_QP_NO_PROX[]
+        _add_prox_curvature_ac!(
+            H, zone, rho;
+            sigma_theta = sigma_theta,
+            sigma_vm = sigma_vm,
+            sigma_pg = sigma_pg,
+            sigma_qg = sigma_qg,
+            sigma_other = sigma_other,
+        )
+    end
     n_vars > 0 && _add_tikhonov_ac!(H, n_vars)
     zone.hess = H
     return nothing
@@ -338,7 +337,8 @@ function _add_flow_gn_curvature_ac(
 
     @inbounds for pair in ws.dummy_line_pairs
         if pair.zone_i == zone_pos
-            lin = _dummy_ac_flow_linearisation(
+            # half-A: the flow proximal is on the TO-side flow; use the same linearisation
+            lin = _dummy_ac_flow_linearisation_to(
                 zone.y, pair.from_theta_col_i, pair.to_theta_col_i,
                 pair.from_vm_col_i, pair.to_vm_col_i,
                 pair.g_i, pair.b_i, pair.b_sh_i, pair.inv_tap_i, pair.tap_angle_i)
@@ -364,6 +364,19 @@ function _add_flow_gn_curvature_ac(
     return H + SparseArrays.sparse(I, J, V, n, n)
 end
 
+# ------------------------------------------------------------
+# PSD-safeguard mode (LIRION_AC_PSD_MODE ∈ {shift, flip, clip})
+# ------------------------------------------------------------
+function _resolve_ac_psd_mode()
+    raw = get(ENV, "LIRION_AC_PSD_MODE", "shift")
+    s = lowercase(strip(raw))
+    s == "shift" && return :shift
+    s == "flip" && return :flip
+    s == "clip" && return :clip
+    error("LIRION_AC_PSD_MODE=$(repr(raw)) is invalid; use one of shift|flip|clip")
+end
+const _PSD_MODE = Ref{Symbol}(_resolve_ac_psd_mode())
+
 function _ensure_psd_ac!(
     H::SparseArrays.SparseMatrixCSC{Float64, Int};
     margin::Float64 = 1e-4,
@@ -380,6 +393,36 @@ function _ensure_psd_ac!(
     # Cheap path: already PD -> no shift (avoid over-regularizing the common case).
     if (try; LinearAlgebra.cholesky(LinearAlgebra.Symmetric(H)); true; catch; false; end)
         return H
+    end
+    # Spectral safeguard (:flip / :clip), dense-eigen branch only; returns a new matrix.
+    mode = _PSD_MODE[]
+    if mode !== :shift && n <= 800
+        F = LinearAlgebra.eigen(LinearAlgebra.Symmetric(Matrix(H)))
+        lam = F.values
+        eps_floor = margin * max(1.0, maximum(abs, lam))   # same 1e-4·max(1,|λ|) scale as the shift margin
+        lam_new = similar(lam)
+        if mode === :flip
+            @inbounds for i in eachindex(lam)
+                a = abs(lam[i])
+                lam_new[i] = a < eps_floor ? eps_floor : a
+            end
+        else  # :clip
+            @inbounds for i in eachindex(lam)
+                lam_new[i] = lam[i] < eps_floor ? eps_floor : lam[i]
+            end
+        end
+        Hd = F.vectors * LinearAlgebra.Diagonal(lam_new) * transpose(F.vectors)
+        Hd = (Hd .+ transpose(Hd)) .* 0.5           # kill round-off asymmetry
+        corr = 0.0
+        @inbounds for i in eachindex(lam)
+            corr = max(corr, lam_new[i] - lam[i])
+        end
+        if corr > 0.0
+            lock(_PSD_DELTA_LOCK) do
+                _PSD_DELTA_LAST[] = max(_PSD_DELTA_LAST[], corr)
+            end
+        end
+        return SparseArrays.sparse(Hd)
     end
     delta = 0.0
     if n <= 800
@@ -452,6 +495,6 @@ function refresh_lagrangian_hessian!(
             ws.sigma_pflow, ws.sigma_qflow,
         )
     end
-    _ensure_psd_ac!(zone.hess)
+    zone.hess = _ensure_psd_ac!(zone.hess)   # :flip/:clip return a new matrix
     return nothing
 end

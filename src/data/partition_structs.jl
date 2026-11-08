@@ -50,9 +50,7 @@ Base.@kwdef mutable struct PartitionDC <: AbstractPartition
     theta_buf::Vector{Float64} = Float64[]
     theta_shared_buf::Vector{Float64} = Float64[]
 
-    # Local subproblem (LP) — solved by Ipopt each ALADIN iteration. Persistent
-    # across iterations (only objective is updated). Distinct from the coordinator
-    # QP built on-the-fly in _build_qp_skeleton and solved by OSQP.
+    # local subproblem (LP)
     local_model::Union{Nothing, JuMP.Model} = nothing
     theta_var::Union{Nothing, JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}} = nothing
 
@@ -95,9 +93,7 @@ Base.@kwdef mutable struct PartitionAC <: AbstractPartition
     v_mag_buf::Vector{Float64} = Float64[]
     v_mag_shared_buf::Vector{Float64} = Float64[]
 
-    # Local subproblem (NLP) — solved by Ipopt each ALADIN iteration. Persistent
-    # across iterations (only objective is updated). Distinct from the coordinator
-    # QP built on-the-fly in _build_qp_skeleton and solved by OSQP.
+    # local subproblem (NLP)
     local_model::Union{Nothing, JuMP.Model} = nothing
     theta_var::Union{Nothing, JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}} = nothing
     v_mag_var::Union{Nothing, JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}} = nothing
@@ -123,6 +119,9 @@ Base.@kwdef mutable struct PartitionSOCWR <: AbstractPartition
     id::Int
     position::Int = 0
 
+    # W-space model for the zone subproblem (SOCWR or SOCWRNL)
+    zone_model::Type{<:OPFModel} = SOCWR
+
     # source data
     bus::BusData
     branch::BranchData
@@ -140,9 +139,7 @@ Base.@kwdef mutable struct PartitionSOCWR <: AbstractPartition
     v2_buf::Vector{Float64} = Float64[]
     v2_shared_buf::Vector{Float64} = Float64[]
 
-    # Local subproblem (SOCP) — solved by Ipopt each ALADIN iteration. Persistent
-    # across iterations (only objective is updated). Distinct from the coordinator
-    # QP built on-the-fly in _build_qp_skeleton and solved by OSQP.
+    # local subproblem (SOCP)
     local_model::Union{Nothing, JuMP.Model} = nothing
     v2_var::Union{Nothing, JuMP.Containers.DenseAxisArray{JuMP.VariableRef, 2}} = nothing
 

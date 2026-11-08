@@ -17,7 +17,9 @@ using MathOptInterface
 using Clarabel
 
 const MOI = MathOptInterface
-const _FAST_USE_LOGS = true
+
+# progress logs off unless LIRION_VERBOSE=true
+const _FAST_USE_LOGS = get(ENV, "LIRION_VERBOSE", "false") == "true"
 
 function __init__()
     if _FAST_USE_LOGS
@@ -138,6 +140,9 @@ include("modeling/power_balance/dispatch.jl")
 include("modeling/objective/generation_cost.jl")
 include("modeling/objective/dispatch.jl")
 
+# --- SOCWRNL (after the per-stage dispatch files)
+include("modeling/branch/socwrnl.jl")
+
 # --- builder/solver
 include("modeling/build_model.jl")
 include("modeling/solve_model.jl")
@@ -202,6 +207,8 @@ include("distributed_algorithms/aladin/dc/coordinator_qp.jl")
 include("distributed_algorithms/aladin/dc/line_search.jl")
 
 include("distributed_algorithms/aladin/ac/zone_data.jl")
+# socwr/zone_data.jl must precede ac/sensitivities.jl (AladinZoneDataSOCWR)
+include("distributed_algorithms/aladin/socwr/zone_data.jl")
 include("distributed_algorithms/aladin/ac/sensitivities.jl")
 include("distributed_algorithms/aladin/ac/active_set.jl")
 include("distributed_algorithms/aladin/ac/pairs.jl")
@@ -211,7 +218,6 @@ include("distributed_algorithms/aladin/ac/objective.jl")
 include("distributed_algorithms/aladin/ac/coordinator_qp.jl")
 include("distributed_algorithms/aladin/ac/line_search.jl")
 
-include("distributed_algorithms/aladin/socwr/zone_data.jl")
 include("distributed_algorithms/aladin/socwr/sensitivities.jl")
 include("distributed_algorithms/aladin/socwr/active_set.jl")
 include("distributed_algorithms/aladin/socwr/pairs.jl")
@@ -236,6 +242,7 @@ include("distributed_algorithms/shared/logging.jl")
 
 include("distributed_algorithms/aladin/core/branch_c.jl")
 
+include("distributed_algorithms/admm/core/warmstart.jl")
 include("distributed_algorithms/admm/run.jl")
 include("distributed_algorithms/aladin/run.jl")
 
@@ -274,7 +281,7 @@ end
 # Public exports
 # ============================================================
 export solve, load_inputs,
-    dc, ac, acr, ivr, lpac, socwr, qc, sdpwrm, socbf, bfa, nfa,
+    dc, ac, acr, ivr, lpac, socwr, socwrnl, qc, sdpwrm, socbf, bfa, nfa,
     centralized, admm, aladin,
     create_partition, write_matpower,
     LirionResult, to_csvs

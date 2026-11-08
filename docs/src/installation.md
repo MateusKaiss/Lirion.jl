@@ -48,6 +48,8 @@ However, if no solver is explicitly specified, Lirion automatically selects a de
 
 These default solvers are installed automatically as dependencies when Lirion is installed.
 
+For distributed solves, ALADIN adds one more default: the coordination QP that links the zones runs on `Clarabel`, unless you override it with `qp_optimizer` (see [ALADIN settings](usage/distributed/aladin.md)).
+
 ---
 
 ## Install a Solver and Other Popular Solvers
@@ -60,7 +62,7 @@ Pkg.add("HiGHS")
 ```
 In the following sections of this documentation, we will show how to use both the default and custom-installed solvers with Lirion’s centralized and distributed OPF formulations.
 
-Below is a non-exhaustive list of well-known solvers compatible with the Julia optimization ecosystem:
+Below is a list of well-known solvers compatible with the Julia optimization ecosystem:
 
 | Solver | Julia Package | License | Typical Use |
 |--------|--------------|----------|------------|

@@ -49,4 +49,18 @@ test/*/*.toml
 *.out
 *.jlser
 *.xml
-Manifest.toml
+
+# Curated paper artifacts are versioned (override the broad *.csv above).
+# Scratch stays under paper/results/ (ignored via **/results/).
+!paper/artifacts/
+!paper/artifacts/**
+!paper/artifacts/**/*.csv
+!paper/reproduction/**/*.csv
+
+# Editor / tool scratch
+*.bak
+
+# Local analysis scratch (probes, diagnostics and intermediate scripts live
+# here and are never versioned; permanent findings go into the docs/paper)
+**/scratch/
+/Manifest.toml
