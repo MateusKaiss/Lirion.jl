@@ -64,6 +64,18 @@ Each inter-zonal branch is cut at its midpoint by inserting one auxiliary (dummy
 
 so the two half-line flows meet (continuity through ``D``). Under `:power` only the flow row ``p_D`` is reconciled; `:hybrid` adds the state row ``\theta_D`` shown above. Because the defining shared quantity is a flow, dummy-bus needs a coupling that carries power and is never used with `:state`. It introduces variables the overlap method does not, which is the price of a cleaner cut.
 
+!!! note "What dummy-bus changes"
+    Eliminating ``D`` by Kron reduction reproduces the original branch's flow
+    equations exactly, but the cut does not preserve every limit. The original
+    angle and thermal bounds are applied to each half-line, so a bound meant for
+    the whole branch now constrains each half, and the thermal check on the
+    half-line flow leaves out the charging moved to the endpoints. The dummy bus
+    ``D`` also carries a fixed voltage band. On the W-space models (SOCWR, SOCWRNL)
+    the Jabr lifting does not commute with the reduction, so dummy-bus relaxes those
+    models further, even under `:hybrid`. None of this binds when no tie-line limit
+    is active, as in the shipped cases, but it is why dummy-bus reformulates the cut
+    rather than reproducing it.
+
 ### Split-bus (`:split_bus`)
 
 ```@raw html
@@ -92,6 +104,18 @@ Sectioning fixes *where* the copies live; coupling fixes *which* boundary quanti
 - `:state` reconciles the boundary-bus voltage state.
 - `:power` reconciles the boundary branch flows.
 - `:hybrid` reconciles both.
+
+!!! note "Power coupling solves a relaxation"
+    State and hybrid keep the full boundary coupling, so the decomposed problem is
+    the centralized one split across regions. Power coupling keeps less. It
+    reconciles the boundary flow and leaves each region's boundary voltage and
+    angle free, so it drops the voltage and angle continuity across the cut, and in
+    AC the equality between a bus's voltage and the copy its neighbour holds. The
+    coupled problem is then a relaxation of the centralized OPF, not a partition of
+    it. For a convex model its optimum is a lower bound on the centralized cost, and
+    the merged boundary state it returns need not satisfy the original nodal
+    balance. Use power coupling when the regions cannot share their full state, and
+    read its objective against the relaxed problem rather than the centralized one.
 
 What "state" and "power" mean is model-dependent, which is the subject of the next section. Not every coupling works with every sectioning: `:state` needs the shared buses that only `:tie_line` keeps; `:dummy_bus` reconciles a flow, so it needs `:power` or `:hybrid`; `:split_bus` needs `:hybrid`. The full matrix, including the ALADIN + SOCWR exception, is in [the Getting Started page](../../usage/distributed/coupling_sectioning.md#Supported-combinations).
 
