@@ -91,7 +91,7 @@ This is the full matrix. A ✓ is a combination you can run; a ✗ raises an `Ar
 | `:hybrid` | `:dummy_bus` | ✓ | ✓ (✗ for SOCWR) |
 | `:hybrid` | `:split_bus` | ✓ | ✓ |
 
-The **ADMM** column is the same for every model (DC, AC, SOCWR). The **ALADIN** column is the same for DC and AC; the two "(✗ for SOCWR)" cells are where ALADIN on the SOCWR model is more restrictive, as explained below.
+The **ADMM** column is the same for every model (DC, AC, SOCWR, SOCWRNL). The **ALADIN** column is the same for DC, AC, and SOCWRNL; the two "(✗ for SOCWR)" cells are where ALADIN on the conic SOCWR model is more restrictive, as explained below.
 
 Read as rules:
 

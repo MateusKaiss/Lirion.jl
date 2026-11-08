@@ -1,13 +1,8 @@
-# docs/Project.toml — STAGING SCAFFOLD for the Lirion.jl documentation build.
+# docs/Project.toml — environment for the Lirion.jl documentation build.
 #
-# Mirrors the original docs/Project.toml (Documenter only) and adds
-# DocumenterCitations for the bibliography (refs.bib). As in the original
-# setup, Lirion itself is NOT listed as a dependency here: the docs
-# environment is expected to `Pkg.develop(path="..")` the parent package,
-# which is what makes `using Lirion` resolve during the build.
-#
-# For reference, the parent package is:
-#   Lirion = "39f2d509-5c07-4bae-a810-f080f7bd369c"  (v0.1.0, Mateus Kaiss)
+# Lirion itself is not listed as a dependency: the docs environment develops
+# the parent package (Pkg.develop(path="..")), which is what makes
+# `using Lirion` resolve during the build.
 
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"

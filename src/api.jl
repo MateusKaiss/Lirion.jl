@@ -3,23 +3,46 @@
 # ============================================================
 
 """
-    dc(), ac(), acr(), ivr(), lpac(), socwr(), socwrnl(), qc(), sdpwrm(), socbf(), bfa(), nfa()
+    dc()
 
-The twelve formulation builders. Each returns the model type you hand to `solve`
-through the `model` keyword, e.g. `solve(case; model = ac())`. See the Theory and
-Getting Started pages for what each one solves.
+DC linear active-power approximation (LP). Hand the result to `solve`'s `model`
+keyword: `solve(case; model = dc())`. The other eleven builders (`ac`, `acr`,
+`ivr`, `lpac`, `socwr`, `socwrnl`, `qc`, `sdpwrm`, `socbf`, `bfa`, `nfa`) follow
+the same pattern; the Theory pages cover what each one solves.
 """
 dc() = DC
+
+"AC optimal power flow in polar coordinates (NLP)."
 ac() = AC
+
+"AC optimal power flow in rectangular coordinates (NLP)."
 acr() = ACR
+
+"Current-voltage rectangular AC formulation (NLP)."
 ivr() = IVR
+
+"LP-based AC approximation (QCQP)."
 lpac() = LPAC
+
+"W-rectangular second-order-cone relaxation, Jabr (SOCP)."
 socwr() = SOCWR
+
+"Smooth-NLP form of the SOCWR relaxation (NLP)."
 socwrnl() = SOCWRNL
+
+"Quadratic-convex relaxation (QCQP)."
 qc() = QC
+
+"Semidefinite W-matrix relaxation (SDP)."
 sdpwrm() = SDPWRM
+
+"Branch-flow second-order-cone relaxation (SOCP)."
 socbf() = SOCBF
+
+"Linearized branch-flow approximation / LinDistFlow (LP)."
 bfa() = BFA
+
+"Network-flow approximation, active power only (LP)."
 nfa() = NFA
 
 # ============================================================

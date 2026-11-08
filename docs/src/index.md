@@ -20,8 +20,8 @@ Centralized, Lirion covers a wide range of models. The exact AC formulation come
 The documentation has two main parts, plus supporting material:
 
 - **[Getting Started](installation.md)** is the practical side: how to run each centralized model, how to pick a solver, the tunable settings, the distributed workflow with ADMM and ALADIN, and how to read the results.
-- **[Theory](teoria/exatas/ac_polar.md)** is the mathematics behind every formulation, centralized and distributed, including how a distributed problem is cut into zones and coupled at the boundary. These pages are written from the study notes Mateus Kaiss kept throughout his studies.
-- **[Performance](performance.md)** collects the benchmark results, and **[References](references.md)** is the bibliography.
+- **[Theory](teoria/exatas/ac_polar.md)** is the mathematics behind the formulations, and how a distributed problem is cut into zones and coupled at the boundary. These pages are written from the study notes Mateus Kaiss kept throughout his studies.
+- **[Performance](performance.md)** covers threading and getting the most from your machine, and **[References](references.md)** is the bibliography.
 
 ## Centralized Models
 

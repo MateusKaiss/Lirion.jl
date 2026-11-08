@@ -29,9 +29,9 @@ Tables (DataFrames, mirror the input matpower schema):
 Distributed extras (`nothing` for centralized):
 - `zones`     : `Vector{NamedTuple}` with one entry per zone, each holding
                 `(id, bus, gen, branch, cost)`
-- `consensus` : DataFrame summarising boundary variables — one row per
-                consensus slot with columns `(variable, zone_i, zone_j,
-                value_i, value_j, residual)`
+- `consensus` : DataFrame of boundary variables in long format — one row
+                per (variable, element, zone), with columns `(variable,
+                bus_id, branch_id, zone, value, consensus, deviation)`
 
 Internals (advanced use):
 - `model`       : JuMP model (centralized) or `nothing`

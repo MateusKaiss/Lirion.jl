@@ -2,8 +2,7 @@
 
 !!! warning "Under construction"
     Placeholder page. Distributed OPF via **ALADIN** will be documented here
-    (local subproblems + coordinator QP, globalizations). Content to be
-    ported from the Obsidian vault (`03 - Algoritmos Distribuídos`).
+    (local subproblems + coordinator QP, globalizations).
 
 Augmented Lagrangian Alternating Direction Inexact Newton [Houska2016](@cite).
 

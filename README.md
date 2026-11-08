@@ -49,7 +49,7 @@ It provides:
 > **Supported combinations.**
 > - **`:state`** — works only with `:tie_line`
 > - **`:power`** — works with `:tie_line`, or with `:dummy_bus` for DC / AC / SOCWRNL (the conic **SOCWR** does not support `:dummy_bus` under ALADIN)
-> - **`:hybrid`** — works with all three (`:tie_line`, `:dummy_bus`, `:split_bus`), except the conic **SOCWR**, which does not support `:dummy_bus` (its smooth sibling **SOCWRNL** does)
+> - **`:hybrid`** — works with all three (`:tie_line`, `:dummy_bus`, `:split_bus`), except the conic **SOCWR**, which does not support `:dummy_bus` under ALADIN (its smooth sibling **SOCWRNL** does)
 
 ---
 
@@ -256,10 +256,10 @@ On Windows PowerShell, set `$env:JULIA_NUM_THREADS = $env:NUMBER_OF_PROCESSORS` 
 three BLAS variables to `"1"`. These counts are logical CPUs (hyperthreads included),
 which is what you want here: one Julia thread per zone.
 
-Lirion scopes BLAS to one thread for the whole distributed solve (so the variables above
-are belt-and-suspenders) and logs `[Lirion] Threads: Julia=N | BLAS=M` on load so you can
-check it took. For the rationale and verification tips, see the **Performance & Threading**
-page in the documentation.
+Lirion scopes BLAS to one thread for the whole distributed solve, so the variables above
+are belt-and-suspenders. Call `Lirion.threadinfo()` to print the Julia, BLAS, and CPU
+thread counts and check it took. For the rationale and verification tips, see the
+**Performance & Threading** page in the documentation.
 
 ---
 
@@ -272,7 +272,7 @@ distributed workflows, solver configuration, worked examples, and the API refere
 
 The **theory** half builds each model from the ground up instead of just listing it.
 It grows out of the master's research (still ongoing) of the lead developer,
-Mateus Kaiss, and derives every formulation from first principles:
+Mateus Kaiss, and works through the formulations from first principles:
 
 - the **twelve OPF formulations** (DC, AC, ACR, IVR, LPAC, SOCWR, SOCWRNL, QC, SDPWRM,
   SOCBF, BFA, NFA), and where each one comes from;

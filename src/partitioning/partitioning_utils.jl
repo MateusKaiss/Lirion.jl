@@ -193,7 +193,6 @@ end
             bus.qd[i] = 0.0
             bus.gs[i] = 0.0
             bus.bs[i] = 0.0
-            # bus.bus_type[i] = 1
         end
     end
 

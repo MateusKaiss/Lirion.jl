@@ -90,7 +90,7 @@ result.consensus        # boundary-variable agreement
 result.diagnostics      # convergence history
 ```
 
-A distributed run's `status` is `:converged`, `:stalled` (it stopped making progress short of convergence), or `:iteration_limit` (it reached `max_iter`), taken from the algorithm's own termination rather than a solver.
+A distributed run's `status` is `:converged`, `:iteration_limit` (it reached `max_iter`), or, for ALADIN, `:stalled` (it stopped making progress short of convergence), taken from the algorithm's own termination rather than a solver.
 
 The top-level `bus`, `gen`, and `branch` are the reconciled network. Shared buses have their voltage columns averaged across the zones that see them, and a tie-line split across zones is fused back into a single row. The merged branch table keys on `branch_id_global`, the branch's index in the original pre-partition case.
 

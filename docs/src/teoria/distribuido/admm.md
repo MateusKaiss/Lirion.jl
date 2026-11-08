@@ -3,8 +3,7 @@
 !!! warning "Under construction"
     Placeholder page. Distributed OPF via **ADMM** will be documented here
     (couplings `:state` / `:power` / `:hybrid`, sectioning `:tie_line` /
-    `:dummy_bus` / `:split_bus`). Content to be ported from the Obsidian
-    vault (`03 - Algoritmos Distribuídos`).
+    `:dummy_bus` / `:split_bus`).
 
 Alternating Direction Method of Multipliers [Boyd2011](@cite).
 
