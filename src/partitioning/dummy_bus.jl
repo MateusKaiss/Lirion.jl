@@ -48,18 +48,20 @@ function prepare_distributed_partitions(full::CaseRaw, ::DummyBus)
         x_h = br.br_x[b] / 2.0
         b_c = br.br_b[b]                       # total π line charging (p.u.)
         has_xfmr = (br.tap[b] != 0.0) || (br.shift[b] != 0.0)
+        ang_lo_h = br.angmin[b] / 2.0
+        ang_hi_h = br.angmax[b] / 2.0
 
         _push_branch!(br, f_orig, dummy_id, r_h, x_h, 0.0,
             br.rate_a[b], br.rate_b[b], br.rate_c[b],
             has_xfmr ? br.tap[b] : 0.0,
             has_xfmr ? br.shift[b] : 0.0,
-            br.angmin[b], br.angmax[b])
+            ang_lo_h, ang_hi_h)
         push!(half_a_globals, length(br.f_bus))
 
         _push_branch!(br, dummy_id, t_orig, r_h, x_h, 0.0,
             br.rate_a[b], br.rate_b[b], br.rate_c[b],
             0.0, 0.0,
-            br.angmin[b], br.angmax[b])
+            ang_lo_h, ang_hi_h)
         push!(half_b_globals, length(br.f_bus))
 
         tap_mag = br.tap[b] == 0.0 ? 1.0 : br.tap[b]
